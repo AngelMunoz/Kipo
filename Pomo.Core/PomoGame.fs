@@ -13,7 +13,14 @@ open FSharp.Data.Adaptive
 open FSharp.UMX
 
 open Pomo.Core.Localization
-open Pomo.Core.Pombo
+open Pomo.Core
+open Pomo.Core.Domain
+open Pomo.Core.Domain.EventBus
+open Pomo.Core.Domain.Systems
+open Pomo.Core.Domains
+open Pomo.Core.Domains.StateUpdate
+open Pomo.Core.Domains.Movement
+
 
 type PomoGame() as this =
   inherit Game()
@@ -27,16 +34,13 @@ type PomoGame() as this =
     || OperatingSystem.IsLinux()
     || OperatingSystem.IsMacOS()
 
-  let eventBus = new Events.EventBus()
+  let eventBus = new EventBus()
 
   // 1. Create both the mutable source of truth and the public read-only view.
   let struct (mutableWorld, worldView) = World.create()
 
   do
-    base.Services.AddService(
-      typeof<GraphicsDeviceManager>,
-      graphicsDeviceManager
-    )
+    base.Services.AddService<GraphicsDeviceManager> graphicsDeviceManager
 
     base.Content.RootDirectory <- "Content"
 
@@ -44,18 +48,13 @@ type PomoGame() as this =
       DisplayOrientation.LandscapeLeft ||| DisplayOrientation.LandscapeRight
 
     // 2. Register global services that all systems can safely access.
-    base.Services.AddService<Events.EventBus>(eventBus)
+    base.Services.AddService<EventBus> eventBus
     //    Only the READ-ONLY world view is registered, preventing accidental write access.
-    base.Services.AddService<World.World>(worldView)
+    base.Services.AddService<World.World> worldView
 
     // 3. Instantiate and add game components (systems).
-    //    Inject the mutableWorld via constructor to ensure it remains private.
-    let stateUpdater = new Systems.StateUpdateSystem(this, mutableWorld)
-    //    Ensure the state updater runs *after* all other systems.
-    stateUpdater.UpdateOrder <- 1000
-
-    base.Components.Add(new Systems.MovementSystem(this))
-    base.Components.Add(stateUpdater)
+    base.Components.Add(new MovementSystem(this))
+    base.Components.Add(new StateUpdateSystem(this, mutableWorld))
 
   override this.Initialize() =
     base.Initialize()
@@ -68,26 +67,15 @@ type PomoGame() as this =
   // Load game content here
   // e.g., this.Content.Load<Texture2D>("textureName")
 
-  override this.Update(gameTime) =
-
-    let state =
-      GamePad.GetState(PlayerIndex.One).Buttons.Back = ButtonState.Pressed
-      || Keyboard.GetState().IsKeyDown(Keys.Escape)
-
-    if state then
-      this.Exit()
-
-    else
-      // Update game logic here
-      // e.g., update game entities, handle input, etc.
-      // This call now triggers MovementSystem (publishes events) and then
-      // StateUpdateSystem (drains event queue and modifies state).
-      base.Update(gameTime)
+  override this.Update gameTime =
+    // Update game logic here
+    // e.g., update game entities, handle input, etc.
+    // This call now triggers MovementSystem (publishes events) and then
+    // StateUpdateSystem (drains event queue and modifies state).
+    base.Update gameTime
 
 
-  override this.Draw(gameTime) =
-
-    base.GraphicsDevice.Clear(Color.MonoGameOrange)
+  override this.Draw gameTime =
+    base.GraphicsDevice.Clear Color.MonoGameOrange
     // Draw game content here
-
-    base.Draw(gameTime)
+    base.Draw gameTime
