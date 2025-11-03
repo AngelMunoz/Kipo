@@ -1,0 +1,17 @@
+<Solution>
+  <Configurations>
+    <Platform Name="Any CPU" />
+    <Platform Name="x64" />
+  </Configurations>
+  <Folder Name="/Platforms/">
+    <Project Path="Pomo.DesktopGL/Pomo.DesktopGL.fsproj" />
+    <Project Path="Pomo.WindowsDX/Pomo.WindowsDX.fsproj" />
+    <Project Path="Pomo.Android/Pomo.Android.fsproj">
+      <Deploy />
+    </Project>
+    <Project Path="Pomo.iOS/Pomo.iOS.fsproj">
+      <Deploy />
+    </Project>
+  </Folder>
+  <Project Path="Pomo.Core/Pomo.Core.fsproj" />
+</Solution>
