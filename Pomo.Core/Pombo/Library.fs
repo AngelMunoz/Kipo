@@ -39,7 +39,7 @@ module World =
   }
 
   let create() =
-    let mutableWorld = {
+    let mutableWorld: MutableWorld = {
       Time = cval TimeSpan.Zero
       Positions = cmap()
       Velocities = cmap()

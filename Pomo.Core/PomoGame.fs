@@ -30,7 +30,7 @@ type PomoGame() as this =
   let eventBus = new Events.EventBus()
 
   // 1. Create both the mutable source of truth and the public read-only view.
-  let mutableWorld, worldView = World.create()
+  let struct (mutableWorld, worldView) = World.create()
 
   do
     base.Services.AddService(
