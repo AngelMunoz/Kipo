@@ -15,13 +15,17 @@ open FSharp.UMX
 open Pomo.Core.Localization
 open Pomo.Core
 open Pomo.Core.Domain
+open Pomo.Core.Domain.Action
 open Pomo.Core.Domain.EventBus
 open Pomo.Core.Domain.Systems
 open Pomo.Core.Domains
-open Pomo.Core.Domains.Input
 open Pomo.Core.Domains.StateUpdate
 open Pomo.Core.Domains.Movement
 open Pomo.Core.Domains.Render
+open Pomo.Core.Domains.RawInput
+open Pomo.Core.Domains.InputMapping
+open Pomo.Core.Domains.PlayerMovement
+open Pomo.Core.Domains.QuickSlot
 
 
 type PomoGame() as this =
@@ -56,7 +60,10 @@ type PomoGame() as this =
     base.Services.AddService<World.World> worldView
 
     // 3. Instantiate and add game components (systems).
-    base.Components.Add(new InputSystem(this, playerId))
+    base.Components.Add(new RawInputSystem(this, playerId))
+    base.Components.Add(new InputMappingSystem(this, playerId))
+    base.Components.Add(new PlayerMovementSystem(this, playerId))
+    base.Components.Add(new QuickSlotSystem(this, playerId))
     base.Components.Add(new MovementSystem(this))
     base.Components.Add(new RenderSystem(this))
     base.Components.Add(new StateUpdateSystem(this, mutableWorld))
@@ -74,6 +81,9 @@ type PomoGame() as this =
     }
 
     eventBus.Publish(World.EntityCreated playerEntity)
+
+    let inputMap = InputMapping.createDefaultInputMap()
+    eventBus.Publish(World.InputMapChanged struct (playerId, inputMap))
 
 
   override this.LoadContent() = base.LoadContent()
