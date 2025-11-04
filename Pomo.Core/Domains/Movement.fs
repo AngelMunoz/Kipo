@@ -17,18 +17,12 @@ module Movement =
   type MovementSystem(game: Game) as this =
     inherit GameSystem(game)
 
-    let movements =
-      Projections.Movements this.World
-      |> AMap.mapA(fun _ struct (velocity, position) -> adaptive {
-        let! time = this.World.DeltaTime
-        let displacement = velocity * float32 time.TotalSeconds
-        return position + displacement
-      })
+    let updatedPositions = Projections.UpdatedPositions this.World
 
     override val Kind = Movement with get
 
     override this.Update gameTime =
-      let movements = movements |> AMap.force
+      let movements = updatedPositions |> AMap.force
 
-      for id, movement in movements do
-        this.EventBus.Publish(PositionChanged struct (id, movement))
+      for id, newPosition in movements do
+        this.EventBus.Publish(PositionChanged struct (id, newPosition))
