@@ -8,7 +8,9 @@
     <Compile Include="Localization/LocalizationManager.fs" />
     <Compile Include="CoreDomain.fs" />
     <Compile Include="Projections.fs" />
+    <Compile Include="Domains/Input.fs" />
     <Compile Include="Domains/Movement.fs" />
+    <Compile Include="Domains/Render.fs" />
     <Compile Include="Domains/State.fs" />
     <Compile Include="PomoGame.fs" />
   </ItemGroup>

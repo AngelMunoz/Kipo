@@ -53,4 +53,6 @@ module StateUpdate =
           match event with
           | PositionChanged change -> Entity.updatePosition mutableWorld change
           | EntityRemoved removed -> Entity.removeEntity mutableWorld removed
-          | EntityCreated created -> Entity.addEntity mutableWorld created)
+          | EntityCreated created -> Entity.addEntity mutableWorld created
+          | VelocityChanged struct (id, vel) ->
+            mutableWorld.Velocities[id] <- vel)

@@ -11,6 +11,8 @@ module Projections =
     ||> AMap.choose2V(fun id velocity position ->
       match velocity, position with
       | ValueSome vel, ValueSome pos ->
-        let newPos = pos + vel
-        ValueSome pos
+        ValueSome struct (vel, pos)
       | _ -> ValueNone)
+
+  let PositionByPlayer (world: World) playerId =
+    world.Positions |> AMap.tryFind playerId

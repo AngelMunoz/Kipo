@@ -26,7 +26,7 @@ module World =
   // The internal, MUTABLE source of truth.
   // This contains the "cell" types that can be modified.
   type MutableWorld = {
-    Time: cval<TimeSpan>
+    DeltaTime: cval<TimeSpan>
     Positions: cmap<Guid<EntityId>, Vector2>
     Velocities: cmap<Guid<EntityId>, Vector2>
   }
@@ -34,20 +34,20 @@ module World =
   // This is the READ-ONLY VIEW of the world.
   // It contains the "adaptive" types.
   type World = {
-    Time: TimeSpan aval
+    DeltaTime: TimeSpan aval
     Positions: amap<Guid<EntityId>, Vector2>
     Velocities: amap<Guid<EntityId>, Vector2>
   }
 
   let create() =
     let mutableWorld: MutableWorld = {
-      Time = cval TimeSpan.Zero
+      DeltaTime = cval TimeSpan.Zero
       Positions = cmap()
       Velocities = cmap()
     }
 
     let worldView = {
-      Time = mutableWorld.Time
+      DeltaTime = mutableWorld.DeltaTime
       Positions = mutableWorld.Positions
       Velocities = mutableWorld.Velocities
     }
@@ -59,21 +59,31 @@ module World =
     | EntityCreated of created: Entity.EntitySnapshot
     | EntityRemoved of removed: Guid<EntityId>
     | PositionChanged of changed: struct (Guid<EntityId> * Vector2)
+    | VelocityChanged of changed: struct (Guid<EntityId> * Vector2)
 
 module EventBus =
   open World
+  open System.Diagnostics
 
   type EventBus() =
     let eventQueue = ConcurrentQueue<WorldEvent>()
 
-    member _.Publish(event) = eventQueue.Enqueue(event)
+    member _.Publish(event) =
+      Debug.WriteLine($"Event Published: {event}")
+      eventQueue.Enqueue(event)
 
     member _.Publish(events: WorldEvent seq) =
       for event in events do
+        Debug.WriteLine($"Event Published: {event}")
         eventQueue.Enqueue(event)
 
     member _.TryDequeue(event: byref<WorldEvent>) =
-      eventQueue.TryDequeue(&event)
+      let dequeued = eventQueue.TryDequeue(&event)
+
+      if dequeued then
+        Debug.WriteLine($"Event Dequeued: {event}")
+
+      dequeued
 
 module Systems =
   open World
