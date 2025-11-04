@@ -16,27 +16,27 @@ open Pomo.Core.Domain.RawInput
 
 module InputMapping =
 
-  let private isKeyJustPressed
+  let inline isKeyJustPressed
     (prev: KeyboardState)
     (curr: KeyboardState)
     (key: Keys)
     =
     curr.IsKeyDown(key) && prev.IsKeyUp(key)
 
-  let private isKeyJustReleased
+  let inline isKeyJustReleased
     (prev: KeyboardState)
     (curr: KeyboardState)
     (key: Keys)
     =
     curr.IsKeyUp(key) && prev.IsKeyDown(key)
 
-  let private isMouseButtonDown (curr: MouseState) (btn: MouseButton) =
+  let inline isMouseButtonDown (curr: MouseState) (btn: MouseButton) =
     match btn with
     | MouseButton.Left -> curr.LeftButton = ButtonState.Pressed
     | MouseButton.Right -> curr.RightButton = ButtonState.Pressed
     | MouseButton.Middle -> curr.MiddleButton = ButtonState.Pressed
 
-  let private isMouseButtonJustPressed
+  let inline isMouseButtonJustPressed
     (prev: MouseState)
     (curr: MouseState)
     (btn: MouseButton)
@@ -45,7 +45,7 @@ module InputMapping =
     let wasDown = isMouseButtonDown prev btn
     isDown && not wasDown
 
-  let private isMouseButtonJustReleased
+  let inline isMouseButtonJustReleased
     (prev: MouseState)
     (curr: MouseState)
     (btn: MouseButton)

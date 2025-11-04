@@ -19,17 +19,18 @@ module QuickSlot =
       this.World.GameActionStates
       |> AMap.tryFind playerId
       |> AVal.map(Option.defaultValue HashMap.empty)
+      |> AMap.ofAVal
 
     let pressedActions =
       actionStates
-      |> AVal.map(fun states ->
-        states
-        |> HashMap.chooseV(fun action state ->
-          if state = Pressed then ValueSome action else ValueNone)
-        |> HashMap.toValueArray)
+      |> AMap.choose(fun action states ->
+        match states with
+        | Pressed -> Some action
+        | _ -> None)
+      |> AMap.toASetValues
 
     override this.Update gameTime =
-      let actions = pressedActions |> AVal.force
+      let actions = pressedActions |> ASet.force
 
       for action in actions do
         match action with

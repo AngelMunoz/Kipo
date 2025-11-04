@@ -22,27 +22,25 @@ module PlayerMovement =
         world.GameActionStates
         |> AMap.tryFind playerId
         |> AVal.map(Option.defaultValue HashMap.empty)
+        |> AMap.ofAVal
 
       actionStates
-      |> AVal.map(fun actions ->
-        let mutable move = Vector2.Zero
+      |> AMap.fold
+        (fun acc action _ ->
+          let mutable move = Vector2.Zero
 
-        if actions.ContainsKey(MoveUp) then
-          move <- move - Vector2.UnitY
+          match action with
+          | MoveUp -> move <- move - Vector2.UnitY
+          | MoveDown -> move <- move + Vector2.UnitY
+          | MoveLeft -> move <- move - Vector2.UnitX
+          | MoveRight -> move <- move + Vector2.UnitX
+          | _ -> ()
 
-        if actions.ContainsKey(MoveDown) then
-          move <- move + Vector2.UnitY
-
-        if actions.ContainsKey(MoveLeft) then
-          move <- move - Vector2.UnitX
-
-        if actions.ContainsKey(MoveRight) then
-          move <- move + Vector2.UnitX
-
-        if move.LengthSquared() > 0.0f then
-          Vector2.Normalize(move) * speed
-        else
-          Vector2.Zero)
+          if move.LengthSquared() > 0.0f then
+            acc + Vector2.Normalize(move) * speed
+          else
+            Vector2.Zero)
+        Vector2.Zero
 
   type PlayerMovementSystem(game: Game, playerId: Guid<EntityId>) as this =
     inherit GameSystem(game)
