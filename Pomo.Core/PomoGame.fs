@@ -27,13 +27,14 @@ open Pomo.Core.Domains.InputMapping
 open Pomo.Core.Domains.PlayerMovement
 open Pomo.Core.Domains.QuickSlot
 
-
 type PomoGame() as this =
   inherit Game()
 
   let graphicsDeviceManager = new GraphicsDeviceManager(this)
 
   let isMobile = OperatingSystem.IsAndroid() || OperatingSystem.IsIOS()
+
+  let deserializer = Serialization.create()
 
   let isDesktop =
     OperatingSystem.IsWindows()
@@ -54,6 +55,10 @@ type PomoGame() as this =
       DisplayOrientation.LandscapeLeft ||| DisplayOrientation.LandscapeRight
 
     base.Services.AddService<GraphicsDeviceManager> graphicsDeviceManager
+
+    base.Services.AddService<Stores.SkillStore>(
+      Stores.Skill.create(JsonFileLoader.readSkills deserializer)
+    )
     // 2. Register global services that all systems can safely access.
     base.Services.AddService<EventBus> eventBus
     //    Only the READ-ONLY world view is registered, preventing accidental write access.

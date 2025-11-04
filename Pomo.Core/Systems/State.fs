@@ -8,9 +8,9 @@ open FSharp.UMX
 open FSharp.Data.Adaptive
 
 open Pomo.Core
+open Pomo.Core.Domain.Units
 open Pomo.Core.Domain
 open Pomo.Core.Domain.Action
-open Pomo.Core.Domain.Units
 open Pomo.Core.Domain.World
 open Pomo.Core.Domain.Systems
 open Pomo.Core.Domain.EventBus

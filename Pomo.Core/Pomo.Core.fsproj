@@ -3,24 +3,36 @@
     <TargetFramework>net9.0</TargetFramework>
     <Platforms>AnyCPU</Platforms>
   </PropertyGroup>
-
   <ItemGroup>
     <Compile Include="Localization/LocalizationManager.fs" />
-    <Compile Include="CoreDomain.fs" />
+    <Compile Include="Domain/Core.fs" />
+    <Compile Include="Domain/Input.fs" />
+    <Compile Include="Domain/Entity.fs" />
+    <Compile Include="Domain/Skill.fs" />
+    <Compile Include="Domain/World.fs" />
+    <Compile Include="Serialization.fs" />
+    <Compile Include="Stores.fs" />
     <Compile Include="Projections.fs" />
-    <Compile Include="Domains/InputMapping.fs" />
-    <Compile Include="Domains/PlayerMovement.fs" />
-    <Compile Include="Domains/QuickSlot.fs" />
-    <Compile Include="Domains/RawInput.fs" />
-    <Compile Include="Domains/Movement.fs" />
-    <Compile Include="Domains/Render.fs" />
-    <Compile Include="Domains/State.fs" />
+    <Compile Include="Systems/InputMapping.fs" />
+    <Compile Include="Systems/PlayerMovement.fs" />
+    <Compile Include="Systems/QuickSlot.fs" />
+    <Compile Include="Systems/RawInput.fs" />
+    <Compile Include="Systems/Movement.fs" />
+    <Compile Include="Systems/Render.fs" />
+    <Compile Include="Systems/State.fs" />
     <Compile Include="PomoGame.fs" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Content Include="Content\Skills.json">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
   </ItemGroup>
 
   <ItemGroup>
     <PackageReference Include="FSharp.Data.Adaptive" Version="1.2.25" />
     <PackageReference Include="FSharp.UMX" Version="1.1.0" />
+    <PackageReference Include="JDeck" Version="1.0.0-rc-006" />
     <PackageReference Include="MonoGame.Framework.DesktopGL" Version="3.8.*">
       <PrivateAssets>All</PrivateAssets>
     </PackageReference>

@@ -3,8 +3,9 @@ namespace Pomo.Core.Domains
 open Microsoft.Xna.Framework
 open FSharp.UMX
 open FSharp.Data.Adaptive
-open Pomo.Core.Domain
+
 open Pomo.Core.Domain.Units
+open Pomo.Core.Domain
 open Pomo.Core.Domain.World
 open Pomo.Core.Domain.Systems
 open Pomo.Core.Domain.EventBus
@@ -54,7 +55,7 @@ module PlayerMovement =
     // A mutable variable scoped to the system is acceptable for this kind of internal bookkeeping.
     let mutable lastVelocity = Vector2.Zero
 
-    override this.Update gameTime =
+    override this.Update _ =
       let currentVelocity = velocity |> AVal.force
 
       if currentVelocity <> lastVelocity then

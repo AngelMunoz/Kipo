@@ -1,0 +1,32 @@
+{
+  "1": {
+    "Kind": "Active",
+    "Id": 1,
+    "Name": "Melee Attack",
+    "Description": "A basic physical attack with a melee weapon.",
+    "Intent": "Offensive",
+    "Cost": { "Type": "MP", "Amount": 10 },
+    "Cooldown": 1.5,
+    "Targeting": "SingleEnemy",
+    "Range": [32.0],
+    "Formula": "AP * 1.0",
+    "Effects": [],
+    "Origin": { "Type": "Caster" }
+  },
+  "2": {
+    "Kind": "Active",
+    "Id": 2,
+    "Name": "Fireball",
+    "Description": "Hurls a seeker fiery ball that explodes upon impact, dealing fire damage.n\nFire attribute increases its damage output.",
+    "Intent": "Offensive",
+    "Cost": { "Type": "MP", "Amount": 20 },
+    "Cooldown": 3.0,
+    "Targeting": "SingleEnemy",
+    "Range": [32, 5],
+    "Formula": "MA * 1.5",
+    "ElementFormula": "FireA * 2.0",
+    "CastingTime": 0.5,
+    "Origin": { "Type": "CasterOffset", "Offset": [16.0, -16.0] },
+    "Effects": []
+  }
+}
