@@ -13,6 +13,8 @@
     <Compile Include="Serialization.fs" />
     <Compile Include="Stores.fs" />
     <Compile Include="Projections.fs" />
+    <Compile Include="Systems/Attributes.fs" />
+    <Compile Include="Systems/Combat.fs" />
     <Compile Include="Systems/InputMapping.fs" />
     <Compile Include="Systems/PlayerMovement.fs" />
     <Compile Include="Systems/QuickSlot.fs" />

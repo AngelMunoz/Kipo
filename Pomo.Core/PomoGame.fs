@@ -46,6 +46,7 @@ type PomoGame() as this =
   // 1. Create both the mutable source of truth and the public read-only view.
   let struct (mutableWorld, worldView) = World.create()
   let playerId = %Guid.NewGuid()
+  let enemyId = %Guid.NewGuid()
 
   do
     base.IsMouseVisible <- true
@@ -79,6 +80,7 @@ type PomoGame() as this =
 
     LocalizationManager.DefaultCultureCode |> LocalizationManager.SetCulture
 
+    // Player Setup
     let playerEntity: Pomo.Core.Domain.Entity.EntitySnapshot = {
       Id = playerId
       Position = Vector2(100.0f, 100.0f)
@@ -87,8 +89,57 @@ type PomoGame() as this =
 
     eventBus.Publish(World.EntityCreated playerEntity)
 
+    let playerResources: Pomo.Core.Domain.Entity.Resource = {
+      HP = 100
+      MP = 50
+      Status = Pomo.Core.Domain.Entity.Status.Alive
+    }
+
+    eventBus.Publish(World.ResourcesChanged struct (playerId, playerResources))
+
+    let playerFactions = HashSet [ Pomo.Core.Domain.Entity.Faction.Player ]
+    eventBus.Publish(World.FactionsChanged struct (playerId, playerFactions))
+
+    let playerBaseStats: Pomo.Core.Domain.Entity.BaseStats = {
+      Power = 10
+      Magic = 5
+      Sense = 7
+      Charm = 8
+    }
+
+    eventBus.Publish(World.BaseStatsChanged struct (playerId, playerBaseStats))
+
     let inputMap = InputMapping.createDefaultInputMap()
     eventBus.Publish(World.InputMapChanged struct (playerId, inputMap))
+
+    // Enemy Setup
+    let enemyEntity: Pomo.Core.Domain.Entity.EntitySnapshot = {
+      Id = enemyId
+      Position = Vector2(300.0f, 100.0f)
+      Velocity = Vector2.Zero
+    }
+
+    eventBus.Publish(World.EntityCreated enemyEntity)
+
+    let enemyResources: Pomo.Core.Domain.Entity.Resource = {
+      HP = 80
+      MP = 0
+      Status = Pomo.Core.Domain.Entity.Status.Alive
+    }
+
+    eventBus.Publish(World.ResourcesChanged struct (enemyId, enemyResources))
+
+    let enemyFactions = HashSet [ Pomo.Core.Domain.Entity.Faction.Enemy ]
+    eventBus.Publish(World.FactionsChanged struct (enemyId, enemyFactions))
+
+    let enemyBaseStats: Pomo.Core.Domain.Entity.BaseStats = {
+      Power = 5
+      Magic = 0
+      Sense = 5
+      Charm = 5
+    }
+
+    eventBus.Publish(World.BaseStatsChanged struct (enemyId, enemyBaseStats))
 
 
   override this.LoadContent() = base.LoadContent()

@@ -158,7 +158,7 @@ module Skill =
     Name: string
     Description: string
     Intent: SkillIntent
-    Cost: ResourceCost
+    Cost: ResourceCost voption
     Cooldown: TimeSpan voption
     Targeting: Targeting
     Range: float32 voption
@@ -804,7 +804,7 @@ module Skill =
           and! intent =
             Required.Property.get ("Intent", SkillIntent.decoder) json
 
-          and! cost = Required.Property.get ("Cost", ResourceCost.decoder) json
+          and! cost = Optional.Property.get ("Cost", ResourceCost.decoder) json
 
           and! cooldownOpt =
             Optional.Property.get ("Cooldown", Required.float) json
@@ -844,7 +844,7 @@ module Skill =
             Name = name
             Description = description
             Intent = intent
-            Cost = cost
+            Cost = cost |> Option.toValueOption
             Cooldown =
               cooldownOpt
               |> Option.map TimeSpan.FromSeconds

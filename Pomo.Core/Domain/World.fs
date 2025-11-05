@@ -18,11 +18,15 @@ module World =
     InputMaps: cmap<Guid<EntityId>, InputMap>
     GameActionStates:
       cmap<Guid<EntityId>, HashMap<GameAction, InputActionState>>
+    QuickSlots: cmap<Guid<EntityId>, HashMap<GameAction, int<SkillId>>>
     // entity components
     Positions: cmap<Guid<EntityId>, Vector2>
     Velocities: cmap<Guid<EntityId>, Vector2>
     Resources: cmap<Guid<EntityId>, Entity.Resource>
     Factions: cmap<Guid<EntityId>, Entity.Faction HashSet>
+    BaseStats: cmap<Guid<EntityId>, Entity.BaseStats>
+    DerivedStats: cmap<Guid<EntityId>, Entity.DerivedStats>
+    ActiveEffects: cmap<Guid<EntityId>, Skill.Effect IndexList>
   }
 
   type World =
@@ -32,11 +36,16 @@ module World =
 
     abstract GameActionStates:
       amap<Guid<EntityId>, HashMap<GameAction, InputActionState>>
+
+    abstract QuickSlots: amap<Guid<EntityId>, HashMap<GameAction, int<SkillId>>>
     // entity components
     abstract Positions: amap<Guid<EntityId>, Vector2>
     abstract Velocities: amap<Guid<EntityId>, Vector2>
     abstract Resources: amap<Guid<EntityId>, Entity.Resource>
     abstract Factions: amap<Guid<EntityId>, Entity.Faction HashSet>
+    abstract BaseStats: amap<Guid<EntityId>, Entity.BaseStats>
+    abstract DerivedStats: amap<Guid<EntityId>, Entity.DerivedStats>
+    abstract ActiveEffects: amap<Guid<EntityId>, Skill.Effect IndexList>
 
 
   let create() =
@@ -47,8 +56,12 @@ module World =
       RawInputStates = cmap()
       InputMaps = cmap()
       GameActionStates = cmap()
+      QuickSlots = cmap()
       Resources = cmap()
       Factions = cmap()
+      BaseStats = cmap()
+      DerivedStats = cmap()
+      ActiveEffects = cmap()
     }
 
     let worldView =
@@ -59,8 +72,12 @@ module World =
           member _.RawInputStates = mutableWorld.RawInputStates
           member _.InputMaps = mutableWorld.InputMaps
           member _.GameActionStates = mutableWorld.GameActionStates
+          member _.QuickSlots = mutableWorld.QuickSlots
           member _.Resources = mutableWorld.Resources
           member _.Factions = mutableWorld.Factions
+          member _.BaseStats = mutableWorld.BaseStats
+          member _.DerivedStats = mutableWorld.DerivedStats
+          member _.ActiveEffects = mutableWorld.ActiveEffects
       }
 
     struct (mutableWorld, worldView)
@@ -76,6 +93,24 @@ module World =
     | InputMapChanged of iMapChanged: struct (Guid<EntityId> * InputMap)
     | GameActionStatesChanged of
       gAChanged: struct (Guid<EntityId> * HashMap<GameAction, InputActionState>)
+    | ResourcesChanged of resChanged: struct (Guid<EntityId> * Entity.Resource)
+    | FactionsChanged of
+      facChanged: struct (Guid<EntityId> * Entity.Faction HashSet)
+    | BaseStatsChanged of
+      statsChanged: struct (Guid<EntityId> * Entity.BaseStats)
+    | QuickSlotsChanged of
+      qsChanged: struct (Guid<EntityId> * HashMap<GameAction, int<SkillId>>)
+    // Combat and Skill events
+    | SlotActivated of slot: GameAction * casterId: Guid<EntityId>
+    | AbilityIntent of
+      caster: Guid<EntityId> *
+      skillId: int<SkillId> *
+      abilityIntentTarget: Guid<EntityId> voption
+    | DamageDealt of target: Guid<EntityId> * amount: int
+    | EntityDied of target: Guid<EntityId>
+    // Attribute and Effect events
+    | StatsChanged of entity: Guid<EntityId> * newStats: Entity.DerivedStats
+    | EffectApplied of entity: Guid<EntityId> * effect: Skill.Effect
 
 module EventBus =
   open World
@@ -103,6 +138,7 @@ module Systems =
     | Movement
     | RawInput
     | InputMapping
+    | Combat
 
   type GameSystem(game: Game) =
     inherit GameComponent(game)

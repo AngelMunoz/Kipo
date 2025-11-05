@@ -62,6 +62,48 @@ module StateUpdate =
       =
       world.GameActionStates[id] <- states
 
+  module Combat =
+    let inline updateResources
+      (world: MutableWorld)
+      struct (id: Guid<EntityId>, resources: Domain.Entity.Resource)
+      =
+      world.Resources[id] <- resources
+
+    let inline updateFactions
+      (world: MutableWorld)
+      struct (id: Guid<EntityId>, factions: Domain.Entity.Faction HashSet)
+      =
+      world.Factions[id] <- factions
+
+    let inline updateQuickSlots
+      (world: MutableWorld)
+      struct (id: Guid<EntityId>,
+              quickSlots:
+                HashMap<Domain.Action.GameAction, int<Domain.Units.SkillId>>)
+      =
+      world.QuickSlots[id] <- quickSlots
+
+  module Attributes =
+    let inline updateBaseStats
+      (world: MutableWorld)
+      struct (id: Guid<EntityId>, stats: Domain.Entity.BaseStats)
+      =
+      world.BaseStats[id] <- stats
+
+    let inline updateDerivedStats
+      (world: MutableWorld)
+      (id: Guid<EntityId>, stats: Domain.Entity.DerivedStats)
+      =
+      world.DerivedStats[id] <- stats
+
+    let inline applyEffect
+      (world: MutableWorld)
+      (id: Guid<EntityId>, effect: Domain.Skill.Effect)
+      =
+      match world.ActiveEffects.TryGetValue(id) with
+      | Some effects -> world.ActiveEffects[id] <- IndexList.add effect effects
+      | None -> world.ActiveEffects[id] <- IndexList.single effect
+
   // The dedicated STATE WRITER system.
   // It receives the MutableWorld via constructor injection, ensuring no other system can access it.
   type StateUpdateSystem(game: Game, mutableWorld: World.MutableWorld) =
@@ -88,4 +130,22 @@ module StateUpdate =
           | InputMapChanged change ->
             InputMapping.updateMap mutableWorld change
           | GameActionStatesChanged change ->
-            InputMapping.updateActionStates mutableWorld change)
+            InputMapping.updateActionStates mutableWorld change
+          | ResourcesChanged change ->
+            Combat.updateResources mutableWorld change
+          | FactionsChanged change -> Combat.updateFactions mutableWorld change
+          | QuickSlotsChanged change ->
+            Combat.updateQuickSlots mutableWorld change
+          | BaseStatsChanged change ->
+            Attributes.updateBaseStats mutableWorld change
+          | StatsChanged(entity, newStats) ->
+            Attributes.updateDerivedStats mutableWorld (entity, newStats)
+          | EffectApplied(entity, effect) ->
+            Attributes.applyEffect mutableWorld (entity, effect)
+          | AbilityIntent _ -> () // To be handled by CombatSystem
+          | DamageDealt(target, amount) ->
+            // TODO: Implement damage logic
+            ()
+          | EntityDied target ->
+            // TODO: Implement entity death logic
+            ())

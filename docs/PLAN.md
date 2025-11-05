@@ -74,20 +74,6 @@ A file like `Domains/Combat.fs` would be structured internally with modules:
 // In file: Domains/Combat.fs
 module Pomo.Core.Domains.Combat
 
-// Import foundational types needed from other files
-open Pomo.Core.Pombo.CoreTypes
-
-// 1. COMPONENT definitions for this domain
-module Components =
-    type Health = { Current: int; Max: int }
-    type Faction = Player | Enemy
-
-// 2. EVENT definitions for this domain
-module Events =
-    type DamageDealt = { Target: Guid<EntityId>; Amount: int }
-    type EntityDied = { Target: Guid<EntityId> }
-
-// 3. SYSTEM definitions for this domain
 module Systems =
     open Pomo.Core.Pombo.World
     open Components // Open local modules
