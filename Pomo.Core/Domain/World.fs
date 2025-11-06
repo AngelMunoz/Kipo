@@ -114,10 +114,12 @@ module World =
 
 module EventBus =
   open World
-  open System.Diagnostics
 
   type EventBus() =
     let eventQueue = ConcurrentQueue<WorldEvent>()
+
+    let observers =
+      Collections.Generic.Dictionary<Guid, IObserver<WorldEvent>>()
 
     member _.Publish(event) = eventQueue.Enqueue(event)
 
@@ -126,7 +128,22 @@ module EventBus =
         eventQueue.Enqueue(event)
 
     member _.TryDequeue(event: byref<WorldEvent>) =
-      eventQueue.TryDequeue(&event)
+      match eventQueue.TryDequeue() with
+      | true, ev ->
+        observers.Values |> Seq.iter(fun obs -> obs.OnNext(ev))
+        event <- ev
+        true
+      | false, _ -> false
+
+    interface IObservable<WorldEvent> with
+      member _.Subscribe(observer: IObserver<WorldEvent>) =
+        let id = Guid.NewGuid()
+        observers.Add(id, observer)
+
+        { new IDisposable with
+            member _.Dispose() = observers.Remove(id) |> ignore
+        }
+
 
 module Systems =
   open World

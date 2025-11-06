@@ -26,6 +26,7 @@ open Pomo.Core.Domains.RawInput
 open Pomo.Core.Domains.InputMapping
 open Pomo.Core.Domains.PlayerMovement
 open Pomo.Core.Domains.QuickSlot
+open Pomo.Core.Domains.Targeting
 
 type PomoGame() as this =
   inherit Game()
@@ -45,6 +46,9 @@ type PomoGame() as this =
 
   // 1. Create both the mutable source of truth and the public read-only view.
   let struct (mutableWorld, worldView) = World.create()
+  let skillStore = Stores.Skill.create(JsonFileLoader.readSkills deserializer)
+  let targetingService = Targeting.create(worldView, eventBus, skillStore)
+
   let playerId = %Guid.NewGuid()
   let enemyId = %Guid.NewGuid()
 
@@ -57,13 +61,13 @@ type PomoGame() as this =
 
     base.Services.AddService<GraphicsDeviceManager> graphicsDeviceManager
 
-    base.Services.AddService<Stores.SkillStore>(
-      Stores.Skill.create(JsonFileLoader.readSkills deserializer)
-    )
+    base.Services.AddService<Stores.SkillStore> skillStore
     // 2. Register global services that all systems can safely access.
     base.Services.AddService<EventBus> eventBus
     //    Only the READ-ONLY world view is registered, preventing accidental write access.
     base.Services.AddService<World.World> worldView
+
+    base.Services.AddService<TargetingService> targetingService
 
     // 3. Instantiate and add game components (systems).
     base.Components.Add(new RawInputSystem(this, playerId))
@@ -71,7 +75,7 @@ type PomoGame() as this =
     base.Components.Add(new PlayerMovementSystem(this, playerId))
     base.Components.Add(new QuickSlotSystem(this, playerId))
     base.Components.Add(new MovementSystem(this))
-    base.Components.Add(new RenderSystem(this))
+    base.Components.Add(new RenderSystem(this, playerId))
     base.Components.Add(new StateUpdateSystem(this, mutableWorld))
 
 
@@ -140,6 +144,12 @@ type PomoGame() as this =
     }
 
     eventBus.Publish(World.BaseStatsChanged struct (enemyId, enemyBaseStats))
+
+    let quickSlots = [ UseSlot1, UMX.tag 1; UseSlot2, UMX.tag 2 ]
+
+    eventBus.Publish(
+      World.QuickSlotsChanged struct (playerId, HashMap.ofList quickSlots)
+    )
 
 
   override this.LoadContent() = base.LoadContent()

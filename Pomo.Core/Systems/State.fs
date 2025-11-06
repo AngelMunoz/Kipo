@@ -148,4 +148,5 @@ module StateUpdate =
             ()
           | EntityDied target ->
             // TODO: Implement entity death logic
-            ())
+            ()
+          | SlotActivated(slot, casterId) -> ())
