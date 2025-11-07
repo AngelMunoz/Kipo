@@ -27,7 +27,6 @@ open Pomo.Core.Domains.InputMapping
 open Pomo.Core.Domains.PlayerMovement
 open Pomo.Core.Domains.QuickSlot
 open Pomo.Core.Domains.Targeting
-open Pomo.Core.Domains.ActionHandler
 
 type PomoGame() as this =
   inherit Game()
@@ -54,8 +53,9 @@ type PomoGame() as this =
   let targetingService = Targeting.create(worldView, eventBus, skillStore)
 
   let actionHandler =
-    ActionHandler(worldView, eventBus, targetingService, playerId)
+    ActionHandler.create(worldView, eventBus, targetingService, playerId)
 
+  let movementService = Navigation.create(eventBus, playerId)
 
   do
     base.IsMouseVisible <- true
@@ -157,7 +157,8 @@ type PomoGame() as this =
     )
 
     // Start listening to action events
-    actionHandler.ListenToEvents() |> ignore<IDisposable>
+    actionHandler.StartListening() |> ignore<IDisposable>
+    movementService.StartListening() |> ignore<IDisposable>
 
 
 

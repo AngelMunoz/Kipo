@@ -58,9 +58,48 @@ module PlayerMovement =
     override this.Update _ =
       let currentVelocity = velocity |> AVal.force
 
-      if currentVelocity <> lastVelocity then
-        this.EventBus.Publish(
-          VelocityChanged struct (playerId, currentVelocity)
-        )
+      let movementState =
+        this.World.MovementStates |> AMap.tryFind playerId |> AVal.force
 
-        lastVelocity <- currentVelocity
+      let position =
+        this.World.Positions
+        |> AMap.tryFind playerId
+        |> AVal.force
+        |> Option.defaultValue Vector2.Zero
+
+      let movementSpeed =
+        this.World.DerivedStats
+        |> AMap.tryFind playerId
+        |> AVal.map(Option.map _.MovementSpeed)
+        |> AVal.force
+        |> Option.defaultValue 100
+
+      match movementState with
+      | Some(MovingTo destination) ->
+        let distance = Vector2.Distance(position, destination)
+        let threshold = 2.0f // Close enough
+
+        if distance < threshold then
+          // We've arrived. Stop moving and return to Idle state.
+          this.EventBus.Publish(VelocityChanged struct (playerId, Vector2.Zero))
+          this.EventBus.Publish(MovementStateChanged struct (playerId, Idle))
+        else
+          // Still moving towards the destination.
+          let direction = Vector2.Normalize(destination - position)
+          let adjustedVelocity = direction * float32 movementSpeed
+
+          if currentVelocity <> adjustedVelocity then
+            this.EventBus.Publish(
+              VelocityChanged struct (playerId, adjustedVelocity)
+            )
+
+          lastVelocity <- adjustedVelocity
+
+      | Some Idle ->
+        if currentVelocity <> lastVelocity then
+          this.EventBus.Publish(
+            VelocityChanged struct (playerId, currentVelocity)
+          )
+
+          lastVelocity <- currentVelocity
+      | None -> ()

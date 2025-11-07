@@ -42,6 +42,12 @@ module StateUpdate =
       =
       world.Velocities[entity] <- velocity
 
+    let inline updateMovementState
+      (world: MutableWorld)
+      struct (entity: Guid<EntityId>, movementState: MovementState)
+      =
+      world.MovementStates[entity] <- movementState
+
   module RawInput =
     let inline updateState
       (world: MutableWorld)
@@ -154,4 +160,6 @@ module StateUpdate =
           | SetMovementTarget(mover, targetPosition) ->
             failwith "Not Implemented"
           | TargetSelected(selector, targetPosition) ->
-            failwith "Not Implemented")
+            failwith "Not Implemented"
+          | MovementStateChanged mStateChanged ->
+            Entity.updateMovementState mutableWorld mStateChanged)

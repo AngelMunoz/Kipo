@@ -12,6 +12,12 @@ module World =
   open RawInput
   open Action
 
+  [<Struct>]
+  type MovementState =
+    | Idle
+    | MovingTo of targetPosition: Vector2
+
+  [<Struct>]
   type MutableWorld = {
     DeltaTime: cval<TimeSpan>
     RawInputStates: cmap<Guid<EntityId>, RawInputState>
@@ -22,6 +28,7 @@ module World =
     // entity components
     Positions: cmap<Guid<EntityId>, Vector2>
     Velocities: cmap<Guid<EntityId>, Vector2>
+    MovementStates: cmap<Guid<EntityId>, MovementState>
     Resources: cmap<Guid<EntityId>, Entity.Resource>
     Factions: cmap<Guid<EntityId>, Entity.Faction HashSet>
     BaseStats: cmap<Guid<EntityId>, Entity.BaseStats>
@@ -41,6 +48,7 @@ module World =
     // entity components
     abstract Positions: amap<Guid<EntityId>, Vector2>
     abstract Velocities: amap<Guid<EntityId>, Vector2>
+    abstract MovementStates: amap<Guid<EntityId>, MovementState>
     abstract Resources: amap<Guid<EntityId>, Entity.Resource>
     abstract Factions: amap<Guid<EntityId>, Entity.Faction HashSet>
     abstract BaseStats: amap<Guid<EntityId>, Entity.BaseStats>
@@ -53,6 +61,7 @@ module World =
       DeltaTime = cval TimeSpan.Zero
       Positions = cmap()
       Velocities = cmap()
+      MovementStates = cmap()
       RawInputStates = cmap()
       InputMaps = cmap()
       GameActionStates = cmap()
@@ -69,6 +78,7 @@ module World =
           member _.DeltaTime = mutableWorld.DeltaTime
           member _.Positions = mutableWorld.Positions
           member _.Velocities = mutableWorld.Velocities
+          member _.MovementStates = mutableWorld.MovementStates
           member _.RawInputStates = mutableWorld.RawInputStates
           member _.InputMaps = mutableWorld.InputMaps
           member _.GameActionStates = mutableWorld.GameActionStates
@@ -112,7 +122,9 @@ module World =
       skillId: int<SkillId> *
       abilityIntentTarget: Guid<EntityId> voption
     | AttackIntent of attacker: Guid<EntityId> * target: Guid<EntityId>
-    | SetMovementTarget of mover: Guid<EntityId> * targetPosition: Vector2
+    | SetMovementTarget of setMTarget: struct (Guid<EntityId> * Vector2)
+    | MovementStateChanged of
+      mStateChanged: struct (Guid<EntityId> * MovementState)
     | TargetSelected of selector: Guid<EntityId> * selection: Selection
     | DamageDealt of target: Guid<EntityId> * amount: int
     | EntityDied of target: Guid<EntityId>

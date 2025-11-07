@@ -16,7 +16,8 @@ module ActionHandler =
   open Microsoft.Xna.Framework.Input
 
 
-  type ActionHandlerService = interface end
+  type ActionHandlerService =
+    abstract member StartListening: unit -> IDisposable
 
   // TODO: This is a placeholder. A real implementation would need to check
   // entity bounding boxes against the click position.
@@ -26,89 +27,90 @@ module ActionHandler =
     : Guid<EntityId> voption =
     ValueNone
 
-  type ActionHandler
+  let create
     (
       world: World,
       eventBus: EventBus,
       targetingService: TargetingService,
       entityId: Guid<EntityId>
     ) =
+    { new ActionHandlerService with
+        member _.StartListening() =
+          eventBus
+          |> Observable.filter(fun ev ->
+            match ev with
+            | GameActionStatesChanged struct (changedEntityId, _) ->
+              changedEntityId = entityId
+            | _ -> false)
+          |> Observable.subscribe(fun ev ->
+            match ev with
+            | GameActionStatesChanged struct (changedEntityId, actionStates) ->
+              let primaryActionState =
+                actionStates |> HashMap.tryFindV PrimaryAction
 
+              match primaryActionState with
+              | ValueSome Pressed ->
+                let mouseState =
+                  world.RawInputStates
+                  |> AMap.tryFind entityId
+                  |> AVal.map(Option.map _.Mouse)
+                  |> AVal.force
+                  |> Option.defaultWith(fun () -> Mouse.GetState())
 
-    member _.ListenToEvents() =
-      eventBus
-      |> Observable.filter(fun ev ->
-        match ev with
-        | GameActionStatesChanged struct (changedEntityId, _) ->
-          changedEntityId = entityId
-        | _ -> false)
-      |> Observable.subscribe(fun ev ->
-        match ev with
-        | GameActionStatesChanged struct (changedEntityId, actionStates) ->
-          let primaryActionState =
-            actionStates |> HashMap.tryFindV PrimaryAction
+                let mousePosition =
+                  Vector2(
+                    float32 mouseState.Position.X,
+                    float32 mouseState.Position.Y
+                  )
 
-          match primaryActionState with
-          | ValueSome Pressed ->
-            let mouseState =
-              world.RawInputStates
-              |> AMap.tryFind entityId
-              |> AVal.map(Option.map _.Mouse)
-              |> AVal.force
-              |> Option.defaultWith(fun () -> Mouse.GetState())
+                let targetingMode =
+                  targetingService.TargetingMode |> AVal.force
 
-            let mousePosition =
-              Vector2(
-                float32 mouseState.Position.X,
-                float32 mouseState.Position.Y
-              )
+                match targetingMode with
+                | ValueNone ->
+                  // NOT targeting: This is a click to move or attack
+                  let clickedEntity = findEntityAtPosition world mousePosition
 
-            let targetingMode = targetingService.TargetingMode |> AVal.force
+                  match clickedEntity with
+                  | ValueSome clickedEntityId ->
+                    // An entity was clicked, publish an attack intent
+                    eventBus.Publish(AttackIntent(entityId, clickedEntityId))
+                  | ValueNone ->
+                    // Nothing was clicked, publish a movement command
+                    eventBus.Publish(
+                      SetMovementTarget(entityId, mousePosition)
+                    )
 
-            match targetingMode with
-            | ValueNone ->
-              // NOT targeting: This is a click to move or attack
-              let clickedEntity = findEntityAtPosition world mousePosition
+                | ValueSome Self ->
+                  // This case should be handled immediately on key press, not click.
+                  ()
 
-              match clickedEntity with
-              | ValueSome clickedEntityId ->
-                // An entity was clicked, publish an attack intent
-                eventBus.Publish(AttackIntent(entityId, clickedEntityId))
-              | ValueNone ->
-                // Nothing was clicked, publish a movement command
-                eventBus.Publish(SetMovementTarget(entityId, mousePosition))
+                | ValueSome SingleAlly
+                | ValueSome SingleEnemy ->
+                  let clickedEntity = findEntityAtPosition world mousePosition
 
-            | ValueSome Self ->
-              // This case should be handled immediately on key press, not click.
-              ()
+                  match clickedEntity with
+                  | ValueSome clickedEntityId ->
+                    // TODO: Validate if it's an ally/enemy
+                    let selection = SelectedEntity clickedEntityId
+                    eventBus.Publish(TargetSelected(entityId, selection))
+                  | ValueNone ->
+                    // Invalid target, do nothing for now
+                    ()
 
-            | ValueSome SingleAlly
-            | ValueSome SingleEnemy ->
-              let clickedEntity = findEntityAtPosition world mousePosition
+                | ValueSome GroundPoint ->
+                  let selection = SelectedPosition mousePosition
+                  eventBus.Publish(TargetSelected(entityId, selection))
+                | ValueSome(GroundArea area) ->
+                  match area with
+                  | Circle _
+                  | Rectangle _
+                  | Cone _
+                  | Square _ ->
+                    let selection = SelectedPosition mousePosition
+                    eventBus.Publish(TargetSelected(entityId, selection))
 
-              match clickedEntity with
-              | ValueSome clickedEntityId ->
-                // TODO: Validate if it's an ally/enemy
-                let selection = SelectedEntity clickedEntityId
-                eventBus.Publish(TargetSelected(entityId, selection))
-              | ValueNone ->
-                // Invalid target, do nothing for now
-                ()
-
-            | ValueSome GroundPoint ->
-              let selection = SelectedPosition mousePosition
-              eventBus.Publish(TargetSelected(entityId, selection))
-            | ValueSome(GroundArea area) ->
-              match area with
-              | Circle _
-              | Rectangle _
-              | Cone _
-              | Square _ ->
-                let selection = SelectedPosition mousePosition
-                eventBus.Publish(TargetSelected(entityId, selection))
-
-          | ValueSome _
-          | ValueNone -> ()
-        | _ -> ())
-
-    interface ActionHandlerService
+              | ValueSome _
+              | ValueNone -> ()
+            | _ -> ())
+    }
