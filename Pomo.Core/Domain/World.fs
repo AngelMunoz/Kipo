@@ -83,6 +83,11 @@ module World =
     struct (mutableWorld, worldView)
 
   [<Struct>]
+  type Selection =
+    | SelectedEntity of entity: Guid<EntityId>
+    | SelectedPosition of position: Vector2
+
+  [<Struct>]
   type WorldEvent =
     | EntityCreated of created: Entity.EntitySnapshot
     | EntityRemoved of removed: Guid<EntityId>
@@ -108,7 +113,7 @@ module World =
       abilityIntentTarget: Guid<EntityId> voption
     | AttackIntent of attacker: Guid<EntityId> * target: Guid<EntityId>
     | SetMovementTarget of mover: Guid<EntityId> * targetPosition: Vector2
-    | TargetSelected of selector: Guid<EntityId> * targetPosition: Vector2
+    | TargetSelected of selector: Guid<EntityId> * selection: Selection
     | DamageDealt of target: Guid<EntityId> * amount: int
     | EntityDied of target: Guid<EntityId>
     // Attribute and Effect events

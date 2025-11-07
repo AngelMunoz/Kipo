@@ -78,9 +78,35 @@ module ActionHandler =
                 // Nothing was clicked, publish a movement command
                 eventBus.Publish(SetMovementTarget(entityId, mousePosition))
 
-            | ValueSome _ ->
-              // IS targeting: This is a click to confirm an ability target
-              eventBus.Publish(TargetSelected(entityId, mousePosition))
+            | ValueSome Self ->
+              // This case should be handled immediately on key press, not click.
+              ()
+
+            | ValueSome SingleAlly
+            | ValueSome SingleEnemy ->
+              let clickedEntity = findEntityAtPosition world mousePosition
+
+              match clickedEntity with
+              | ValueSome clickedEntityId ->
+                // TODO: Validate if it's an ally/enemy
+                let selection = SelectedEntity clickedEntityId
+                eventBus.Publish(TargetSelected(entityId, selection))
+              | ValueNone ->
+                // Invalid target, do nothing for now
+                ()
+
+            | ValueSome GroundPoint ->
+              let selection = SelectedPosition mousePosition
+              eventBus.Publish(TargetSelected(entityId, selection))
+            | ValueSome(GroundArea area) ->
+              match area with
+              | Circle _
+              | Rectangle _
+              | Cone _
+              | Square _ ->
+                let selection = SelectedPosition mousePosition
+                eventBus.Publish(TargetSelected(entityId, selection))
+
           | ValueSome _
           | ValueNone -> ()
         | _ -> ())
