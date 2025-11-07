@@ -27,6 +27,7 @@ open Pomo.Core.Domains.InputMapping
 open Pomo.Core.Domains.PlayerMovement
 open Pomo.Core.Domains.QuickSlot
 open Pomo.Core.Domains.Targeting
+open Pomo.Core.Domains.ActionHandler
 
 type PomoGame() as this =
   inherit Game()
@@ -42,6 +43,9 @@ type PomoGame() as this =
     || OperatingSystem.IsLinux()
     || OperatingSystem.IsMacOS()
 
+  let playerId = %Guid.NewGuid()
+  let enemyId = %Guid.NewGuid()
+
   let eventBus = new EventBus()
 
   // 1. Create both the mutable source of truth and the public read-only view.
@@ -49,8 +53,9 @@ type PomoGame() as this =
   let skillStore = Stores.Skill.create(JsonFileLoader.readSkills deserializer)
   let targetingService = Targeting.create(worldView, eventBus, skillStore)
 
-  let playerId = %Guid.NewGuid()
-  let enemyId = %Guid.NewGuid()
+  let actionHandler =
+    ActionHandler(worldView, eventBus, targetingService, playerId)
+
 
   do
     base.IsMouseVisible <- true
@@ -150,6 +155,10 @@ type PomoGame() as this =
     eventBus.Publish(
       World.QuickSlotsChanged struct (playerId, HashMap.ofList quickSlots)
     )
+
+    // Start listening to action events
+    actionHandler.ListenToEvents() |> ignore<IDisposable>
+
 
 
   override this.LoadContent() = base.LoadContent()

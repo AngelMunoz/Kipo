@@ -149,4 +149,9 @@ module StateUpdate =
           | EntityDied target ->
             // TODO: Implement entity death logic
             ()
-          | SlotActivated(slot, casterId) -> ())
+          | SlotActivated(slot, casterId) -> ()
+          | AttackIntent(attacker, target) -> failwith "Not Implemented"
+          | SetMovementTarget(mover, targetPosition) ->
+            failwith "Not Implemented"
+          | TargetSelected(selector, targetPosition) ->
+            failwith "Not Implemented")

@@ -153,6 +153,19 @@ module Skill =
     | TargetOffset of struct (float32 * float32)
 
   [<Struct>]
+  type ProjectileInfo = {
+    Speed: float32
+    Collision: CollisionMode
+  }
+
+  [<Struct>]
+  type Delivery =
+    | Instant
+    | Melee
+    | Projectile of projectile: ProjectileInfo
+
+
+  [<Struct>]
   type ActiveSkill = {
     Id: int<SkillId>
     Name: string
@@ -162,6 +175,7 @@ module Skill =
     Cooldown: TimeSpan voption
     Targeting: Targeting
     Range: float32 voption
+    Delivery: Delivery
     Formula: Formula.MathExpr voption
     ElementFormula: Formula.MathExpr voption
     Effects: Effect[]
@@ -511,7 +525,7 @@ module Skill =
           let! type' = Required.Property.get ("Type", Required.string) json
 
           match type'.ToLowerInvariant() with
-          | "instant" -> return Instant
+          | "instant" -> return Duration.Instant
           | "timed" ->
             let! timeSeconds =
               Required.Property.get ("Seconds", Required.float) json
@@ -655,6 +669,15 @@ module Skill =
         }
 
     module GroundAreaKind =
+      /// Examples
+      ///
+      /// { "Type": "Circle", "Radius": 5.0 }
+      ///
+      /// { "Type": "Square", "SideLength": 4.0 }
+      ///
+      /// { "Type": "Cone", "Angle": 45.0, "Length": 10.0 }
+      ///
+      /// { "Type": "Rectangle", "Width": 3.0, "Length": 8.0 }
       let decoder: Decoder<GroundAreaKind> =
         fun json -> decode {
           let! type' = Required.Property.get ("Type", Required.string) json
@@ -728,6 +751,14 @@ module Skill =
           Decode.oneOf [ simpleDecoder; complexDecoder ] json
 
     module CastOrigin =
+
+      /// Examples
+      ///
+      /// { "Type": "Caster" }
+      ///
+      /// { "Type": "CasterOffset", "Offset": [10.0, -5.0] }
+      ///
+      /// { "Type": "TargetOffset", "Offset": [0.0, 15.0] }
       let decoder: Decoder<CastOrigin> =
         fun json -> decode {
           let! type' = Required.Property.get ("Type", Required.string) json
@@ -792,7 +823,107 @@ module Skill =
           }
         }
 
+    module CollisionMode =
+      let decoder: Decoder<CollisionMode> =
+        fun json -> decode {
+          let! modeStr = Required.string json
+
+          match modeStr.ToLowerInvariant() with
+          | "ignoreterrain" -> return IgnoreTerrain
+          | "blockedbyterrain" -> return BlockedByTerrain
+          | _ ->
+            return!
+              DecodeError.ofError(
+                json.Clone(),
+                $"Unknown CollisionMode: {modeStr}"
+              )
+              |> Error
+        }
+
+    module ProjectileInfo =
+      /// Examples
+      ///
+      /// {
+      ///   "Speed": 150.0,
+      ///   "CollisionMode": "IgnoreTerrain"
+      /// }
+      ///
+      /// {
+      ///   "Speed": 300.0,
+      ///   "CollisionMode": "BlockedByTerrain"
+      /// }
+      let decoder: Decoder<ProjectileInfo> =
+        fun json -> decode {
+          let! speed = Required.Property.get ("Speed", Required.float) json
+
+          and! collision =
+            Required.Property.get ("Collision", CollisionMode.decoder) json
+
+          return {
+            Speed = float32 speed
+            Collision = collision
+          }
+        }
+
+
+    module Delivery =
+      /// Examples
+      ///
+      /// { "Type": "Instant" }
+      ///
+      /// { "Type": "Melee" }
+      ///
+      /// { "Type": "Projectile", "Projectile": { "Speed": 150.0, "CollisionMode": "IgnoreTerrain" } }
+      let decoder: Decoder<Delivery> =
+        fun json -> decode {
+          let! type' = Required.Property.get ("Type", Required.string) json
+
+          match type'.ToLowerInvariant() with
+          | "instant" -> return Instant
+          | "melee" -> return Melee
+          | "projectile" ->
+            let! projectile =
+              Required.Property.get ("Projectile", ProjectileInfo.decoder) json
+
+            return Projectile projectile
+          | _ ->
+            return!
+              DecodeError.ofError(
+                json.Clone(),
+                $"Unknown Delivery type: {type'}"
+              )
+              |> Error
+        }
+
     module ActiveSkill =
+      /// Example
+      ///
+      /// {
+      ///   "Id": 101,
+      ///   "Name": "Fireball",
+      ///   "Description": "Hurls a fiery ball that explodes upon impact.",
+      ///   "Intent": "Offensive",
+      ///   "Cost": { "Type": "Mana", "Amount": 20 },
+      ///   "Cooldown": 5.0,
+      ///   "Targeting": "SingleEnemy",
+      ///   "Range": [15.0],
+      ///   "Formula": "MA * 2 + 10",
+      ///   "Delivery": { "Type": "Projectile", "Projectile": { "Speed": 200.0, "CollisionMode": "IgnoreTerrain" } },
+      ///   "ElementFormula": "FireA * 5",
+      ///   "Effects": [
+      ///     {
+      ///       "Name": "Burn",
+      ///       "Kind": "DamageOverTime",
+      ///       "Stacking": { "Type": "RefreshDuration" },
+      ///       "Duration": { "Type": "Timed", "Seconds": 6.0 },
+      ///       "Modifiers": [
+      ///         {
+      ///           "Type": "AbilityDamageMod",
+      ///           "AbilityDamageValue": "MA * 1.5",
+      ///           "Element": "Fire"
+      ///         }
+      ///       ]
+      ///    }
       let decoder: Decoder<ActiveSkill> =
         fun json -> decode {
           let! id = Required.Property.get ("Id", Required.int) json
@@ -830,6 +961,9 @@ module Skill =
 
           and! formula = Optional.Property.get ("Formula", Formula.decoder) json
 
+          and! delivery =
+            Required.Property.get ("Delivery", Delivery.decoder) json
+
           and! elementFormula =
             Optional.Property.get ("ElementFormula", Formula.decoder) json
 
@@ -851,6 +985,7 @@ module Skill =
               |> Option.toValueOption
             Targeting = targeting
             Range = rangeOpt |> Option.toValueOption
+            Delivery = delivery
             Formula = formula |> Option.toValueOption
             ElementFormula = elementFormula |> Option.toValueOption
             Effects = effects

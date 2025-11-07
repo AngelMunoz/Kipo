@@ -106,6 +106,9 @@ module World =
       caster: Guid<EntityId> *
       skillId: int<SkillId> *
       abilityIntentTarget: Guid<EntityId> voption
+    | AttackIntent of attacker: Guid<EntityId> * target: Guid<EntityId>
+    | SetMovementTarget of mover: Guid<EntityId> * targetPosition: Vector2
+    | TargetSelected of selector: Guid<EntityId> * targetPosition: Vector2
     | DamageDealt of target: Guid<EntityId> * amount: int
     | EntityDied of target: Guid<EntityId>
     // Attribute and Effect events

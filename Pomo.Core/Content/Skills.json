@@ -9,6 +9,7 @@
     "Cooldown": 1.5,
     "Targeting": "SingleEnemy",
     "Range": [32.0],
+    "Delivery": { "Type": "Melee" },
     "Formula": "AP * 1.0",
     "Effects": [],
     "Origin": { "Type": "Caster" }
@@ -23,6 +24,11 @@
     "Cooldown": 3.0,
     "Targeting": "SingleEnemy",
     "Range": [32, 5],
+    "Delivery": {
+      "Type": "Projectile",
+      "Speed": 200.0,
+      "CollisionMode": "IgnoreTerrain"
+    },
     "Formula": "MA * 1.5",
     "ElementFormula": "FireA * 2.0",
     "CastingTime": 0.5,
