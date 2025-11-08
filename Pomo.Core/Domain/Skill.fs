@@ -830,9 +830,7 @@ module Skill =
           | "instant" -> return Instant
           | "melee" -> return Melee
           | "projectile" ->
-            let! projectile =
-              Required.Property.get ("Projectile", ProjectileInfo.decoder) json
-
+            let! projectile = ProjectileInfo.decoder json
             return Projectile projectile
           | _ ->
             return!

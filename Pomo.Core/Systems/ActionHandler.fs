@@ -19,13 +19,48 @@ module ActionHandler =
   type ActionHandlerService =
     abstract member StartListening: unit -> IDisposable
 
-  // TODO: This is a placeholder. A real implementation would need to check
-  // entity bounding boxes against the click position.
-  let findEntityAtPosition
+  let private createHoveredEntityProjection
     (world: World)
-    (position: Vector2)
-    : Guid<EntityId> voption =
-    ValueNone
+    (playerId: Guid<EntityId>)
+    =
+    adaptive {
+      let! mousePositionAval =
+        world.RawInputStates
+        |> AMap.tryFind playerId
+        |> AVal.map(
+          Option.map(fun state ->
+            let ms = state.Mouse
+            Vector2(float32 ms.Position.X, float32 ms.Position.Y))
+        )
+
+      return!
+        world.Positions
+        |> AMap.fold
+          (fun (acc: _ option) entityId entityPos ->
+            if acc.IsSome then
+              acc
+            else
+              mousePositionAval
+              |> Option.bind(fun mousePos ->
+                if entityId = playerId then
+                  None
+                else
+                  let entitySize = Vector2(32.0f, 32.0f)
+
+                  let entityBounds =
+                    Microsoft.Xna.Framework.Rectangle(
+                      int entityPos.X,
+                      int entityPos.Y,
+                      int entitySize.X,
+                      int entitySize.Y
+                    )
+
+                  if entityBounds.Contains mousePos then
+                    Some entityId
+                  else
+                    None))
+          None
+    }
 
   let create
     (
@@ -34,6 +69,8 @@ module ActionHandler =
       targetingService: TargetingService,
       entityId: Guid<EntityId>
     ) =
+    let hoveredEntityAval = createHoveredEntityProjection world entityId
+
     { new ActionHandlerService with
         member _.StartListening() =
           eventBus
@@ -66,16 +103,17 @@ module ActionHandler =
                 let targetingMode =
                   targetingService.TargetingMode |> AVal.force
 
+                // Get the entity under the cursor AT THIS MOMENT by forcing the projection.
+                let clickedEntity = hoveredEntityAval |> AVal.force
+
                 match targetingMode with
                 | ValueNone ->
                   // NOT targeting: This is a click to move or attack
-                  let clickedEntity = findEntityAtPosition world mousePosition
-
                   match clickedEntity with
-                  | ValueSome clickedEntityId ->
+                  | Some clickedEntityId ->
                     // An entity was clicked, publish an attack intent
                     eventBus.Publish(AttackIntent(entityId, clickedEntityId))
-                  | ValueNone ->
+                  | None ->
                     // Nothing was clicked, publish a movement command
                     eventBus.Publish(
                       SetMovementTarget(entityId, mousePosition)
@@ -87,14 +125,12 @@ module ActionHandler =
 
                 | ValueSome SingleAlly
                 | ValueSome SingleEnemy ->
-                  let clickedEntity = findEntityAtPosition world mousePosition
-
                   match clickedEntity with
-                  | ValueSome clickedEntityId ->
+                  | Some clickedEntityId ->
                     // TODO: Validate if it's an ally/enemy
                     let selection = SelectedEntity clickedEntityId
                     eventBus.Publish(TargetSelected(entityId, selection))
-                  | ValueNone ->
+                  | None ->
                     // Invalid target, do nothing for now
                     ()
 

@@ -22,7 +22,6 @@ module Projectile =
       // This inner block will only re-run if these specific positions change.
       let! projPos = positions |> AMap.tryFind projectileId
       let! targetPos = positions |> AMap.tryFind projectile.Target
-
       let mutable events = IndexList.empty
 
       match projPos, targetPos with

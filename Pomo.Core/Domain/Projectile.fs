@@ -94,7 +94,7 @@ module Projectile =
           let! speed = Required.Property.get ("Speed", Required.float) json
 
           and! collision =
-            Required.Property.get ("Collision", CollisionMode.decoder) json
+            Required.Property.get ("CollisionMode", CollisionMode.decoder) json
 
           and! kind =
             Optional.Property.get ("Kind", ProjectileKind.decoder) json

@@ -29,7 +29,7 @@
     <Compile Include="PomoGame.fs" />
   </ItemGroup>
   <ItemGroup>
-    <Content Include="Content\Skills.json">
+    <Content Include="Content/Skills.json">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
   </ItemGroup>

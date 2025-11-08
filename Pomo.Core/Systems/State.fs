@@ -49,11 +49,18 @@ module StateUpdate =
       =
       world.MovementStates[entity] <- movementState
 
-    let inline createProjectile
+    let createProjectile
       (world: MutableWorld)
       struct (entity: Guid<EntityId>, projectile: Projectile.LiveProjectile)
       =
-      world.LiveProjectiles[entity] <- projectile
+      // Get caster's position to use as the projectile's starting position.
+      match world.Positions.TryGetValue(projectile.Caster) with
+      | Some casterPos ->
+        // A projectile needs a position and velocity to exist in the world.
+        world.Positions[entity] <- casterPos
+        world.Velocities[entity] <- Vector2.Zero
+        world.LiveProjectiles[entity] <- projectile
+      | None -> () // Caster has no position, so we can't create the projectile.
 
   module RawInput =
     let inline updateState
@@ -96,7 +103,7 @@ module StateUpdate =
       =
       world.QuickSlots[id] <- quickSlots
 
-    let inline dealDamage
+    let dealDamage
       (world: MutableWorld)
       (eventBus: EventBus)
       (targetId: Guid<EntityId>)
