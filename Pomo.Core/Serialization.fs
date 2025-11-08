@@ -26,6 +26,7 @@ let private JsonSerializerOptions =
   |> Codec.useDecoder EffectModifier.decoder
   |> Codec.useDecoder Effect.decoder
   |> Codec.useDecoder SkillIntent.decoder
+  |> Codec.useDecoder DamageSource.decoder
   |> Codec.useDecoder PassiveSkill.decoder
   |> Codec.useDecoder ActiveSkill.decoder
   |> Codec.useDecoder Skill.decoder

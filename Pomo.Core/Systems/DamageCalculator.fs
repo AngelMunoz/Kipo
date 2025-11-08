@@ -1,6 +1,7 @@
 namespace Pomo.Core.Systems
 
 open System
+open FSharp.Data.Adaptive
 open Pomo.Core.Domain
 open Pomo.Core.Domain.Entity
 open Pomo.Core.Domain.Skill
@@ -35,13 +36,13 @@ module DamageCalculator =
       max 0.05 (min 0.95 chance)
 
   let calculateFinalDamage
-    (rng: System.Random)
+    (rng: Random)
     (attackerStats: DerivedStats)
     (defenderStats: DerivedStats)
     (skill: ActiveSkill)
     =
     // 1. Hit/Evasion
-    let hitRoll = rng.NextDouble() * 100.0
+    let hitRoll = rng.NextDouble()
     let hitChance = calculateHitChance attackerStats defenderStats
 
     if hitRoll > hitChance then
@@ -57,17 +58,22 @@ module DamageCalculator =
         |> ValueOption.map(evaluate attackerStats)
         |> ValueOption.defaultValue 0.0
 
-      // TODO: This assumes the element is in the formula name (e.g., FireA).
-      // A more robust solution might be needed if skills can have elements
-      // independent of their formula variables.
-      let elementalDamage =
-        skill.ElementFormula
-        |> ValueOption.map(_.Formula >> evaluate attackerStats)
-        |> ValueOption.defaultValue 0.0
+      let elementalDamage, elementalResistance =
+        match skill.ElementFormula with
+        | ValueSome ef ->
+          let dmg = evaluate attackerStats ef.Formula
+
+          let res =
+            defenderStats.ElementResistances
+            |> HashMap.tryFind ef.Element
+            |> Option.defaultValue 0.0
+
+          (dmg, res)
+        | ValueNone -> (0.0, 0.0)
 
       // 3. Critical Hit
-      let critRoll = rng.NextDouble() * 100.0
-      let isCritical = critRoll < float attackerStats.LK * 0.01
+      let critRoll = rng.NextDouble()
+      let isCritical = critRoll < (float attackerStats.LK * 0.01)
 
       let critBonus =
         if isCritical then
@@ -76,18 +82,17 @@ module DamageCalculator =
           0.0
 
       // 4. Elemental Resistance
-      // This part is tricky without knowing the skill's element.
-      // For now, we'll assume no resistance.
-      // TODO: Determine skill's element to apply correct resistance.
-      let damageAfterResistance = baseDamage + elementalDamage
+      let elementalDamageAfterResistance =
+        elementalDamage * (1.0 - elementalResistance)
 
       // 5. Combine
-      let totalDamage = damageAfterResistance + critBonus
+      let totalDamage = baseDamage + elementalDamageAfterResistance + critBonus
 
       // 6. Mitigation
-      // TODO: Determine if damage is Physical or Magical to use DP or MD.
-      // For now, we'll assume physical and use DP.
-      let damageAfterMitigation = totalDamage - (float defenderStats.DP)
+      let damageAfterMitigation =
+        match skill.DamageSource with
+        | Physical -> totalDamage - (float defenderStats.DP)
+        | Magical -> totalDamage - (float defenderStats.MD)
 
       let finalDamage = max 0 (int damageAfterMitigation)
 

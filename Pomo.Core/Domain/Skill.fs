@@ -114,6 +114,11 @@ module Skill =
     | Supportive
 
   [<Struct>]
+  type DamageSource =
+    | Physical
+    | Magical
+
+  [<Struct>]
   type PassiveSkill = {
     Id: int<SkillId>
     Name: string
@@ -167,6 +172,7 @@ module Skill =
     Name: string
     Description: string
     Intent: SkillIntent
+    DamageSource: DamageSource
     Cost: ResourceCost voption
     Cooldown: TimeSpan voption
     Targeting: Targeting
@@ -666,6 +672,23 @@ module Skill =
               |> Error
         }
 
+    module DamageSource =
+      let decoder: Decoder<DamageSource> =
+        fun json -> decode {
+          let! sourceStr = Required.string json
+
+          match sourceStr.ToLowerInvariant() with
+          | "physical" -> return Physical
+          | "magical" -> return Magical
+          | _ ->
+            return!
+              DecodeError.ofError(
+                json.Clone(),
+                $"Unknown DamageSource: {sourceStr}"
+              )
+              |> Error
+        }
+
     module ResourceCost =
       let decoder: Decoder<ResourceCost> =
         fun json -> decode {
@@ -765,57 +788,61 @@ module Skill =
           Decode.oneOf [ simpleDecoder; complexDecoder ] json
 
     module CastOrigin =
-
-      /// Examples
-      ///
-      /// { "Type": "Caster" }
-      ///
-      /// { "Type": "CasterOffset", "Offset": [10.0, -5.0] }
-      ///
-      /// { "Type": "TargetOffset", "Offset": [0.0, 15.0] }
-      let decoder: Decoder<CastOrigin> =
+      let private simpleDecoder: Decoder<CastOrigin> =
         fun json -> decode {
-          let! type' = Required.Property.get ("Type", Required.string) json
+          let! originStr = Required.string json
 
-          match type'.ToLowerInvariant() with
+          match originStr.ToLowerInvariant() with
           | "caster" -> return Caster
-          | "casteroffset" ->
+          | _ ->
+            return!
+              DecodeError.ofError(
+                json.Clone(),
+                $"Unknown simple CastOrigin: {originStr}"
+              )
+              |> Error
+        }
 
-            let! offset =
-              Required.Property.array ("Offset", Required.float) json
+      let private complexDecoder: Decoder<CastOrigin> =
+        fun json -> decode {
+          let! offset =
+            Optional.Property.array ("CasterOffset", Required.float) json
 
-            if offset.Length <> 2 then
-              return!
-                DecodeError.ofError(
-                  json.Clone(),
-                  "CasterOffset requires exactly 2 float values"
-                )
-                |> Error
-            else
+          match offset with
+          | Some [| x; y |] ->
+            return CasterOffset struct (float32 x, float32 y)
+          | Some _ ->
+            return!
+              DecodeError.ofError(
+                json.Clone(),
+                "CasterOffset requires exactly 2 float values"
+              )
+              |> Error
+          | None ->
+            let! targetOffset =
+              Optional.Property.array ("TargetOffset", Required.float) json
 
-            return CasterOffset struct (float32 offset[0], float32 offset[1])
-          | "targetoffset" ->
-            let! offset =
-              Required.Property.array ("Offset", Required.float) json
-
-            if offset.Length <> 2 then
+            match targetOffset with
+            | Some [| x; y |] ->
+              return TargetOffset struct (float32 x, float32 y)
+            | Some _ ->
               return!
                 DecodeError.ofError(
                   json.Clone(),
                   "TargetOffset requires exactly 2 float values"
                 )
                 |> Error
-            else
-
-            return TargetOffset struct (float32 offset[0], float32 offset[1])
-          | _ ->
-            return!
-              DecodeError.ofError(
-                json.Clone(),
-                $"Unknown CastOrigin type: {type'}"
-              )
-              |> Error
+            | None ->
+              return!
+                DecodeError.ofError(
+                  json.Clone(),
+                  "Expected 'Caster', 'CasterOffset', or 'TargetOffset'"
+                )
+                |> Error
         }
+
+      let decoder: Decoder<CastOrigin> =
+        Decode.oneOf [ simpleDecoder; complexDecoder ]
 
     module PassiveSkill =
       let decoder: Decoder<PassiveSkill> =
@@ -865,34 +892,6 @@ module Skill =
         }
 
     module ActiveSkill =
-      /// Example
-      ///
-      /// {
-      ///   "Id": 101,
-      ///   "Name": "Fireball",
-      ///   "Description": "Hurls a fiery ball that explodes upon impact.",
-      ///   "Intent": "Offensive",
-      ///   "Cost": { "Type": "Mana", "Amount": 20 },
-      ///   "Cooldown": 5.0,
-      ///   "Targeting": "SingleEnemy",
-      ///   "Range": [15.0],
-      ///   "Formula": "MA * 2 + 10",
-      ///   "Delivery": { "Type": "Projectile", "Projectile": { "Speed": 200.0, "CollisionMode": "IgnoreTerrain" } },
-      ///   "ElementFormula": { "Element": "Fire", "Formula": "FireA * 2.0" },
-      ///   "Effects": [
-      ///     {
-      ///       "Name": "Burn",
-      ///       "Kind": "DamageOverTime",
-      ///       "Stacking": { "Type": "RefreshDuration" },
-      ///       "Duration": { "Type": "Timed", "Seconds": 6.0 },
-      ///       "Modifiers": [
-      ///         {
-      ///           "Type": "AbilityDamageMod",
-      ///           "AbilityDamageValue": "MA * 1.5",
-      ///           "Element": "Fire"
-      ///         }
-      ///       ]
-      ///    }
       let decoder: Decoder<ActiveSkill> =
         fun json -> decode {
           let! id = Required.Property.get ("Id", Required.int) json
@@ -903,6 +902,9 @@ module Skill =
 
           and! intent =
             Required.Property.get ("Intent", SkillIntent.decoder) json
+
+          and! damageSource =
+            Required.Property.get ("DamageSource", DamageSource.decoder) json
 
           and! cost = Optional.Property.get ("Cost", ResourceCost.decoder) json
 
@@ -949,6 +951,7 @@ module Skill =
             Name = name
             Description = description
             Intent = intent
+            DamageSource = damageSource
             Cost = cost |> Option.toValueOption
             Cooldown =
               cooldownOpt
