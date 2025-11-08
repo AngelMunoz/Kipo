@@ -5,7 +5,7 @@ open Pomo.Core.Domain.Entity
 open Pomo.Core.Domain.Systems
 
 module Systems =
-  type StatSystem(game: Microsoft.Xna.Framework.Game) as this =
+  type StatSystem(game: Microsoft.Xna.Framework.Game) =
     inherit GameSystem(game)
 
     override _.Kind = SystemKind.Game // Or a new SystemKind.Attributes

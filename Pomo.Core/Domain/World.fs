@@ -34,6 +34,7 @@ module World =
     BaseStats: cmap<Guid<EntityId>, Entity.BaseStats>
     DerivedStats: cmap<Guid<EntityId>, Entity.DerivedStats>
     ActiveEffects: cmap<Guid<EntityId>, Skill.Effect IndexList>
+    AbilityCooldowns: cmap<Guid<EntityId>, HashMap<int<SkillId>, TimeSpan>>
     LiveProjectiles: cmap<Guid<EntityId>, Projectile.LiveProjectile>
   }
 
@@ -55,6 +56,7 @@ module World =
     abstract BaseStats: amap<Guid<EntityId>, Entity.BaseStats>
     abstract DerivedStats: amap<Guid<EntityId>, Entity.DerivedStats>
     abstract ActiveEffects: amap<Guid<EntityId>, Skill.Effect IndexList>
+    abstract AbilityCooldowns: amap<Guid<EntityId>, HashMap<int<SkillId>, TimeSpan>>
     abstract LiveProjectiles: amap<Guid<EntityId>, Projectile.LiveProjectile>
 
 
@@ -73,6 +75,7 @@ module World =
       BaseStats = cmap()
       DerivedStats = cmap()
       ActiveEffects = cmap()
+      AbilityCooldowns = cmap()
       LiveProjectiles = cmap()
     }
 
@@ -91,6 +94,7 @@ module World =
           member _.BaseStats = mutableWorld.BaseStats
           member _.DerivedStats = mutableWorld.DerivedStats
           member _.ActiveEffects = mutableWorld.ActiveEffects
+          member _.AbilityCooldowns = mutableWorld.AbilityCooldowns
           member _.LiveProjectiles = mutableWorld.LiveProjectiles
       }
 
@@ -127,6 +131,10 @@ module World =
       statsChanged: struct (Guid<EntityId> * Entity.BaseStats)
     | QuickSlotsChanged of
       qsChanged: struct (Guid<EntityId> * HashMap<GameAction, int<SkillId>>)
+    | CooldownsChanged of
+      cdChanged: struct (Guid<EntityId> * HashMap<int<SkillId>, TimeSpan>)
+    // UI Events
+    | ShowNotification of message: string * position: Vector2
     // Combat and Skill events
     | SlotActivated of slot: GameAction * casterId: Guid<EntityId>
     | AbilityIntent of

@@ -17,17 +17,17 @@ open Pomo.Core
 open Pomo.Core.Domain
 open Pomo.Core.Domain.Action
 open Pomo.Core.Domain.EventBus
-open Pomo.Core.Domain.Systems
 open Pomo.Core.Domains
+open Pomo.Core.Domains.Combat
 open Pomo.Core.Domains.StateUpdate
 open Pomo.Core.Domains.Movement
 open Pomo.Core.Domains.Render
 open Pomo.Core.Domains.RawInput
 open Pomo.Core.Domains.InputMapping
 open Pomo.Core.Domains.PlayerMovement
-open Pomo.Core.Domains.QuickSlot
 open Pomo.Core.Domains.Targeting
 open Pomo.Core.Systems
+open Pomo.Core.Systems.AbilityActivation
 
 type PomoGame() as this =
   inherit Game()
@@ -79,8 +79,8 @@ type PomoGame() as this =
     base.Components.Add(new RawInputSystem(this, playerId))
     base.Components.Add(new InputMappingSystem(this, playerId))
     base.Components.Add(new PlayerMovementSystem(this, playerId))
-    base.Components.Add(new QuickSlotSystem(this, playerId))
-    base.Components.Add(new Combat.CombatSystem(this))
+    base.Components.Add(new AbilityActivationSystem(this, playerId))
+    base.Components.Add(new CombatSystem(this))
     base.Components.Add(new ProjectileSystem(this))
     base.Components.Add(new MovementSystem(this))
     base.Components.Add(new RenderSystem(this, playerId))

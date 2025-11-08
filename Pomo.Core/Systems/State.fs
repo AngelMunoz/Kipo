@@ -204,4 +204,6 @@ module StateUpdate =
             Entity.updateMovementState mutableWorld mStateChanged
           | ProjectileImpacted _ -> () // Handled by CombatSystem
           | CreateProjectile projectile ->
-            Entity.createProjectile mutableWorld projectile)
+            Entity.createProjectile mutableWorld projectile
+          | CooldownsChanged(cdChanged) -> failwith "Not Implemented"
+          | ShowNotification(message, position) -> failwith "Not Implemented")
