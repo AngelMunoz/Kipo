@@ -30,7 +30,7 @@
       "CollisionMode": "IgnoreTerrain"
     },
     "Formula": "MA * 1.5",
-    "ElementFormula": "FireA * 2.0",
+    "ElementFormula": { "Element": "Fire", "Formula": "FireA * 2.0" },
     "CastingTime": 0.5,
     "Origin": { "Type": "CasterOffset", "Offset": [16.0, -16.0] },
     "Effects": []

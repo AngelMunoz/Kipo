@@ -51,9 +51,10 @@ This is the core of the task. We'll replace the let damage = 10 placeholder in C
       4.  Damage Calculation:
           - If there's a skill.Formula, call FormulaEvaluator.evaluate to get the base damage.
           - If there's an skill.ElementFormula, evaluate that too.
-          - Combine them to get total pre-mitigation damage.
       5.  Critical Hit: Check for a critical hit based on the attacker's LK. Apply bonus damage if needed.
-      6.  Mitigation: Reduce the damage based on the target's DP (for physical) or MD (for magical).
-      7.  Publish Events: Publish the final DamageDealt event with the calculated amount. Also publish CriticalHit or Evaded events for floating text.
+      6.  Apply Elemental Resistance to ElementFormula damage if applicable.
+      7.  Combine the results to get the final damage amount.
+      8.  Mitigation: Reduce the damage based on the target's DP (for physical) or MD (for magical).
+      9.  Publish Events: Publish the final DamageDealt event with the calculated amount. Also publish CriticalHit or Evaded events for floating text.
 
 This revised plan leverages the existing code and focuses on the missing pieces: the StatSystem, the validation logic, and the formula evaluation pipeline.
