@@ -212,4 +212,5 @@ module StateUpdate =
           | CreateProjectile projectile ->
             Entity.createProjectile mutableWorld projectile
           | CooldownsChanged cdChanged -> Combat.updateCooldowns mutableWorld cdChanged
-          | ShowNotification(message, position) -> failwith "Not Implemented")
+          | ShowNotification _ -> ()
+      )

@@ -28,6 +28,7 @@ open Pomo.Core.Domains.Targeting
 open Pomo.Core.Systems
 open Pomo.Core.Systems.AbilityActivation
 open Pomo.Core.Systems.Combat
+open Pomo.Core.Systems.Notification
 
 type PomoGame() as this =
   inherit Game()
@@ -83,6 +84,7 @@ type PomoGame() as this =
     base.Components.Add(new CombatSystem(this))
     base.Components.Add(new ProjectileSystem(this))
     base.Components.Add(new MovementSystem(this))
+    base.Components.Add(new NotificationSystem(this, eventBus))
     base.Components.Add(new RenderSystem(this, playerId))
     base.Components.Add(new StateUpdateSystem(this, mutableWorld))
 

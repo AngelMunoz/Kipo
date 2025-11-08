@@ -20,6 +20,7 @@
     <Compile Include="Systems/Combat.fs" />
     <Compile Include="Systems/InputMapping.fs" />
     <Compile Include="Systems/PlayerMovement.fs" />
+    <Compile Include="Systems/Notification.fs" />
     <Compile Include="Systems/Projectile.fs" />
     <Compile Include="Systems/Targeting.fs" />
     <Compile Include="Systems/AbilityActivation.fs" />
