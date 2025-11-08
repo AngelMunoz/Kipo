@@ -5,6 +5,7 @@ open FSharp.UMX
 open FSharp.Data.Adaptive
 open Microsoft.Xna.Framework
 open Pomo.Core.Domain.Units
+open Pomo.Core.Domain.Core
 
 module Entity =
 
@@ -54,17 +55,6 @@ module Entity =
   type Profession = { Family: Family; Stage: Stage }
 
   [<Struct>]
-  type Element =
-    | Fire
-    | Water
-    | Earth
-    | Air
-    | Lightning
-    | Light
-    | Dark
-    | Neutral
-
-  [<Struct>]
   type BaseStats = {
     Power: int
     Magic: int
@@ -91,7 +81,7 @@ module Entity =
     DP: int
     HV: int
     // Movement
-    MovementSpeed: int
+    MS: int
 
     // Element % of attributes and resistances
     ElementAttributes: HashMap<Element, float>
@@ -101,26 +91,6 @@ module Entity =
 
   module Serialization =
     open JDeck
-
-    module Element =
-      let decoder: Decoder<Element> =
-        fun json -> decode {
-          let! elemStr = Required.string json
-
-          match elemStr with
-          | "Fire" -> return Fire
-          | "Water" -> return Water
-          | "Earth" -> return Earth
-          | "Air" -> return Air
-          | "Lightning" -> return Lightning
-          | "Light" -> return Light
-          | "Dark" -> return Dark
-          | "Neutral" -> return Neutral
-          | other ->
-            return!
-              DecodeError.ofError(json.Clone(), $"Unknown Element: {other}")
-              |> Error
-        }
 
     module Status =
       let decoder: Decoder<Status> =

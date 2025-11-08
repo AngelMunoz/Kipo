@@ -13,6 +13,16 @@ module Units =
 
 
 module Core =
+  [<Struct>]
+  type Element =
+    | Fire
+    | Water
+    | Earth
+    | Air
+    | Lightning
+    | Light
+    | Dark
+    | Neutral
 
   [<Struct>]
   type Stat =
@@ -29,17 +39,40 @@ module Core =
     | HP // Health Pool
     | DP // Defense Points
     | HV // Evasion
-    | MovementSpeed // Movement Speed
+    | MS // Movement Speed
+    | ElementResistance of ofElement: Element
+    | ElementAttribute of ofElement: Element
 
   [<Struct>]
   type StatModifier =
-    | Additive of addStat: Stat * adStatValue: int
+    | Additive of addStat: Stat * adStatValue: float
     | Multiplicative of mulStat: Stat * mulStatValue: float
 
 
 
   module Serialization =
     open JDeck
+
+    module Element =
+      let decoder: Decoder<Element> =
+        fun json -> decode {
+          let! elemStr = Required.string json
+
+          match elemStr with
+          | "Fire" -> return Fire
+          | "Water" -> return Water
+          | "Earth" -> return Earth
+          | "Air" -> return Air
+          | "Lightning" -> return Lightning
+          | "Light" -> return Light
+          | "Dark" -> return Dark
+          | "Neutral" -> return Neutral
+          | other ->
+            return!
+              DecodeError.ofError(json.Clone(), $"Unknown Element: {other}")
+              |> Error
+        }
+
 
     module Stat =
       let decoder: Decoder<Stat> =
@@ -59,7 +92,23 @@ module Core =
           | "HP" -> return HP
           | "DP" -> return DP
           | "HV" -> return HV
-          | "MovementSpeed" -> return MovementSpeed
+          | "MS" -> return MS
+          | "ElementRes:Fire" -> return ElementResistance Fire
+          | "ElementRes:Water" -> return ElementResistance Water
+          | "ElementRes:Earth" -> return ElementResistance Earth
+          | "ElementRes:Air" -> return ElementResistance Air
+          | "ElementRes:Lightning" -> return ElementResistance Lightning
+          | "ElementRes:Light" -> return ElementResistance Light
+          | "ElementRes:Dark" -> return ElementResistance Dark
+          | "ElementRes:Neutral" -> return ElementResistance Neutral
+          | "ElementAttr:Fire" -> return ElementAttribute Fire
+          | "ElementAttr:Water" -> return ElementAttribute Water
+          | "ElementAttr:Earth" -> return ElementAttribute Earth
+          | "ElementAttr:Air" -> return ElementAttribute Air
+          | "ElementAttr:Lightning" -> return ElementAttribute Lightning
+          | "ElementAttr:Light" -> return ElementAttribute Light
+          | "ElementAttr:Dark" -> return ElementAttribute Dark
+          | "ElementAttr:Neutral" -> return ElementAttribute Neutral
           | _ ->
             return!
               DecodeError.ofError(json.Clone(), $"Unknown Stat: {statStr}")
@@ -78,11 +127,11 @@ module Core =
           match modifierType with
           | "Additive" ->
             let! stat = Required.Property.get ("stat", Stat.decoder) json
-            let! value = Required.Property.get ("value", Required.int) json
+            and! value = Required.Property.get ("value", Required.float) json
             return Additive(stat, value)
           | "Multiplicative" ->
             let! stat = Required.Property.get ("stat", Stat.decoder) json
-            let! value = Required.Property.get ("value", Required.float) json
+            and! value = Required.Property.get ("value", Required.float) json
             return Multiplicative(stat, value)
           | _ ->
             return!

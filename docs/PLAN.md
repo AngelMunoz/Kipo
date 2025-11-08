@@ -125,12 +125,12 @@ module Systems =
 - **Systems to Implement:**
   - `CombatSystem`
 - **✅ Verification Checklist:**
-  - [ ] Does a second "enemy" entity appear at launch?
-  - [ ] Does pressing an "attack" key publish an `AttackIntent`?
-  - [ ] Does the `CombatSystem` publish a `DamageDealt` event?
-  - [ ] Does the target's health (in a debug renderer) decrease?
-  - [ ] Does the target entity disappear from the screen upon death?
-  - [ ] Is the `Health` cmap updated only by the `StateUpdateSystem`?
+  - [x] Does a second "enemy" entity appear at launch?
+  - [x] Does pressing an "attack" key publish an `AttackIntent`?
+  - [x] Does the `CombatSystem` publish a `DamageDealt` event?
+  - [x] Does the target's health (in a debug renderer) decrease?
+  - [x] Does the target entity disappear from the screen upon death?
+  - [x] Is the `Health` cmap updated only by the `StateUpdateSystem`?
 
 ## 7. Phase 3: Advanced Systems (Abilities & Stats)
 

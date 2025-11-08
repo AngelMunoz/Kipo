@@ -70,7 +70,7 @@ module PlayerMovement =
       let movementSpeed =
         this.World.DerivedStats
         |> AMap.tryFind playerId
-        |> AVal.map(Option.map _.MovementSpeed)
+        |> AVal.map(Option.map _.MS)
         |> AVal.force
         |> Option.defaultValue 100
 
