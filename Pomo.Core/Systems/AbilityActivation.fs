@@ -73,12 +73,13 @@ module AbilityActivation =
 
     let validate
       (world: World)
-      (gameTime: TimeSpan)
       (skillStore: SkillStore)
       (casterId: Guid<EntityId>)
       (skillId: int<SkillId>)
       =
       adaptive {
+        let! gameTime = world.DeltaTime
+
         match skillStore.tryFind skillId with
         | ValueNone -> return Error SkillNotFound
         | ValueSome(Passive _) -> return Error CannotActivatePassiveSkill
@@ -136,12 +137,7 @@ module AbilityActivation =
           match slots |> HashMap.tryFindV action with
           | ValueSome skillId ->
             let validationResult =
-              Validation.validate
-                this.World
-                gameTime.TotalGameTime
-                skillStore
-                playerId
-                skillId
+              Validation.validate this.World skillStore playerId skillId
               |> AVal.force
 
             match validationResult with
