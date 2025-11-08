@@ -133,8 +133,8 @@ module AbilityActivation =
         | UseSlot6
         | UseSlot7
         | UseSlot8 ->
-          match slots.TryFind action with
-          | Some skillId ->
+          match slots |> HashMap.tryFindV action with
+          | ValueSome skillId ->
             let validationResult =
               Validation.validate
                 this.World
@@ -154,5 +154,5 @@ module AbilityActivation =
                 |> Option.defaultWith(fun () -> Vector2.Zero)
 
               this.EventBus.Publish(ShowNotification($"{msg}", casterPos))
-          | None -> () // Slot is empty
+          | ValueNone -> () // Slot is empty
         | _ -> ()
