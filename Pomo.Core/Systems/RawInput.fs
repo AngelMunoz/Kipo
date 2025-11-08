@@ -13,6 +13,7 @@ open Pomo.Core.Domain.RawInput
 module RawInput =
   open Microsoft.Xna.Framework
 
+
   type RawInputSystem(game: Game, entityId: Guid<EntityId>) as this =
     inherit GameSystem(game)
 

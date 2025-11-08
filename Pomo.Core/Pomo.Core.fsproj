@@ -1,4 +1,4 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <TargetFramework>net9.0</TargetFramework>
     <Platforms>AnyCPU</Platforms>
@@ -8,27 +8,31 @@
     <Compile Include="Domain/Core.fs" />
     <Compile Include="Domain/Input.fs" />
     <Compile Include="Domain/Entity.fs" />
+    <Compile Include="Domain/Projectile.fs" />
     <Compile Include="Domain/Skill.fs" />
     <Compile Include="Domain/World.fs" />
     <Compile Include="Serialization.fs" />
     <Compile Include="Stores.fs" />
     <Compile Include="Projections.fs" />
+    <Compile Include="Systems/Attributes.fs" />
+    <Compile Include="Systems/Combat.fs" />
     <Compile Include="Systems/InputMapping.fs" />
     <Compile Include="Systems/PlayerMovement.fs" />
+    <Compile Include="Systems/Projectile.fs" />
+    <Compile Include="Systems/Targeting.fs" />
     <Compile Include="Systems/QuickSlot.fs" />
     <Compile Include="Systems/RawInput.fs" />
+    <Compile Include="Systems/ActionHandler.fs" /><Compile Include="Systems/Navigation.fs" />
     <Compile Include="Systems/Movement.fs" />
     <Compile Include="Systems/Render.fs" />
     <Compile Include="Systems/State.fs" />
     <Compile Include="PomoGame.fs" />
   </ItemGroup>
-
   <ItemGroup>
-    <Content Include="Content\Skills.json">
+    <Content Include="Content/Skills.json">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
   </ItemGroup>
-
   <ItemGroup>
     <PackageReference Include="FSharp.Data.Adaptive" Version="1.2.25" />
     <PackageReference Include="FSharp.UMX" Version="1.1.0" />

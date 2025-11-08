@@ -34,12 +34,12 @@ module QuickSlot =
 
       for action in actions do
         match action with
-        | UseSlot1 -> Debug.WriteLine("Used Quick Slot 1")
-        | UseSlot2 -> Debug.WriteLine("Used Quick Slot 2")
-        | UseSlot3 -> Debug.WriteLine("Used Quick Slot 3")
-        | UseSlot4 -> Debug.WriteLine("Used Quick Slot 4")
-        | UseSlot5 -> Debug.WriteLine("Used Quick Slot 5")
-        | UseSlot6 -> Debug.WriteLine("Used Quick Slot 6")
-        | UseSlot7 -> Debug.WriteLine("Used Quick Slot 7")
-        | UseSlot8 -> Debug.WriteLine("Used Quick Slot 8")
+        | UseSlot1
+        | UseSlot2
+        | UseSlot3
+        | UseSlot4
+        | UseSlot5
+        | UseSlot6
+        | UseSlot7
+        | UseSlot8 -> this.EventBus.Publish(SlotActivated(action, playerId))
         | _ -> ()

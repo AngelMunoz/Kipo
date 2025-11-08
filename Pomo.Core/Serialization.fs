@@ -7,6 +7,7 @@ open Pomo.Core.Domain
 open Pomo.Core.Domain.Core.Serialization
 open Pomo.Core.Domain.Entity.Serialization
 open Pomo.Core.Domain.Skill.Serialization
+open Pomo.Core.Domain.Projectile.Serialization
 
 let private JsonSerializerOptions =
   JsonSerializerOptions()
@@ -32,6 +33,10 @@ let private JsonSerializerOptions =
   |> Codec.useDecoder GroundAreaKind.decoder
   |> Codec.useDecoder Targeting.decoder
   |> Codec.useDecoder CastOrigin.decoder
+  |> Codec.useDecoder CollisionMode.decoder
+  |> Codec.useDecoder ProjectileKind.decoder
+  |> Codec.useDecoder ProjectileInfo.decoder
+  |> Codec.useDecoder Delivery.decoder
 
 
 type JDeckDeserializer =
