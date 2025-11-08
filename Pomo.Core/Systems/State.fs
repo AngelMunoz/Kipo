@@ -103,6 +103,12 @@ module StateUpdate =
       =
       world.QuickSlots[id] <- quickSlots
 
+    let inline updateCooldowns
+      (world: MutableWorld)
+      struct (id: Guid<EntityId>, cooldowns: HashMap<int<SkillId>, TimeSpan>)
+      =
+      world.AbilityCooldowns[id] <- cooldowns
+
     let dealDamage
       (world: MutableWorld)
       (eventBus: EventBus)
@@ -205,5 +211,5 @@ module StateUpdate =
           | ProjectileImpacted _ -> () // Handled by CombatSystem
           | CreateProjectile projectile ->
             Entity.createProjectile mutableWorld projectile
-          | CooldownsChanged(cdChanged) -> failwith "Not Implemented"
+          | CooldownsChanged cdChanged -> Combat.updateCooldowns mutableWorld cdChanged
           | ShowNotification(message, position) -> failwith "Not Implemented")

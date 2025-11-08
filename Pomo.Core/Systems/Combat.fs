@@ -1,8 +1,9 @@
-module Pomo.Core.Domains.Combat
+namespace Pomo.Core.Systems
 
 open System
 open Microsoft.Xna.Framework
 open FSharp.UMX
+open FSharp.Data.Adaptive
 
 open Pomo.Core
 open Pomo.Core.Domain
@@ -11,79 +12,158 @@ open Pomo.Core.Domain.World
 open Pomo.Core.Domain.EventBus
 open Pomo.Core.Domain.Skill
 open Pomo.Core.Domain.Systems
+open Pomo.Core.Systems.DamageCalculator
 
-module Handlers =
+module Combat =
 
-  let private handleAbilityIntent
-    (eventBus: EventBus)
-    (skillStore: Stores.SkillStore)
-    (casterId: Guid<EntityId>)
-    (skillId: int<SkillId>)
-    (targetId: Guid<EntityId>)
-    =
-    match skillStore.tryFind skillId with
-    | ValueSome(Skill.Active activeSkill) ->
-      match activeSkill.Delivery with
-      | Delivery.Projectile projectileInfo ->
-        let projectileId = Guid.NewGuid() |> UMX.tag<EntityId>
+  module Handlers =
+    let private handleAbilityIntent
+      (world: World)
+      (eventBus: EventBus)
+      (skillStore: Stores.SkillStore)
+      (casterId: Guid<EntityId>)
+      (skillId: int<SkillId>)
+      (targetId: Guid<EntityId>)
+      =
+      match skillStore.tryFind skillId with
+      | ValueSome(Skill.Active activeSkill) ->
+        // Apply cost and cooldown now that the ability is confirmed
+        let gameTime = world.DeltaTime |> AVal.force
+        let resources = world.Resources |> AMap.force
+        let cooldowns = world.AbilityCooldowns |> AMap.force
 
-        let liveProjectile: Projectile.LiveProjectile = {
-          Caster = casterId
-          Target = targetId
-          SkillId = skillId
-          Info = projectileInfo
-        }
+        // 1. Apply resource cost
+        match activeSkill.Cost with
+        | ValueSome cost ->
+          let currentResources =
+            resources.TryFindV casterId
+            |> ValueOption.defaultValue {
+              HP = 0
+              MP = 0
+              Status = Entity.Status.Dead
+            }
 
-        eventBus.Publish(CreateProjectile struct (projectileId, liveProjectile))
-      | Delivery.Instant -> () // Explicitly ignored for now
-      | Delivery.Melee -> () // Explicitly ignored for now
-    | ValueSome(Skill.Passive _) -> () // Not an active skill, do nothing
-    | ValueNone -> () // Skill not found, do nothing
+          let requiredAmount = cost.Amount |> ValueOption.defaultValue 0
 
-  let private handleProjectileImpact
-    (eventBus: EventBus)
-    (impact: ProjectileImpact)
-    =
-    // TODO: Calculate damage based on stats and formula
-    let damage = 10 // Placeholder damage
-    eventBus.Publish(DamageDealt(impact.TargetId, damage))
+          let newResources =
+            match cost.ResourceType with
+            | Entity.ResourceType.HP -> {
+                currentResources with
+                    HP = currentResources.HP - requiredAmount
+              }
+            | Entity.ResourceType.MP ->
+                {
+                  currentResources with
+                      MP = currentResources.MP - requiredAmount
+                }
 
-  /// The main event handler, with dependencies injected via a tuple.
-  let handleEvent
-    (dependencies: EventBus * Stores.SkillStore)
-    (event: WorldEvent)
-    =
-    let eventBus, skillStore = dependencies
+          eventBus.Publish(ResourcesChanged struct (casterId, newResources))
+        | ValueNone -> ()
 
-    match event with
-    | AbilityIntent(casterId, skillId, ValueSome targetId) ->
-      handleAbilityIntent eventBus skillStore casterId skillId targetId
-    | ProjectileImpacted impact -> handleProjectileImpact eventBus impact
-    | _ -> ()
+        // 2. Apply cooldown
+        match activeSkill.Cooldown with
+        | ValueSome cd ->
+          let currentCooldowns =
+            cooldowns.TryFindV casterId
+            |> ValueOption.defaultValue HashMap.empty
+
+          let readyTime = gameTime + cd
+          let newCooldowns = currentCooldowns.Add(skillId, readyTime)
+          eventBus.Publish(CooldownsChanged struct (casterId, newCooldowns))
+        | ValueNone -> ()
+
+        // 3. Handle delivery
+        match activeSkill.Delivery with
+        | Delivery.Projectile projectileInfo ->
+          let projectileId = Guid.NewGuid() |> UMX.tag<EntityId>
+
+          let liveProjectile: Projectile.LiveProjectile = {
+            Caster = casterId
+            Target = targetId
+            SkillId = skillId
+            Info = projectileInfo
+          }
+
+          eventBus.Publish(
+            CreateProjectile struct (projectileId, liveProjectile)
+          )
+        | Delivery.Instant -> () // TODO: Implement instant-hit logic
+        | Delivery.Melee -> () // TODO: Implement melee-hit logic
+      | _ -> ()
+
+    let private handleProjectileImpact
+      (world: World)
+      (eventBus: EventBus)
+      (skillStore: Stores.SkillStore)
+      (impact: ProjectileImpact)
+      =
+      let stats = world.DerivedStats |> AMap.force
+      let positions = world.Positions |> AMap.force
+
+      match
+        skillStore.tryFind impact.SkillId,
+        stats.TryFindV impact.CasterId,
+        stats.TryFindV impact.TargetId
+      with
+      | ValueSome(Active skill),
+        ValueSome attackerStats,
+        ValueSome defenderStats ->
+        let result =
+          DamageCalculator.calculateFinalDamage
+            world.Rng
+            attackerStats
+            defenderStats
+            skill
+
+        let targetPos =
+          positions.TryFindV impact.TargetId
+          |> ValueOption.defaultValue Vector2.Zero
+
+        if result.IsEvaded then
+          eventBus.Publish(ShowNotification("Miss", targetPos))
+        else
+          eventBus.Publish(DamageDealt(impact.TargetId, result.Amount))
+
+          if result.IsCritical then
+            eventBus.Publish(ShowNotification("Crit!", targetPos))
+
+      | _ -> () // Attacker, defender, or skill not found
+
+    let handleEvent
+      (dependencies: World * EventBus * Stores.SkillStore)
+      (event: WorldEvent)
+      =
+      let world, eventBus, skillStore = dependencies
+
+      match event with
+      | AbilityIntent(casterId, skillId, ValueSome targetId) ->
+        handleAbilityIntent world eventBus skillStore casterId skillId targetId
+      | ProjectileImpacted impact ->
+        handleProjectileImpact world eventBus skillStore impact
+      | _ -> ()
 
 
-type CombatSystem(game: Microsoft.Xna.Framework.Game) as this =
-  inherit GameSystem(game)
+  type CombatSystem(game: Game) as this =
+    inherit GameSystem(game)
 
-  let eventBus = this.EventBus
-  let skillStore = game.Services.GetService<Stores.SkillStore>()
-  let mutable subscription: IDisposable = null
+    let eventBus = this.EventBus
+    let skillStore = this.Game.Services.GetService<Stores.SkillStore>()
 
-  // Create the partially-applied handler with its dependencies injected.
-  let injectedHandler = Handlers.handleEvent(eventBus, skillStore)
+    let mutable subscription: IDisposable = null
 
-  override this.Initialize() =
-    base.Initialize()
-    // Subscribe the handler to the event bus.
-    subscription <- eventBus |> Observable.subscribe injectedHandler
+    let injectedHandler = Handlers.handleEvent(this.World, eventBus, skillStore)
 
-  override this.Dispose disposing =
-    base.Dispose disposing
-    // Unsubscribe when the system is disposed to prevent memory leaks.
-    match subscription with
-    | null -> ()
-    | sub -> sub.Dispose()
+    override this.Initialize() =
+      base.Initialize()
+      subscription <- eventBus |> Observable.subscribe injectedHandler
 
-  override _.Kind = SystemKind.Combat
+    override this.Dispose disposing =
+      base.Dispose disposing
 
-  override this.Update gameTime = base.Update gameTime
+      match subscription with
+      | null -> ()
+      | sub -> sub.Dispose()
+
+    override _.Kind = SystemKind.Combat
+
+    override this.Update gameTime = base.Update gameTime

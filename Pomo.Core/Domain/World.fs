@@ -39,6 +39,7 @@ module World =
   }
 
   type World =
+    abstract Rng: Random
     abstract DeltaTime: TimeSpan aval
     abstract RawInputStates: amap<Guid<EntityId>, RawInputState>
     abstract InputMaps: amap<Guid<EntityId>, InputMap>
@@ -56,11 +57,14 @@ module World =
     abstract BaseStats: amap<Guid<EntityId>, Entity.BaseStats>
     abstract DerivedStats: amap<Guid<EntityId>, Entity.DerivedStats>
     abstract ActiveEffects: amap<Guid<EntityId>, Skill.Effect IndexList>
-    abstract AbilityCooldowns: amap<Guid<EntityId>, HashMap<int<SkillId>, TimeSpan>>
+
+    abstract AbilityCooldowns:
+      amap<Guid<EntityId>, HashMap<int<SkillId>, TimeSpan>>
+
     abstract LiveProjectiles: amap<Guid<EntityId>, Projectile.LiveProjectile>
 
 
-  let create() =
+  let create(rng: Random) =
     let mutableWorld: MutableWorld = {
       DeltaTime = cval TimeSpan.Zero
       Positions = cmap()
@@ -81,6 +85,7 @@ module World =
 
     let worldView =
       { new World with
+          member _.Rng = rng
           member _.DeltaTime = mutableWorld.DeltaTime
           member _.Positions = mutableWorld.Positions
           member _.Velocities = mutableWorld.Velocities

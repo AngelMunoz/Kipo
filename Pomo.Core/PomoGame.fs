@@ -18,7 +18,6 @@ open Pomo.Core.Domain
 open Pomo.Core.Domain.Action
 open Pomo.Core.Domain.EventBus
 open Pomo.Core.Domains
-open Pomo.Core.Domains.Combat
 open Pomo.Core.Domains.StateUpdate
 open Pomo.Core.Domains.Movement
 open Pomo.Core.Domains.Render
@@ -28,6 +27,7 @@ open Pomo.Core.Domains.PlayerMovement
 open Pomo.Core.Domains.Targeting
 open Pomo.Core.Systems
 open Pomo.Core.Systems.AbilityActivation
+open Pomo.Core.Systems.Combat
 
 type PomoGame() as this =
   inherit Game()
@@ -49,7 +49,7 @@ type PomoGame() as this =
   let eventBus = new EventBus()
 
   // 1. Create both the mutable source of truth and the public read-only view.
-  let struct (mutableWorld, worldView) = World.create()
+  let struct (mutableWorld, worldView) = World.create Random.Shared
   let skillStore = Stores.Skill.create(JsonFileLoader.readSkills deserializer)
   let targetingService = Targeting.create(worldView, eventBus, skillStore)
 
