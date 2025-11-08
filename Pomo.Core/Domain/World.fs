@@ -34,6 +34,7 @@ module World =
     BaseStats: cmap<Guid<EntityId>, Entity.BaseStats>
     DerivedStats: cmap<Guid<EntityId>, Entity.DerivedStats>
     ActiveEffects: cmap<Guid<EntityId>, Skill.Effect IndexList>
+    LiveProjectiles: cmap<Guid<EntityId>, Projectile.LiveProjectile>
   }
 
   type World =
@@ -54,6 +55,7 @@ module World =
     abstract BaseStats: amap<Guid<EntityId>, Entity.BaseStats>
     abstract DerivedStats: amap<Guid<EntityId>, Entity.DerivedStats>
     abstract ActiveEffects: amap<Guid<EntityId>, Skill.Effect IndexList>
+    abstract LiveProjectiles: amap<Guid<EntityId>, Projectile.LiveProjectile>
 
 
   let create() =
@@ -71,6 +73,7 @@ module World =
       BaseStats = cmap()
       DerivedStats = cmap()
       ActiveEffects = cmap()
+      LiveProjectiles = cmap()
     }
 
     let worldView =
@@ -88,9 +91,18 @@ module World =
           member _.BaseStats = mutableWorld.BaseStats
           member _.DerivedStats = mutableWorld.DerivedStats
           member _.ActiveEffects = mutableWorld.ActiveEffects
+          member _.LiveProjectiles = mutableWorld.LiveProjectiles
       }
 
     struct (mutableWorld, worldView)
+
+  [<Struct>]
+  type ProjectileImpact = {
+    ProjectileId: Guid<EntityId>
+    CasterId: Guid<EntityId>
+    TargetId: Guid<EntityId>
+    SkillId: int<SkillId>
+  }
 
   [<Struct>]
   type Selection =
@@ -131,6 +143,9 @@ module World =
     // Attribute and Effect events
     | StatsChanged of entity: Guid<EntityId> * newStats: Entity.DerivedStats
     | EffectApplied of entity: Guid<EntityId> * effect: Skill.Effect
+    | CreateProjectile of
+      projParams: struct (Guid<EntityId> * Projectile.LiveProjectile)
+    | ProjectileImpacted of impact: ProjectileImpact
 
 module EventBus =
   open World

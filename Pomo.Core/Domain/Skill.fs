@@ -5,6 +5,7 @@ open FSharp.UMX
 open Pomo.Core.Domain.Units
 open Pomo.Core.Domain.Core
 open Pomo.Core.Domain.Entity
+open Pomo.Core.Domain.Projectile
 
 
 module Formula =
@@ -127,11 +128,6 @@ module Skill =
   }
 
   [<Struct>]
-  type CollisionMode =
-    | IgnoreTerrain
-    | BlockedByTerrain
-
-  [<Struct>]
   type GroundAreaKind =
     | Circle of radius: float32
     | Square of sideLength: float32
@@ -151,12 +147,6 @@ module Skill =
     | Caster
     | CasterOffset of struct (float32 * float32)
     | TargetOffset of struct (float32 * float32)
-
-  [<Struct>]
-  type ProjectileInfo = {
-    Speed: float32
-    Collision: CollisionMode
-  }
 
   [<Struct>]
   type Delivery =
@@ -434,6 +424,7 @@ module Skill =
     open System.Text.Json.Serialization
     open JDeck
     open JDeck.Decode
+    open Pomo.Core.Domain.Projectile.Serialization
 
     type DecodeBuilder with
 
@@ -822,49 +813,6 @@ module Skill =
             Effects = effects
           }
         }
-
-    module CollisionMode =
-      let decoder: Decoder<CollisionMode> =
-        fun json -> decode {
-          let! modeStr = Required.string json
-
-          match modeStr.ToLowerInvariant() with
-          | "ignoreterrain" -> return IgnoreTerrain
-          | "blockedbyterrain" -> return BlockedByTerrain
-          | _ ->
-            return!
-              DecodeError.ofError(
-                json.Clone(),
-                $"Unknown CollisionMode: {modeStr}"
-              )
-              |> Error
-        }
-
-    module ProjectileInfo =
-      /// Examples
-      ///
-      /// {
-      ///   "Speed": 150.0,
-      ///   "CollisionMode": "IgnoreTerrain"
-      /// }
-      ///
-      /// {
-      ///   "Speed": 300.0,
-      ///   "CollisionMode": "BlockedByTerrain"
-      /// }
-      let decoder: Decoder<ProjectileInfo> =
-        fun json -> decode {
-          let! speed = Required.Property.get ("Speed", Required.float) json
-
-          and! collision =
-            Required.Property.get ("Collision", CollisionMode.decoder) json
-
-          return {
-            Speed = float32 speed
-            Collision = collision
-          }
-        }
-
 
     module Delivery =
       /// Examples

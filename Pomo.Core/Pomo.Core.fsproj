@@ -8,6 +8,7 @@
     <Compile Include="Domain/Core.fs" />
     <Compile Include="Domain/Input.fs" />
     <Compile Include="Domain/Entity.fs" />
+    <Compile Include="Domain/Projectile.fs" />
     <Compile Include="Domain/Skill.fs" />
     <Compile Include="Domain/World.fs" />
     <Compile Include="Serialization.fs" />
@@ -17,6 +18,7 @@
     <Compile Include="Systems/Combat.fs" />
     <Compile Include="Systems/InputMapping.fs" />
     <Compile Include="Systems/PlayerMovement.fs" />
+    <Compile Include="Systems/Projectile.fs" />
     <Compile Include="Systems/Targeting.fs" />
     <Compile Include="Systems/QuickSlot.fs" />
     <Compile Include="Systems/RawInput.fs" />

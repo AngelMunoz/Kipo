@@ -29,6 +29,7 @@ module StateUpdate =
     let inline removeEntity (world: MutableWorld) (entity: Guid<EntityId>) =
       world.Positions.Remove(entity) |> ignore
       world.Velocities.Remove(entity) |> ignore
+      world.LiveProjectiles.Remove(entity) |> ignore
 
     let inline updatePosition
       (world: MutableWorld)
@@ -47,6 +48,12 @@ module StateUpdate =
       struct (entity: Guid<EntityId>, movementState: MovementState)
       =
       world.MovementStates[entity] <- movementState
+
+    let inline createProjectile
+      (world: MutableWorld)
+      struct (entity: Guid<EntityId>, projectile: Projectile.LiveProjectile)
+      =
+      world.LiveProjectiles[entity] <- projectile
 
   module RawInput =
     let inline updateState
@@ -88,6 +95,29 @@ module StateUpdate =
                 HashMap<Domain.Action.GameAction, int<Domain.Units.SkillId>>)
       =
       world.QuickSlots[id] <- quickSlots
+
+    let inline dealDamage
+      (world: MutableWorld)
+      (eventBus: EventBus)
+      (targetId: Guid<EntityId>)
+      (amount: int)
+      =
+      match world.Resources.TryGetValue(targetId) with
+      | Some currentResources ->
+        if currentResources.Status <> Entity.Status.Dead then
+          let newHp = currentResources.HP - amount
+          let newResources = { currentResources with HP = newHp }
+          updateResources world (targetId, newResources)
+
+          if newHp <= 0 then
+            let deadResources = {
+              newResources with
+                  Status = Entity.Status.Dead
+            }
+
+            updateResources world (targetId, deadResources)
+            eventBus.Publish(EntityDied targetId)
+      | None -> ()
 
   module Attributes =
     let inline updateBaseStats
@@ -149,17 +179,22 @@ module StateUpdate =
           | EffectApplied(entity, effect) ->
             Attributes.applyEffect mutableWorld (entity, effect)
           | AbilityIntent _ -> () // To be handled by CombatSystem
-          | DamageDealt(target, amount) ->
-            // TODO: Implement damage logic
-            ()
-          | EntityDied target ->
-            // TODO: Implement entity death logic
-            ()
+          | DamageDealt(targetId, amount) ->
+            Combat.dealDamage mutableWorld eventBus targetId amount
+          | EntityDied targetId -> Entity.removeEntity mutableWorld targetId
           | SlotActivated(slot, casterId) -> ()
-          | AttackIntent(attacker, target) -> failwith "Not Implemented"
+          | AttackIntent(attacker, target) ->
+            // Treat as a basic melee attack (Skill 1)
+            eventBus.Publish(
+              AbilityIntent(attacker, (UMX.tag 1), ValueSome target)
+            )
           | SetMovementTarget(mover, targetPosition) ->
-            failwith "Not Implemented"
-          | TargetSelected(selector, targetPosition) ->
-            failwith "Not Implemented"
+            Entity.updateMovementState
+              mutableWorld
+              (mover, MovingTo targetPosition)
+          | TargetSelected(selector, targetPosition) -> () // Handled by TargetingSystem
           | MovementStateChanged mStateChanged ->
-            Entity.updateMovementState mutableWorld mStateChanged)
+            Entity.updateMovementState mutableWorld mStateChanged
+          | ProjectileImpacted _ -> () // Handled by CombatSystem
+          | CreateProjectile projectile ->
+            Entity.createProjectile mutableWorld projectile)

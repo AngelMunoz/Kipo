@@ -27,6 +27,7 @@ open Pomo.Core.Domains.InputMapping
 open Pomo.Core.Domains.PlayerMovement
 open Pomo.Core.Domains.QuickSlot
 open Pomo.Core.Domains.Targeting
+open Pomo.Core.Systems
 
 type PomoGame() as this =
   inherit Game()
@@ -79,6 +80,8 @@ type PomoGame() as this =
     base.Components.Add(new InputMappingSystem(this, playerId))
     base.Components.Add(new PlayerMovementSystem(this, playerId))
     base.Components.Add(new QuickSlotSystem(this, playerId))
+    base.Components.Add(new Combat.CombatSystem(this))
+    base.Components.Add(new ProjectileSystem(this))
     base.Components.Add(new MovementSystem(this))
     base.Components.Add(new RenderSystem(this, playerId))
     base.Components.Add(new StateUpdateSystem(this, mutableWorld))
