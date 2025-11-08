@@ -20,7 +20,6 @@ module Entity =
   type Status =
     | Alive
     | Dead
-    | Disabled
 
   [<Struct>]
   type ResourceType =
@@ -100,7 +99,6 @@ module Entity =
           match statusStr with
           | "Alive" -> return Alive
           | "Dead" -> return Dead
-          | "Disabled" -> return Disabled
           | other ->
             return!
               DecodeError.ofError(json.Clone(), $"Unknown Status: {other}")

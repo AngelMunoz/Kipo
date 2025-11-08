@@ -23,6 +23,23 @@ module Projections =
       return position + displacement
     })
 
+  let private effectKindToCombatStatus(effect: Skill.Effect) =
+    match effect.Kind with
+    | Skill.EffectKind.Stun -> Some CombatStatus.Stunned
+    | Skill.EffectKind.Silence -> Some CombatStatus.Silenced
+    | Skill.EffectKind.Taunt ->
+      // TODO: Handle Taunt status
+      None
+    | Skill.EffectKind.Buff
+    | Skill.EffectKind.DamageOverTime
+    | Skill.EffectKind.ResourceOverTime
+    | Skill.EffectKind.Debuff -> None
+
+  let CalculateCombatStatuses(world: World) =
+    world.ActiveEffects
+    |> AMap.map(fun _ effectList ->
+      effectList |> IndexList.choose effectKindToCombatStatus)
+
   module private DerivedStatsCalculator =
     let calculateBase(baseStats: Entity.BaseStats) : Entity.DerivedStats = {
       AP = baseStats.Power * 2

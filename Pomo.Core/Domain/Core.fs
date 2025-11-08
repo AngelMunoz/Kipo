@@ -25,6 +25,12 @@ module Core =
     | Neutral
 
   [<Struct>]
+  type CombatStatus =
+    | Stunned
+    | Silenced
+    | Rooted
+
+  [<Struct>]
   type Stat =
     // Derived stats (using game definition names)
     | AP // Attack Power
@@ -70,6 +76,24 @@ module Core =
           | other ->
             return!
               DecodeError.ofError(json.Clone(), $"Unknown Element: {other}")
+              |> Error
+        }
+
+    module CombatStatus =
+      let decoder: Decoder<CombatStatus> =
+        fun json -> decode {
+          let! statusStr = Required.string json
+
+          match statusStr.ToLowerInvariant() with
+          | "stunned" -> return Stunned
+          | "silenced" -> return Silenced
+          | "rooted" -> return Rooted
+          | other ->
+            return!
+              DecodeError.ofError(
+                json.Clone(),
+                $"Unknown CombatStatus: {other}"
+              )
               |> Error
         }
 

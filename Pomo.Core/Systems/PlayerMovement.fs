@@ -10,6 +10,7 @@ open Pomo.Core.Domain.World
 open Pomo.Core.Domain.Systems
 open Pomo.Core.Domain.EventBus
 open Pomo.Core.Domain.Action
+open Pomo.Core.Domain.Core
 
 module PlayerMovement =
 
@@ -51,55 +52,75 @@ module PlayerMovement =
     // Use the projection
     let velocity = Projections.PlayerVelocity this.World playerId speed
 
+    let playerCombatStatuses =
+      Pomo.Core.Projections.CalculateCombatStatuses this.World
+      |> AMap.tryFind playerId
+      |> AVal.map(Option.defaultValue IndexList.empty)
+
+    let position =
+      this.World.Positions
+      |> AMap.tryFind playerId
+      |> AVal.map(Option.defaultValue Vector2.Zero)
+
+    let movementSpeed =
+      this.World.DerivedStats
+      |> AMap.tryFind playerId
+      |> AVal.map(Option.map _.MS >> Option.defaultValue 100)
+
+    let movementState = this.World.MovementStates |> AMap.tryFind playerId
+
     // This is a simple, non-adaptive way to track the last published value.
     // A mutable variable scoped to the system is acceptable for this kind of internal bookkeeping.
     let mutable lastVelocity = Vector2.Zero
 
     override this.Update _ =
       let currentVelocity = velocity |> AVal.force
+      let statuses = playerCombatStatuses |> AVal.force
 
-      let movementState =
-        this.World.MovementStates |> AMap.tryFind playerId |> AVal.force
+      let isStunned = statuses |> IndexList.exists(fun _ s -> s.IsStunned)
+      let isRooted = statuses |> IndexList.exists(fun _ s -> s.IsRooted)
 
-      let position =
-        this.World.Positions
-        |> AMap.tryFind playerId
-        |> AVal.force
-        |> Option.defaultValue Vector2.Zero
-
-      let movementSpeed =
-        this.World.DerivedStats
-        |> AMap.tryFind playerId
-        |> AVal.map(Option.map _.MS)
-        |> AVal.force
-        |> Option.defaultValue 100
-
-      match movementState with
-      | Some(MovingTo destination) ->
-        let distance = Vector2.Distance(position, destination)
-        let threshold = 2.0f // Close enough
-
-        if distance < threshold then
-          // We've arrived. Stop moving and return to Idle state.
+      if isStunned || isRooted then
+        // If stunned or rooted, ensure velocity is zero.
+        if lastVelocity <> Vector2.Zero then
           this.EventBus.Publish(VelocityChanged struct (playerId, Vector2.Zero))
-          this.EventBus.Publish(MovementStateChanged struct (playerId, Idle))
-        else
-          // Still moving towards the destination.
-          let direction = Vector2.Normalize(destination - position)
-          let adjustedVelocity = direction * float32 movementSpeed
+          lastVelocity <- Vector2.Zero
+      else
+        let movementState = movementState |> AVal.force
 
-          if currentVelocity <> adjustedVelocity then
+        let position = position |> AVal.force
+
+        let movementSpeed = movementSpeed |> AVal.force
+
+        match movementState with
+        | Some(MovingTo destination) ->
+          let distance = Vector2.Distance(position, destination)
+          let threshold = 2.0f // Close enough
+
+          if distance < threshold then
+            // We've arrived. Stop moving and return to Idle state.
             this.EventBus.Publish(
-              VelocityChanged struct (playerId, adjustedVelocity)
+              VelocityChanged struct (playerId, Vector2.Zero)
             )
 
-          lastVelocity <- adjustedVelocity
+            this.EventBus.Publish(MovementStateChanged struct (playerId, Idle))
+          else
+            // Still moving towards the destination.
+            let direction = Vector2.Normalize(destination - position)
+            let adjustedVelocity = direction * float32 movementSpeed
 
-      | Some Idle ->
-        if currentVelocity <> lastVelocity then
-          this.EventBus.Publish(
-            VelocityChanged struct (playerId, currentVelocity)
-          )
+            if currentVelocity <> adjustedVelocity then
+              this.EventBus.Publish(
+                VelocityChanged struct (playerId, adjustedVelocity)
+              )
 
-          lastVelocity <- currentVelocity
-      | None -> ()
+            lastVelocity <- adjustedVelocity
+
+        | Some Idle ->
+          if currentVelocity <> lastVelocity then
+            this.EventBus.Publish(
+              VelocityChanged struct (playerId, currentVelocity)
+            )
+
+            lastVelocity <- currentVelocity
+        | None -> ()

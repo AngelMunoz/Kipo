@@ -17,6 +17,38 @@ open Pomo.Core.Systems.DamageCalculator
 module Combat =
 
   module Handlers =
+    let private applySkillDamage
+      (world: World)
+      (eventBus: EventBus)
+      (casterId: Guid<EntityId>)
+      (targetId: Guid<EntityId>)
+      (skill: ActiveSkill)
+      =
+      let stats = world.DerivedStats |> AMap.force
+      let positions = world.Positions |> AMap.force
+
+      match stats.TryFindV casterId, stats.TryFindV targetId with
+      | ValueSome attackerStats, ValueSome defenderStats ->
+        let result =
+          DamageCalculator.calculateFinalDamage
+            world.Rng
+            attackerStats
+            defenderStats
+            skill
+
+        let targetPos =
+          positions.TryFindV targetId
+          |> ValueOption.defaultValue Vector2.Zero
+
+        if result.IsEvaded then
+          eventBus.Publish(ShowNotification("Miss", targetPos))
+        else
+          eventBus.Publish(DamageDealt(targetId, result.Amount))
+
+          if result.IsCritical then
+            eventBus.Publish(ShowNotification("Crit!", targetPos))
+      | _ -> () // Attacker or defender not found
+
     let private handleAbilityIntent
       (world: World)
       (eventBus: EventBus)
@@ -87,8 +119,9 @@ module Combat =
           eventBus.Publish(
             CreateProjectile struct (projectileId, liveProjectile)
           )
+        | Delivery.Melee ->
+          applySkillDamage world eventBus casterId targetId activeSkill
         | Delivery.Instant -> () // TODO: Implement instant-hit logic
-        | Delivery.Melee -> () // TODO: Implement melee-hit logic
       | _ -> ()
 
     let private handleProjectileImpact
@@ -97,37 +130,15 @@ module Combat =
       (skillStore: Stores.SkillStore)
       (impact: ProjectileImpact)
       =
-      let stats = world.DerivedStats |> AMap.force
-      let positions = world.Positions |> AMap.force
-
-      match
-        skillStore.tryFind impact.SkillId,
-        stats.TryFindV impact.CasterId,
-        stats.TryFindV impact.TargetId
-      with
-      | ValueSome(Active skill),
-        ValueSome attackerStats,
-        ValueSome defenderStats ->
-        let result =
-          DamageCalculator.calculateFinalDamage
-            world.Rng
-            attackerStats
-            defenderStats
-            skill
-
-        let targetPos =
-          positions.TryFindV impact.TargetId
-          |> ValueOption.defaultValue Vector2.Zero
-
-        if result.IsEvaded then
-          eventBus.Publish(ShowNotification("Miss", targetPos))
-        else
-          eventBus.Publish(DamageDealt(impact.TargetId, result.Amount))
-
-          if result.IsCritical then
-            eventBus.Publish(ShowNotification("Crit!", targetPos))
-
-      | _ -> () // Attacker, defender, or skill not found
+      match skillStore.tryFind impact.SkillId with
+      | ValueSome(Active skill) ->
+        applySkillDamage
+          world
+          eventBus
+          impact.CasterId
+          impact.TargetId
+          skill
+      | _ -> () // Skill not found
 
     let handleEvent
       (dependencies: World * EventBus * Stores.SkillStore)
