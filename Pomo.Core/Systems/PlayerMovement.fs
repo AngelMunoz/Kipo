@@ -1,4 +1,4 @@
-namespace Pomo.Core.Domains
+namespace Pomo.Core.Systems
 
 open Microsoft.Xna.Framework
 open FSharp.UMX
@@ -8,7 +8,7 @@ open Pomo.Core.Domain.Units
 open Pomo.Core.Domain
 open Pomo.Core.Domain.World
 open Pomo.Core.Domain.Systems
-open Pomo.Core.Domain.EventBus
+open Pomo.Core.Domain.Events
 open Pomo.Core.Domain.Action
 open Pomo.Core.Domain.Core
 
@@ -83,7 +83,12 @@ module PlayerMovement =
       if isStunned || isRooted then
         // If stunned or rooted, ensure velocity is zero.
         if lastVelocity <> Vector2.Zero then
-          this.EventBus.Publish(VelocityChanged struct (playerId, Vector2.Zero))
+          this.EventBus.Publish(
+            StateChangeEvent.Physics(
+              PhysicsEvents.VelocityChanged struct (playerId, Vector2.Zero)
+            )
+          )
+
           lastVelocity <- Vector2.Zero
       else
         let movementState = movementState |> AVal.force
@@ -100,10 +105,16 @@ module PlayerMovement =
           if distance < threshold then
             // We've arrived. Stop moving and return to Idle state.
             this.EventBus.Publish(
-              VelocityChanged struct (playerId, Vector2.Zero)
+              StateChangeEvent.Physics(
+                PhysicsEvents.VelocityChanged struct (playerId, Vector2.Zero)
+              )
             )
 
-            this.EventBus.Publish(MovementStateChanged struct (playerId, Idle))
+            this.EventBus.Publish(
+              StateChangeEvent.Physics(
+                PhysicsEvents.MovementStateChanged struct (playerId, Idle)
+              )
+            )
           else
             // Still moving towards the destination.
             let direction = Vector2.Normalize(destination - position)
@@ -111,7 +122,10 @@ module PlayerMovement =
 
             if currentVelocity <> adjustedVelocity then
               this.EventBus.Publish(
-                VelocityChanged struct (playerId, adjustedVelocity)
+                StateChangeEvent.Physics(
+                  PhysicsEvents.VelocityChanged
+                    struct (playerId, adjustedVelocity)
+                )
               )
 
             lastVelocity <- adjustedVelocity
@@ -119,7 +133,9 @@ module PlayerMovement =
         | Some Idle ->
           if currentVelocity <> lastVelocity then
             this.EventBus.Publish(
-              VelocityChanged struct (playerId, currentVelocity)
+              StateChangeEvent.Physics(
+                PhysicsEvents.VelocityChanged struct (playerId, currentVelocity)
+              )
             )
 
             lastVelocity <- currentVelocity

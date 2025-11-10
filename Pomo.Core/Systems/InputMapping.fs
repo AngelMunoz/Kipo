@@ -1,4 +1,4 @@
-namespace Pomo.Core.Domains
+namespace Pomo.Core.Systems
 
 open Microsoft.Xna.Framework
 open Microsoft.Xna.Framework.Input
@@ -10,6 +10,7 @@ open Pomo.Core.Domain.Units
 open Pomo.Core.Domain.World
 open Pomo.Core.Domain.Systems
 open Pomo.Core.Domain.Action
+open Pomo.Core.Domain.Events
 open Pomo.Core.Domain.RawInput
 
 module InputMapping =
@@ -113,7 +114,11 @@ module InputMapping =
     override this.Update gameTime =
       match actionStates |> AVal.force with
       | Some states ->
-        this.EventBus.Publish(GameActionStatesChanged struct (entityId, states))
+        this.EventBus.Publish(
+          StateChangeEvent.Input(
+            InputEvents.GameActionStatesChanged struct (entityId, states)
+          )
+        )
       | None -> ()
 
 

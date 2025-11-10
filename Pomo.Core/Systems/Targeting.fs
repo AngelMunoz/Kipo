@@ -1,16 +1,19 @@
-namespace Pomo.Core.Domains
+namespace Pomo.Core.Systems
 
+open System.Reactive.Disposables
 open Microsoft.Xna.Framework.Input
 open FSharp.UMX
 open FSharp.Data.Adaptive
 
+open Pomo.Core
+open Pomo.Core.EventBus
+open Pomo.Core.Domain.Events
 open Pomo.Core.Domain.Units
 open Pomo.Core.Domain.RawInput
 
 
 module Targeting =
   open Pomo.Core.Domain.World
-  open Pomo.Core.Domain.EventBus
   open Pomo.Core.Domain.Skill
   open Pomo.Core.Stores
   open Pomo.Core.Domain.Action
@@ -94,7 +97,12 @@ module Targeting =
         match skillOpt, targetIdOpt with
         | ValueSome(Active activeSkill), Some targetId ->
           eventBus.Publish(
-            AbilityIntent(selector, activeSkill.Id, ValueSome targetId)
+            {
+              Caster = selector
+              SkillId = activeSkill.Id
+              Target = ValueSome targetId
+            }
+            : SystemCommunications.AbilityIntent
           )
 
           transact(fun () ->
@@ -106,31 +114,6 @@ module Targeting =
       else
         () // Event selector was not the active caster
     | ValueNone -> () // No active caster
-
-  let private handleEvent
-    (handleTargetSelected: struct (Guid<EntityId> * Selection) -> unit)
-    (_action: _ cval)
-    (_entityId: _ cval)
-    (targetingMode: _ aval)
-    (event: WorldEvent)
-    =
-    match event with
-    | SlotActivated(action, entityId) ->
-      transact(fun () ->
-        _action.Value <- ValueSome action
-        _entityId.Value <- ValueSome entityId)
-    | TargetSelected(selector, selection) ->
-      handleTargetSelected(selector, selection)
-    | RawInputStateChanged struct (_, rawInput) ->
-      let currentTargetingMode = targetingMode |> AVal.force
-
-      let onEscape() =
-        transact(fun () ->
-          _action.Value <- ValueNone
-          _entityId.Value <- ValueNone)
-
-      rawInput |> detectEscape onEscape currentTargetingMode
-    | _ -> ()
 
   let create(world: World, eventBus: EventBus, skillStore: SkillStore) =
     let _entityId = cval ValueNone
@@ -154,13 +137,39 @@ module Targeting =
         currentAction = struct (_entityId, _action)
       }
 
-    let injectedHandler =
-      handleEvent handleSelected _action _entityId targetingMode
+    let sub1 =
+      eventBus.GetObservableFor<SystemCommunications.SlotActivated>()
+      |> Observable.subscribe(fun event ->
+        transact(fun () ->
+          _action.Value <- ValueSome event.Slot
+          _entityId.Value <- ValueSome event.CasterId))
 
-    let sub = eventBus |> Observable.subscribe injectedHandler
+    let sub2 =
+      eventBus.GetObservableFor<SystemCommunications.TargetSelected>()
+      |> Observable.subscribe(fun event ->
+        handleSelected(event.Selector, event.Selection))
+
+    let sub3 =
+      eventBus.GetObservableFor<StateChangeEvent>()
+      |> Observable.choose(fun event ->
+        match event with
+        | StateChangeEvent.Input(InputEvents.RawStateChanged(struct (_,
+                                                                     rawInput))) ->
+          Some rawInput
+        | _ -> None)
+      |> Observable.subscribe(fun rawInput ->
+        let currentTargetingMode = targetingMode |> AVal.force
+
+        let onEscape() =
+          transact(fun () ->
+            _action.Value <- ValueNone
+            _entityId.Value <- ValueNone)
+
+        rawInput |> detectEscape onEscape currentTargetingMode)
+
+    let disposable = new CompositeDisposable([ sub1; sub2; sub3 ])
 
     { new TargetingService with
         member _.TargetingMode = targetingMode
-        member _.Dispose() = sub.Dispose()
-
+        member _.Dispose() = disposable.Dispose()
     }

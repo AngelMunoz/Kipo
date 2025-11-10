@@ -1,4 +1,4 @@
-namespace Pomo.Core.Domains
+namespace Pomo.Core.Systems
 
 open System
 open Microsoft.Xna.Framework
@@ -9,8 +9,7 @@ open FSharp.Data.Adaptive
 
 open Pomo.Core.Domain
 open Pomo.Core.Domain.Units
-open Pomo.Core.Domains.Targeting
-open Pomo.Core.Domains.RawInput
+open Pomo.Core.Systems.Targeting
 
 
 module Render =

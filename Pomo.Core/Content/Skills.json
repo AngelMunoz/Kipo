@@ -31,8 +31,10 @@
       "Speed": 200.0,
       "CollisionMode": "IgnoreTerrain"
     },
-    "Formula": null,
-    "ElementFormula": { "Element": "Fire", "Formula": "(MA * 1.0) + (FireA * 1500)" },
+    "ElementFormula": {
+      "Element": "Fire",
+      "Formula": "(MA * 1.0) + (FireA * 1500)"
+    },
     "CastingTime": 0.5,
     "Origin": { "CasterOffset": [16.0, -16.0] },
     "Effects": []

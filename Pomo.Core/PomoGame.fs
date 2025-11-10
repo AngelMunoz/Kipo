@@ -14,21 +14,24 @@ open FSharp.UMX
 
 open Pomo.Core.Localization
 open Pomo.Core
+open Pomo.Core.EventBus
 open Pomo.Core.Domain
 open Pomo.Core.Domain.Action
-open Pomo.Core.Domain.EventBus
-open Pomo.Core.Domains
-open Pomo.Core.Domains.StateUpdate
-open Pomo.Core.Domains.Movement
-open Pomo.Core.Domains.Render
-open Pomo.Core.Domains.RawInput
-open Pomo.Core.Domains.InputMapping
-open Pomo.Core.Domains.PlayerMovement
-open Pomo.Core.Domains.Targeting
+open Pomo.Core.Domain.Events
 open Pomo.Core.Systems
+open Pomo.Core.Systems.StateUpdate
+open Pomo.Core.Systems.Movement
+open Pomo.Core.Systems.Render
+open Pomo.Core.Systems.RawInput
+open Pomo.Core.Systems.InputMapping
+open Pomo.Core.Systems.PlayerMovement
+open Pomo.Core.Systems.Targeting
+open Pomo.Core.Systems.Navigation
 open Pomo.Core.Systems.AbilityActivation
 open Pomo.Core.Systems.Combat
 open Pomo.Core.Systems.Notification
+open Pomo.Core.Systems.Projectile
+open Pomo.Core.Systems.ActionHandler
 
 type PomoGame() as this =
   inherit Game()
@@ -101,7 +104,11 @@ type PomoGame() as this =
       Velocity = Vector2.Zero
     }
 
-    eventBus.Publish(World.EntityCreated playerEntity)
+    eventBus.Publish(
+      StateChangeEvent.EntityLifecycle(
+        EntityLifecycleEvents.Created playerEntity
+      )
+    )
 
     let playerResources: Pomo.Core.Domain.Entity.Resource = {
       HP = 100
@@ -109,10 +116,19 @@ type PomoGame() as this =
       Status = Pomo.Core.Domain.Entity.Status.Alive
     }
 
-    eventBus.Publish(World.ResourcesChanged struct (playerId, playerResources))
+    eventBus.Publish(
+      StateChangeEvent.Combat(
+        CombatEvents.ResourcesChanged struct (playerId, playerResources)
+      )
+    )
 
     let playerFactions = HashSet [ Pomo.Core.Domain.Entity.Faction.Player ]
-    eventBus.Publish(World.FactionsChanged struct (playerId, playerFactions))
+
+    eventBus.Publish(
+      StateChangeEvent.Combat(
+        CombatEvents.FactionsChanged struct (playerId, playerFactions)
+      )
+    )
 
     let playerBaseStats: Pomo.Core.Domain.Entity.BaseStats = {
       Power = 10
@@ -121,10 +137,17 @@ type PomoGame() as this =
       Charm = 8
     }
 
-    eventBus.Publish(World.BaseStatsChanged struct (playerId, playerBaseStats))
+    eventBus.Publish(
+      StateChangeEvent.Combat(
+        CombatEvents.BaseStatsChanged struct (playerId, playerBaseStats)
+      )
+    )
 
     let inputMap = InputMapping.createDefaultInputMap()
-    eventBus.Publish(World.InputMapChanged struct (playerId, inputMap))
+
+    eventBus.Publish(
+      StateChangeEvent.Input(InputEvents.MapChanged struct (playerId, inputMap))
+    )
 
     // Enemy Setup
     let enemyEntity: Pomo.Core.Domain.Entity.EntitySnapshot = {
@@ -133,7 +156,11 @@ type PomoGame() as this =
       Velocity = Vector2.Zero
     }
 
-    eventBus.Publish(World.EntityCreated enemyEntity)
+    eventBus.Publish(
+      StateChangeEvent.EntityLifecycle(
+        EntityLifecycleEvents.Created enemyEntity
+      )
+    )
 
     let enemyResources: Pomo.Core.Domain.Entity.Resource = {
       HP = 80
@@ -141,10 +168,19 @@ type PomoGame() as this =
       Status = Pomo.Core.Domain.Entity.Status.Alive
     }
 
-    eventBus.Publish(World.ResourcesChanged struct (enemyId, enemyResources))
+    eventBus.Publish(
+      StateChangeEvent.Combat(
+        CombatEvents.ResourcesChanged struct (enemyId, enemyResources)
+      )
+    )
 
     let enemyFactions = HashSet [ Pomo.Core.Domain.Entity.Faction.Enemy ]
-    eventBus.Publish(World.FactionsChanged struct (enemyId, enemyFactions))
+
+    eventBus.Publish(
+      StateChangeEvent.Combat(
+        CombatEvents.FactionsChanged struct (enemyId, enemyFactions)
+      )
+    )
 
     let enemyBaseStats: Pomo.Core.Domain.Entity.BaseStats = {
       Power = 5
@@ -153,12 +189,19 @@ type PomoGame() as this =
       Charm = 5
     }
 
-    eventBus.Publish(World.BaseStatsChanged struct (enemyId, enemyBaseStats))
+    eventBus.Publish(
+      StateChangeEvent.Combat(
+        CombatEvents.BaseStatsChanged struct (enemyId, enemyBaseStats)
+      )
+    )
 
     let quickSlots = [ UseSlot1, UMX.tag 1; UseSlot2, UMX.tag 2 ]
 
     eventBus.Publish(
-      World.QuickSlotsChanged struct (playerId, HashMap.ofList quickSlots)
+      StateChangeEvent.Input(
+        InputEvents.QuickSlotsChanged
+          struct (playerId, HashMap.ofList quickSlots)
+      )
     )
 
     // Start listening to action events

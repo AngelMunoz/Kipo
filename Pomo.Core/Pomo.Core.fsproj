@@ -10,11 +10,12 @@
     <Compile Include="Domain/Entity.fs" />
     <Compile Include="Domain/Projectile.fs" />
     <Compile Include="Domain/Skill.fs" />
+    <Compile Include="Domain/Events.fs" />
+    <Compile Include="EventBus.fs" />
     <Compile Include="Domain/World.fs" />
     <Compile Include="Serialization.fs" />
     <Compile Include="Stores.fs" />
     <Compile Include="Projections.fs" />
-    <Compile Include="Systems/Attributes.fs" />
     <Compile Include="Systems/FormulaEvaluator.fs" />
     <Compile Include="Systems/DamageCalculator.fs" />
     <Compile Include="Systems/Combat.fs" />
@@ -38,6 +39,7 @@
     </Content>
   </ItemGroup>
   <ItemGroup>
+    <PackageReference Include="FSharp.Control.Reactive" Version="6.1.2" />
     <PackageReference Include="FSharp.Data.Adaptive" Version="1.2.25" />
     <PackageReference Include="FSharp.UMX" Version="1.1.0" />
     <PackageReference Include="JDeck" Version="1.0.0-rc-006" />

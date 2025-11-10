@@ -4,8 +4,10 @@ open System
 open System.Collections.Generic
 open Microsoft.Xna.Framework
 open Microsoft.Xna.Framework.Graphics
+open Pomo.Core
 open Pomo.Core.Domain
-open Pomo.Core.Domain.EventBus
+open Pomo.Core.EventBus
+open Pomo.Core.Domain.Events
 open Pomo.Core.Domain.Systems
 open Pomo.Core.Domain.World
 
@@ -26,19 +28,16 @@ module Notification =
     let spriteBatch = lazy new SpriteBatch(game.GraphicsDevice)
     let mutable hudFont: SpriteFont = null
 
-    let handleEvent(event: WorldEvent) =
-      match event with
-      | ShowNotification(message, position) ->
-        let newNotification = {
-          Text = message
-          Position = position
-          Velocity = Vector2(0.0f, -20.0f) // Float upwards
-          Life = 2.0f // Live for 2 seconds
-          MaxLife = 2.0f
-        }
+    let handleEvent(event: SystemCommunications.ShowNotification) =
+      let newNotification = {
+        Text = event.Message
+        Position = event.Position
+        Velocity = Vector2(0.0f, -20.0f) // Float upwards
+        Life = 2.0f // Live for 2 seconds
+        MaxLife = 2.0f
+      }
 
-        notifications.Add newNotification
-      | _ -> ()
+      notifications.Add newNotification
 
     let mutable sub: IDisposable = null
 
@@ -51,7 +50,10 @@ module Notification =
 
     override _.Initialize() =
       base.Initialize()
-      sub <- eventBus |> Observable.subscribe(handleEvent)
+
+      sub <-
+        eventBus.GetObservableFor<SystemCommunications.ShowNotification>()
+        |> Observable.subscribe(handleEvent)
 
     override _.LoadContent() =
       base.LoadContent()

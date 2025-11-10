@@ -1,19 +1,18 @@
-namespace Pomo.Core.Domains
-
+namespace Pomo.Core.Systems
 
 open System
+open System.Collections.Concurrent
 open Microsoft.Xna.Framework
-
+open FSharp.Control.Reactive
 open FSharp.UMX
 open FSharp.Data.Adaptive
-
 open Pomo.Core
+open Pomo.Core.EventBus
 open Pomo.Core.Domain.Units
 open Pomo.Core.Domain
 open Pomo.Core.Domain.Action
+open Pomo.Core.Domain.Events
 open Pomo.Core.Domain.World
-open Pomo.Core.Domain.Systems
-open Pomo.Core.Domain.EventBus
 open Pomo.Core.Domain.RawInput
 
 module StateUpdate =
@@ -109,29 +108,6 @@ module StateUpdate =
       =
       world.AbilityCooldowns[id] <- cooldowns
 
-    let dealDamage
-      (world: MutableWorld)
-      (eventBus: EventBus)
-      (targetId: Guid<EntityId>)
-      (amount: int)
-      =
-      match world.Resources.TryGetValue(targetId) with
-      | Some currentResources ->
-        if currentResources.Status <> Entity.Status.Dead then
-          let newHp = currentResources.HP - amount
-          let newResources = { currentResources with HP = newHp }
-          updateResources world (targetId, newResources)
-
-          if newHp <= 0 then
-            let deadResources = {
-              newResources with
-                  Status = Entity.Status.Dead
-            }
-
-            updateResources world (targetId, deadResources)
-            eventBus.Publish(EntityDied targetId)
-      | None -> ()
-
   module Attributes =
     let inline updateBaseStats
       (world: MutableWorld)
@@ -159,58 +135,66 @@ module StateUpdate =
     inherit GameComponent(game)
 
     let eventBus = game.Services.GetService<EventBus>()
+    let events = ConcurrentQueue<StateChangeEvent>()
+    let mutable sub: IDisposable = null
 
-    do base.UpdateOrder <- 1000
+    do
+      base.UpdateOrder <- 1000
+
+      sub <-
+        eventBus.GetObservableFor<StateChangeEvent>()
+        |> Observable.subscribe(fun e -> events.Enqueue(e))
+
+    override this.Dispose(disposing: bool) : unit =
+      base.Dispose(disposing: bool)
+      sub.Dispose()
 
     override this.Update(gameTime) =
       // This is the one and only place where state is written,
       // wrapped in a single transaction for efficiency.
       transact(fun () ->
-        let mutable event = Unchecked.defaultof<WorldEvent>
+        let mutable event = Unchecked.defaultof<StateChangeEvent>
 
-        while eventBus.TryDequeue(&event) do
+        while events.TryDequeue(&event) do
           match event with
-          | PositionChanged change -> Entity.updatePosition mutableWorld change
-          | EntityRemoved removed -> Entity.removeEntity mutableWorld removed
-          | EntityCreated created -> Entity.addEntity mutableWorld created
-          | VelocityChanged change -> Entity.updateVelocity mutableWorld change
-          | RawInputStateChanged change ->
-            RawInput.updateState mutableWorld change
-          | InputMapChanged change ->
-            InputMapping.updateMap mutableWorld change
-          | GameActionStatesChanged change ->
-            InputMapping.updateActionStates mutableWorld change
-          | ResourcesChanged change ->
-            Combat.updateResources mutableWorld change
-          | FactionsChanged change -> Combat.updateFactions mutableWorld change
-          | QuickSlotsChanged change ->
-            Combat.updateQuickSlots mutableWorld change
-          | BaseStatsChanged change ->
-            Attributes.updateBaseStats mutableWorld change
-          | StatsChanged(entity, newStats) ->
-            Attributes.updateDerivedStats mutableWorld (entity, newStats)
-          | EffectApplied(entity, effect) ->
-            Attributes.applyEffect mutableWorld (entity, effect)
-          | AbilityIntent _ -> () // To be handled by CombatSystem
-          | DamageDealt(targetId, amount) ->
-            Combat.dealDamage mutableWorld eventBus targetId amount
-          | EntityDied targetId -> Entity.removeEntity mutableWorld targetId
-          | SlotActivated(slot, casterId) -> ()
-          | AttackIntent(attacker, target) ->
-            // Treat as a basic melee attack (Skill 1)
-            eventBus.Publish(
-              AbilityIntent(attacker, (UMX.tag 1), ValueSome target)
-            )
-          | SetMovementTarget(mover, targetPosition) ->
-            Entity.updateMovementState
-              mutableWorld
-              (mover, MovingTo targetPosition)
-          | TargetSelected(selector, targetPosition) -> () // Handled by TargetingSystem
-          | MovementStateChanged mStateChanged ->
-            Entity.updateMovementState mutableWorld mStateChanged
-          | ProjectileImpacted _ -> () // Handled by CombatSystem
-          | CreateProjectile projectile ->
-            Entity.createProjectile mutableWorld projectile
-          | CooldownsChanged cdChanged -> Combat.updateCooldowns mutableWorld cdChanged
-          | ShowNotification _ -> ()
-      )
+          | StateChangeEvent.EntityLifecycle event ->
+            match event with
+            | EntityLifecycleEvents.Created created ->
+              Entity.addEntity mutableWorld created
+            | EntityLifecycleEvents.Removed removed ->
+              Entity.removeEntity mutableWorld removed
+          | StateChangeEvent.Input event ->
+            match event with
+            | InputEvents.RawStateChanged rawIChanged ->
+              RawInput.updateState mutableWorld rawIChanged
+            | InputEvents.MapChanged iMapChanged ->
+              InputMapping.updateMap mutableWorld iMapChanged
+            | InputEvents.GameActionStatesChanged gAChanged ->
+              InputMapping.updateActionStates mutableWorld gAChanged
+            | InputEvents.QuickSlotsChanged qsChanged ->
+              Combat.updateQuickSlots mutableWorld qsChanged
+          | StateChangeEvent.Physics event ->
+            match event with
+            | PhysicsEvents.PositionChanged posChanged ->
+              Entity.updatePosition mutableWorld posChanged
+            | PhysicsEvents.VelocityChanged velChanged ->
+              Entity.updateVelocity mutableWorld velChanged
+            | PhysicsEvents.MovementStateChanged mStateChanged ->
+              Entity.updateMovementState mutableWorld mStateChanged
+          | StateChangeEvent.Combat event ->
+            match event with
+            | CombatEvents.ResourcesChanged resChanged ->
+              Combat.updateResources mutableWorld resChanged
+            | CombatEvents.FactionsChanged facChanged ->
+              Combat.updateFactions mutableWorld facChanged
+            | CombatEvents.BaseStatsChanged statsChanged ->
+              Attributes.updateBaseStats mutableWorld statsChanged
+            | CombatEvents.StatsChanged(entity, newStats) ->
+              Attributes.updateDerivedStats mutableWorld (entity, newStats)
+            | CombatEvents.EffectApplied(entity, effect) ->
+              Attributes.applyEffect mutableWorld (entity, effect)
+            | CombatEvents.CooldownsChanged cdChanged ->
+              Combat.updateCooldowns mutableWorld cdChanged
+          // Uncategorized
+          | StateChangeEvent.CreateProjectile projParams ->
+            Entity.createProjectile mutableWorld projParams)

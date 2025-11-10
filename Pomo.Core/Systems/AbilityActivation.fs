@@ -7,8 +7,10 @@ open FSharp.Data.Adaptive
 
 open Pomo.Core.Stores
 open Pomo.Core.Domain
+open Pomo.Core.EventBus
 open Pomo.Core.Domain.Action
 open Pomo.Core.Domain.Core
+open Pomo.Core.Domain.Events
 open Pomo.Core.Domain.Skill
 open Pomo.Core.Domain.Systems
 open Pomo.Core.Domain.Units
@@ -140,7 +142,10 @@ module AbilityActivation =
       let publishNotification(msg: string) =
         let casterPos = playerPosition |> AVal.force
 
-        this.EventBus.Publish(ShowNotification(msg, casterPos))
+        this.EventBus.Publish<SystemCommunications.ShowNotification> {
+          Message = msg
+          Position = casterPos
+        }
 
       for action in actions do
         match action with
@@ -164,7 +169,11 @@ module AbilityActivation =
                 skillId
 
             match validationResult with
-            | Ok() -> this.EventBus.Publish(SlotActivated(action, playerId))
+            | Ok() ->
+              this.EventBus.Publish(
+                { Slot = action; CasterId = playerId }
+                : SystemCommunications.SlotActivated
+              )
             | Error msg ->
               let notificationMsg =
                 match msg with

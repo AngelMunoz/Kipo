@@ -1,4 +1,4 @@
-namespace Pomo.Core.Domains
+namespace Pomo.Core.Systems
 
 open Microsoft.Xna.Framework.Input
 open Microsoft.Xna.Framework.Input.Touch
@@ -7,7 +7,7 @@ open FSharp.Data.Adaptive
 open Pomo.Core.Domain.Units
 open Pomo.Core.Domain.World
 open Pomo.Core.Domain.Systems
-open Pomo.Core.Domain.EventBus
+open Pomo.Core.Domain.Events
 open Pomo.Core.Domain.RawInput
 
 module RawInput =
@@ -54,5 +54,7 @@ module RawInput =
       }
 
       this.EventBus.Publish(
-        RawInputStateChanged struct (entityId, newRawInputState)
+        StateChangeEvent.Input(
+          InputEvents.RawStateChanged struct (entityId, newRawInputState)
+        )
       )

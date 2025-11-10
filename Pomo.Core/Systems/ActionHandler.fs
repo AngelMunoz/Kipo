@@ -1,16 +1,19 @@
-namespace Pomo.Core.Domains
+namespace Pomo.Core.Systems
 
 open System
 open Microsoft.Xna.Framework
 open FSharp.UMX
 open FSharp.Data.Adaptive
+open FSharp.Control.Reactive
+open Pomo.Core
+open Pomo.Core.EventBus
 open Pomo.Core.Domain
 open Pomo.Core.Domain.Units
 open Pomo.Core.Domain.World
-open Pomo.Core.Domain.EventBus
-open Pomo.Core.Domains.Targeting
+open Pomo.Core.Domain.Events
 open Pomo.Core.Domain.Skill
 open Pomo.Core.Domain.Action
+open Pomo.Core.Systems.Targeting
 
 module ActionHandler =
   open Microsoft.Xna.Framework.Input
@@ -73,80 +76,111 @@ module ActionHandler =
 
     { new ActionHandlerService with
         member _.StartListening() =
-          eventBus
-          |> Observable.filter(fun ev ->
-            match ev with
-            | GameActionStatesChanged struct (changedEntityId, _) ->
-              changedEntityId = entityId
-            | _ -> false)
-          |> Observable.subscribe(fun ev ->
-            match ev with
-            | GameActionStatesChanged struct (changedEntityId, actionStates) ->
-              let primaryActionState =
-                actionStates |> HashMap.tryFindV PrimaryAction
+          eventBus.GetObservableFor<StateChangeEvent>()
+          |> Observable.choose(fun event ->
+            match event with
+            | StateChangeEvent.Input(InputEvents.GameActionStatesChanged(struct (changedEntityId,
+                                                                                 actionStates))) ->
+              if changedEntityId = entityId then
+                Some actionStates
+              else
+                None
+            | _ -> None)
+          |> Observable.subscribe(fun actionStates ->
+            let primaryActionState =
+              actionStates |> HashMap.tryFindV GameAction.PrimaryAction
 
-              match primaryActionState with
-              | ValueSome Pressed ->
-                let mouseState =
-                  world.RawInputStates
-                  |> AMap.tryFind entityId
-                  |> AVal.map(Option.map _.Mouse)
-                  |> AVal.force
-                  |> Option.defaultWith(fun () -> Mouse.GetState())
+            match primaryActionState with
+            | ValueSome Pressed ->
+              let mouseState =
+                world.RawInputStates
+                |> AMap.tryFind entityId
+                |> AVal.map(Option.map _.Mouse)
+                |> AVal.force
+                |> Option.defaultWith(fun () -> Mouse.GetState())
 
-                let mousePosition =
-                  Vector2(
-                    float32 mouseState.Position.X,
-                    float32 mouseState.Position.Y
+              let mousePosition =
+                Vector2(
+                  float32 mouseState.Position.X,
+                  float32 mouseState.Position.Y
+                )
+
+              let targetingMode = targetingService.TargetingMode |> AVal.force
+
+              // Get the entity under the cursor AT THIS MOMENT by forcing the projection.
+              let clickedEntity = hoveredEntityAval |> AVal.force
+
+              match targetingMode with
+              | ValueNone ->
+                // NOT targeting: This is a click to move or attack
+                match clickedEntity with
+                | Some clickedEntityId ->
+                  // An entity was clicked, publish an attack intent
+                  eventBus.Publish(
+                    {
+                      Attacker = entityId
+                      Target = clickedEntityId
+                    }
+                    : SystemCommunications.AttackIntent
+                  )
+                | None ->
+                  // Nothing was clicked, publish a movement command
+                  eventBus.Publish(
+                    {
+                      EntityId = entityId
+                      Target = mousePosition
+                    }
+                    : SystemCommunications.SetMovementTarget
                   )
 
-                let targetingMode =
-                  targetingService.TargetingMode |> AVal.force
+              | ValueSome Self ->
+                // This case should be handled immediately on key press, not click.
+                ()
 
-                // Get the entity under the cursor AT THIS MOMENT by forcing the projection.
-                let clickedEntity = hoveredEntityAval |> AVal.force
+              | ValueSome SingleAlly
+              | ValueSome SingleEnemy ->
+                match clickedEntity with
+                | Some clickedEntityId ->
+                  // TODO: Validate if it's an ally/enemy
+                  let selection = SelectedEntity clickedEntityId
 
-                match targetingMode with
-                | ValueNone ->
-                  // NOT targeting: This is a click to move or attack
-                  match clickedEntity with
-                  | Some clickedEntityId ->
-                    // An entity was clicked, publish an attack intent
-                    eventBus.Publish(AttackIntent(entityId, clickedEntityId))
-                  | None ->
-                    // Nothing was clicked, publish a movement command
-                    eventBus.Publish(
-                      SetMovementTarget(entityId, mousePosition)
-                    )
-
-                | ValueSome Self ->
-                  // This case should be handled immediately on key press, not click.
+                  eventBus.Publish(
+                    {
+                      Selector = entityId
+                      Selection = selection
+                    }
+                    : SystemCommunications.TargetSelected
+                  )
+                | None ->
+                  // Invalid target, do nothing for now
                   ()
 
-                | ValueSome SingleAlly
-                | ValueSome SingleEnemy ->
-                  match clickedEntity with
-                  | Some clickedEntityId ->
-                    // TODO: Validate if it's an ally/enemy
-                    let selection = SelectedEntity clickedEntityId
-                    eventBus.Publish(TargetSelected(entityId, selection))
-                  | None ->
-                    // Invalid target, do nothing for now
-                    ()
+              | ValueSome GroundPoint ->
+                let selection = SelectedPosition mousePosition
 
-                | ValueSome GroundPoint ->
+                eventBus.Publish(
+                  {
+                    Selector = entityId
+                    Selection = selection
+                  }
+                  : SystemCommunications.TargetSelected
+                )
+              | ValueSome(GroundArea area) ->
+                match area with
+                | Circle _
+                | Rectangle _
+                | Cone _
+                | Square _ ->
                   let selection = SelectedPosition mousePosition
-                  eventBus.Publish(TargetSelected(entityId, selection))
-                | ValueSome(GroundArea area) ->
-                  match area with
-                  | Circle _
-                  | Rectangle _
-                  | Cone _
-                  | Square _ ->
-                    let selection = SelectedPosition mousePosition
-                    eventBus.Publish(TargetSelected(entityId, selection))
 
-              | ValueSome _
-              | ValueNone -> ()
-            | _ -> ())
+                  eventBus.Publish(
+                    {
+                      Selector = entityId
+                      Selection = selection
+                    }
+                    : SystemCommunications.TargetSelected
+                  )
+
+            | ValueSome _
+            | ValueNone -> ())
     }

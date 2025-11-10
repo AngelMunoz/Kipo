@@ -1,4 +1,4 @@
-namespace Pomo.Core.Domains
+namespace Pomo.Core.Systems
 
 open System
 open Microsoft.Xna.Framework
@@ -9,7 +9,7 @@ open FSharp.Data.Adaptive
 open Pomo.Core
 open Pomo.Core.Domain.World
 open Pomo.Core.Domain.Systems
-open Pomo.Core.Domain.EventBus
+open Pomo.Core.Domain.Events
 
 
 module Movement =
@@ -26,4 +26,8 @@ module Movement =
       let movements = updatedPositions |> AMap.force
 
       for id, newPosition in movements do
-        this.EventBus.Publish(PositionChanged struct (id, newPosition))
+        this.EventBus.Publish(
+          StateChangeEvent.Physics(
+            PhysicsEvents.PositionChanged struct (id, newPosition)
+          )
+        )
