@@ -141,5 +141,29 @@
         ]
       }
     ]
+  },
+  "6": {
+    "Kind": "Active",
+    "Id": 6,
+    "Name": "Shield Bash",
+    "Description": "A quick bash that stuns the target for a short duration.",
+    "Intent": "Offensive",
+    "DamageSource": "Physical",
+    "Origin": "Caster",
+    "Cost": { "Type": "MP", "Amount": 5 },
+    "Cooldown": 10.0,
+    "Targeting": "SingleEnemy",
+    "Range": [32.0, 2],
+    "Delivery": { "Type": "Melee" },
+    "Effects": [
+      {
+        "Name": "Stunned",
+        "Kind": "Stun",
+        "DamageSource": "Physical",
+        "Stacking": { "Type": "RefreshDuration" },
+        "Duration": { "Type": "Timed", "Seconds": 2.0 },
+        "Modifiers": []
+      }
+    ]
   }
 }

@@ -1,6 +1,7 @@
 namespace Pomo.Core.Systems
 
 open System.Reactive.Disposables
+open Microsoft.Xna.Framework
 open Microsoft.Xna.Framework.Input
 open FSharp.UMX
 open FSharp.Data.Adaptive
@@ -17,6 +18,8 @@ module Targeting =
   open Pomo.Core.Domain.Skill
   open Pomo.Core.Stores
   open Pomo.Core.Domain.Action
+
+  let private SKILL_ACTIVATION_RANGE_BUFFER = 5.0f
 
   type TargetingService =
     inherit System.IDisposable
@@ -69,7 +72,63 @@ module Targeting =
     skillBeingTargeted: Skill voption aval
     currentAction:
       struct (cval<Guid<EntityId> voption> * cval<GameAction voption>)
+    world: World
   }
+
+  let private getSkillActivationPositions
+    (world: World)
+    (casterId: Guid<EntityId>)
+    (targetId: Guid<EntityId>)
+    =
+    let positions = world.Positions |> AMap.force
+
+    match positions.TryFindV casterId, positions.TryFindV targetId with
+    | ValueSome casterPos, ValueSome targetPos ->
+      ValueSome(casterPos, targetPos)
+    | _ -> ValueNone
+
+  let private checkRangeAndPublish
+    (eventBus: EventBus)
+    (world: World)
+    (skill: ActiveSkill)
+    (casterId: Guid<EntityId>)
+    (targetId: Guid<EntityId>)
+    =
+    match getSkillActivationPositions world casterId targetId with
+    | ValueNone -> () // Or log an error that positions were not found
+    | ValueSome(casterPos, targetPos) ->
+      let distance = Vector2.Distance(casterPos, targetPos)
+      // Assuming the first element in Range is the max range
+      let maxRange = skill.Range |> ValueOption.defaultValue 0f
+
+      if distance > maxRange then
+        let direction = Vector2.Normalize(targetPos - casterPos)
+
+        let moveTarget =
+          targetPos - direction * (maxRange - SKILL_ACTIVATION_RANGE_BUFFER)
+
+        eventBus.Publish(
+          {
+            EntityId = casterId
+            Target = moveTarget
+          }
+          : SystemCommunications.SetMovementTarget
+        )
+
+        eventBus.Publish(
+          StateChangeEvent.Combat(
+            CombatEvents.PendingSkillCastSet(casterId, skill.Id, targetId)
+          )
+        )
+      else
+        eventBus.Publish(
+          {
+            Caster = casterId
+            SkillId = skill.Id
+            Target = ValueSome targetId
+          }
+          : SystemCommunications.AbilityIntent
+        )
 
   let handleTargetSelected
     (args: HandleSelectedTargetArgs)
@@ -79,6 +138,7 @@ module Targeting =
           eventBus = eventBus
           skillBeingTargeted = skillBeingTargeted
           currentAction = _entityId, _action
+          world = world
         } =
       args
 
@@ -96,21 +156,17 @@ module Targeting =
 
         match skillOpt, targetIdOpt with
         | ValueSome(Active activeSkill), Some targetId ->
-          eventBus.Publish(
-            {
-              Caster = selector
-              SkillId = activeSkill.Id
-              Target = ValueSome targetId
-            }
-            : SystemCommunications.AbilityIntent
-          )
+          checkRangeAndPublish eventBus world activeSkill casterId targetId
 
+          // Always clear targeting mode after a selection is made
           transact(fun () ->
             _action.Value <- ValueNone
             _entityId.Value <- ValueNone)
-        | ValueSome(Active _), None -> () // No target selected for an active skill
-        | ValueSome(Passive _), _ -> () // A passive skill was somehow targeted
-        | ValueNone, _ -> () // The skill could not be found
+        | _ ->
+          // Invalid selection, clear targeting mode
+          transact(fun () ->
+            _action.Value <- ValueNone
+            _entityId.Value <- ValueNone)
       else
         () // Event selector was not the active caster
     | ValueNone -> () // No active caster
@@ -135,6 +191,7 @@ module Targeting =
         eventBus = eventBus
         skillBeingTargeted = skillBeingTargeted
         currentAction = struct (_entityId, _action)
+        world = world
       }
 
     let sub1 =

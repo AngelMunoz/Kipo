@@ -187,7 +187,7 @@ This system is the core of the stat calculation pipeline.
 
 ### 7.5 ✅ Verification Checklist
 
-- [ ] Can an ability apply a "Stun" (or similar state-based) effect to an entity? Does a debug view confirm the `ActiveEffect` is present?
+- [x] Can an ability apply a "Stun" (or similar state-based) effect to an entity? Does a debug view confirm the `ActiveEffect` is present?
 - [x] Does a "Damage over Time" effect cause the target's health to decrease periodically, driven by the `EffectLifecycleSystem`?
 - [x] Can a temporary debug command apply a "+10 AP" buff effect?
 - [x] Does a debug renderer show the updated `DerivedStats` value on the _next_ frame?

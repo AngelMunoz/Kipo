@@ -117,6 +117,20 @@ module StateUpdate =
       let newTimestamp = world.Time.Value.TotalGameTime + COMBAT_DURATION
       world.InCombatUntil[entityId] <- newTimestamp
 
+    let inline setPendingSkillCast
+      (world: MutableWorld)
+      (entityId: Guid<EntityId>)
+      (skillId: int<SkillId>)
+      (targetId: Guid<EntityId>)
+      =
+      world.PendingSkillCast[entityId] <- struct (skillId, targetId)
+
+    let inline clearPendingSkillCast
+      (world: MutableWorld)
+      (entityId: Guid<EntityId>)
+      =
+      world.PendingSkillCast.Remove entityId |> ignore
+
   module Attributes =
     let inline updateBaseStats
       (world: MutableWorld)
@@ -266,6 +280,10 @@ module StateUpdate =
               Attributes.changeEffectStack mutableWorld effectStackChanged
             | CombatEvents.InCombatTimerRefreshed entityId ->
               Combat.updateInCombatTimer mutableWorld entityId
+            | CombatEvents.PendingSkillCastSet(entityId, skillId, targetId) ->
+              Combat.setPendingSkillCast mutableWorld entityId skillId targetId
+            | CombatEvents.PendingSkillCastCleared entityId ->
+              Combat.clearPendingSkillCast mutableWorld entityId
           // Uncategorized
           | StateChangeEvent.CreateProjectile projParams ->
             Entity.createProjectile mutableWorld projParams)

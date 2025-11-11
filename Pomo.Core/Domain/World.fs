@@ -40,6 +40,7 @@ module World =
     AbilityCooldowns: cmap<Guid<EntityId>, HashMap<int<SkillId>, TimeSpan>>
     LiveProjectiles: cmap<Guid<EntityId>, Projectile.LiveProjectile>
     InCombatUntil: cmap<Guid<EntityId>, TimeSpan>
+    PendingSkillCast: cmap<Guid<EntityId>, struct (int<SkillId> * Guid<EntityId>)>
   }
 
   type World =
@@ -67,6 +68,7 @@ module World =
 
     abstract LiveProjectiles: amap<Guid<EntityId>, Projectile.LiveProjectile>
     abstract InCombatUntil: amap<Guid<EntityId>, TimeSpan>
+    abstract PendingSkillCast: amap<Guid<EntityId>, struct (int<SkillId> * Guid<EntityId>)>
 
 
   let create(rng: Random) =
@@ -92,6 +94,7 @@ module World =
       AbilityCooldowns = cmap()
       LiveProjectiles = cmap()
       InCombatUntil = cmap()
+      PendingSkillCast = cmap()
     }
 
     let worldView =
@@ -113,6 +116,7 @@ module World =
           member _.AbilityCooldowns = mutableWorld.AbilityCooldowns
           member _.LiveProjectiles = mutableWorld.LiveProjectiles
           member _.InCombatUntil = mutableWorld.InCombatUntil
+          member _.PendingSkillCast = mutableWorld.PendingSkillCast
       }
 
     struct (mutableWorld, worldView)

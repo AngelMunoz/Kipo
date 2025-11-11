@@ -110,16 +110,16 @@ module Combat =
             : SystemCommunications.ShowNotification
           )
 
-      for effect in activeSkill.Effects do
-        let intent =
-          {
-            SourceEntity = casterId
-            TargetEntity = targetId
-            Effect = effect
-          }
-          : SystemCommunications.EffectApplicationIntent
+        for effect in activeSkill.Effects do
+          let intent =
+            {
+              SourceEntity = casterId
+              TargetEntity = targetId
+              Effect = effect
+            }
+            : SystemCommunications.EffectApplicationIntent
 
-        eventBus.Publish intent
+          eventBus.Publish intent
 
     let handleEffectDamageIntent
       (world: World)
@@ -186,7 +186,9 @@ module Combat =
       match skillStore.tryFind skillId with
       | ValueSome(Skill.Active activeSkill) ->
         // Apply cost and cooldown now that the ability is confirmed
-        let gameTime = world.Time |> AVal.map _.Delta |> AVal.force
+        let totalGameTime =
+          world.Time |> AVal.map _.TotalGameTime |> AVal.force
+
         let resources = world.Resources |> AMap.force
         let cooldowns = world.AbilityCooldowns |> AMap.force
 
@@ -230,7 +232,7 @@ module Combat =
             cooldowns.TryFindV casterId
             |> ValueOption.defaultValue HashMap.empty
 
-          let readyTime = gameTime + cd
+          let readyTime = totalGameTime + cd
           let newCooldowns = currentCooldowns.Add(skillId, readyTime)
 
           eventBus.Publish(

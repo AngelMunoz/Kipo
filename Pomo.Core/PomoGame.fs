@@ -209,6 +209,7 @@ type PomoGame() as this =
       UseSlot1, UMX.tag 1
       UseSlot2, UMX.tag 2
       UseSlot3, UMX.tag 3
+      UseSlot4, UMX.tag 6
       UseSlot5, UMX.tag 4
       UseSlot6, UMX.tag 5
     ]

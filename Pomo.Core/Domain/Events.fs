@@ -122,6 +122,8 @@ type CombatEvents =
   | CooldownsChanged of
     cdChanged: struct (Guid<EntityId> * HashMap<int<SkillId>, TimeSpan>)
   | InCombatTimerRefreshed of entityId: Guid<EntityId>
+  | PendingSkillCastSet of entityId: Guid<EntityId> * skillId: int<SkillId> * targetId: Guid<EntityId>
+  | PendingSkillCastCleared of entityId: Guid<EntityId>
 
 [<Struct>]
 type StateChangeEvent =
