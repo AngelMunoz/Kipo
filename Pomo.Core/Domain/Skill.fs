@@ -153,10 +153,16 @@ module Skill =
   [<Struct>]
   type Targeting =
     | Self
-    | SingleAlly
-    | SingleEnemy
-    | GroundPoint
-    | GroundArea of GroundAreaKind
+    | TargetEntity
+    | TargetPosition
+
+  [<Struct>]
+  type SkillArea =
+    | Point
+    | Circle of radius: float32
+    | Cone of angle: float32 * length: float32
+    | Line of width: float32
+    | MultiPoint of radius: float32 * count: int
 
   [<Struct>]
   type CastOrigin =
@@ -167,7 +173,6 @@ module Skill =
   [<Struct>]
   type Delivery =
     | Instant
-    | Melee
     | Projectile of projectile: ProjectileInfo
 
   [<Struct>]
@@ -189,6 +194,7 @@ module Skill =
     Targeting: Targeting
     Range: float32 voption
     Delivery: Delivery
+    Area: SkillArea
     Formula: Formula.MathExpr voption
     ElementFormula: ElementFormula voption
     Effects: Effect[]
@@ -737,20 +743,20 @@ module Skill =
           match type'.ToLowerInvariant() with
           | "circle" ->
             let! radius = Required.Property.get ("Radius", Required.float) json
-            return Circle(float32 radius)
+            return GroundAreaKind.Circle(float32 radius)
           | "square" ->
             let! sideLength =
               Required.Property.get ("SideLength", Required.float) json
 
-            return Square(float32 sideLength)
+            return GroundAreaKind.Square(float32 sideLength)
           | "cone" ->
             let! angle = Required.Property.get ("Angle", Required.float) json
             and! length = Required.Property.get ("Length", Required.float) json
-            return Cone(float32 angle, float32 length)
+            return GroundAreaKind.Cone(float32 angle, float32 length)
           | "rectangle" ->
             let! width = Required.Property.get ("Width", Required.float) json
             and! length = Required.Property.get ("Length", Required.float) json
-            return Rectangle(float32 width, float32 length)
+            return GroundAreaKind.Rectangle(float32 width, float32 length)
           | _ ->
             return!
               DecodeError.ofError(
@@ -762,21 +768,36 @@ module Skill =
 
     module Targeting =
       let decoder: Decoder<Targeting> =
+        fun json -> decode {
+          let! targetingStr = Required.string json
+
+          match targetingStr.ToLowerInvariant() with
+          | "self" -> return Self
+          | "targetentity" -> return TargetEntity
+          | "targetposition" -> return TargetPosition
+          | _ ->
+            return!
+              DecodeError.ofError(
+                json.Clone(),
+                $"Unknown Targeting type: {targetingStr}"
+              )
+              |> Error
+        }
+
+    module SkillArea =
+      let decoder: Decoder<SkillArea> =
         fun json ->
           let simpleDecoder =
             fun json -> decode {
-              let! targetingStr = Required.string json
+              let! areaStr = Required.string json
 
-              match targetingStr.ToLowerInvariant() with
-              | "self" -> return Self
-              | "singleally" -> return SingleAlly
-              | "singleenemy" -> return SingleEnemy
-              | "groundpoint" -> return GroundPoint
+              match areaStr.ToLowerInvariant() with
+              | "point" -> return Point
               | _ ->
                 return!
                   DecodeError.ofError(
                     json.Clone(),
-                    $"Unknown simple Targeting type: {targetingStr}"
+                    $"Unknown simple SkillArea type: {areaStr}"
                   )
                   |> Error
             }
@@ -786,16 +807,36 @@ module Skill =
               let! type' = Required.Property.get ("Type", Required.string) json
 
               match type'.ToLowerInvariant() with
-              | "groundarea" ->
-                let! area =
-                  Required.Property.get ("Area", GroundAreaKind.decoder) json
+              | "circle" ->
+                let! radius =
+                  Required.Property.get ("Radius", Required.float) json
 
-                return GroundArea area
+                return Circle(float32 radius)
+              | "cone" ->
+                let! angle =
+                  Required.Property.get ("Angle", Required.float) json
+
+                and! length =
+                  Required.Property.get ("Length", Required.float) json
+
+                return Cone(float32 angle, float32 length)
+              | "line" ->
+                let! width =
+                  Required.Property.get ("Width", Required.float) json
+
+                return Line(float32 width)
+              | "multipoint" ->
+                let! radius =
+                  Required.Property.get ("Radius", Required.float) json
+
+                and! count = Required.Property.get ("Count", Required.int) json
+
+                return MultiPoint(float32 radius, count)
               | _ ->
                 return!
                   DecodeError.ofError(
                     json.Clone(),
-                    $"Unknown complex Targeting type: {type'}"
+                    $"Unknown complex SkillArea type: {type'}"
                   )
                   |> Error
             }
@@ -883,8 +924,6 @@ module Skill =
       ///
       /// { "Type": "Instant" }
       ///
-      /// { "Type": "Melee" }
-      ///
       /// { "Type": "Projectile", "Projectile": { "Speed": 150.0, "CollisionMode": "IgnoreTerrain" } }
       let decoder: Decoder<Delivery> =
         fun json -> decode {
@@ -892,7 +931,6 @@ module Skill =
 
           match type'.ToLowerInvariant() with
           | "instant" -> return Instant
-          | "melee" -> return Melee
           | "projectile" ->
             let! projectile = ProjectileInfo.decoder json
             return Projectile projectile
@@ -927,6 +965,8 @@ module Skill =
 
           and! targeting =
             Required.Property.get ("Targeting", Targeting.decoder) json
+
+          and! area = Required.Property.get ("Area", SkillArea.decoder) json
 
           and! rangeOpt =
             Optional.Property.array ("Range", Required.float) json
@@ -972,6 +1012,7 @@ module Skill =
               |> Option.map TimeSpan.FromSeconds
               |> Option.toValueOption
             Targeting = targeting
+            Area = area
             Range = rangeOpt |> Option.toValueOption
             Delivery = delivery
             Formula = formula |> Option.toValueOption
