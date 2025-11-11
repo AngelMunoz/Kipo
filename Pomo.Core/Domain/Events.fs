@@ -121,6 +121,7 @@ type CombatEvents =
     effectStackChanged: struct (Guid<EntityId> * Guid<EffectId> * int)
   | CooldownsChanged of
     cdChanged: struct (Guid<EntityId> * HashMap<int<SkillId>, TimeSpan>)
+  | InCombatTimerRefreshed of entityId: Guid<EntityId>
 
 [<Struct>]
 type StateChangeEvent =

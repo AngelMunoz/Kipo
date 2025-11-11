@@ -114,9 +114,19 @@ type PomoGame() as this =
       )
     )
 
+    let playerBaseStats: Pomo.Core.Domain.Entity.BaseStats = {
+      Power = 10
+      Magic = 40
+      Sense = 20
+      Charm = 30
+    }
+    
+    let maxPlayerHP = playerBaseStats.Charm * 10
+    let maxPlayerMP = playerBaseStats.Magic * 5
+
     let playerResources: Pomo.Core.Domain.Entity.Resource = {
-      HP = 1000
-      MP = 1000
+      HP = maxPlayerHP
+      MP = maxPlayerMP
       Status = Pomo.Core.Domain.Entity.Status.Alive
     }
 
@@ -133,13 +143,6 @@ type PomoGame() as this =
         CombatEvents.FactionsChanged struct (playerId, playerFactions)
       )
     )
-
-    let playerBaseStats: Pomo.Core.Domain.Entity.BaseStats = {
-      Power = 10
-      Magic = 40
-      Sense = 20
-      Charm = 30
-    }
 
     eventBus.Publish(
       StateChangeEvent.Combat(
@@ -166,9 +169,19 @@ type PomoGame() as this =
       )
     )
 
+    let enemyBaseStats: Pomo.Core.Domain.Entity.BaseStats = {
+      Power = 2
+      Magic = 2
+      Sense = 2
+      Charm = 100
+    }
+
+    let maxEnemyHP = enemyBaseStats.Charm * 10
+    let maxEnemyMP = enemyBaseStats.Magic * 5
+
     let enemyResources: Pomo.Core.Domain.Entity.Resource = {
-      HP = 80
-      MP = 0
+      HP = maxEnemyHP
+      MP = maxEnemyMP
       Status = Pomo.Core.Domain.Entity.Status.Alive
     }
 
@@ -185,13 +198,6 @@ type PomoGame() as this =
         CombatEvents.FactionsChanged struct (enemyId, enemyFactions)
       )
     )
-
-    let enemyBaseStats: Pomo.Core.Domain.Entity.BaseStats = {
-      Power = 2
-      Magic = 2
-      Sense = 2
-      Charm = 100
-    }
 
     eventBus.Publish(
       StateChangeEvent.Combat(

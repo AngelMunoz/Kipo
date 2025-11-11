@@ -45,6 +45,8 @@ module Core =
     | DP // Defense Points
     | HV // Evasion
     | MS // Movement Speed
+    | HPRegen
+    | MPRegen
     | ElementResistance of ofElement: Element
     | ElementAttribute of ofElement: Element
 
@@ -116,6 +118,8 @@ module Core =
           | "DP" -> return DP
           | "HV" -> return HV
           | "MS" -> return MS
+          | "HPRegen" -> return HPRegen
+          | "MPRegen" -> return MPRegen
           | "ElementRes:Fire" -> return ElementResistance Fire
           | "ElementRes:Water" -> return ElementResistance Water
           | "ElementRes:Earth" -> return ElementResistance Earth

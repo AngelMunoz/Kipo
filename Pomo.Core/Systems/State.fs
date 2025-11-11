@@ -17,6 +17,7 @@ open Pomo.Core.Domain.RawInput
 open Pomo.Core.Domain.Skill
 
 module StateUpdate =
+  let COMBAT_DURATION = TimeSpan.FromSeconds(5.0)
 
   /// <remarks>
   /// These functions must run within a transaction block as they mutate changeable values.
@@ -109,6 +110,13 @@ module StateUpdate =
       =
       world.AbilityCooldowns[id] <- cooldowns
 
+    let inline updateInCombatTimer
+      (world: MutableWorld)
+      (entityId: Guid<EntityId>)
+      =
+      let newTimestamp = world.Time.Value.TotalGameTime + COMBAT_DURATION
+      world.InCombatUntil[entityId] <- newTimestamp
+
   module Attributes =
     let inline updateBaseStats
       (world: MutableWorld)
@@ -155,7 +163,10 @@ module StateUpdate =
           effects
           |> IndexList.map(fun effect ->
             if effect.Id = effectId then
-              { effect with StartTime = world.Time.Value.TotalGameTime }
+              {
+                effect with
+                    StartTime = world.Time.Value.TotalGameTime
+              }
             else
               effect)
 
@@ -253,6 +264,8 @@ module StateUpdate =
               Attributes.refreshEffect mutableWorld effectRefreshed
             | CombatEvents.EffectStackChanged effectStackChanged ->
               Attributes.changeEffectStack mutableWorld effectStackChanged
+            | CombatEvents.InCombatTimerRefreshed entityId ->
+              Combat.updateInCombatTimer mutableWorld entityId
           // Uncategorized
           | StateChangeEvent.CreateProjectile projParams ->
             Entity.createProjectile mutableWorld projParams)

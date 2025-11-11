@@ -55,7 +55,10 @@ module Projections =
       DP = baseStats.Charm + int(float baseStats.Charm * 1.25)
       HV = baseStats.Charm * 2
       // Movement
-      MS = 100 // Base speed
+      MS = 100
+      // Resources
+      HPRegen = 20
+      MPRegen = 20
       // Elements
       ElementAttributes = HashMap.empty
       ElementResistances = HashMap.empty
@@ -81,6 +84,8 @@ module Projections =
       | DP -> { stats with DP = transformI stats.DP }
       | HV -> { stats with HV = transformI stats.HV }
       | MS -> { stats with MS = transformI stats.MS }
+      | HPRegen -> { stats with HPRegen = transformI stats.HPRegen }
+      | MPRegen -> { stats with MPRegen = transformI stats.MPRegen }
       | ElementResistance element ->
         let current =
           stats.ElementResistances

@@ -81,6 +81,9 @@ module Entity =
     HV: int
     // Movement
     MS: int
+    // Regeneration
+    HPRegen: int
+    MPRegen: int
 
     // Element % of attributes and resistances
     ElementAttributes: HashMap<Element, float>

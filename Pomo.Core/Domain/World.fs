@@ -39,6 +39,7 @@ module World =
     ActiveEffects: cmap<Guid<EntityId>, Skill.ActiveEffect IndexList>
     AbilityCooldowns: cmap<Guid<EntityId>, HashMap<int<SkillId>, TimeSpan>>
     LiveProjectiles: cmap<Guid<EntityId>, Projectile.LiveProjectile>
+    InCombatUntil: cmap<Guid<EntityId>, TimeSpan>
   }
 
   type World =
@@ -65,6 +66,7 @@ module World =
       amap<Guid<EntityId>, HashMap<int<SkillId>, TimeSpan>>
 
     abstract LiveProjectiles: amap<Guid<EntityId>, Projectile.LiveProjectile>
+    abstract InCombatUntil: amap<Guid<EntityId>, TimeSpan>
 
 
   let create(rng: Random) =
@@ -89,6 +91,7 @@ module World =
       ActiveEffects = cmap()
       AbilityCooldowns = cmap()
       LiveProjectiles = cmap()
+      InCombatUntil = cmap()
     }
 
     let worldView =
@@ -109,6 +112,7 @@ module World =
           member _.ActiveEffects = mutableWorld.ActiveEffects
           member _.AbilityCooldowns = mutableWorld.AbilityCooldowns
           member _.LiveProjectiles = mutableWorld.LiveProjectiles
+          member _.InCombatUntil = mutableWorld.InCombatUntil
       }
 
     struct (mutableWorld, worldView)

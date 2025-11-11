@@ -172,8 +172,15 @@ module AbilityActivation =
             | Ok() ->
               match skillStore.tryFind skillId with
               | ValueSome(Active skill) ->
+                if skill.Intent = Offensive then
+                  this.EventBus.Publish(
+                    StateChangeEvent.Combat(
+                      CombatEvents.InCombatTimerRefreshed playerId
+                    )
+                  )
+
                 match skill.Targeting with
-                | Targeting.Self ->
+                | Self ->
                   this.EventBus.Publish(
                     {
                       Caster = playerId
