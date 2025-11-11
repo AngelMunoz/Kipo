@@ -77,5 +77,69 @@
         ]
       }
     ]
+  },
+  "4": {
+    "Kind": "Active",
+    "Id": 4,
+    "Name": "Dark Summoning",
+    "Description": "Summons dark energy to empower the caster's dark affinity for 30 seconds.",
+    "Intent": "Supportive",
+    "DamageSource": "Magical",
+    "Cost": { "Type": "MP", "Amount": 5 },
+    "Cooldown": 45.0,
+    "Targeting": "Self",
+    "Delivery": { "Type": "Instant" },
+    "Origin": "Caster",
+    "Effects": [
+      {
+        "Name": "Hollow Darkness",
+        "Kind": "Buff",
+        "Stacking": { "Type": "RefreshDuration" },
+        "Duration": { "Type": "Timed", "Seconds": 30.0 },
+        "DamageSource": "Magical",
+        "Modifiers": [
+          {
+            "Type": "StaticMod",
+            "StatModifier": {
+              "type": "Additive",
+              "stat": "ElementAttr:Dark",
+              "value": 0.25
+            }
+          }
+        ]
+      }
+    ]
+  },
+  "5": {
+    "Kind": "Active",
+    "Id": 5,
+    "Name": "Mana Cloud",
+    "Description": "Envelops the caster in a cloud of mana, increasing magical aptitude for 30 seconds.",
+    "Intent": "Supportive",
+    "DamageSource": "Magical",
+    "Cost": { "Type": "MP", "Amount": 5 },
+    "Cooldown": 60.0,
+    "Targeting": "Self",
+    "Delivery": { "Type": "Instant" },
+    "Origin": "Caster",
+    "Effects": [
+      {
+        "Name": "Mana Concentration",
+        "Kind": "Buff",
+        "Stacking": { "Type": "RefreshDuration" },
+        "Duration": { "Type": "Timed", "Seconds": 30.0 },
+        "DamageSource": "Magical",
+        "Modifiers": [
+          {
+            "Type": "StaticMod",
+            "StatModifier": {
+              "type": "Additive",
+              "stat": "MA",
+              "value": 25.0
+            }
+          }
+        ]
+      }
+    ]
   }
 }

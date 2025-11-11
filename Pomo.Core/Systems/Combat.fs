@@ -32,11 +32,18 @@ module Combat =
       match stats.TryFindV casterId, stats.TryFindV targetId with
       | ValueSome attackerStats, ValueSome defenderStats ->
         let result =
-          DamageCalculator.calculateFinalDamage
-            world.Rng
-            attackerStats
-            defenderStats
-            skill
+          if casterId = targetId then
+            DamageCalculator.calculateRawDamageSelfTarget
+              world.Rng
+              attackerStats
+              defenderStats
+              skill
+          else
+            DamageCalculator.calculateFinalDamage
+              world.Rng
+              attackerStats
+              defenderStats
+              skill
 
         let targetPos =
           positions
@@ -51,6 +58,68 @@ module Combat =
             IsCritical = false
             IsEvaded = false
           }
+
+    let private applyInstantaneousSkillEffects
+      (world: World)
+      (eventBus: EventBus)
+      (casterId: Guid<EntityId>)
+      (targetId: Guid<EntityId>)
+      (activeSkill: ActiveSkill)
+      =
+      let positions = Projections.UpdatedPositions world |> AMap.force
+
+      let result =
+        applySkillDamage world eventBus casterId targetId activeSkill
+
+      let targetPos =
+        positions
+        |> HashMap.tryFindV targetId
+        |> ValueOption.defaultValue Vector2.Zero
+
+      if result.IsEvaded then
+        eventBus.Publish(
+          {
+            Message = "Miss"
+            Position = targetPos
+          }
+          : SystemCommunications.ShowNotification
+        )
+      else
+        eventBus.Publish(
+          {
+            Target = targetId
+            Amount = result.Amount
+          }
+          : SystemCommunications.DamageDealt
+        )
+
+        eventBus.Publish(
+          {
+            Message = $"-{result.Amount}"
+            Position = targetPos
+          }
+          : SystemCommunications.ShowNotification
+        )
+
+        if result.IsCritical then
+          eventBus.Publish(
+            {
+              Message = "Crit!"
+              Position = targetPos
+            }
+            : SystemCommunications.ShowNotification
+          )
+
+      for effect in activeSkill.Effects do
+        let intent =
+          {
+            SourceEntity = casterId
+            TargetEntity = targetId
+            Effect = effect
+          }
+          : SystemCommunications.EffectApplicationIntent
+
+        eventBus.Publish intent
 
     let handleEffectDamageIntent
       (world: World)
@@ -120,7 +189,7 @@ module Combat =
         let gameTime = world.Time |> AVal.map _.Delta |> AVal.force
         let resources = world.Resources |> AMap.force
         let cooldowns = world.AbilityCooldowns |> AMap.force
-        let positions = Projections.UpdatedPositions world |> AMap.force
+
 
         // 1. Apply resource cost
         match activeSkill.Cost with
@@ -188,48 +257,19 @@ module Combat =
               struct (projectileId, liveProjectile)
           )
         | Delivery.Melee ->
-          let result =
-            applySkillDamage world eventBus casterId targetId activeSkill
-
-          let targetPos =
-            positions
-            |> HashMap.tryFindV targetId
-            |> ValueOption.defaultValue Vector2.Zero
-
-          if result.IsEvaded then
-            eventBus.Publish(
-              {
-                Message = "Miss"
-                Position = targetPos
-              }
-              : SystemCommunications.ShowNotification
-            )
-          else
-            eventBus.Publish(
-              {
-                Target = targetId
-                Amount = result.Amount
-              }
-              : SystemCommunications.DamageDealt
-            )
-
-            eventBus.Publish(
-              {
-                Message = $"-{result.Amount}"
-                Position = targetPos
-              }
-              : SystemCommunications.ShowNotification
-            )
-
-            if result.IsCritical then
-              eventBus.Publish(
-                {
-                  Message = "Crit!"
-                  Position = targetPos
-                }
-                : SystemCommunications.ShowNotification
-              )
-        | Delivery.Instant -> () // TODO: Implement instant-hit logic
+          applyInstantaneousSkillEffects
+            world
+            eventBus
+            casterId
+            targetId
+            activeSkill
+        | Delivery.Instant ->
+          applyInstantaneousSkillEffects
+            world
+            eventBus
+            casterId
+            targetId
+            activeSkill
       | _ -> ()
 
     let handleProjectileImpact

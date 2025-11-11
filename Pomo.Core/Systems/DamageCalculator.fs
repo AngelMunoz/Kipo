@@ -147,3 +147,37 @@ module DamageCalculator =
         IsCritical = isCritical
         IsEvaded = false
       }
+
+  let calculateRawDamageSelfTarget
+    (rng: Random)
+    (attackerStats: DerivedStats)
+    (defenderStats: DerivedStats)
+    (skill: ActiveSkill)
+    =
+    // 1. Base Damage Calculation
+    let baseDamage =
+      skill.Formula
+      |> ValueOption.map(evaluate attackerStats)
+      |> ValueOption.defaultValue 0.0
+
+    let elementalDamageAfterResistance =
+      match skill.ElementFormula with
+      | ValueSome ef ->
+        let dmg = evaluate attackerStats ef.Formula
+
+        let res =
+          defenderStats.ElementResistances
+          |> HashMap.tryFind ef.Element
+          |> Option.defaultValue 0.0
+
+        dmg * (1.0 - res)
+      | ValueNone -> 0.0
+
+    // Combine
+    let finalDamage = baseDamage + elementalDamageAfterResistance
+
+    {
+      Amount = max 0 (int finalDamage)
+      IsCritical = false
+      IsEvaded = false
+    }

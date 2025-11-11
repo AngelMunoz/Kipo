@@ -19,6 +19,7 @@
     <Compile Include="Systems/FormulaEvaluator.fs" />
     <Compile Include="Systems/DamageCalculator.fs" />
     <Compile Include="Systems/EffectApplication.fs" />
+    <Compile Include="Systems/ResourceManager.fs" />
     <Compile Include="Systems/Combat.fs" />
     <Compile Include="Systems/InputMapping.fs" />
     <Compile Include="Systems/PlayerMovement.fs" />
@@ -31,6 +32,7 @@
     <Compile Include="Systems/Navigation.fs" />
     <Compile Include="Systems/Movement.fs" />
     <Compile Include="Systems/Render.fs" />
+    <Compile Include="Systems/DebugRender.fs" />
     <Compile Include="Systems/State.fs" />
     <Compile Include="PomoGame.fs" />
   </ItemGroup>

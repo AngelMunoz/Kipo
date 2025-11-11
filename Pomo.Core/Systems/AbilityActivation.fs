@@ -170,10 +170,25 @@ module AbilityActivation =
 
             match validationResult with
             | Ok() ->
-              this.EventBus.Publish(
-                { Slot = action; CasterId = playerId }
-                : SystemCommunications.SlotActivated
-              )
+              match skillStore.tryFind skillId with
+              | ValueSome(Active skill) ->
+                match skill.Targeting with
+                | Targeting.Self ->
+                  this.EventBus.Publish(
+                    {
+                      Caster = playerId
+                      SkillId = skill.Id
+                      Target = ValueSome playerId
+                    }
+                    : SystemCommunications.AbilityIntent
+                  )
+                | _ ->
+
+                  this.EventBus.Publish(
+                    { Slot = action; CasterId = playerId }
+                    : SystemCommunications.SlotActivated
+                  )
+              | _ -> () // Should not happen due to earlier validation
             | Error msg ->
               let notificationMsg =
                 match msg with

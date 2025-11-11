@@ -189,10 +189,9 @@ This system is the core of the stat calculation pipeline.
 
 - [ ] Can an ability apply a "Stun" (or similar state-based) effect to an entity? Does a debug view confirm the `ActiveEffect` is present?
 - [x] Does a "Damage over Time" effect cause the target's health to decrease periodically, driven by the `EffectLifecycleSystem`?
-- [ ] Can a temporary debug command apply a "+10 AP" buff effect?
-- [ ] Does the `StatSystem` run and publish a `StatsRecalculated` event in response?
-- [ ] Does a debug renderer show the updated `DerivedStats` value on the _next_ frame?
-- [ ] Does a subsequent ability cast use the newly calculated (buffed) stats for its own calculations (e.g., damage)?
+- [x] Can a temporary debug command apply a "+10 AP" buff effect?
+- [x] Does a debug renderer show the updated `DerivedStats` value on the _next_ frame?
+- [x] Does a subsequent ability cast use the newly calculated (buffed) stats for its own calculations (e.g., damage)?
 
 ### 7.6 Chained Ability Execution
 

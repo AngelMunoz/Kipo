@@ -124,6 +124,7 @@ module Systems =
     | InputMapping
     | Combat
     | Effects
+    | ResourceManager
 
   type GameSystem(game: Game) =
     inherit GameComponent(game)

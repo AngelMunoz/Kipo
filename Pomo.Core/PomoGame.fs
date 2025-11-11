@@ -32,7 +32,9 @@ open Pomo.Core.Systems.Combat
 open Pomo.Core.Systems.Notification
 open Pomo.Core.Systems.Projectile
 open Pomo.Core.Systems.ActionHandler
+open Pomo.Core.Systems.DebugRender
 open Pomo.Core.Systems.Effects
+open Pomo.Core.Systems.ResourceManager
 
 type PomoGame() as this =
   inherit Game()
@@ -84,11 +86,13 @@ type PomoGame() as this =
     base.Components.Add(new PlayerMovementSystem(this, playerId))
     base.Components.Add(new AbilityActivationSystem(this, playerId))
     base.Components.Add(new CombatSystem(this))
+    base.Components.Add(new ResourceManagerSystem(this))
     base.Components.Add(new ProjectileSystem(this))
     base.Components.Add(new MovementSystem(this))
     base.Components.Add(new NotificationSystem(this, eventBus))
     base.Components.Add(new EffectProcessingSystem(this))
     base.Components.Add(new RenderSystem(this, playerId))
+    base.Components.Add(new DebugRenderSystem(this, playerId))
     base.Components.Add(new StateUpdateSystem(this, mutableWorld))
 
 
@@ -199,6 +203,8 @@ type PomoGame() as this =
       UseSlot1, UMX.tag 1
       UseSlot2, UMX.tag 2
       UseSlot3, UMX.tag 3
+      UseSlot5, UMX.tag 4
+      UseSlot6, UMX.tag 5
     ]
 
     eventBus.Publish(
