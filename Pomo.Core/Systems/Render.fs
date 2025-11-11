@@ -13,6 +13,7 @@ open Pomo.Core.Systems.Targeting
 
 
 module Render =
+  open Pomo.Core
 
   type DrawCommand =
     | DrawPlayer of rect: Rectangle
@@ -24,7 +25,7 @@ module Render =
     (world: World.World)
     (playerId: Guid<EntityId>)
     =
-    world.Positions
+    Projections.UpdatedPositions world
     |> AMap.chooseA(fun entityId pos -> adaptive {
       let! isProjectile =
         AMap.keys world.LiveProjectiles |> ASet.contains entityId
@@ -45,7 +46,8 @@ module Render =
   let private generateProjectileCommands(world: World.World) =
     world.LiveProjectiles
     |> AMap.chooseA(fun projectileId _ -> adaptive {
-      let! posOpt = AMap.tryFind projectileId world.Positions
+      let! posOpt =
+        AMap.tryFind projectileId (Projections.UpdatedPositions world)
 
       match posOpt with
       | Some pos ->

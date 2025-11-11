@@ -13,11 +13,16 @@ module World =
   open RawInput
   open Action
 
-
+  [<Struct>]
+  type Time = {
+    Delta: TimeSpan
+    TotalGameTime: TimeSpan
+    Previous: TimeSpan
+  }
 
   [<Struct>]
   type MutableWorld = {
-    DeltaTime: cval<TimeSpan>
+    Time: Time cval
     RawInputStates: cmap<Guid<EntityId>, RawInputState>
     InputMaps: cmap<Guid<EntityId>, InputMap>
     GameActionStates:
@@ -31,14 +36,14 @@ module World =
     Factions: cmap<Guid<EntityId>, Entity.Faction HashSet>
     BaseStats: cmap<Guid<EntityId>, Entity.BaseStats>
     DerivedStats: cmap<Guid<EntityId>, Entity.DerivedStats>
-    ActiveEffects: cmap<Guid<EntityId>, Skill.Effect IndexList>
+    ActiveEffects: cmap<Guid<EntityId>, Skill.ActiveEffect IndexList>
     AbilityCooldowns: cmap<Guid<EntityId>, HashMap<int<SkillId>, TimeSpan>>
     LiveProjectiles: cmap<Guid<EntityId>, Projectile.LiveProjectile>
   }
 
   type World =
     abstract Rng: Random
-    abstract DeltaTime: TimeSpan aval
+    abstract Time: Time aval
     abstract RawInputStates: amap<Guid<EntityId>, RawInputState>
     abstract InputMaps: amap<Guid<EntityId>, InputMap>
 
@@ -54,7 +59,7 @@ module World =
     abstract Factions: amap<Guid<EntityId>, Entity.Faction HashSet>
     abstract BaseStats: amap<Guid<EntityId>, Entity.BaseStats>
     abstract DerivedStats: amap<Guid<EntityId>, Entity.DerivedStats>
-    abstract ActiveEffects: amap<Guid<EntityId>, Skill.Effect IndexList>
+    abstract ActiveEffects: amap<Guid<EntityId>, Skill.ActiveEffect IndexList>
 
     abstract AbilityCooldowns:
       amap<Guid<EntityId>, HashMap<int<SkillId>, TimeSpan>>
@@ -64,7 +69,12 @@ module World =
 
   let create(rng: Random) =
     let mutableWorld: MutableWorld = {
-      DeltaTime = cval TimeSpan.Zero
+      Time =
+        cval {
+          Delta = TimeSpan.Zero
+          TotalGameTime = TimeSpan.Zero
+          Previous = TimeSpan.Zero
+        }
       Positions = cmap()
       Velocities = cmap()
       MovementStates = cmap()
@@ -84,7 +94,7 @@ module World =
     let worldView =
       { new World with
           member _.Rng = rng
-          member _.DeltaTime = mutableWorld.DeltaTime
+          member _.Time = mutableWorld.Time
           member _.Positions = mutableWorld.Positions
           member _.Velocities = mutableWorld.Velocities
           member _.MovementStates = mutableWorld.MovementStates
@@ -113,6 +123,7 @@ module Systems =
     | RawInput
     | InputMapping
     | Combat
+    | Effects
 
   type GameSystem(game: Game) =
     inherit GameComponent(game)

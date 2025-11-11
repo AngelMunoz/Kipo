@@ -78,7 +78,9 @@ type ProjectileSystem(game: Game) as this =
 
   let eventsToPublish =
     this.World.LiveProjectiles
-    |> AMap.mapA(Projectile.generateEvents this.World.Positions)
+    |> AMap.mapA(
+      Projectile.generateEvents(Projections.UpdatedPositions this.World)
+    )
     |> AMap.fold
       (fun (sysAcc, stateAcc) _ struct (sysEvents, stateEvents) ->
         (IndexList.append sysEvents sysAcc,

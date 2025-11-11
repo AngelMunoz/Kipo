@@ -132,26 +132,69 @@ module Systems =
   - [x] Does the target entity disappear from the screen upon death?
   - [x] Is the `Health` cmap updated only by the `StateUpdateSystem`?
 
-## 7. Phase 3: Advanced Systems (Abilities & Stats)
+## 7. Phase 3: The Skill Effect & Stat Pipeline
 
-### 7.1 The Stat Calculation Pipeline
+**Goal:** Implement a complete, end-to-end pipeline for applying skill effects, managing their lifecycle, and calculating their impact on entity stats. This phase is critical for enabling most of the game's core mechanics.
 
-**Goal:** A robust, non-circular system for calculating derived stats from base stats and effects.
+### 7.1 Data Model: Components & Events
+
+First, we define the necessary data structures that will be stored in the world state and the events that will drive all logic.
 
 - **Components to Define:**
-  - `BaseStatsComponent`
-  - `ActiveEffectComponent`
-  - `DerivedStatsComponent`
-- **Events to Define:**
-  - `StatsCalculated of EntityId: Guid<EntityId> * Stats: DerivedStats`
-- **Systems to Implement:**
-  - `StatSystem` (implements the multi-pass pipeline)
-- **✅ Verification Checklist:**
-  - [ ] Can a temporary debug command apply a simple "+10 Power" buff effect to an entity?
-  - [ ] Does the `StatSystem` run and publish a `StatsCalculated` event?
-  - [ ] Does a debug renderer show the updated `DerivedStats` value on the _next_ frame?
 
-### 7.2 Chained Ability Execution
+  - `ActiveEffect`: A record representing an instance of an effect on an entity. It should store the source `Effect`, the entity that applied it, the start time, remaining duration, and current stack count.
+  - `ActiveEffectComponent`: A `cmap<EntityId, ActiveEffect list>` in the `MutableWorld` to track all active effects on every entity.
+  - `BaseStatsComponent`: Holds the unmodified, base statistics of an entity.
+  - `DerivedStatsComponent`: Holds the final, calculated statistics of an entity after all effect modifiers have been applied. This is a read-only, projected component.
+
+- **Events to Define:**
+  - `EffectApplied of EntityId * ActiveEffect`: Published when an effect is successfully applied to an entity. The `StateUpdateSystem` will use this to add to the `ActiveEffectComponent`.
+  - `EffectExpired of EntityId * EffectId`: Published when an effect's duration runs out or it is removed. The `StateUpdateSystem` will use this to remove from the `ActiveEffectComponent`.
+  - `EffectRefreshed of EntityId * EffectId`: Published when an effect's duration is reset.
+  - `StatsRecalculated of EntityId * DerivedStats`: Published by the `StatSystem` after it computes new stats for an entity.
+
+### 7.2 System 1: `EffectApplicationSystem`
+
+This system is the entry point for all effects.
+
+- **Responsibilities:**
+  - Listens for trigger events like `AbilityCasted` and `ProjectileImpacted`.
+  - Determines the target(s) of the skill or ability.
+  - For each effect on the skill, it checks the target and applies the effect according to its `StackingRule` (NoStack, RefreshDuration, AddStack).
+  - Publishes `EffectApplied` or `EffectRefreshed` events.
+
+### 7.3 System 2: `EffectLifecycleSystem`
+
+This system manages the "time" component of all active effects.
+
+- **Responsibilities:**
+  - Runs each frame, iterating through all entities with an `ActiveEffectComponent`.
+  - For `Timed` effects, it decrements their duration and publishes `EffectExpired` when they run out.
+  - For `Loop` and `PermanentLoop` effects, it checks if the interval has passed. If so, it triggers the effect's action (e.g., for a Damage-over-Time effect, it would publish a `DamageDealt` event).
+
+### 7.4 System 3: `StatSystem`
+
+This system is the core of the stat calculation pipeline.
+
+- **Responsibilities:**
+  - Listens for `EffectApplied` and `EffectExpired` events.
+  - When an entity's effects change, it triggers a recalculation for that entity.
+  - **Calculation Pipeline:**
+    1.  Fetches the entity's `BaseStatsComponent`.
+    2.  Fetches the entity's `ActiveEffectComponent`.
+    3.  Iterates through each `ActiveEffect`, applying its `EffectModifier` (`StaticMod`, `DynamicMod`, etc.) to the stats. This will require a **Formula Evaluator** to process `MathExpr`.
+    4.  Once all modifiers are applied, it publishes a `StatsRecalculated` event with the final `DerivedStats`.
+
+### 7.5 ✅ Verification Checklist
+
+- [ ] Can an ability apply a "Stun" (or similar state-based) effect to an entity? Does a debug view confirm the `ActiveEffect` is present?
+- [x] Does a "Damage over Time" effect cause the target's health to decrease periodically, driven by the `EffectLifecycleSystem`?
+- [ ] Can a temporary debug command apply a "+10 AP" buff effect?
+- [ ] Does the `StatSystem` run and publish a `StatsRecalculated` event in response?
+- [ ] Does a debug renderer show the updated `DerivedStats` value on the _next_ frame?
+- [ ] Does a subsequent ability cast use the newly calculated (buffed) stats for its own calculations (e.g., damage)?
+
+### 7.6 Chained Ability Execution
 
 **Goal:** Implement a single projectile ability using the event-chaining pattern.
 

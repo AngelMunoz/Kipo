@@ -128,7 +128,7 @@ module AbilityActivation =
     let playerCooldowns = this.World.AbilityCooldowns |> AMap.tryFind playerId
 
     let playerPosition =
-      this.World.Positions
+      Projections.UpdatedPositions this.World
       |> AMap.tryFind playerId
       |> AVal.map(Option.defaultValue Vector2.Zero)
 

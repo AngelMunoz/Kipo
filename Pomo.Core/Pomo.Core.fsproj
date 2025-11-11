@@ -18,6 +18,7 @@
     <Compile Include="Projections.fs" />
     <Compile Include="Systems/FormulaEvaluator.fs" />
     <Compile Include="Systems/DamageCalculator.fs" />
+    <Compile Include="Systems/EffectApplication.fs" />
     <Compile Include="Systems/Combat.fs" />
     <Compile Include="Systems/InputMapping.fs" />
     <Compile Include="Systems/PlayerMovement.fs" />

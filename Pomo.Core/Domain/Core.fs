@@ -11,7 +11,6 @@ module Units =
   [<Measure>]
   type SkillId
 
-
 module Core =
   [<Struct>]
   type Element =

@@ -14,6 +14,7 @@ open Pomo.Core.Domain.Action
 open Pomo.Core.Domain.Events
 open Pomo.Core.Domain.World
 open Pomo.Core.Domain.RawInput
+open Pomo.Core.Domain.Skill
 
 module StateUpdate =
 
@@ -123,11 +124,60 @@ module StateUpdate =
 
     let inline applyEffect
       (world: MutableWorld)
-      (id: Guid<EntityId>, effect: Domain.Skill.Effect)
+      (id: Guid<EntityId>, effect: ActiveEffect)
       =
       match world.ActiveEffects.TryGetValue(id) with
       | Some effects -> world.ActiveEffects[id] <- IndexList.add effect effects
       | None -> world.ActiveEffects[id] <- IndexList.single effect
+
+    let inline expireEffect
+      (world: MutableWorld)
+      struct (entityId: Guid<EntityId>, effectId: Guid<EffectId>)
+      =
+      match world.ActiveEffects.TryGetValue(entityId) with
+      | Some effects ->
+        let newEffects =
+          effects |> IndexList.filter(fun effect -> effect.Id <> effectId)
+
+        if IndexList.isEmpty newEffects then
+          world.ActiveEffects.Remove(entityId) |> ignore
+        else
+          world.ActiveEffects[entityId] <- newEffects
+      | None -> ()
+
+    let inline refreshEffect
+      (world: MutableWorld)
+      struct (entityId: Guid<EntityId>, effectId: Guid<EffectId>)
+      =
+      match world.ActiveEffects.TryGetValue(entityId) with
+      | Some effects ->
+        let newEffects =
+          effects
+          |> IndexList.map(fun effect ->
+            if effect.Id = effectId then
+              { effect with StartTime = world.Time.Value.TotalGameTime }
+            else
+              effect)
+
+        world.ActiveEffects[entityId] <- newEffects
+      | None -> ()
+
+    let inline changeEffectStack
+      (world: MutableWorld)
+      struct (entityId: Guid<EntityId>, effectId: Guid<EffectId>, newCount: int)
+      =
+      match world.ActiveEffects.TryGetValue(entityId) with
+      | Some effects ->
+        let newEffects =
+          effects
+          |> IndexList.map(fun effect ->
+            if effect.Id = effectId then
+              { effect with StackCount = newCount }
+            else
+              effect)
+
+        world.ActiveEffects[entityId] <- newEffects
+      | None -> ()
 
   // The dedicated STATE WRITER system.
   // It receives the MutableWorld via constructor injection, ensuring no other system can access it.
@@ -145,9 +195,11 @@ module StateUpdate =
         eventBus.GetObservableFor<StateChangeEvent>()
         |> Observable.subscribe(fun e -> events.Enqueue(e))
 
-    override this.Dispose(disposing: bool) : unit =
-      base.Dispose(disposing: bool)
-      sub.Dispose()
+    override _.Dispose(disposing: bool) : unit =
+      if disposing then
+        sub.Dispose()
+
+      base.Dispose disposing
 
     override this.Update(gameTime) =
       // This is the one and only place where state is written,
@@ -195,6 +247,12 @@ module StateUpdate =
               Attributes.applyEffect mutableWorld (entity, effect)
             | CombatEvents.CooldownsChanged cdChanged ->
               Combat.updateCooldowns mutableWorld cdChanged
+            | CombatEvents.EffectExpired effectExpired ->
+              Attributes.expireEffect mutableWorld effectExpired
+            | CombatEvents.EffectRefreshed effectRefreshed ->
+              Attributes.refreshEffect mutableWorld effectRefreshed
+            | CombatEvents.EffectStackChanged effectStackChanged ->
+              Attributes.changeEffectStack mutableWorld effectStackChanged
           // Uncategorized
           | StateChangeEvent.CreateProjectile projParams ->
             Entity.createProjectile mutableWorld projParams)

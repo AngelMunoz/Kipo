@@ -44,6 +44,20 @@ module SystemCommunications =
   }
 
   [<Struct>]
+  type EffectApplicationIntent = {
+    SourceEntity: Guid<EntityId>
+    TargetEntity: Guid<EntityId>
+    Effect: Effect
+  }
+
+  [<Struct>]
+  type EffectDamageIntent = {
+    SourceEntity: Guid<EntityId>
+    TargetEntity: Guid<EntityId>
+    Effect: Effect
+  }
+
+  [<Struct>]
   type AttackIntent = {
     Attacker: Guid<EntityId>
     Target: Guid<EntityId>
@@ -100,7 +114,11 @@ type CombatEvents =
   | FactionsChanged of facChanged: struct (Guid<EntityId> * Faction HashSet)
   | BaseStatsChanged of statsChanged: struct (Guid<EntityId> * BaseStats)
   | StatsChanged of entity: Guid<EntityId> * newStats: DerivedStats
-  | EffectApplied of entity: Guid<EntityId> * effect: Effect
+  | EffectApplied of effectApplied: struct (Guid<EntityId> * ActiveEffect)
+  | EffectExpired of effectExpired: struct (Guid<EntityId> * Guid<EffectId>)
+  | EffectRefreshed of effectRefreshed: struct (Guid<EntityId> * Guid<EffectId>)
+  | EffectStackChanged of
+    effectStackChanged: struct (Guid<EntityId> * Guid<EffectId> * int)
   | CooldownsChanged of
     cdChanged: struct (Guid<EntityId> * HashMap<int<SkillId>, TimeSpan>)
 

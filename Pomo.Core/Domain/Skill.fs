@@ -90,6 +90,11 @@ module Skill =
     | Permanent
 
   [<Struct>]
+  type DamageSource =
+    | Physical
+    | Magical
+
+  [<Struct>]
   type EffectModifier =
     | StaticMod of StatModifier
     // e.g. The more MA, the more HP heals as the result of the effect
@@ -103,20 +108,26 @@ module Skill =
   type Effect = {
     Name: string
     Kind: EffectKind
+    DamageSource: DamageSource
     Stacking: StackingRule
     Duration: Duration
     Modifiers: EffectModifier[]
   }
 
   [<Struct>]
+  type ActiveEffect = {
+    Id: Guid<EffectId>
+    SourceEffect: Effect
+    SourceEntity: Guid<EntityId>
+    TargetEntity: Guid<EntityId>
+    StartTime: TimeSpan
+    StackCount: int
+  }
+
+  [<Struct>]
   type SkillIntent =
     | Offensive
     | Supportive
-
-  [<Struct>]
-  type DamageSource =
-    | Physical
-    | Magical
 
   [<Struct>]
   type PassiveSkill = {
@@ -575,6 +586,23 @@ module Skill =
               |> Error
         }
 
+    module DamageSource =
+      let decoder: Decoder<DamageSource> =
+        fun json -> decode {
+          let! damageSource = Required.string json
+
+          match damageSource.ToLowerInvariant() with
+          | "physical" -> return Physical
+          | "magical" -> return Magical
+          | _ ->
+            return!
+              DecodeError.ofError(
+                json.Clone(),
+                $"Unknown DamageType: {damageSource}"
+              )
+              |> Error
+        }
+
     module EffectModifier =
       /// Examples
       ///
@@ -582,9 +610,9 @@ module Skill =
       ///
       /// { "Type": "DynamicMod", "Expression": "AP * 1.5", "TargetStat": "HP" }
       ///
-      /// { "Type": "AbilityDamageMod", "AbilityDamageValue": "FireA * 10", "Element": "Fire" }
+      /// { "Type": "AbilityDamageMod", "AbilityDamageValue": "MA * 10" }
       ///
-      /// { "Type": "AbilityDamageMod", "AbilityDamageValue": "MA * 5" }
+      /// { "Type": "AbilityDamageMod", "AbilityDamageValue": "FireA * 10", "Element": "Fire" }
       let decoder: Decoder<EffectModifier> =
         fun json -> decode {
           let! modifierType =
@@ -612,7 +640,7 @@ module Skill =
             let! abilityDamageValue =
               Required.Property.get ("AbilityDamageValue", Formula.decoder) json
 
-            and! elementOpt =
+            and! element =
               Optional.Property.get
                 ("Element", Serialization.Element.decoder)
                 json
@@ -620,7 +648,7 @@ module Skill =
             return
               AbilityDamageMod(
                 abilityDamageValue,
-                elementOpt |> Option.toValueOption
+                element |> Option.toValueOption
               )
           | _ ->
             return!
@@ -637,6 +665,9 @@ module Skill =
           let! name = Required.Property.get ("Name", Required.string) json
           and! kind = Required.Property.get ("Kind", EffectKind.decoder) json
 
+          and! damageSource =
+            Required.Property.get ("DamageSource", DamageSource.decoder) json
+
           and! stacking =
             Required.Property.get ("Stacking", StackingRule.decoder) json
 
@@ -649,6 +680,7 @@ module Skill =
           return {
             Name = name
             Kind = kind
+            DamageSource = damageSource
             Stacking = stacking
             Duration = duration
             Modifiers = modifiers
@@ -668,23 +700,6 @@ module Skill =
               DecodeError.ofError(
                 json.Clone(),
                 $"Unknown SkillIntent: {intentStr}"
-              )
-              |> Error
-        }
-
-    module DamageSource =
-      let decoder: Decoder<DamageSource> =
-        fun json -> decode {
-          let! sourceStr = Required.string json
-
-          match sourceStr.ToLowerInvariant() with
-          | "physical" -> return Physical
-          | "magical" -> return Magical
-          | _ ->
-            return!
-              DecodeError.ofError(
-                json.Clone(),
-                $"Unknown DamageSource: {sourceStr}"
               )
               |> Error
         }
@@ -809,8 +824,7 @@ module Skill =
             Optional.Property.array ("CasterOffset", Required.float) json
 
           match offset with
-          | Some [| x; y |] ->
-            return CasterOffset struct (float32 x, float32 y)
+          | Some [| x; y |] -> return CasterOffset struct (float32 x, float32 y)
           | Some _ ->
             return!
               DecodeError.ofError(

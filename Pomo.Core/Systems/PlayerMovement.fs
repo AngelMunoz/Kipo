@@ -58,7 +58,7 @@ module PlayerMovement =
       |> AVal.map(Option.defaultValue IndexList.empty)
 
     let position =
-      this.World.Positions
+      Pomo.Core.Projections.UpdatedPositions this.World
       |> AMap.tryFind playerId
       |> AVal.map(Option.defaultValue Vector2.Zero)
 

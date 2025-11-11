@@ -18,13 +18,13 @@ module Projections =
       | ValueSome vel, ValueSome pos -> ValueSome struct (vel, pos)
       | _ -> ValueNone)
     |> AMap.mapA(fun _ struct (velocity, position) -> adaptive {
-      let! time = world.DeltaTime
+      let! time = world.Time |> AVal.map _.Delta
       let displacement = velocity * float32 time.TotalSeconds
       return position + displacement
     })
 
-  let private effectKindToCombatStatus(effect: Skill.Effect) =
-    match effect.Kind with
+  let private effectKindToCombatStatus(effect: Skill.ActiveEffect) =
+    match effect.SourceEffect.Kind with
     | Skill.EffectKind.Stun -> Some CombatStatus.Stunned
     | Skill.EffectKind.Silence -> Some CombatStatus.Silenced
     | Skill.EffectKind.Taunt ->
@@ -121,13 +121,13 @@ module Projections =
 
     let applyModifiers
       (stats: Entity.DerivedStats)
-      (effects: Skill.Effect IndexList voption)
+      (effects: Skill.ActiveEffect IndexList voption)
       =
       match effects with
       | ValueNone -> stats
       | ValueSome effectList ->
         effectList.AsArray
-        |> Array.collect(fun effect -> effect.Modifiers)
+        |> Array.collect _.SourceEffect.Modifiers
         |> Array.choose (function
           | Skill.EffectModifier.StaticMod m -> Some m
           // TODO: Handle dynamic modifiers

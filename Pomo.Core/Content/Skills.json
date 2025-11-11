@@ -38,5 +38,44 @@
     "CastingTime": 0.5,
     "Origin": { "CasterOffset": [16.0, -16.0] },
     "Effects": []
+  },
+  "3": {
+    "Kind": "Active",
+    "Id": 3,
+    "Name": "HellFire",
+    "Description": "Summons a devastating inferno that engulfs enemies in flames, dealing massive dark damage over time.n\nThe dark attribute significantly amplifies its destructive power.",
+    "Intent": "Offensive",
+    "DamageSource": "Magical",
+    "Cost": { "Type": "MP", "Amount": 1 },
+    "Cooldown": 0.5,
+    "Targeting": "SingleEnemy",
+    "Range": [32, 8],
+    "Delivery": {
+      "Type": "Projectile",
+      "Speed": 150.0,
+      "CollisionMode": "IgnoreTerrain"
+    },
+    "ElementFormula": {
+      "Element": "Dark",
+      "Formula": "(MA * 2.0) + (DarkA * 3000)"
+    },
+    "CastingTime": 1.0,
+    "Origin": { "CasterOffset": [16.0, -16.0] },
+    "Effects": [
+      {
+        "Name": "Hell Burn",
+        "Kind": "DamageOverTime",
+        "Stacking": { "Type": "RefreshDuration" },
+        "Duration": { "Type": "Loop", "Interval": 1.0, "Duration": 8.0 },
+        "DamageSource": "Magical",
+        "Modifiers": [
+          {
+            "Type": "AbilityDamageMod",
+            "AbilityDamageValue": "(MA * 1.5) + (DarkA * 500)",
+            "Element": "Dark"
+          }
+        ]
+      }
+    ]
   }
 }

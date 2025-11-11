@@ -37,7 +37,7 @@ module ActionHandler =
         )
 
       return!
-        world.Positions
+        Projections.UpdatedPositions world
         |> AMap.fold
           (fun (acc: _ option) entityId entityPos ->
             if acc.IsSome then

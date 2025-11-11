@@ -8,6 +8,7 @@ open Pomo.Core.Domain.Skill
 open Pomo.Core.Systems.FormulaEvaluator
 
 module DamageCalculator =
+  open Pomo.Core.Domain.Core
 
   [<Struct>]
   type DamageResult = {
@@ -17,12 +18,23 @@ module DamageCalculator =
   }
 
   let private calculateHitChance
+    (source: DamageSource)
     (attackerStats: DerivedStats)
     (defenderStats: DerivedStats)
     =
     // This logic is taken from the old prototype's EffectApplication.fs
-    let attackerValue = float attackerStats.AC
-    let defenderValue = float defenderStats.HV
+    let attackerValue =
+      match source with
+      | Physical -> attackerStats.AC
+      | Magical -> attackerStats.LK
+      |> float
+
+    let defenderValue =
+      match source with
+      | Physical -> defenderStats.HV
+      | Magical -> defenderStats.LK
+      |> float
+
     let baseHitChance = 0.5
 
     if attackerValue = 0.0 && defenderValue = 0.0 then
@@ -32,8 +44,40 @@ module DamageCalculator =
       let effectiveDefender = max 0.0 defenderValue
       let statAdvantage = effectiveAttacker - effectiveDefender
       let divisor = 100.0
-      let chance = baseHitChance + (statAdvantage / divisor)
+      let chance = baseHitChance + statAdvantage / divisor
       max 0.05 (min 0.95 chance)
+
+  let calculateEffectDamage
+    (attackerStats: DerivedStats)
+    (defenderStats: DerivedStats)
+    (formula: Formula.MathExpr)
+    (damageType: Skill.DamageSource)
+    (element: Element voption)
+    =
+    // 1. Base Damage Calculation (from effect)
+    let baseDamage = evaluate attackerStats formula
+
+    // 2. Elemental Resistance
+    let elementalResistance =
+      match element with
+      | ValueSome element ->
+        defenderStats.ElementResistances
+        |> HashMap.tryFind element
+        |> Option.defaultValue 0.0
+      | ValueNone -> 0.0
+
+    let damageAfterResistance = baseDamage * (1.0 - elementalResistance)
+
+    // 3. Combine
+    let totalDamage = damageAfterResistance
+
+    // 4. Mitigation
+    let damageAfterMitigation =
+      match damageType with
+      | Physical -> totalDamage - float defenderStats.DP
+      | Magical -> totalDamage - float defenderStats.MD
+
+    max 0 (int damageAfterMitigation)
 
   let calculateFinalDamage
     (rng: Random)
@@ -43,7 +87,9 @@ module DamageCalculator =
     =
     // 1. Hit/Evasion
     let hitRoll = rng.NextDouble()
-    let hitChance = calculateHitChance attackerStats defenderStats
+
+    let hitChance =
+      calculateHitChance skill.DamageSource attackerStats defenderStats
 
     if hitRoll > hitChance then
       {
@@ -58,7 +104,7 @@ module DamageCalculator =
         |> ValueOption.map(evaluate attackerStats)
         |> ValueOption.defaultValue 0.0
 
-      let elementalDamage, elementalResistance =
+      let struct (elementalDamage, elementalResistance) =
         match skill.ElementFormula with
         | ValueSome ef ->
           let dmg = evaluate attackerStats ef.Formula
@@ -68,12 +114,12 @@ module DamageCalculator =
             |> HashMap.tryFind ef.Element
             |> Option.defaultValue 0.0
 
-          (dmg, res)
-        | ValueNone -> (0.0, 0.0)
+          struct (dmg, res)
+        | ValueNone -> struct (0.0, 0.0)
 
       // 3. Critical Hit
       let critRoll = rng.NextDouble()
-      let isCritical = critRoll < (float attackerStats.LK * 0.01)
+      let isCritical = critRoll < float attackerStats.LK * 0.01
 
       let critBonus =
         if isCritical then
@@ -91,8 +137,8 @@ module DamageCalculator =
       // 6. Mitigation
       let damageAfterMitigation =
         match skill.DamageSource with
-        | Physical -> totalDamage - (float defenderStats.DP)
-        | Magical -> totalDamage - (float defenderStats.MD)
+        | Physical -> totalDamage - float defenderStats.DP
+        | Magical -> totalDamage - float defenderStats.MD
 
       let finalDamage = max 0 (int damageAfterMitigation)
 

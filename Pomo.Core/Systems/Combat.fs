@@ -16,6 +16,7 @@ open Pomo.Core.Domain.Systems
 open Pomo.Core.Systems.DamageCalculator
 
 module Combat =
+  open System.Reactive.Disposables
 
   module private Handlers =
     let applySkillDamage
@@ -25,8 +26,8 @@ module Combat =
       (targetId: Guid<EntityId>)
       (skill: ActiveSkill)
       =
-      let stats = world.DerivedStats |> AMap.force
-      let positions = world.Positions |> AMap.force
+      let stats = Projections.CalculateDerivedStats world |> AMap.force
+      let positions = Projections.UpdatedPositions world |> AMap.force
 
       match stats.TryFindV casterId, stats.TryFindV targetId with
       | ValueSome attackerStats, ValueSome defenderStats ->
@@ -38,34 +39,72 @@ module Combat =
             skill
 
         let targetPos =
-          positions.TryFindV targetId |> ValueOption.defaultValue Vector2.Zero
+          positions
+          |> HashMap.tryFindV targetId
+          |> ValueOption.defaultValue Vector2.Zero
 
-        if result.IsEvaded then
+        result
+      | _ ->
+          // Caster or target stats not found
+          {
+            Amount = 0
+            IsCritical = false
+            IsEvaded = false
+          }
+
+    let handleEffectDamageIntent
+      (world: World)
+      (eventBus: EventBus)
+      (intent: SystemCommunications.EffectDamageIntent)
+      =
+      let stats = Projections.CalculateDerivedStats world |> AMap.force
+      let positions = Projections.UpdatedPositions world |> AMap.force
+
+      match
+        stats.TryFindV intent.SourceEntity, stats.TryFindV intent.TargetEntity
+      with
+      | ValueSome attackerStats, ValueSome defenderStats ->
+
+        let totalDamageFromModifiers =
+          intent.Effect.Modifiers
+          |> Array.choose(fun m ->
+            match m with
+            | AbilityDamageMod(mathExpr, element) ->
+              let dmg =
+                DamageCalculator.calculateEffectDamage
+                  attackerStats
+                  defenderStats
+                  mathExpr
+                  intent.Effect.DamageSource
+                  element
+
+              Some dmg
+            | _ -> None)
+          |> Array.sum
+
+
+        if totalDamageFromModifiers > 0 then
           eventBus.Publish(
             {
-              Message = "Miss"
-              Position = targetPos
-            }
-            : SystemCommunications.ShowNotification
-          )
-        else
-          eventBus.Publish(
-            {
-              Target = targetId
-              Amount = result.Amount
+              Target = intent.TargetEntity
+              Amount = totalDamageFromModifiers
             }
             : SystemCommunications.DamageDealt
           )
 
-          if result.IsCritical then
-            eventBus.Publish(
-              {
-                Message = "Crit!"
-                Position = targetPos
-              }
-              : SystemCommunications.ShowNotification
-            )
-      | _ -> () // Attacker or defender not found
+          let targetPos =
+            positions
+            |> HashMap.tryFindV intent.TargetEntity
+            |> ValueOption.defaultValue Vector2.Zero
+
+          eventBus.Publish(
+            {
+              Message = $"-{totalDamageFromModifiers}"
+              Position = targetPos
+            }
+            : SystemCommunications.ShowNotification
+          )
+      | _ -> () // Attacker or defender stats not found
 
     let handleAbilityIntent
       (world: World)
@@ -78,9 +117,10 @@ module Combat =
       match skillStore.tryFind skillId with
       | ValueSome(Skill.Active activeSkill) ->
         // Apply cost and cooldown now that the ability is confirmed
-        let gameTime = world.DeltaTime |> AVal.force
+        let gameTime = world.Time |> AVal.map _.Delta |> AVal.force
         let resources = world.Resources |> AMap.force
         let cooldowns = world.AbilityCooldowns |> AMap.force
+        let positions = Projections.UpdatedPositions world |> AMap.force
 
         // 1. Apply resource cost
         match activeSkill.Cost with
@@ -148,7 +188,47 @@ module Combat =
               struct (projectileId, liveProjectile)
           )
         | Delivery.Melee ->
-          applySkillDamage world eventBus casterId targetId activeSkill
+          let result =
+            applySkillDamage world eventBus casterId targetId activeSkill
+
+          let targetPos =
+            positions
+            |> HashMap.tryFindV targetId
+            |> ValueOption.defaultValue Vector2.Zero
+
+          if result.IsEvaded then
+            eventBus.Publish(
+              {
+                Message = "Miss"
+                Position = targetPos
+              }
+              : SystemCommunications.ShowNotification
+            )
+          else
+            eventBus.Publish(
+              {
+                Target = targetId
+                Amount = result.Amount
+              }
+              : SystemCommunications.DamageDealt
+            )
+
+            eventBus.Publish(
+              {
+                Message = $"-{result.Amount}"
+                Position = targetPos
+              }
+              : SystemCommunications.ShowNotification
+            )
+
+            if result.IsCritical then
+              eventBus.Publish(
+                {
+                  Message = "Crit!"
+                  Position = targetPos
+                }
+                : SystemCommunications.ShowNotification
+              )
         | Delivery.Instant -> () // TODO: Implement instant-hit logic
       | _ -> ()
 
@@ -158,7 +238,60 @@ module Combat =
       =
       match skillStore.tryFind impact.SkillId with
       | ValueSome(Active skill) ->
-        applySkillDamage world eventBus impact.CasterId impact.TargetId skill
+        let result =
+          applySkillDamage world eventBus impact.CasterId impact.TargetId skill
+
+        let positions = Projections.UpdatedPositions world |> AMap.force
+
+        let targetPos =
+          positions
+          |> HashMap.tryFindV impact.TargetId
+          |> ValueOption.defaultValue Vector2.Zero
+
+        if result.IsEvaded then
+          eventBus.Publish(
+            {
+              Message = "Miss"
+              Position = targetPos
+            }
+            : SystemCommunications.ShowNotification
+          )
+        else
+          eventBus.Publish(
+            {
+              Target = impact.TargetId
+              Amount = result.Amount
+            }
+            : SystemCommunications.DamageDealt
+          )
+
+          eventBus.Publish(
+            {
+              Message = $"-{result.Amount}"
+              Position = targetPos
+            }
+            : SystemCommunications.ShowNotification
+          )
+
+          if result.IsCritical then
+            eventBus.Publish(
+              {
+                Message = "Crit!"
+                Position = targetPos
+              }
+              : SystemCommunications.ShowNotification
+            )
+
+          for effect in skill.Effects do
+            let intent =
+              {
+                SourceEntity = impact.CasterId
+                TargetEntity = impact.TargetId
+                Effect = effect
+              }
+              : SystemCommunications.EffectApplicationIntent
+
+            eventBus.Publish intent
       | _ -> () // Skill not found
 
     let handleAbilityIntentEvent
@@ -183,30 +316,35 @@ module Combat =
     let eventBus = this.EventBus
     let skillStore = this.Game.Services.GetService<Stores.SkillStore>()
 
-    let mutable subscriptions: IDisposable list = []
+    let subscriptions = new CompositeDisposable()
 
     override this.Initialize() =
       base.Initialize()
 
-      let sub1 =
-        eventBus.GetObservableFor<SystemCommunications.AbilityIntent>()
-        |> Observable.subscribe(
-          Handlers.handleAbilityIntentEvent(this.World, eventBus, skillStore)
-        )
+      eventBus.GetObservableFor<SystemCommunications.AbilityIntent>()
+      |> Observable.subscribe(
+        Handlers.handleAbilityIntentEvent(this.World, eventBus, skillStore)
+      )
+      |> subscriptions.Add
 
-      let sub2 =
-        eventBus.GetObservableFor<SystemCommunications.ProjectileImpacted>()
-        |> Observable.subscribe(
-          Handlers.handleProjectileImpact(this.World, eventBus, skillStore)
-        )
+      eventBus.GetObservableFor<SystemCommunications.ProjectileImpacted>()
+      |> Observable.subscribe(
+        Handlers.handleProjectileImpact(this.World, eventBus, skillStore)
+      )
+      |> subscriptions.Add
 
-      subscriptions <- [ sub1; sub2 ]
+      eventBus.GetObservableFor<SystemCommunications.EffectDamageIntent>()
+      |> Observable.subscribe(
+        Handlers.handleEffectDamageIntent this.World eventBus
+      )
+      |> subscriptions.Add
 
-    override this.Dispose disposing =
+    override _.Dispose disposing =
+      if disposing then
+        subscriptions.Dispose()
+
       base.Dispose disposing
-      subscriptions |> List.iter(fun sub -> sub.Dispose())
-
 
     override _.Kind = SystemKind.Combat
 
-    override this.Update gameTime = base.Update gameTime
+    override _.Update gameTime = base.Update gameTime

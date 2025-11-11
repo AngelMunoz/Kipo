@@ -32,20 +32,16 @@ open Pomo.Core.Systems.Combat
 open Pomo.Core.Systems.Notification
 open Pomo.Core.Systems.Projectile
 open Pomo.Core.Systems.ActionHandler
+open Pomo.Core.Systems.Effects
 
 type PomoGame() as this =
   inherit Game()
 
   let graphicsDeviceManager = new GraphicsDeviceManager(this)
 
-  let isMobile = OperatingSystem.IsAndroid() || OperatingSystem.IsIOS()
+  let subs = new System.Reactive.Disposables.CompositeDisposable()
 
   let deserializer = Serialization.create()
-
-  let isDesktop =
-    OperatingSystem.IsWindows()
-    || OperatingSystem.IsLinux()
-    || OperatingSystem.IsMacOS()
 
   let playerId = %Guid.NewGuid()
   let enemyId = %Guid.NewGuid()
@@ -56,6 +52,9 @@ type PomoGame() as this =
   let struct (mutableWorld, worldView) = World.create Random.Shared
   let skillStore = Stores.Skill.create(JsonFileLoader.readSkills deserializer)
   let targetingService = Targeting.create(worldView, eventBus, skillStore)
+
+  let effectApplicationService =
+    Effects.EffectApplication.create(worldView, eventBus)
 
   let actionHandler =
     ActionHandler.create(worldView, eventBus, targetingService, playerId)
@@ -88,6 +87,7 @@ type PomoGame() as this =
     base.Components.Add(new ProjectileSystem(this))
     base.Components.Add(new MovementSystem(this))
     base.Components.Add(new NotificationSystem(this, eventBus))
+    base.Components.Add(new EffectProcessingSystem(this))
     base.Components.Add(new RenderSystem(this, playerId))
     base.Components.Add(new StateUpdateSystem(this, mutableWorld))
 
@@ -111,8 +111,8 @@ type PomoGame() as this =
     )
 
     let playerResources: Pomo.Core.Domain.Entity.Resource = {
-      HP = 100
-      MP = 50
+      HP = 1000
+      MP = 1000
       Status = Pomo.Core.Domain.Entity.Status.Alive
     }
 
@@ -132,9 +132,9 @@ type PomoGame() as this =
 
     let playerBaseStats: Pomo.Core.Domain.Entity.BaseStats = {
       Power = 10
-      Magic = 5
-      Sense = 7
-      Charm = 8
+      Magic = 40
+      Sense = 20
+      Charm = 30
     }
 
     eventBus.Publish(
@@ -183,10 +183,10 @@ type PomoGame() as this =
     )
 
     let enemyBaseStats: Pomo.Core.Domain.Entity.BaseStats = {
-      Power = 5
-      Magic = 0
-      Sense = 5
-      Charm = 5
+      Power = 2
+      Magic = 2
+      Sense = 2
+      Charm = 100
     }
 
     eventBus.Publish(
@@ -195,7 +195,11 @@ type PomoGame() as this =
       )
     )
 
-    let quickSlots = [ UseSlot1, UMX.tag 1; UseSlot2, UMX.tag 2 ]
+    let quickSlots = [
+      UseSlot1, UMX.tag 1
+      UseSlot2, UMX.tag 2
+      UseSlot3, UMX.tag 3
+    ]
 
     eventBus.Publish(
       StateChangeEvent.Input(
@@ -205,27 +209,40 @@ type PomoGame() as this =
     )
 
     // Start listening to action events
-    actionHandler.StartListening() |> ignore<IDisposable>
-    movementService.StartListening() |> ignore<IDisposable>
+    actionHandler.StartListening() |> subs.Add
+    movementService.StartListening() |> subs.Add
+    effectApplicationService.StartListening() |> subs.Add
 
 
+  override _.Dispose(disposing: bool) =
+    if disposing then
+      subs.Dispose()
 
-  override this.LoadContent() = base.LoadContent()
+    base.Dispose disposing
+
+  override _.LoadContent() = base.LoadContent()
 
   // Load game content here
   // e.g., this.Content.Load<Texture2D>("textureName")
 
-  override this.Update gameTime =
+  override _.Update gameTime =
     // Update game logic here
     // e.g., update game entities, handle input, etc.
     // This call now triggers MovementSystem (publishes events) and then
     // StateUpdateSystem (drains event queue and modifies state).
-    transact(fun () -> mutableWorld.DeltaTime.Value <- gameTime.ElapsedGameTime)
+    transact(fun () ->
+      let previous = mutableWorld.Time.Value.TotalGameTime
+
+      mutableWorld.Time.Value <- {
+        Delta = gameTime.ElapsedGameTime
+        TotalGameTime = gameTime.TotalGameTime
+        Previous = previous
+      })
 
     base.Update gameTime
 
 
-  override this.Draw gameTime =
+  override _.Draw gameTime =
     base.GraphicsDevice.Clear Color.MonoGameOrange
     // Draw game content here
     base.Draw gameTime
