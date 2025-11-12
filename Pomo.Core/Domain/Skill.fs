@@ -209,8 +209,7 @@ module Skill =
 
   module private FormulaParser =
     open Formula
-
-    let inline (!)(s: string) = s.AsSpan()
+    #nowarn 3391
 
     // Helper for comparing a ReadOnlySpan<char> with a string without allocation
     let inline spanEquals (span: ReadOnlySpan<char>) (s: ReadOnlySpan<char>) =
@@ -220,38 +219,38 @@ module Skill =
       // Match by length first to reduce comparisons
       match token.Length with
       | 2 ->
-        if spanEquals token !"AP" then AP
-        elif spanEquals token !"AC" then AC
-        elif spanEquals token !"DX" then DX
-        elif spanEquals token !"MP" then MP
-        elif spanEquals token !"MA" then MA
-        elif spanEquals token !"MD" then MD
-        elif spanEquals token !"WT" then WT
-        elif spanEquals token !"DA" then DA
-        elif spanEquals token !"LK" then LK
-        elif spanEquals token !"HP" then HP
-        elif spanEquals token !"DP" then DP
-        elif spanEquals token !"HV" then HV
+        if spanEquals token "AP" then AP
+        elif spanEquals token "AC" then AC
+        elif spanEquals token "DX" then DX
+        elif spanEquals token "MP" then MP
+        elif spanEquals token "MA" then MA
+        elif spanEquals token "MD" then MD
+        elif spanEquals token "WT" then WT
+        elif spanEquals token "DA" then DA
+        elif spanEquals token "LK" then LK
+        elif spanEquals token "HP" then HP
+        elif spanEquals token "DP" then DP
+        elif spanEquals token "HV" then HV
         else Unknown(token.ToString())
       | 5 ->
-        if spanEquals token !"FireA" then Fire
-        elif spanEquals token !"FireR" then FireRes
-        elif spanEquals token !"WaterA" then Water
-        elif spanEquals token !"WaterR" then WaterRes
-        elif spanEquals token !"EarthA" then Earth
-        elif spanEquals token !"EarthR" then EarthRes
-        elif spanEquals token !"LightA" then Light
-        elif spanEquals token !"LightR" then LightRes
-        elif spanEquals token !"DarkA" then Dark
-        elif spanEquals token !"DarkR" then DarkRes
+        if spanEquals token "FireA" then Fire
+        elif spanEquals token "FireR" then FireRes
+        elif spanEquals token "WaterA" then Water
+        elif spanEquals token "WaterR" then WaterRes
+        elif spanEquals token "EarthA" then Earth
+        elif spanEquals token "EarthR" then EarthRes
+        elif spanEquals token "LightA" then Light
+        elif spanEquals token "LightR" then LightRes
+        elif spanEquals token "DarkA" then Dark
+        elif spanEquals token "DarkR" then DarkRes
         else Unknown(token.ToString())
       | 4 ->
-        if spanEquals token !"AirA" then Air
-        elif spanEquals token !"AirR" then AirRes
+        if spanEquals token "AirA" then Air
+        elif spanEquals token "AirR" then AirRes
         else Unknown(token.ToString())
       | 10 ->
-        if spanEquals token !"LightningA" then Lightning
-        elif spanEquals token !"LightningR" then LightningRes
+        if spanEquals token "LightningA" then Lightning
+        elif spanEquals token "LightningR" then LightningRes
         else Unknown(token.ToString())
       | _ -> Unknown(token.ToString())
 
@@ -318,12 +317,12 @@ module Skill =
       while looping do
         let nextToken = SpanToken.peek i span
 
-        if spanEquals nextToken !"+" then
+        if spanEquals nextToken "+" then
           SpanToken.consume i span
           let right = parseTerm i span
 
           left <- Add(left, right)
-        elif spanEquals nextToken !"-" then
+        elif spanEquals nextToken "-" then
           SpanToken.consume i span
           let right = parseTerm i span
 
@@ -340,12 +339,12 @@ module Skill =
       while looping do
         let nextToken = SpanToken.peek i span
 
-        if spanEquals nextToken !"*" then
+        if spanEquals nextToken "*" then
           SpanToken.consume i span
           let right = parsePower i span
 
           left <- Mul(left, right)
-        elif spanEquals nextToken !"/" then
+        elif spanEquals nextToken "/" then
           SpanToken.consume i span
           let right = parsePower i span
 
@@ -359,7 +358,7 @@ module Skill =
       let left = parseFactor i span
       let nextToken = SpanToken.peek i span
 
-      if spanEquals nextToken !"^" then
+      if spanEquals nextToken "^" then
         SpanToken.consume i span
 
         let right = parsePower i span // Right-associative
@@ -383,18 +382,18 @@ module Skill =
         | false, _ ->
           raise(FormulaException(InvalidToken(token.ToString(), startPos)))
       elif Char.IsLetter firstChar then
-        if spanEquals token !"log" then
+        if spanEquals token "log" then
           parseFunction Log i span
-        elif spanEquals token !"log10" then
+        elif spanEquals token "log10" then
           parseFunction Log10 i span
         else
           Var(classifyVar token)
-      elif spanEquals token !"(" then
+      elif spanEquals token "(" then
         let expr = parseExpr i span
         let closingParenPos = i.Value
         let closingToken = SpanToken.next i span
 
-        if spanEquals closingToken !")" then
+        if spanEquals closingToken ")" then
           expr
         else
           raise(
@@ -413,7 +412,7 @@ module Skill =
       let startPos = i.Value
       let openParen = SpanToken.next i span
 
-      if not(spanEquals openParen !"(") then
+      if not(spanEquals openParen "(") then
         raise(
           FormulaException(UnexpectedToken("(", openParen.ToString(), startPos))
         )
@@ -422,7 +421,7 @@ module Skill =
 
       let closeParen = SpanToken.next i span
 
-      if not(spanEquals closeParen !")") then
+      if not(spanEquals closeParen ")") then
         raise(
           FormulaException(
             UnexpectedToken(")", closeParen.ToString(), startPos)
@@ -449,6 +448,8 @@ module Skill =
         )
 
       expr
+
+    #warnon 3391
 
   module Serialization =
     open System.Text.Json

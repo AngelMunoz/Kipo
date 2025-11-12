@@ -9,14 +9,14 @@
       "type": "coreclr",
       "request": "launch",
       "preLaunchTask": "Build: Pomo.WindowsDX.fsproj",
-      "program": "${workspaceFolder}/Pomo.WindowsDX/bin/Debug/net9.0-windows/Pomo.dll"
+      "program": "${workspaceFolder}/Pomo.WindowsDX/bin/Debug/net10.0-windows/Pomo.dll"
     },
     {
       "name": "F#: Pomo Debug (DesktopGL)",
       "type": "coreclr",
       "request": "launch",
       "preLaunchTask": "Build: Pomo.DesktopGL.fsproj",
-      "program": "${workspaceFolder}/Pomo.DesktopGL/bin/Debug/net9.0/Pomo.dll"
+      "program": "${workspaceFolder}/Pomo.DesktopGL/bin/Debug/net10.0/Pomo.dll"
     },
     {
       "name": "C#: Pomo Debug (Android)",
