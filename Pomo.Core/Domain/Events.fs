@@ -141,4 +141,5 @@ type StateChangeEvent =
   | Physics of physics: PhysicsEvents
   | Combat of combat: CombatEvents
   // Uncategorized
-  | CreateProjectile of projParams: struct (Guid<EntityId> * LiveProjectile)
+  | CreateProjectile of
+    projParams: struct (Guid<EntityId> * LiveProjectile * Vector2 voption)

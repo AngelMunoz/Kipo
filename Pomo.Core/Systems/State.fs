@@ -52,16 +52,22 @@ module StateUpdate =
 
     let createProjectile
       (world: MutableWorld)
-      struct (entity: Guid<EntityId>, projectile: Projectile.LiveProjectile)
+      struct (entityId: Guid<EntityId>, projectile: Projectile.LiveProjectile,
+              startPos: Vector2 voption)
       =
+      let startingPos =
+        match startPos with
+        | ValueSome pos -> Some pos
+        | ValueNone -> world.Positions.TryGetValue projectile.Caster
+
       // Get caster's position to use as the projectile's starting position.
-      match world.Positions.TryGetValue(projectile.Caster) with
-      | Some casterPos ->
+      match startingPos with
+      | Some pos ->
         // A projectile needs a position and velocity to exist in the world.
-        world.Positions[entity] <- casterPos
-        world.Velocities[entity] <- Vector2.Zero
-        world.LiveProjectiles[entity] <- projectile
-      | None -> () // Caster has no position, so we can't create the projectile.
+        world.Positions[entityId] <- pos
+        world.Velocities[entityId] <- Vector2.Zero
+        world.LiveProjectiles[entityId] <- projectile
+      | None -> () // Caster/start has no position, so we can't create the projectile.
 
   module RawInput =
     let inline updateState

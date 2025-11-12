@@ -285,7 +285,7 @@ module Combat =
 
             eventBus.Publish(
               StateChangeEvent.CreateProjectile
-                struct (projectileId, liveProjectile)
+                struct (projectileId, liveProjectile, ValueNone)
             )
           | None -> ()
         | Delivery.Instant ->
