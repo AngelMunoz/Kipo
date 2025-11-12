@@ -121,9 +121,9 @@ module StateUpdate =
       (world: MutableWorld)
       (entityId: Guid<EntityId>)
       (skillId: int<SkillId>)
-      (targetId: Guid<EntityId>)
+      (target: SystemCommunications.SkillTarget)
       =
-      world.PendingSkillCast[entityId] <- struct (skillId, targetId)
+      world.PendingSkillCast[entityId] <- struct (skillId, target)
 
     let inline clearPendingSkillCast
       (world: MutableWorld)
@@ -280,8 +280,8 @@ module StateUpdate =
               Attributes.changeEffectStack mutableWorld effectStackChanged
             | CombatEvents.InCombatTimerRefreshed entityId ->
               Combat.updateInCombatTimer mutableWorld entityId
-            | CombatEvents.PendingSkillCastSet(entityId, skillId, targetId) ->
-              Combat.setPendingSkillCast mutableWorld entityId skillId targetId
+            | CombatEvents.PendingSkillCastSet(entityId, skillId, target) ->
+              Combat.setPendingSkillCast mutableWorld entityId skillId target
             | CombatEvents.PendingSkillCastCleared entityId ->
               Combat.clearPendingSkillCast mutableWorld entityId
           // Uncategorized

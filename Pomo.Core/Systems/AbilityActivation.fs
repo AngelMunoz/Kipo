@@ -22,15 +22,14 @@ module AbilityActivation =
   open System.Reactive.Disposables
 
   [<Struct>]
-  type ValidationContext =
-    {
-      SkillStore: SkillStore
-      Statuses: CombatStatus IndexList
-      Resources: Entity.Resource voption
-      Cooldowns: HashMap<int<SkillId>, TimeSpan> voption
-      GameTime: TimeSpan
-      EntityId: Guid<EntityId>
-    }
+  type ValidationContext = {
+    SkillStore: SkillStore
+    Statuses: CombatStatus IndexList
+    Resources: Entity.Resource voption
+    Cooldowns: HashMap<int<SkillId>, TimeSpan> voption
+    GameTime: TimeSpan
+    EntityId: Guid<EntityId>
+  }
 
   let private SKILL_ACTIVATION_RANGE_BUFFER = 5.0f
 
@@ -107,55 +106,143 @@ module AbilityActivation =
           checkCooldown context.Cooldowns context.GameTime skillId)
 
   module private Handlers =
-    let private getPendingCastData
+
+    module private IntentPublisher =
+      let private publishSingleIntent
+        (eventBus: EventBus)
+        (casterId: Guid<EntityId>)
+        (skillId: int<SkillId>)
+        (target)
+        =
+        eventBus.Publish<SystemCommunications.AbilityIntent> {
+          Caster = casterId
+          SkillId = skillId
+          Target = target
+        }
+
+      let private publishMultiPointIntent
+        (eventBus: EventBus)
+        (world: World)
+        (casterId: Guid<EntityId>)
+        (skillId: int<SkillId>)
+        (center: Vector2)
+        (radius: float32)
+        (count: int)
+        =
+        for _ in 1..count do
+          let angle = float(world.Rng.NextDouble()) * 2.0 * Math.PI
+          let dist = float(world.Rng.NextDouble()) * float radius
+          let offsetX = cos angle * dist
+          let offsetY = sin angle * dist
+
+          let pointTargetPos =
+            center + Vector2(float32 offsetX, float32 offsetY)
+
+          publishSingleIntent
+            eventBus
+            casterId
+            skillId
+            (SystemCommunications.TargetPosition pointTargetPos)
+
+      let publish
+        (eventBus: EventBus)
+        (world: World)
+        (casterId: Guid<EntityId>)
+        (skill: ActiveSkill)
+        target
+        (center: Vector2)
+        =
+        match skill.Area with
+        | Point
+        | Circle _
+        | Cone _
+        | Line _ -> publishSingleIntent eventBus casterId skill.Id target
+        | MultiPoint(radius, count) ->
+          publishMultiPointIntent
+            eventBus
+            world
+            casterId
+            skill.Id
+            center
+            radius
+            count
+
+    let private getPendingCastContext
       (pendingCasts:
-        HashMap<Guid<EntityId>, struct (int<SkillId> * Guid<EntityId>)>)
-      (positions: HashMap<Guid<EntityId>, Vector2>)
+        HashMap<
+          Guid<EntityId>,
+          struct (int<SkillId> * SystemCommunications.SkillTarget)
+         >)
       (skillStore: SkillStore)
       (entityId: Guid<EntityId>)
       =
       match pendingCasts.TryFindV entityId with
-      | ValueSome(struct (skillId, targetId)) ->
-        let casterPos = positions.TryFindV entityId
-        let targetPos = positions.TryFindV targetId
+      | ValueSome(struct (skillId, target)) ->
         let skill = skillStore.tryFind skillId
 
-        match casterPos, targetPos, skill with
-        | ValueSome cPos, ValueSome tPos, ValueSome(Active s) ->
-          ValueSome(cPos, tPos, s, targetId)
+        match skill with
+        | ValueSome(Active s) -> ValueSome(s, target)
         | _ -> ValueNone
       | _ -> ValueNone
 
-    let private validateAndCast
+    let private handlePendingCast
       (eventBus: EventBus)
       (validationContext: ValidationContext)
-      (castData: Vector2 * Vector2 * ActiveSkill * Guid<EntityId>)
+      (world: World)
+      (skill: ActiveSkill)
+      (target: SystemCommunications.SkillTarget)
       =
-      let (casterPos, targetPos, skill, targetId) = castData
+      let casterId = validationContext.EntityId
+      let positions = Projections.UpdatedPositions world |> AMap.force
 
-      let distance = Vector2.Distance(casterPos, targetPos)
-      let maxRange = skill.Range |> ValueOption.defaultValue 0f
+      let casterPos = positions.TryFindV casterId
 
-      if distance <= maxRange + SKILL_ACTIVATION_RANGE_BUFFER then
+      match casterPos with
+      | ValueNone -> () // Caster has no position, should not happen
+      | ValueSome casterPos ->
         let validationResult = Validation.validate validationContext skill.Id
 
         match validationResult with
-        | Ok() ->
-          eventBus.Publish<SystemCommunications.AbilityIntent> {
-            Caster = validationContext.EntityId
-            SkillId = skill.Id
-            Target = ValueSome targetId
-          }
-        | Error _ ->
+        | Error msg ->
+          let message =
+            match msg with
+            | NotEnoughResources -> "Not enough resources"
+            | OnCooldown -> "Skill is on cooldown"
+            | _ -> "Cannot cast skill"
+
           eventBus.Publish<SystemCommunications.ShowNotification> {
-            Message = "Cannot cast skill"
+            Message = message
             Position = casterPos
           }
-      else
-        eventBus.Publish<SystemCommunications.ShowNotification> {
-          Message = "Target is out of range"
-          Position = casterPos
-        }
+        | Ok() ->
+          // Validation passed, now check range and publish intent
+          let centerTargetPos =
+            match target with
+            | SystemCommunications.TargetEntity targetId ->
+              positions.TryFindV targetId
+            | SystemCommunications.TargetPosition pos -> ValueSome pos
+            | _ -> ValueNone // Should not happen for pending casts
+
+          match centerTargetPos with
+          | ValueNone -> () // Target has no position
+          | ValueSome centerTargetPos ->
+            let distance = Vector2.Distance(casterPos, centerTargetPos)
+            let maxRange = skill.Range |> ValueOption.defaultValue 0f
+
+            if distance <= maxRange + SKILL_ACTIVATION_RANGE_BUFFER then
+              IntentPublisher.publish
+                eventBus
+                world
+                casterId
+                skill
+                target
+                centerTargetPos
+            else
+              // This should have been handled by TargetingSystem, but as a fallback
+              eventBus.Publish<SystemCommunications.ShowNotification> {
+                Message = "Target is out of range"
+                Position = casterPos
+              }
 
     let handleMovementStateChanged
       (world: World)
@@ -165,10 +252,9 @@ module AbilityActivation =
       =
       if movementState = Idle then
         let pendingCasts = world.PendingSkillCast |> AMap.force
-        let positions = world.Positions |> AMap.force
 
-        match getPendingCastData pendingCasts positions skillStore entityId with
-        | ValueSome castData ->
+        match getPendingCastContext pendingCasts skillStore entityId with
+        | ValueSome(skill, target) ->
           let statuses =
             Projections.CalculateCombatStatuses world
             |> AMap.force
@@ -184,17 +270,16 @@ module AbilityActivation =
           let totalGameTime =
             world.Time |> AVal.map _.TotalGameTime |> AVal.force
 
-          let validationContext =
-            {
-              SkillStore = skillStore
-              Statuses = statuses
-              Resources = resources
-              Cooldowns = cooldowns
-              GameTime = totalGameTime
-              EntityId = entityId
-            }
+          let validationContext = {
+            SkillStore = skillStore
+            Statuses = statuses
+            Resources = resources
+            Cooldowns = cooldowns
+            GameTime = totalGameTime
+            EntityId = entityId
+          }
 
-          validateAndCast eventBus validationContext castData
+          handlePendingCast eventBus validationContext world skill target
 
           // Always clear the pending cast after checking
           eventBus.Publish(
@@ -293,18 +378,16 @@ module AbilityActivation =
         | UseSlot8 ->
           match slots |> HashMap.tryFindV action with
           | ValueSome skillId ->
-            let validationContext =
-              {
-                SkillStore = skillStore
-                Statuses = statuses
-                Resources = resources |> Option.toValueOption
-                Cooldowns = cooldowns |> Option.toValueOption
-                GameTime = gameTime.TotalGameTime
-                EntityId = playerId
-              }
+            let validationContext = {
+              SkillStore = skillStore
+              Statuses = statuses
+              Resources = resources |> Option.toValueOption
+              Cooldowns = cooldowns |> Option.toValueOption
+              GameTime = gameTime.TotalGameTime
+              EntityId = playerId
+            }
 
-            let validationResult =
-              Validation.validate validationContext skillId
+            let validationResult = Validation.validate validationContext skillId
 
             match validationResult with
             | Ok() ->
@@ -322,7 +405,7 @@ module AbilityActivation =
                   this.EventBus.Publish<SystemCommunications.AbilityIntent> {
                     Caster = playerId
                     SkillId = skill.Id
-                    Target = ValueSome playerId
+                    Target = SystemCommunications.TargetSelf
                   }
                 | _ ->
 

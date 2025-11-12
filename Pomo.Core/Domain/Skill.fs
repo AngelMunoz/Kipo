@@ -159,10 +159,10 @@ module Skill =
   [<Struct>]
   type SkillArea =
     | Point
-    | Circle of radius: float32
-    | Cone of angle: float32 * length: float32
-    | Line of width: float32
-    | MultiPoint of radius: float32 * count: int
+    | Circle of radius: float32 * maxCircleTargets: int
+    | Cone of angle: float32 * length: float32 * maxConeTargets: int
+    | Line of width: float32 * maxLineTargets: int
+    | MultiPoint of radius: float32 * maxPointTargets: int
 
   [<Struct>]
   type CastOrigin =
@@ -191,6 +191,7 @@ module Skill =
     DamageSource: DamageSource
     Cost: ResourceCost voption
     Cooldown: TimeSpan voption
+    CastingTime: TimeSpan voption
     Targeting: Targeting
     Range: float32 voption
     Delivery: Delivery
@@ -812,7 +813,11 @@ module Skill =
                 let! radius =
                   Required.Property.get ("Radius", Required.float) json
 
-                return Circle(float32 radius)
+                and! maxTargets =
+                  Optional.Property.get ("MaxTargets", Required.int) json
+                  |> Result.map(Option.defaultValue 1)
+
+                return Circle(float32 radius, maxTargets)
               | "cone" ->
                 let! angle =
                   Required.Property.get ("Angle", Required.float) json
@@ -820,18 +825,25 @@ module Skill =
                 and! length =
                   Required.Property.get ("Length", Required.float) json
 
-                return Cone(float32 angle, float32 length)
+                and! maxTargets =
+                  Optional.Property.get ("MaxTargets", Required.int) json
+                  |> Result.map(Option.defaultValue 1)
+
+                return Cone(float32 angle, float32 length, maxTargets)
               | "line" ->
                 let! width =
                   Required.Property.get ("Width", Required.float) json
 
-                return Line(float32 width)
+                and! maxTargets =
+                  Optional.Property.get ("MaxTargets", Required.int) json
+                  |> Result.map(Option.defaultValue 1)
+
+                return Line(float32 width, maxTargets)
               | "multipoint" ->
                 let! radius =
                   Required.Property.get ("Radius", Required.float) json
 
                 and! count = Required.Property.get ("Count", Required.int) json
-
                 return MultiPoint(float32 radius, count)
               | _ ->
                 return!
@@ -925,7 +937,7 @@ module Skill =
       ///
       /// { "Type": "Instant" }
       ///
-      /// { "Type": "Projectile", "Projectile": { "Speed": 150.0, "CollisionMode": "IgnoreTerrain" } }
+      /// { "Type": "Projectile",  "Speed": 150.0, "CollisionMode": "IgnoreTerrain" }
       let decoder: Decoder<Delivery> =
         fun json -> decode {
           let! type' = Required.Property.get ("Type", Required.string) json
@@ -963,6 +975,9 @@ module Skill =
 
           and! cooldownOpt =
             Optional.Property.get ("Cooldown", Required.float) json
+
+          and! castingTimeOpt =
+            Optional.Property.get ("CastingTime", Required.float) json
 
           and! targeting =
             Required.Property.get ("Targeting", Targeting.decoder) json
@@ -1010,6 +1025,10 @@ module Skill =
             Cost = cost |> Option.toValueOption
             Cooldown =
               cooldownOpt
+              |> Option.map TimeSpan.FromSeconds
+              |> Option.toValueOption
+            CastingTime =
+              castingTimeOpt
               |> Option.map TimeSpan.FromSeconds
               |> Option.toValueOption
             Targeting = targeting

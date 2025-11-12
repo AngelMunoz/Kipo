@@ -37,10 +37,16 @@ module SystemCommunications =
   }
 
   [<Struct>]
+  type SkillTarget =
+    | TargetSelf
+    | TargetEntity of entity: Guid<EntityId>
+    | TargetPosition of position: Vector2
+
+  [<Struct>]
   type AbilityIntent = {
     Caster: Guid<EntityId>
     SkillId: int<SkillId>
-    Target: Guid<EntityId> voption
+    Target: SkillTarget
   }
 
   [<Struct>]
@@ -122,7 +128,10 @@ type CombatEvents =
   | CooldownsChanged of
     cdChanged: struct (Guid<EntityId> * HashMap<int<SkillId>, TimeSpan>)
   | InCombatTimerRefreshed of entityId: Guid<EntityId>
-  | PendingSkillCastSet of entityId: Guid<EntityId> * skillId: int<SkillId> * targetId: Guid<EntityId>
+  | PendingSkillCastSet of
+    entityId: Guid<EntityId> *
+    skillId: int<SkillId> *
+    target: SystemCommunications.SkillTarget
   | PendingSkillCastCleared of entityId: Guid<EntityId>
 
 [<Struct>]

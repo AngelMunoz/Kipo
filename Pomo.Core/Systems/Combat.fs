@@ -18,6 +18,28 @@ open Pomo.Core.Systems.DamageCalculator
 module Combat =
   open System.Reactive.Disposables
 
+  module private AreaOfEffect =
+    let private getPotentialTargets (world: World) (casterId: Guid<EntityId>) =
+      // For now, all entities except the caster are potential targets.
+      // This could be filtered by faction in the future.
+      world.Positions
+      |> AMap.force
+      |> HashMap.filter(fun entityId _ -> entityId <> casterId)
+
+    let findTargetsInCircle
+      (world: World)
+      (casterId: Guid<EntityId>)
+      (center: Vector2)
+      (radius: float32)
+      (maxTargets: int)
+      =
+      getPotentialTargets world casterId
+      |> HashMap.toList
+      |> List.filter(fun (_, pos) -> Vector2.Distance(center, pos) <= radius)
+      |> List.sortBy(fun (_, pos) -> Vector2.DistanceSquared(center, pos))
+      |> List.truncate maxTargets
+      |> List.map fst
+
   module private Handlers =
     let applySkillDamage
       (world: World)
@@ -68,8 +90,7 @@ module Combat =
       =
       let positions = Projections.UpdatedPositions world |> AMap.force
 
-      let result =
-        applySkillDamage world eventBus casterId targetId activeSkill
+      let result = applySkillDamage world eventBus casterId targetId activeSkill
 
       let targetPos =
         positions
@@ -181,13 +202,12 @@ module Combat =
       (skillStore: Stores.SkillStore)
       (casterId: Guid<EntityId>)
       (skillId: int<SkillId>)
-      (targetId: Guid<EntityId>)
+      (target: SystemCommunications.SkillTarget)
       =
       match skillStore.tryFind skillId with
       | ValueSome(Skill.Active activeSkill) ->
         // Apply cost and cooldown now that the ability is confirmed
-        let totalGameTime =
-          world.Time |> AVal.map _.TotalGameTime |> AVal.force
+        let totalGameTime = world.Time |> AVal.map _.TotalGameTime |> AVal.force
 
         let resources = world.Resources |> AMap.force
         let cooldowns = world.AbilityCooldowns |> AMap.force
@@ -245,33 +265,74 @@ module Combat =
         // 3. Handle delivery
         match activeSkill.Delivery with
         | Delivery.Projectile projectileInfo ->
-          let projectileId = Guid.NewGuid() |> UMX.tag<EntityId>
+          let targetEntity =
+            match target with
+            | SystemCommunications.TargetEntity te -> Some te
+            // If a projectile is targeted at a position, we can't create a homing projectile.
+            // This logic can be extended to support non-homing projectiles to a point.
+            | _ -> None
 
-          let liveProjectile: Projectile.LiveProjectile = {
-            Caster = casterId
-            Target = targetId
-            SkillId = skillId
-            Info = projectileInfo
-          }
+          match targetEntity with
+          | Some targetId ->
+            let projectileId = Guid.NewGuid() |> UMX.tag<EntityId>
 
-          eventBus.Publish(
-            StateChangeEvent.CreateProjectile
-              struct (projectileId, liveProjectile)
-          )
-        | Delivery.Melee ->
-          applyInstantaneousSkillEffects
-            world
-            eventBus
-            casterId
-            targetId
-            activeSkill
+            let liveProjectile: Projectile.LiveProjectile = {
+              Caster = casterId
+              Target = targetId
+              SkillId = skillId
+              Info = projectileInfo
+            }
+
+            eventBus.Publish(
+              StateChangeEvent.CreateProjectile
+                struct (projectileId, liveProjectile)
+            )
+          | None -> ()
         | Delivery.Instant ->
-          applyInstantaneousSkillEffects
-            world
-            eventBus
-            casterId
-            targetId
-            activeSkill
+          let positions = Projections.UpdatedPositions world |> AMap.force
+          let getPosition = fun entityId -> positions.TryFindV entityId
+
+          let targetCenter =
+            match target with
+            | SystemCommunications.TargetSelf -> getPosition casterId
+            | SystemCommunications.TargetEntity targetId -> getPosition targetId
+            | SystemCommunications.TargetPosition pos -> ValueSome pos
+
+          match targetCenter with
+          | ValueNone -> () // No center to apply AoE
+          | ValueSome center ->
+            let targets =
+              match activeSkill.Area with
+              | Point ->
+                match target with
+                | SystemCommunications.TargetSelf -> [ casterId ]
+                | SystemCommunications.TargetEntity targetId -> [ targetId ]
+                | SystemCommunications.TargetPosition _ -> [] // Can't target entities with a point on the ground
+              | Circle(radius, maxTargets) ->
+                AreaOfEffect.findTargetsInCircle
+                  world
+                  casterId
+                  center
+                  radius
+                  maxTargets
+              | Cone(angle, length, maxTargets) ->
+                  // TODO: Implement findTargetsInCone
+                  []
+              | Line(width, maxTargets) ->
+                  // TODO: Implement findTargetsInLine
+                  []
+              | MultiPoint _ ->
+                  // This is for spawning multiple projectiles, which is handled in AbilityActivation.
+                  // If an instant skill has this, it's probably a bug in the skill definition.
+                  []
+
+            for targetId in targets do
+              applyInstantaneousSkillEffects
+                world
+                eventBus
+                casterId
+                targetId
+                activeSkill
       | _ -> ()
 
     let handleProjectileImpact
@@ -280,76 +341,108 @@ module Combat =
       =
       match skillStore.tryFind impact.SkillId with
       | ValueSome(Active skill) ->
-        let result =
-          applySkillDamage world eventBus impact.CasterId impact.TargetId skill
-
         let positions = Projections.UpdatedPositions world |> AMap.force
+        let impactPosition = positions.TryFindV impact.TargetId
 
-        let targetPos =
-          positions
-          |> HashMap.tryFindV impact.TargetId
-          |> ValueOption.defaultValue Vector2.Zero
+        match impactPosition with
+        | ValueNone -> () // Impacted entity has no position, should not happen
+        | ValueSome center ->
+          let targets =
+            match skill.Area with
+            | Point -> [ impact.TargetId ]
+            | Circle(radius, maxTargets) ->
+              AreaOfEffect.findTargetsInCircle
+                world
+                impact.CasterId
+                center
+                radius
+                maxTargets
+            | Cone(angle, length, maxTargets) ->
+              // TODO: Implement proper Cone logic for projectile impact.
+              AreaOfEffect.findTargetsInCircle
+                world
+                impact.CasterId
+                center
+                32.0f
+                maxTargets // Placeholder radius
+            | Line(width, maxTargets) ->
+              // TODO: Implement proper Line logic for projectile impact.
+              AreaOfEffect.findTargetsInCircle
+                world
+                impact.CasterId
+                center
+                32.0f
+                maxTargets // Placeholder radius
+            | MultiPoint _ ->
+                // This shouldn't happen. MultiPoint is for firing multiple projectiles,
+                // not for the area of a single projectile impact.
+                [ impact.TargetId ]
 
-        if result.IsEvaded then
-          eventBus.Publish(
-            {
-              Message = "Miss"
-              Position = targetPos
-            }
-            : SystemCommunications.ShowNotification
-          )
-        else
-          eventBus.Publish(
-            {
-              Target = impact.TargetId
-              Amount = result.Amount
-            }
-            : SystemCommunications.DamageDealt
-          )
+          for targetId in targets do
+            let result =
+              applySkillDamage world eventBus impact.CasterId targetId skill
 
-          eventBus.Publish(
-            {
-              Message = $"-{result.Amount}"
-              Position = targetPos
-            }
-            : SystemCommunications.ShowNotification
-          )
+            let targetPos =
+              positions
+              |> HashMap.tryFindV targetId
+              |> ValueOption.defaultValue Vector2.Zero
 
-          if result.IsCritical then
-            eventBus.Publish(
-              {
-                Message = "Crit!"
-                Position = targetPos
-              }
-              : SystemCommunications.ShowNotification
-            )
+            if result.IsEvaded then
+              eventBus.Publish(
+                {
+                  Message = "Miss"
+                  Position = targetPos
+                }
+                : SystemCommunications.ShowNotification
+              )
+            else
+              eventBus.Publish(
+                {
+                  Target = targetId
+                  Amount = result.Amount
+                }
+                : SystemCommunications.DamageDealt
+              )
 
-          for effect in skill.Effects do
-            let intent =
-              {
-                SourceEntity = impact.CasterId
-                TargetEntity = impact.TargetId
-                Effect = effect
-              }
-              : SystemCommunications.EffectApplicationIntent
+              eventBus.Publish(
+                {
+                  Message = $"-{result.Amount}"
+                  Position = targetPos
+                }
+                : SystemCommunications.ShowNotification
+              )
 
-            eventBus.Publish intent
+              if result.IsCritical then
+                eventBus.Publish(
+                  {
+                    Message = "Crit!"
+                    Position = targetPos
+                  }
+                  : SystemCommunications.ShowNotification
+                )
+
+              for effect in skill.Effects do
+                eventBus.Publish(
+                  {
+                    SourceEntity = impact.CasterId
+                    TargetEntity = targetId
+                    Effect = effect
+                  }
+                  : SystemCommunications.EffectApplicationIntent
+                )
       | _ -> () // Skill not found
 
     let handleAbilityIntentEvent
       (world: World, eventBus: EventBus, skillStore: Stores.SkillStore)
       (event: SystemCommunications.AbilityIntent)
       =
-      match event.Target with
-      | ValueSome targetId ->
-        handleAbilityIntent
-          world
-          eventBus
-          skillStore
-          event.Caster
-          event.SkillId
-          targetId
-      | ValueNone -> ()
+      handleAbilityIntent
+        world
+        eventBus
+        skillStore
+        event.Caster
+        event.SkillId
+        event.Target
 
 
   type CombatSystem(game: Game) as this =

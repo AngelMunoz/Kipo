@@ -75,60 +75,113 @@ module Targeting =
     world: World
   }
 
-  let private getSkillActivationPositions
-    (world: World)
-    (casterId: Guid<EntityId>)
-    (targetId: Guid<EntityId>)
-    =
-    let positions = world.Positions |> AMap.force
+  module private TargetingHandlers =
 
-    match positions.TryFindV casterId, positions.TryFindV targetId with
-    | ValueSome casterPos, ValueSome targetPos ->
-      ValueSome(casterPos, targetPos)
-    | _ -> ValueNone
+    let private getSkillActivationPositions
+      (world: World)
+      (casterId: Guid<EntityId>)
+      (targetId: Guid<EntityId>)
+      =
+      let positions = Projections.UpdatedPositions world |> AMap.force
 
-  let private checkRangeAndPublish
-    (eventBus: EventBus)
-    (world: World)
-    (skill: ActiveSkill)
-    (casterId: Guid<EntityId>)
-    (targetId: Guid<EntityId>)
-    =
-    match getSkillActivationPositions world casterId targetId with
-    | ValueNone -> () // Or log an error that positions were not found
-    | ValueSome(casterPos, targetPos) ->
-      let distance = Vector2.Distance(casterPos, targetPos)
-      // Assuming the first element in Range is the max range
-      let maxRange = skill.Range |> ValueOption.defaultValue 0f
+      match positions.TryFindV casterId, positions.TryFindV targetId with
+      | ValueSome casterPos, ValueSome targetPos ->
+        ValueSome(casterPos, targetPos)
+      | _ -> ValueNone
 
-      if distance > maxRange then
-        let direction = Vector2.Normalize(targetPos - casterPos)
+    let handleTargetEntity
+      (eventBus: EventBus)
+      (world: World)
+      (skill: ActiveSkill)
+      (casterId: Guid<EntityId>)
+      (targetId: Guid<EntityId>)
+      =
+      match getSkillActivationPositions world casterId targetId with
+      | ValueNone -> () // Or log an error that positions were not found
+      | ValueSome(casterPos, targetPos) ->
+        let distance = Vector2.Distance(casterPos, targetPos)
+        let maxRange = skill.Range |> ValueOption.defaultValue 0f
 
-        let moveTarget =
-          targetPos - direction * (maxRange - SKILL_ACTIVATION_RANGE_BUFFER)
+        if distance > maxRange then
+          let direction = Vector2.Normalize(targetPos - casterPos)
 
-        eventBus.Publish(
-          {
-            EntityId = casterId
-            Target = moveTarget
-          }
-          : SystemCommunications.SetMovementTarget
-        )
+          let moveTarget =
+            targetPos - direction * (maxRange - SKILL_ACTIVATION_RANGE_BUFFER)
 
-        eventBus.Publish(
-          StateChangeEvent.Combat(
-            CombatEvents.PendingSkillCastSet(casterId, skill.Id, targetId)
+          eventBus.Publish(
+            {
+              EntityId = casterId
+              Target = moveTarget
+            }
+            : SystemCommunications.SetMovementTarget
           )
-        )
-      else
-        eventBus.Publish(
-          {
-            Caster = casterId
-            SkillId = skill.Id
-            Target = ValueSome targetId
-          }
-          : SystemCommunications.AbilityIntent
-        )
+
+          eventBus.Publish(
+            StateChangeEvent.Combat(
+              CombatEvents.PendingSkillCastSet(
+                casterId,
+                skill.Id,
+                SystemCommunications.TargetEntity targetId
+              )
+            )
+          )
+        else
+          eventBus.Publish(
+            {
+              Caster = casterId
+              SkillId = skill.Id
+              Target = SystemCommunications.TargetEntity targetId
+            }
+            : SystemCommunications.AbilityIntent
+          )
+
+    let handleTargetPosition
+      (eventBus: EventBus)
+      (world: World)
+      (skill: ActiveSkill)
+      (casterId: Guid<EntityId>)
+      (targetPos: Vector2)
+      =
+      let positions = Projections.UpdatedPositions world |> AMap.force
+
+      match positions.TryFindV casterId with
+      | ValueNone -> () // Caster position not found, do nothing.
+      | ValueSome casterPos ->
+        let distance = Vector2.Distance(casterPos, targetPos)
+        let maxRange = skill.Range |> ValueOption.defaultValue 0f
+
+        if distance > maxRange then
+          let direction = Vector2.Normalize(targetPos - casterPos)
+
+          let moveTarget =
+            targetPos - direction * (maxRange - SKILL_ACTIVATION_RANGE_BUFFER)
+
+          eventBus.Publish(
+            {
+              EntityId = casterId
+              Target = moveTarget
+            }
+            : SystemCommunications.SetMovementTarget
+          )
+
+          eventBus.Publish(
+            StateChangeEvent.Combat(
+              CombatEvents.PendingSkillCastSet(
+                casterId,
+                skill.Id,
+                SystemCommunications.TargetPosition targetPos
+              )
+            )
+          )
+        else
+          eventBus.Publish(
+            {
+              Caster = casterId
+              SkillId = skill.Id
+              Target = SystemCommunications.TargetPosition targetPos
+            }
+            : SystemCommunications.AbilityIntent
+          )
 
   let handleTargetSelected
     (args: HandleSelectedTargetArgs)
@@ -147,23 +200,33 @@ module Targeting =
     match _entityId.Value with
     | ValueSome casterId ->
       if casterId = selector then
-        let targetIdOpt =
-          match selection with
-          | SelectedEntity entity -> Some entity
-          | SelectedPosition _ -> None
-
         let skillOpt = skillBeingTargeted |> AVal.force
 
-        match skillOpt, targetIdOpt with
-        | ValueSome(Active activeSkill), Some targetId ->
-          checkRangeAndPublish eventBus world activeSkill casterId targetId
+        match skillOpt with
+        | ValueSome(Active activeSkill) ->
+          match activeSkill.Targeting, selection with
+          | TargetEntity, SelectedEntity targetId ->
+            TargetingHandlers.handleTargetEntity
+              eventBus
+              world
+              activeSkill
+              casterId
+              targetId
+          | TargetPosition, SelectedPosition targetPos ->
+            TargetingHandlers.handleTargetPosition
+              eventBus
+              world
+              activeSkill
+              casterId
+              targetPos
+          | _ -> () // Invalid selection for the targeting mode
 
           // Always clear targeting mode after a selection is made
           transact(fun () ->
             _action.Value <- ValueNone
             _entityId.Value <- ValueNone)
         | _ ->
-          // Invalid selection, clear targeting mode
+          // Skill not active or passive, clear targeting mode
           transact(fun () ->
             _action.Value <- ValueNone
             _entityId.Value <- ValueNone)

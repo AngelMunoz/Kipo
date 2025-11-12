@@ -4,6 +4,14 @@ This is a cross-platform game built with F# and MonoGame. The project is structu
 
 - The general guidelines of this project are in @AGENTS.md and @.agents/fsharp_conventions.md
 
+## Code sugestions
+
+When you're suggesting code to the user, your proposed code should avoid living in a single place.
+
+- Large function bodies should be refactored into smaller functions.
+- Logic that can be reused should be moved to module-level functions.
+- Avoid putting large amounts of logic directly inside class methods.
+
 **Game Systems and Drawable Game Systems:**
 
 When implementing Sytems, whether they're a GameComponent (or our GameSystem class) or a DrawableGameComponent. The component class itself should be a slim wrapper that delegates all logic to module-level functions.

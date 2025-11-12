@@ -98,6 +98,12 @@
 
 ### Functions Must Be Focused
 
+When you're suggesting code to the user, your proposed code should avoid living in a single place.
+
+- Large function bodies should be refactored into smaller functions.
+- Logic that can be reused should be moved to module-level functions.
+- Avoid putting large amounts of logic directly inside class methods.
+
 Each function should be descriptive of what it does. If a function is doing too much, it can either use:
 
 **Local functions:**

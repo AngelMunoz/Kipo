@@ -79,8 +79,8 @@ module ActionHandler =
           eventBus.GetObservableFor<StateChangeEvent>()
           |> Observable.choose(fun event ->
             match event with
-            | StateChangeEvent.Input(InputEvents.GameActionStatesChanged(struct (changedEntityId,
-                                                                                 actionStates))) ->
+            | Input(GameActionStatesChanged struct (changedEntityId,
+                                                    actionStates)) ->
               if changedEntityId = entityId then
                 Some actionStates
               else
@@ -137,8 +137,7 @@ module ActionHandler =
                 // This case should be handled immediately on key press, not click.
                 ()
 
-              | ValueSome SingleAlly
-              | ValueSome SingleEnemy ->
+              | ValueSome TargetEntity ->
                 match clickedEntity with
                 | Some clickedEntityId ->
                   // TODO: Validate if it's an ally/enemy
@@ -155,7 +154,7 @@ module ActionHandler =
                   // Invalid target, do nothing for now
                   ()
 
-              | ValueSome GroundPoint ->
+              | ValueSome TargetPosition ->
                 let selection = SelectedPosition mousePosition
 
                 eventBus.Publish(
@@ -165,22 +164,6 @@ module ActionHandler =
                   }
                   : SystemCommunications.TargetSelected
                 )
-              | ValueSome(GroundArea area) ->
-                match area with
-                | Circle _
-                | Rectangle _
-                | Cone _
-                | Square _ ->
-                  let selection = SelectedPosition mousePosition
-
-                  eventBus.Publish(
-                    {
-                      Selector = entityId
-                      Selection = selection
-                    }
-                    : SystemCommunications.TargetSelected
-                  )
-
             | ValueSome _
             | ValueNone -> ())
     }
