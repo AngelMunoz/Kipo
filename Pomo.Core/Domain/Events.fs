@@ -93,6 +93,7 @@ module SystemCommunications =
     CasterId: Guid<EntityId>
     TargetId: Guid<EntityId>
     SkillId: int<SkillId>
+    RemainingJumps: int voption
   }
 
 // --- State Change Events ---

@@ -403,10 +403,18 @@ module Combat =
                 }
                 : SystemCommunications.DamageDealt
               )
+              
+              let baseMessage = $"-{result.Amount}"
+              let debugText =
+                match impact.RemainingJumps with
+                | ValueSome jumps -> $" ({jumps} left)"
+                | ValueNone -> ""
+              
+              let finalMessage = baseMessage + debugText
 
               eventBus.Publish(
                 {
-                  Message = $"-{result.Amount}"
+                  Message = finalMessage
                   Position = targetPos
                 }
                 : SystemCommunications.ShowNotification

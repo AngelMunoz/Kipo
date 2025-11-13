@@ -195,5 +195,31 @@
     },
     "Origin": "Caster",
     "Effects": []
+  },
+  "8": {
+    "Kind": "Active",
+    "Id": 8,
+    "Name": "Catchy Song",
+    "Description": "Lobs a musical note that bounces between enemies.",
+    "Intent": "Offensive",
+    "DamageSource": "Magical",
+    "Cost": { "Type": "MP", "Amount": 5 },
+    "Cooldown": 4.0,
+    "Targeting": "TargetEntity",
+    "Range": [32, 6],
+    "Area": "Point",
+    "Delivery": {
+      "Type": "Projectile",
+      "Speed": 250.0,
+      "CollisionMode": "IgnoreTerrain",
+      "Kind": {
+        "Type": "Chained",
+        "JumpsLeft": 4,
+        "MaxRange": 1000.0
+      }
+    },
+    "Formula": "MA * 0.8",
+    "Origin": "Caster",
+    "Effects": []
   }
 }

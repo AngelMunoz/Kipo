@@ -15,68 +15,87 @@ open Pomo.Core.Domain.Projectile
 
 module Projectile =
   let private findNextChainTarget
-    (positions: HashMap<Guid<EntityId>, Vector2>)
+    (positions: amap<Guid<EntityId>, Vector2>)
     (casterId: Guid<EntityId>)
     (currentTargetId: Guid<EntityId>)
     (maxRange: float32)
     =
     positions
-    |> HashMap.toList
-    |> List.filter(fun (id, _) -> id <> casterId && id <> currentTargetId)
-    |> List.map(fun (id, pos) ->
-      id, pos, Vector2.DistanceSquared(positions[currentTargetId], pos))
-    |> List.filter(fun (_, _, distSq) -> distSq <= maxRange * maxRange)
-    |> List.sortBy(fun (_, _, distSq) -> distSq)
-    |> List.tryHead
-    |> Option.map(fun (id, _, _) -> id)
+    |> AMap.filter(fun id _ -> id <> casterId && id <> currentTargetId)
+    |> AMap.chooseA(fun id pos -> adaptive {
+      let! currentTargetPos = positions |> AMap.tryFind currentTargetId
+
+      match currentTargetPos with
+      | None -> return None
+      | Some curentTargetPos ->
+        let distance = Vector2.DistanceSquared(curentTargetPos, pos)
+
+        if distance <= maxRange * maxRange then
+          return Some distance
+        else
+          return None
+    })
+    |> AMap.sortBy(fun _ distance -> distance)
+    |> AList.toAVal
 
   let generateEvents
-    (positions: amap<_, _>)
-    projectileId
+    (positions: amap<Guid<EntityId>, Vector2>)
+    (projectileId: Guid<EntityId>)
     (projectile: Projectile.LiveProjectile)
     =
-    adaptive {
-      // Adaptively find the positions of the projectile and its target.
-      // This inner block will only re-run if these specific positions change.
-      let! projPos = positions |> AMap.tryFind projectileId
-      let! targetPos = positions |> AMap.tryFind projectile.Target
-      let mutable systemEvents = IndexList.empty
-      let mutable stateEvents = IndexList.empty
 
-      match projPos, targetPos with
-      | Some projPos, Some targetPos ->
-        let distance = Vector2.Distance(projPos, targetPos)
-        let threshold = 4.0f // Close enough for impact
+    let generateFoundTarget projPos targetPos = adaptive {
 
-        if distance < threshold then
-          // Impact: Create impact and removal events
-          let impact: SystemCommunications.ProjectileImpacted = {
-            ProjectileId = projectileId
-            CasterId = projectile.Caster
-            TargetId = projectile.Target
-            SkillId = projectile.SkillId
-          }
+      let distance = Vector2.Distance(projPos, targetPos)
+      let threshold = 4.0f // Close enough for impact
+      let commEvents = ResizeArray()
+      let stateEvents = ResizeArray()
 
-          systemEvents <- IndexList.add impact systemEvents
+      let inline addComms(event) = commEvents.Add event
 
-          // Always remove the current projectile after impact
-          stateEvents <-
-            IndexList.add (EntityLifecycle(Removed projectileId)) stateEvents
+      let inline addState(event) = stateEvents.Add event
 
-          // Handle chaining
+      if distance < threshold then
+        let remainingJumps =
           match projectile.Info.Variations with
-          | ValueSome(Chained(jumpsLeft, maxRange)) when jumpsLeft > 0 ->
-            let allPositions = positions |> AMap.force
+          | ValueSome(Chained(jumpsLeft, _)) -> ValueSome jumpsLeft
+          | _ -> ValueNone
+        // Impact: Create impact and removal events
+        let impact: SystemCommunications.ProjectileImpacted = {
+          ProjectileId = projectileId
+          CasterId = projectile.Caster
+          TargetId = projectile.Target
+          SkillId = projectile.SkillId
+          RemainingJumps = remainingJumps
+        }
 
-            let nextTarget =
+        do addComms impact
+
+        // Always remove the current projectile after impact
+        do addState <| EntityLifecycle(Removed projectileId)
+
+        // Handle chaining
+        let! nextTarget = adaptive {
+          match projectile.Info.Variations with
+          | ValueSome(Chained(jumpsLeft, maxRange)) when jumpsLeft >= 0 ->
+            let! nextTarget =
               findNextChainTarget
-                allPositions
+                positions
                 projectile.Caster
                 projectile.Target
                 maxRange
 
-            match nextTarget with
-            | Some newTargetId ->
+            let targets = nextTarget.AsArray
+
+            let selectedTarget =
+              match targets with
+              | [||] -> ValueNone
+              | targets ->
+                let selected, _ = Array.randomChoice targets
+                ValueSome selected
+
+            match selectedTarget with
+            | ValueSome newTargetId ->
               let newProjectileId = Guid.NewGuid() |> UMX.tag<EntityId>
 
               let newLiveProjectile: LiveProjectile = {
@@ -89,43 +108,55 @@ module Projectile =
                     }
               }
 
-              stateEvents <-
-                IndexList.add
-                  (StateChangeEvent.CreateProjectile
-                    struct (newProjectileId,
-                            newLiveProjectile,
-                            ValueSome targetPos))
-                  stateEvents
-            | None -> ()
-          | _ -> ()
+              return
+                ValueSome
+                <| CreateProjectile
+                  struct (newProjectileId,
+                          newLiveProjectile,
+                          ValueSome targetPos)
+            | ValueNone -> return ValueNone
+          | _ -> return ValueNone
+        }
 
-        else
-          // Keep moving: Create a velocity change event
-          let direction = Vector2.Normalize(targetPos - projPos)
-          let velocity = direction * projectile.Info.Speed
+        do nextTarget |> ValueOption.iter addState
 
-          stateEvents <-
-            IndexList.add
-              (Physics(VelocityChanged struct (projectileId, velocity)))
-              stateEvents
+        return
+          struct (commEvents |> IndexList.ofSeq, stateEvents |> IndexList.ofSeq)
+      else
+        // Keep moving: Create a velocity change event
+        let direction = Vector2.Normalize(targetPos - projPos)
+        let velocity = direction * projectile.Info.Speed
+
+        do addState <| Physics(VelocityChanged struct (projectileId, velocity))
+
+        return
+          struct (commEvents |> IndexList.ofSeq, stateEvents |> IndexList.ofSeq)
+    }
+
+    adaptive {
+      let! projPos = positions |> AMap.tryFind projectileId
+      let! targetPos = positions |> AMap.tryFind projectile.Target
+
+
+      match projPos, targetPos with
+      | Some projPos, Some targetPos ->
+        return! generateFoundTarget projPos targetPos
       | Some _, None
       | None, Some _
       | None, None ->
-        // If projectile or target has no position, remove projectile
-        stateEvents <-
-          IndexList.add (EntityLifecycle(Removed projectileId)) stateEvents
-
-      return struct (systemEvents, stateEvents)
+        return
+          struct (IndexList.empty,
+                  IndexList.single(EntityLifecycle(Removed projectileId)))
     }
 
 type ProjectileSystem(game: Game) as this =
   inherit GameSystem(game)
 
   let eventsToPublish =
+    let positions = Projections.UpdatedPositions this.World
+
     this.World.LiveProjectiles
-    |> AMap.mapA(
-      Projectile.generateEvents(Projections.UpdatedPositions this.World)
-    )
+    |> AMap.mapA(Projectile.generateEvents positions)
     |> AMap.fold
       (fun (sysAcc, stateAcc) _ struct (sysEvents, stateEvents) ->
         (IndexList.append sysEvents sysAcc,
@@ -134,5 +165,5 @@ type ProjectileSystem(game: Game) as this =
 
   override this.Update _ =
     let sysEvents, stateEvents = eventsToPublish |> AVal.force
-    sysEvents |> IndexList.iter(fun e -> this.EventBus.Publish(e))
-    stateEvents |> IndexList.iter(fun e -> this.EventBus.Publish(e))
+    sysEvents |> IndexList.iter this.EventBus.Publish
+    stateEvents |> IndexList.iter this.EventBus.Publish

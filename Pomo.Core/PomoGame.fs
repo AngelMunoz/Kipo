@@ -35,6 +35,7 @@ open Pomo.Core.Systems.ActionHandler
 open Pomo.Core.Systems.DebugRender
 open Pomo.Core.Systems.Effects
 open Pomo.Core.Systems.ResourceManager
+open Pomo.Core.Domain.Units
 
 type PomoGame() as this =
   inherit Game()
@@ -46,7 +47,11 @@ type PomoGame() as this =
   let deserializer = Serialization.create()
 
   let playerId = %Guid.NewGuid()
-  let enemyId = %Guid.NewGuid()
+  let enemyId1 = %Guid.NewGuid()
+  let enemyId2 = %Guid.NewGuid()
+  let enemyId3 = %Guid.NewGuid()
+  let enemyId4 = %Guid.NewGuid()
+  let enemyId5 = %Guid.NewGuid()
 
   let eventBus = new EventBus()
 
@@ -102,112 +107,90 @@ type PomoGame() as this =
     LocalizationManager.DefaultCultureCode |> LocalizationManager.SetCulture
 
     // Player Setup
-    let playerEntity: Pomo.Core.Domain.Entity.EntitySnapshot = {
+    let playerEntity: Entity.EntitySnapshot = {
       Id = playerId
       Position = Vector2(100.0f, 100.0f)
       Velocity = Vector2.Zero
     }
 
-    eventBus.Publish(
-      StateChangeEvent.EntityLifecycle(
-        EntityLifecycleEvents.Created playerEntity
-      )
-    )
+    eventBus.Publish(EntityLifecycle(Created playerEntity))
 
-    let playerBaseStats: Pomo.Core.Domain.Entity.BaseStats = {
+    let playerBaseStats: Entity.BaseStats = {
       Power = 10
-      Magic = 40
+      Magic = 50
       Sense = 20
       Charm = 30
     }
-    
+
     let maxPlayerHP = playerBaseStats.Charm * 10
     let maxPlayerMP = playerBaseStats.Magic * 5
 
-    let playerResources: Pomo.Core.Domain.Entity.Resource = {
+    let playerResources: Entity.Resource = {
       HP = maxPlayerHP
       MP = maxPlayerMP
-      Status = Pomo.Core.Domain.Entity.Status.Alive
+      Status = Entity.Status.Alive
     }
 
     eventBus.Publish(
-      StateChangeEvent.Combat(
-        CombatEvents.ResourcesChanged struct (playerId, playerResources)
-      )
+      Combat(ResourcesChanged struct (playerId, playerResources))
     )
 
-    let playerFactions = HashSet [ Pomo.Core.Domain.Entity.Faction.Player ]
+    let playerFactions = HashSet [ Entity.Faction.Player ]
+
+    eventBus.Publish(Combat(FactionsChanged struct (playerId, playerFactions)))
 
     eventBus.Publish(
-      StateChangeEvent.Combat(
-        CombatEvents.FactionsChanged struct (playerId, playerFactions)
-      )
-    )
-
-    eventBus.Publish(
-      StateChangeEvent.Combat(
-        CombatEvents.BaseStatsChanged struct (playerId, playerBaseStats)
-      )
+      Combat(BaseStatsChanged struct (playerId, playerBaseStats))
     )
 
     let inputMap = InputMapping.createDefaultInputMap()
 
-    eventBus.Publish(
-      StateChangeEvent.Input(InputEvents.MapChanged struct (playerId, inputMap))
-    )
+    eventBus.Publish(Input(MapChanged struct (playerId, inputMap)))
 
     // Enemy Setup
-    let enemyEntity: Pomo.Core.Domain.Entity.EntitySnapshot = {
-      Id = enemyId
-      Position = Vector2(300.0f, 100.0f)
-      Velocity = Vector2.Zero
-    }
-
-    eventBus.Publish(
-      StateChangeEvent.EntityLifecycle(
-        EntityLifecycleEvents.Created enemyEntity
-      )
-    )
-
-    let enemyBaseStats: Pomo.Core.Domain.Entity.BaseStats = {
+    let enemyBaseStats: Entity.BaseStats = {
       Power = 2
       Magic = 2
       Sense = 2
-      Charm = 100
+      Charm = 200
     }
 
     let maxEnemyHP = enemyBaseStats.Charm * 10
     let maxEnemyMP = enemyBaseStats.Magic * 5
 
-    let enemyResources: Pomo.Core.Domain.Entity.Resource = {
+    let enemyResources: Entity.Resource = {
       HP = maxEnemyHP
       MP = maxEnemyMP
-      Status = Pomo.Core.Domain.Entity.Status.Alive
+      Status = Entity.Status.Alive
     }
 
-    eventBus.Publish(
-      StateChangeEvent.Combat(
-        CombatEvents.ResourcesChanged struct (enemyId, enemyResources)
-      )
-    )
+    let enemyFactions = HashSet [ Entity.Faction.Enemy ]
 
-    let enemyFactions = HashSet [ Pomo.Core.Domain.Entity.Faction.Enemy ]
+    let createEnemy (id: Guid<EntityId>) (pos: Vector2) =
+      let enemyEntity: Entity.EntitySnapshot = {
+        Id = id
+        Position = pos
+        Velocity = Vector2.Zero
+      }
 
-    eventBus.Publish(
-      StateChangeEvent.Combat(
-        CombatEvents.FactionsChanged struct (enemyId, enemyFactions)
-      )
-    )
+      eventBus.Publish(EntityLifecycle(Created enemyEntity))
 
-    eventBus.Publish(
-      StateChangeEvent.Combat(
-        CombatEvents.BaseStatsChanged struct (enemyId, enemyBaseStats)
-      )
-    )
+      eventBus.Publish(Combat(ResourcesChanged struct (id, enemyResources)))
+
+      eventBus.Publish(Combat(FactionsChanged struct (id, enemyFactions)))
+
+      eventBus.Publish(Combat(BaseStatsChanged struct (id, enemyBaseStats)))
+
+    createEnemy enemyId1 (Vector2(300.0f, 100.0f))
+    createEnemy enemyId2 (Vector2(350.0f, 150.0f))
+    createEnemy enemyId3 (Vector2(400.0f, 100.0f))
+    createEnemy enemyId4 (Vector2(450.0f, 150.0f))
+    createEnemy enemyId5 (Vector2(500.0f, 100.0f))
+
 
     let quickSlots = [
-      UseSlot1, UMX.tag 1
-      UseSlot2, UMX.tag 2
+      UseSlot1, UMX.tag 7 // Summon Boulder
+      UseSlot2, UMX.tag 8 // Catchy Song
       UseSlot3, UMX.tag 3
       UseSlot4, UMX.tag 6
       UseSlot5, UMX.tag 4
@@ -215,10 +198,7 @@ type PomoGame() as this =
     ]
 
     eventBus.Publish(
-      StateChangeEvent.Input(
-        InputEvents.QuickSlotsChanged
-          struct (playerId, HashMap.ofList quickSlots)
-      )
+      Input(QuickSlotsChanged struct (playerId, HashMap.ofList quickSlots))
     )
 
     // Start listening to action events
@@ -256,6 +236,6 @@ type PomoGame() as this =
 
 
   override _.Draw gameTime =
-    base.GraphicsDevice.Clear Color.MonoGameOrange
+    base.GraphicsDevice.Clear Color.Peru
     // Draw game content here
     base.Draw gameTime

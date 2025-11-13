@@ -193,23 +193,25 @@ This system is the core of the stat calculation pipeline.
 - [x] Does a debug renderer show the updated `DerivedStats` value on the _next_ frame?
 - [x] Does a subsequent ability cast use the newly calculated (buffed) stats for its own calculations (e.g., damage)?
 
-### 7.6 Chained Ability Execution
+### 7.6 Advanced Skill System Refactor
 
-**Goal:** Implement a single projectile ability using the event-chaining pattern.
+**Goal:** Refactor the entire skill pipeline to support a wide variety of composable skill types, including complex targeting, delivery, and area of effect, as well as advanced projectile behaviors like chaining.
 
-- **Events to Define:**
-  - `AbilityCasted`
-  - `ProjectileFired`
-  - `ProjectileImpacted`
-- **Systems to Implement:**
-  - `AbilitySystem`
-  - `ProjectileSystem`
-  - `VfxSystem` (can just draw primitive shapes for now)
+- **Key Architectural Changes:**
+  - **Decoupled Skill Definition:** A skill is now composed of `Targeting` (Self, Entity, Position), `Delivery` (Instant, Projectile), and `SkillArea` (Point, Circle, Cone, Line, MultiPoint).
+  - **Flexible Targeting:** The `TargetingSystem` now handles different targeting modes and initiates movement-then-cast behavior for out-of-range targets via a `PendingSkillCast` state.
+  - **Generalized Activation:** The `AbilityActivationSystem` correctly interprets the `PendingSkillCast` and publishes a generic `AbilityIntent` event. It also handles spawning multiple projectiles for `MultiPoint` area skills.
+  - **Area of Effect Combat:** The `CombatSystem` now uses the `SkillArea` definition to apply effects to multiple targets for both `Instant` delivery skills and on-impact effects for `Projectile` skills.
+  - **Advanced Projectile Logic:** The `ProjectileSystem` has been refactored to support complex variations. It can now handle `Chained` projectiles, creating new projectiles at impact points to continue the chain.
+
 - **✅ Verification Checklist:**
-  - [ ] Does using the ability publish an `AbilityCasted` event?
-  - [ ] Does the `VfxSystem` react by publishing a `ProjectileFired` event?
-  - [ ] Does the `ProjectileSystem` move the projectile and publish `ProjectileImpacted` on collision?
-  - [ ] Does the `CombatSystem` react to `ProjectileImpacted` by publishing `DamageDealt`?
+  - [x] Can a skill be defined with `TargetPosition` and an `Instant` `Circle` area of effect (e.g., "Summon Boulder")?
+  - [x] Does the `CombatSystem` correctly find and apply damage to multiple targets within the AoE?
+  - [x] Can a `Projectile` skill be defined with a `Circle` area of effect on impact?
+  - [x] Does the `CombatSystem` apply AoE damage when the projectile hits its target?
+  - [x] Can a `Projectile` be defined with a `Chained` variation?
+  - [x] Does the `ProjectileSystem` correctly spawn a new projectile at the impact site to continue the chain?
+  - [x] Is the entire flow, from input to damage, handled through the event bus and `StateUpdateSystem`?
 
 ## 8. Phase 4 and Beyond
 
