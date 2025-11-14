@@ -185,7 +185,7 @@
     "Range": [32, 7],
     "Area": {
       "Type": "Circle",
-      "Radius": 80.0,
+      "Radius": 300.0,
       "MaxTargets": 5
     },
     "Delivery": { "Type": "Instant" },

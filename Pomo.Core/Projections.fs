@@ -23,6 +23,11 @@ module Projections =
       return position + displacement
     })
 
+  let LiveEntities(world: World) =
+    world.Resources
+    |> AMap.filter(fun _ resource -> resource.Status = Entity.Status.Alive)
+    |> AMap.keys
+
   let private effectKindToCombatStatus(effect: Skill.ActiveEffect) =
     match effect.SourceEffect.Kind with
     | Skill.EffectKind.Stun -> Some CombatStatus.Stunned
@@ -84,8 +89,14 @@ module Projections =
       | DP -> { stats with DP = transformI stats.DP }
       | HV -> { stats with HV = transformI stats.HV }
       | MS -> { stats with MS = transformI stats.MS }
-      | HPRegen -> { stats with HPRegen = transformI stats.HPRegen }
-      | MPRegen -> { stats with MPRegen = transformI stats.MPRegen }
+      | HPRegen -> {
+          stats with
+              HPRegen = transformI stats.HPRegen
+        }
+      | MPRegen -> {
+          stats with
+              MPRegen = transformI stats.MPRegen
+        }
       | ElementResistance element ->
         let current =
           stats.ElementResistances

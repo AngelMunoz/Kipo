@@ -16,30 +16,31 @@ open Pomo.Core.Domain.Projectile
 module Projectile =
   let private findNextChainTarget
     (positions: amap<Guid<EntityId>, Vector2>)
+    (liveEntities: aset<Guid<EntityId>>)
     (casterId: Guid<EntityId>)
     (currentTargetId: Guid<EntityId>)
+    (originPos: Vector2)
     (maxRange: float32)
     =
     positions
-    |> AMap.filter(fun id _ -> id <> casterId && id <> currentTargetId)
-    |> AMap.chooseA(fun id pos -> adaptive {
-      let! currentTargetPos = positions |> AMap.tryFind currentTargetId
+    |> AMap.filterA(fun id _ -> adaptive {
+      let! isLive = liveEntities |> ASet.contains id
+      return isLive && id <> casterId && id <> currentTargetId
+    })
+    |> AMap.chooseA(fun _ pos -> adaptive {
+      let distance = Vector2.DistanceSquared(originPos, pos)
 
-      match currentTargetPos with
-      | None -> return None
-      | Some curentTargetPos ->
-        let distance = Vector2.DistanceSquared(curentTargetPos, pos)
-
-        if distance <= maxRange * maxRange then
-          return Some distance
-        else
-          return None
+      if distance <= maxRange * maxRange then
+        return Some distance
+      else
+        return None
     })
     |> AMap.sortBy(fun _ distance -> distance)
     |> AList.toAVal
 
   let generateEvents
     (positions: amap<Guid<EntityId>, Vector2>)
+    (liveEntities: aset<Guid<EntityId>>)
     (projectileId: Guid<EntityId>)
     (projectile: Projectile.LiveProjectile)
     =
@@ -81,8 +82,10 @@ module Projectile =
             let! nextTarget =
               findNextChainTarget
                 positions
+                liveEntities
                 projectile.Caster
                 projectile.Target
+                targetPos
                 maxRange
 
             let targets = nextTarget.AsArray
@@ -154,9 +157,10 @@ type ProjectileSystem(game: Game) as this =
 
   let eventsToPublish =
     let positions = Projections.UpdatedPositions this.World
+    let liveEntities = Projections.LiveEntities this.World
 
     this.World.LiveProjectiles
-    |> AMap.mapA(Projectile.generateEvents positions)
+    |> AMap.mapA(Projectile.generateEvents positions liveEntities)
     |> AMap.fold
       (fun (sysAcc, stateAcc) _ struct (sysEvents, stateEvents) ->
         (IndexList.append sysEvents sysAcc,
