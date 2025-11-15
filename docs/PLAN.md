@@ -213,16 +213,120 @@ This system is the core of the stat calculation pipeline.
   - [x] Does the `ProjectileSystem` correctly spawn a new projectile at the impact site to continue the chain?
   - [x] Is the entire flow, from input to damage, handled through the event bus and `StateUpdateSystem`?
 
-## 8. Phase 4 and Beyond
+## 8. Phase 4: Inventory & Equipment
+
+**Goal:** Implement a complete pipeline for picking up, managing, and equipping items, and have their stats correctly influence character performance.
+
+### 8.1 Data Model: Components & Core Types
+
+- **`ItemDefinition`**: Static data loaded from `Content/Items.json`.
+  - Fields: `Id: int<ItemId>`, `Name: string`, `Weight: float32`, `Kind: ItemKind`.
+- **`ItemKind`**: A DU defining item behavior: `Wearable of EquipmentProperties`, `Usable of UsabilityProperties`, `NonUsable`.
+- **`ItemInstance`**: A unique item in the game world.
+  - Fields: `InstanceId: Guid<ItemInstanceId>`, `ItemId: int<ItemId>`.
+- **`ItemInstanceComponent: cmap<Guid<ItemInstanceId>, ItemInstance>`**
+  - This is a global map of all item instances in the world. It's a `cmap` because individual `ItemInstance`s might have mutable state (e.g., durability, charges) that we want to react to.
+- **`EntityInventoryComponent: cmap<EntityId, HashSet<Guid<ItemInstanceId>>>`**
+  - This maps an entity to a **`HashSet`** of `ItemInstanceId`s it owns. The `HashSet` is a non-reactive collection. When an item is added or removed from an entity's inventory, the entire `HashSet` for that entity is replaced in the `cmap`. This is efficient for updates and queries.
+- **`EquippedItemsComponent: cmap<EntityId, HashMap<Slot, Guid<ItemInstanceId>>>`**
+  - This maps an entity to a **`HashMap`** of `Slot` to `ItemInstanceId`. The `HashMap` is a non-reactive collection. When an item is equipped or unequipped, the entire `HashMap` for that entity is replaced in the `cmap`. This allows for efficient lookups by slot and reactive updates when equipment changes.
+
+### 8.2 SCE: Systems, Components, Events
+
+- **Events to Define:**
+  - `PickUpItemIntent of Picker: EntityId * Item: ItemInstance`
+  - `ItemAddedToInventory of Owner: EntityId * Item: ItemInstance`
+  - `EquipItemIntent of EntityId * ItemInstanceId * Slot`
+  - `ItemEquipped of EntityId * ItemInstanceId * Slot`
+  - `UnequipItemIntent of EntityId * Slot`
+  - `ItemUnequipped of EntityId * ItemInstanceId * Slot`
+- **Systems to Implement:**
+  - **`InventorySystem`**: Listens for `PickUpItemIntent`, validates, and publishes `ItemAddedToInventory`.
+  - **`EquipmentSystem`**: Listens for `EquipItemIntent` and `UnequipItemIntent`, validates, and publishes `ItemEquipped` or `ItemUnequipped`.
+  - **`StateUpdateSystem`**: Updated to handle the new events and modify the `EntityInventoryComponent` and `EquippedItemsComponent`.
+
+### 8.3 Data-Driven Definitions
+
+- **`Content/Items.json`**: A new file to define all items in the game.
+- **`ItemStore`**: A new service, loaded at startup and added to `EngineServices`, that provides access to `ItemDefinition`s.
+
+### 8.4 Integration & Projections
+
+- **New Projection (`Projections.getEquipmentStatBonuses`)**:
+  - This will be an `amap<EntityId, StatBonus list>` derived from `EquippedItemsComponent` and `ItemStore`.
+  - It will reactively compute the list of stat bonuses for an entity whenever its gear changes.
+- **Update `Projections.getDerivedStats`**:
+  - The main `DerivedStats` projection will be updated to consume `Projections.getEquipmentStatBonuses`.
+  - It will combine bonuses from equipment with bonuses from active effects to produce the final character stats.
+- **New Projections for UI/Consumption**:
+  - **`Projections.getEquippedItems`**: `world -> amap<EntityId, HashMap<Slot, ItemInstance>>`. Provides a reactive map of equipped items, perfect for a character UI. This projection will join `EquippedItemsComponent` with `ItemInstanceComponent`.
+  - **`Projections.getInventory`**: `world -> amap<EntityId, HashSet<ItemInstance>>`. Provides a reactive set of inventory contents for an inventory screen. This projection will join `EntityInventoryComponent` with `ItemInstanceComponent`.
+
+### 8.5 ✅ Verification Checklist
+
+- [ ] Can an `Items.json` file be created and loaded by a new `ItemStore`?
+- [ ] Can an entity pick up an item, triggering an `ItemAddedToInventory` event and updating the `EntityInventoryComponent`?
+- [ ] Can an entity equip an item from its inventory, triggering `ItemEquipped` and updating `EquippedItemsComponent`?
+- [ ] Does equipping an item with stats cause the `DerivedStats` projection for that entity to update on the next frame?
+- [ ] Does a debug renderer show the updated stats?
+- [ ] Does unequipping the item revert the stats correctly?
+
+## 9. Phase 5: Scenario & Terrain
+
+**Goal:** Implement a data-driven map system that supports tile-based rendering, collision, and spatial queries, laying the groundwork for advanced AI and gameplay.
+
+### 9.1 Data Model: Components & Core Types
+
+- **`TileDefinition`**: Static data for a tile type, e.g., `Id`, `TerrainType` (`Walkable`, `Blocked`, `Water`), `MovementCost`.
+- **`MapTile`**: An instance of a tile on the map, holding a `TileDefinitionId` and its position.
+- **`MapDefinition`**: Static data for a whole map, loaded from a Tiled JSON file.
+    - Fields: `Name`, `Dimensions` (width/height in tiles), `TileSize`, a 2D array of `MapTile`s, and a list of `MapObject`s (for things like spawn points or triggers placed in Tiled).
+- **`CollisionShape`**: A DU for entity collision, e.g., `Circle of float32` or `Box of Vector2`. This will be added to the `Entity` record.
+- **`SpatialGrid`**: A core data structure in the `World` state. It will be a simple grid-based spatial index to accelerate queries like "what entities are in this area?".
+
+### 9.2 SCE: Systems, Components, Events
+
+- **Events:**
+    - `MapLoaded of MapDefinition`
+    - `CollisionDetected of EntityA: EntityId * EntityB: EntityId` (for entity-entity collisions)
+- **Systems:**
+    - **`MapLoadingService`**: A service responsible for parsing Tiled JSON files into our `MapDefinition` format.
+    - **`TerrainRenderSystem`**: A `DrawableGameComponent` that renders the `MapDefinition` with an isometric projection.
+    - **`SpatialIndexingSystem`**: A system that runs each frame to update the `SpatialGrid` with the current positions of all entities.
+    - **`CollisionSystem`**: This system will use the `SpatialGrid` to get nearby entities and perform narrow-phase collision checks. It will be used by other systems (like `MovementSystem`) to validate actions.
+
+### 9.3 Data-Driven Definitions
+
+- Maps will be created in the **Tiled Map Editor** and exported to JSON format (e.g., `Content/Maps/Forest.json`).
+- We will establish a convention for using **Custom Properties** in Tiled to define `TerrainType` and other metadata for our tilesets.
+
+### 9.4 Integration & Projections
+
+- **`MovementSystem` Integration**: Will be updated to query the `CollisionSystem` to check if a proposed new position is valid.
+- **`CombatSystem` Integration**: Will use the `SpatialGrid` to efficiently find targets for Area of Effect abilities.
+- **New Projection (`Projections.getNearbyEntities`)**:
+    - **Signature**: `world -> EntityId -> float -> alist<EntityId>`
+    - **Purpose**: A crucial projection for AI. It will take an entity and a radius and use the `SpatialGrid` to efficiently return a reactive list of all entities within that radius.
+
+### 9.5 ✅ Verification Checklist
+
+- [ ] Can a map file exported from Tiled (`.json`) be successfully parsed into a `MapDefinition`?
+- [ ] Does the `TerrainRenderSystem` correctly draw the tilemap in an isometric view?
+- [ ] Do entities correctly collide with tiles marked as `Blocked`?
+- [ ] Does the `MovementSystem` prevent entities from moving into blocked spaces?
+- [ ] Can the `SpatialGrid` be queried to find entities within a specific area?
+- [ ] Does a debug renderer correctly visualize the collision shapes of entities and the spatial grid boundaries?
+
+## 10. Phase 6: AI
+
+**Goal:** An enemy that moves and attacks the player, using the terrain and spatial index for intelligent behavior.
+
+- **SCE:** `AIControllerComponent`, `PerceptionSystem`, `AIBehaviorSystem`, `TargetChanged` event.
+
+## 11. Phase 7 and Beyond
 
 Once the above phases are complete, the core architecture is proven and battle-tested. You can now add the remaining domains from your old prototype by repeating this pattern.
 
-- **Next Slice: AI**
-  - **Goal:** An enemy that moves and attacks the player.
-  - **SCE:** `AIControllerComponent`, `PerceptionSystem`, `AIBehaviorSystem`, `TargetChanged` event.
-- **Next Slice: Inventory & Equipment**
-  - **Goal:** Pick up, equip, and get stat bonuses from an item.
-  - **SCE:** `InventoryComponent`, `ItemStore` service, `EquipItemIntent`, `ItemEquipped` event.
 - **Next Slice: Audio**
   - **Goal:** Play sounds in response to game events.
   - **SCE:** `AudioSystem` that listens to `DamageDealt`, `ProjectileFired`, etc., and publishes `PlaySound` events.
