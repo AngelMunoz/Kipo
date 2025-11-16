@@ -21,7 +21,6 @@ module World =
     Previous: TimeSpan
   }
 
-  [<Struct>]
   type MutableWorld = {
     Time: Time cval
     RawInputStates: cmap<Guid<EntityId>, RawInputState>

@@ -159,6 +159,7 @@ module Projections =
           |> Array.collect _.SourceEffect.Modifiers
           |> Array.choose (function
             | Skill.EffectModifier.StaticMod m -> Some m
+            | Skill.EffectModifier.ResourceChange _
             | Skill.EffectModifier.AbilityDamageMod _
             | Skill.EffectModifier.DynamicMod _ -> None)
 

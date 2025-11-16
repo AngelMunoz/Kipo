@@ -38,7 +38,7 @@ module Item =
   type ItemDefinition = {
     Id: int<ItemId>
     Name: string
-    Weight: float32
+    Weight: int
     Kind: ItemKind
   }
 
@@ -119,13 +119,13 @@ module Item =
         fun json -> decode {
           let! id = Required.Property.get ("Id", Required.int) json
           and! name = Required.Property.get ("Name", Required.string) json
-          and! weight = Required.Property.get ("Weight", Required.float) json
+          and! weight = Required.Property.get ("Weight", Required.int) json
           and! kind = ItemKind.decoder json
 
           return {
             Id = UMX.tag id
             Name = name
-            Weight = float32 weight
+            Weight = weight
             Kind = kind
           }
         }

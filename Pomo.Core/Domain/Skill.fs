@@ -103,6 +103,7 @@ module Skill =
     | AbilityDamageMod of
       abilityDamageValue: Formula.MathExpr *
       element: Element voption
+    | ResourceChange of resource: ResourceType * amount: Formula.MathExpr
 
   [<Struct>]
   type Effect = {
@@ -621,6 +622,8 @@ module Skill =
       /// { "Type": "AbilityDamageMod", "AbilityDamageValue": "MA * 10" }
       ///
       /// { "Type": "AbilityDamageMod", "AbilityDamageValue": "FireA * 10", "Element": "Fire" }
+      ///
+      /// { "Type": "ResourceChange", "Resource": "MP", "Amount": "20 }
       let decoder: Decoder<EffectModifier> =
         fun json -> decode {
           let! modifierType =
@@ -658,6 +661,15 @@ module Skill =
                 abilityDamageValue,
                 element |> Option.toValueOption
               )
+          | "resourcechange" ->
+            let! resource =
+              Required.Property.get
+                ("Resource", Serialization.ResourceType.decoder)
+                json
+
+            and! amount = Required.Property.get ("Amount", Formula.decoder) json
+
+            return ResourceChange(resource, amount)
           | _ ->
             return!
               DecodeError.ofError(

@@ -2,7 +2,7 @@
   "1": {
     "Id": 1,
     "Name": "Simple Sword",
-    "Weight": 5.0,
+    "Weight": 5,
     "Kind": {
       "Type": "Wearable",
       "Slot": "Weapon",
@@ -18,7 +18,7 @@
   "2": {
     "Id": 2,
     "Name": "Health Potion",
-    "Weight": 0.5,
+    "Weight": 1,
     "Kind": {
       "Type": "Usable",
       "Effect": {
@@ -29,9 +29,9 @@
         "Duration": { "Type": "Instant" },
         "Modifiers": [
           {
-            "Type": "DynamicMod",
-            "Expression": "50",
-            "TargetStat": "HP"
+            "Type": "ResourceChange",
+            "Resource": "HP",
+            "Amount": "50"
           }
         ]
       }
@@ -40,9 +40,68 @@
   "3": {
     "Id": 3,
     "Name": "Rock",
-    "Weight": 1.0,
+    "Weight": 1,
     "Kind": {
       "Type": "NonUsable"
+    }
+  },
+  "4": {
+    "Id": 4,
+    "Name": "Wizard Hat",
+    "Weight": 30,
+    "Kind": {
+      "Type": "Wearable",
+      "Slot": "Head",
+      "Stats": [
+        {
+          "type": "Additive",
+          "stat": "MA",
+          "value": 10.0
+        }
+      ]
+    }
+  },
+  "5": {
+    "Id": 5,
+    "Name": "Magic Staff",
+    "Weight": 40,
+    "Kind": {
+      "Type": "Wearable",
+      "Slot": "Weapon",
+      "Stats": [
+        {
+          "type": "Additive",
+          "stat": "MA",
+          "value": 15.0
+        },
+        {
+          "type": "Additive",
+          "stat": "MPRegen",
+          "value": 5.0
+        }
+      ]
+    }
+  },
+  "6": {
+    "Id": 6,
+    "Name": "Troll's Blood Potion",
+    "Weight": 5,
+    "Kind": {
+      "Type": "Usable",
+      "Effect": {
+        "Name": "Troll's Blood",
+        "Kind": "ResourceOverTime",
+        "DamageSource": "Physical",
+        "Stacking": { "Type": "RefreshDuration" },
+        "Duration": { "Type": "Timed", "Seconds": 10.0 },
+        "Modifiers": [
+          {
+            "Type": "ResourceChange",
+            "Resource": "HP",
+            "Amount": "5"
+          }
+        ]
+      }
     }
   }
 }

@@ -172,6 +172,40 @@ type PomoGame() as this =
 
     eventBus.Publish(Input(MapChanged struct (playerId, inputMap)))
 
+    // Equip starting items
+    let wizardHat: Item.ItemInstance = {
+      Item.InstanceId = Guid.NewGuid() |> UMX.tag
+      ItemId = 4 |> UMX.tag
+    }
+
+    let magicStaff: Item.ItemInstance = {
+      Item.InstanceId = Guid.NewGuid() |> UMX.tag
+      ItemId = 5 |> UMX.tag
+    }
+
+    eventBus.Publish(Inventory(ItemInstanceCreated wizardHat))
+    eventBus.Publish(Inventory(ItemInstanceCreated magicStaff))
+
+    eventBus.Publish(
+      Inventory(ItemAddedToInventory struct (playerId, wizardHat.InstanceId))
+    )
+
+    eventBus.Publish(
+      Inventory(ItemAddedToInventory struct (playerId, magicStaff.InstanceId))
+    )
+
+    eventBus.Publish(
+      Inventory(
+        ItemEquipped struct (playerId, Item.Slot.Head, wizardHat.InstanceId)
+      )
+    )
+
+    eventBus.Publish(
+      Inventory(
+        ItemEquipped struct (playerId, Item.Slot.Weapon, magicStaff.InstanceId)
+      )
+    )
+
     // Enemy Setup
     let enemyBaseStats: Entity.BaseStats = {
       Power = 2
