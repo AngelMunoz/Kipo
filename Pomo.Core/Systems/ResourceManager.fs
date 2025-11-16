@@ -12,7 +12,7 @@ open Pomo.Core.Domain
 open Pomo.Core.Domain.Events
 open Pomo.Core.Domain.Units
 open Pomo.Core.Domain.World
-open Pomo.Core.Systems
+open Pomo.Core.Systems.Systems
 
 module ResourceManager =
   open System.Reactive.Disposables

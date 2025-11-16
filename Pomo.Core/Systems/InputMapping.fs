@@ -10,7 +10,7 @@ open Pomo.Core.Domain.Units
 open Pomo.Core.Domain.Action
 open Pomo.Core.Domain.Events
 open Pomo.Core.Domain.RawInput
-open Pomo.Core.Systems
+open Pomo.Core.Systems.Systems
 
 module InputMapping =
 

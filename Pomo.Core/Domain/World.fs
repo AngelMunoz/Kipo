@@ -46,8 +46,7 @@ module World =
         Guid<EntityId>,
         struct (int<SkillId> * SystemCommunications.SkillTarget)
        >
-    ItemInstances:
-      System.Collections.Generic.Dictionary<Guid<ItemInstanceId>, ItemInstance>
+    ItemInstances: ConcurrentDictionary<Guid<ItemInstanceId>, ItemInstance>
     EntityInventories: cmap<Guid<EntityId>, HashSet<Guid<ItemInstanceId>>>
     EquippedItems: cmap<Guid<EntityId>, HashMap<Slot, Guid<ItemInstanceId>>>
   }
@@ -118,7 +117,7 @@ module World =
       LiveProjectiles = cmap()
       InCombatUntil = cmap()
       PendingSkillCast = cmap()
-      ItemInstances = Collections.Generic.Dictionary()
+      ItemInstances = ConcurrentDictionary()
       EntityInventories = cmap()
       EquippedItems = cmap()
     }

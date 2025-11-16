@@ -218,7 +218,10 @@ module StateUpdate =
       (itemInstance: Item.ItemInstance voption)
       =
       match itemInstance with
-      | ValueNone -> world.ItemInstances.Remove itemInstanceId |> ignore
+      | ValueNone ->
+        match world.ItemInstances.TryRemove itemInstanceId with
+        | true, _ -> ()
+        | false, _ -> ()
       | ValueSome itemInstance ->
         world.ItemInstances[itemInstanceId] <- itemInstance
 

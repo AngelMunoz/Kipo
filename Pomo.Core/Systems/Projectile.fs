@@ -9,7 +9,7 @@ open Pomo.Core.Domain
 open Pomo.Core.Domain.Units
 open Pomo.Core.Domain.Events
 open Pomo.Core.Domain.Projectile
-open Pomo.Core.Systems
+open Pomo.Core.Systems.Systems
 
 module Projectile =
   let private findNextChainTarget

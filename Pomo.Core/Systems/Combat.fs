@@ -13,6 +13,7 @@ open Pomo.Core.Domain.World
 open Pomo.Core.Domain.Events
 open Pomo.Core.Domain.Skill
 open Pomo.Core.Systems
+open Pomo.Core.Systems.Systems
 open Pomo.Core.Systems.DamageCalculator
 
 module Combat =

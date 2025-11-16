@@ -1,8 +1,10 @@
-namespace Pomo.Core
+namespace Pomo.Core.Systems
 
 module Systems =
   open Microsoft.Xna.Framework
   open Pomo.Core.Domain.World
+  open Pomo.Core
+  open Pomo.Core.Projections
 
 
   [<Struct>]
@@ -24,6 +26,6 @@ module Systems =
     member val World = game.Services.GetService<World>() with get
 
     member val Projections =
-      game.Services.GetService<Projections.ProjectionService>() with get
+      game.Services.GetService<ProjectionService>() with get
 
     member val EventBus = game.Services.GetService<EventBus.EventBus>() with get
