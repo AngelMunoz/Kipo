@@ -13,9 +13,9 @@ open Pomo.Core.Domain.Action
 open Pomo.Core.Domain.Core
 open Pomo.Core.Domain.Events
 open Pomo.Core.Domain.Skill
-open Pomo.Core.Domain.Systems
 open Pomo.Core.Domain.Units
 open Pomo.Core.Domain.World
+open Pomo.Core.Systems
 
 module AbilityActivation =
   open Pomo.Core
@@ -122,7 +122,7 @@ module AbilityActivation =
 
       let private publishMultiPointIntent
         (eventBus: EventBus)
-        (world: World)
+        (rng: Random)
         (casterId: Guid<EntityId>)
         (skillId: int<SkillId>)
         (center: Vector2)
@@ -130,8 +130,8 @@ module AbilityActivation =
         (count: int)
         =
         for _ in 1..count do
-          let angle = float(world.Rng.NextDouble()) * 2.0 * Math.PI
-          let dist = float(world.Rng.NextDouble()) * float radius
+          let angle = float(rng.NextDouble()) * 2.0 * Math.PI
+          let dist = float(rng.NextDouble()) * float radius
           let offsetX = cos angle * dist
           let offsetY = sin angle * dist
 
@@ -146,7 +146,7 @@ module AbilityActivation =
 
       let publish
         (eventBus: EventBus)
-        (world: World)
+        (rng: Random)
         (casterId: Guid<EntityId>)
         (skill: ActiveSkill)
         target
@@ -160,7 +160,7 @@ module AbilityActivation =
         | MultiPoint(radius, count) ->
           publishMultiPointIntent
             eventBus
-            world
+            rng
             casterId
             skill.Id
             center
@@ -188,12 +188,12 @@ module AbilityActivation =
     let private handlePendingCast
       (eventBus: EventBus)
       (validationContext: ValidationContext)
-      (world: World)
+      (positions: HashMap<Guid<EntityId>, Vector2>)
+      (rng: Random)
       (skill: ActiveSkill)
       (target: SystemCommunications.SkillTarget)
       =
       let casterId = validationContext.EntityId
-      let positions = Projections.UpdatedPositions world |> AMap.force
 
       let casterPos = positions.TryFindV casterId
 
@@ -232,7 +232,7 @@ module AbilityActivation =
             if distance <= maxRange + SKILL_ACTIVATION_RANGE_BUFFER then
               IntentPublisher.publish
                 eventBus
-                world
+                rng
                 casterId
                 skill
                 target
@@ -248,7 +248,9 @@ module AbilityActivation =
       (world: World)
       (eventBus: EventBus)
       (skillStore: SkillStore)
-      (struct (entityId, movementState))
+      (combatStatuses: HashMap<Guid<EntityId>, CombatStatus IndexList>)
+      (positions: HashMap<Guid<EntityId>, Vector2>)
+      struct (entityId, movementState)
       =
       if movementState = Idle then
         let pendingCasts = world.PendingSkillCast |> AMap.force
@@ -256,8 +258,7 @@ module AbilityActivation =
         match getPendingCastContext pendingCasts skillStore entityId with
         | ValueSome(skill, target) ->
           let statuses =
-            Projections.CalculateCombatStatuses world
-            |> AMap.force
+            combatStatuses
             |> HashMap.tryFindV entityId
             |> ValueOption.defaultValue IndexList.empty
 
@@ -279,13 +280,17 @@ module AbilityActivation =
             EntityId = entityId
           }
 
-          handlePendingCast eventBus validationContext world skill target
+          handlePendingCast
+            eventBus
+            validationContext
+            positions
+            world.Rng
+            skill
+            target
 
           // Always clear the pending cast after checking
           eventBus.Publish(
-            StateChangeEvent.Combat(
-              CombatEvents.PendingSkillCastCleared entityId
-            )
+            StateChangeEvent.Combat(PendingSkillCastCleared entityId)
           )
         | _ -> () // No pending cast or data missing
       else
@@ -317,7 +322,7 @@ module AbilityActivation =
       |> AVal.map(Option.defaultValue HashMap.empty)
 
     let playerCombatStatuses =
-      Projections.CalculateCombatStatuses this.World
+      this.Projections.CombatStatuses
       |> AMap.tryFind playerId
       |> AVal.map(Option.defaultValue IndexList.empty)
 
@@ -326,7 +331,7 @@ module AbilityActivation =
     let playerCooldowns = this.World.AbilityCooldowns |> AMap.tryFind playerId
 
     let playerPosition =
-      Projections.UpdatedPositions this.World
+      this.Projections.UpdatedPositions
       |> AMap.tryFind playerId
       |> AVal.map(Option.defaultValue Vector2.Zero)
 
@@ -336,12 +341,16 @@ module AbilityActivation =
       this.EventBus.GetObservableFor<StateChangeEvent>()
       |> Observable.choose(fun e ->
         match e with
-        | StateChangeEvent.Physics(PhysicsEvents.MovementStateChanged data) ->
-          Some data
+        | Physics(MovementStateChanged data) -> Some data
         | _ -> None)
-      |> Observable.subscribe(
-        Handlers.handleMovementStateChanged this.World this.EventBus skillStore
-      )
+      |> Observable.subscribe(fun e ->
+        Handlers.handleMovementStateChanged
+          this.World
+          this.EventBus
+          skillStore
+          (this.Projections.CombatStatuses |> AMap.force)
+          (this.Projections.UpdatedPositions |> AMap.force)
+          e)
       |> subscriptions.Add
 
 

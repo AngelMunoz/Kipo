@@ -21,6 +21,7 @@ module ActionHandler =
 
   let private createHoveredEntityProjection
     (world: World)
+    (positions: amap<Guid<EntityId>, Vector2>)
     (playerId: Guid<EntityId>)
     =
     adaptive {
@@ -34,7 +35,7 @@ module ActionHandler =
         )
 
       return!
-        Projections.UpdatedPositions world
+        positions
         |> AMap.fold
           (fun (acc: _ option) entityId entityPos ->
             if acc.IsSome then
@@ -67,9 +68,11 @@ module ActionHandler =
       world: World,
       eventBus: EventBus,
       targetingService: TargetingService,
+      projections: Projections.ProjectionService,
       entityId: Guid<EntityId>
     ) =
-    let hoveredEntityAval = createHoveredEntityProjection world entityId
+    let hoveredEntityAval =
+      createHoveredEntityProjection world projections.UpdatedPositions entityId
 
     { new CoreEventListener with
         member _.StartListening() =

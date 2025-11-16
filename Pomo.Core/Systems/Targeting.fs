@@ -73,17 +73,16 @@ module Targeting =
     skillBeingTargeted: Skill voption aval
     currentAction:
       struct (cval<Guid<EntityId> voption> * cval<GameAction voption>)
-    world: World
+    positions: HashMap<Guid<EntityId>, Vector2>
   }
 
   module private TargetingHandlers =
 
     let private getSkillActivationPositions
-      (world: World)
+      (positions: HashMap<Guid<EntityId>, Vector2>)
       (casterId: Guid<EntityId>)
       (targetId: Guid<EntityId>)
       =
-      let positions = Projections.UpdatedPositions world |> AMap.force
 
       match positions.TryFindV casterId, positions.TryFindV targetId with
       | ValueSome casterPos, ValueSome targetPos ->
@@ -92,12 +91,12 @@ module Targeting =
 
     let handleTargetEntity
       (eventBus: EventBus)
-      (world: World)
+      (positions: HashMap<Guid<EntityId>, Vector2>)
       (skill: ActiveSkill)
       (casterId: Guid<EntityId>)
       (targetId: Guid<EntityId>)
       =
-      match getSkillActivationPositions world casterId targetId with
+      match getSkillActivationPositions positions casterId targetId with
       | ValueNone -> () // Or log an error that positions were not found
       | ValueSome(casterPos, targetPos) ->
         let distance = Vector2.Distance(casterPos, targetPos)
@@ -118,8 +117,8 @@ module Targeting =
           )
 
           eventBus.Publish(
-            StateChangeEvent.Combat(
-              CombatEvents.PendingSkillCastSet(
+            Combat(
+              PendingSkillCastSet(
                 casterId,
                 skill.Id,
                 SystemCommunications.TargetEntity targetId
@@ -138,12 +137,11 @@ module Targeting =
 
     let handleTargetPosition
       (eventBus: EventBus)
-      (world: World)
+      (positions: HashMap<Guid<EntityId>, Vector2>)
       (skill: ActiveSkill)
       (casterId: Guid<EntityId>)
       (targetPos: Vector2)
       =
-      let positions = Projections.UpdatedPositions world |> AMap.force
 
       match positions.TryFindV casterId with
       | ValueNone -> () // Caster position not found, do nothing.
@@ -192,7 +190,7 @@ module Targeting =
           eventBus = eventBus
           skillBeingTargeted = skillBeingTargeted
           currentAction = _entityId, _action
-          world = world
+          positions = positions
         } =
       args
 
@@ -209,14 +207,14 @@ module Targeting =
           | TargetEntity, SelectedEntity targetId ->
             TargetingHandlers.handleTargetEntity
               eventBus
-              world
+              positions
               activeSkill
               casterId
               targetId
           | TargetPosition, SelectedPosition targetPos ->
             TargetingHandlers.handleTargetPosition
               eventBus
-              world
+              positions
               activeSkill
               casterId
               targetPos
@@ -235,7 +233,13 @@ module Targeting =
         () // Event selector was not the active caster
     | ValueNone -> () // No active caster
 
-  let create(world: World, eventBus: EventBus, skillStore: SkillStore) =
+  let create
+    (
+      world: World,
+      eventBus: EventBus,
+      skillStore: SkillStore,
+      projections: Projections.ProjectionService
+    ) =
     let _entityId = cval ValueNone
     let _action = cval ValueNone
 
@@ -255,7 +259,7 @@ module Targeting =
         eventBus = eventBus
         skillBeingTargeted = skillBeingTargeted
         currentAction = struct (_entityId, _action)
-        world = world
+        positions = projections.UpdatedPositions |> AMap.force
       }
 
 

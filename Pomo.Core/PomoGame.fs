@@ -62,17 +62,27 @@ type PomoGame() as this =
   let struct (mutableWorld, worldView) = World.create Random.Shared
   let skillStore = Stores.Skill.create(JsonFileLoader.readSkills deserializer)
   let itemStore = Stores.Item.create(JsonFileLoader.readItems deserializer)
-  let targetingService = Targeting.create(worldView, eventBus, skillStore)
+  let projections = Projections.create(itemStore, worldView)
+
+  let targetingService =
+    Targeting.create(worldView, eventBus, skillStore, projections)
 
   let effectApplicationService =
     Effects.EffectApplication.create(worldView, eventBus)
 
   let actionHandler =
-    ActionHandler.create(worldView, eventBus, targetingService, playerId)
+    ActionHandler.create(
+      worldView,
+      eventBus,
+      targetingService,
+      projections,
+      playerId
+    )
 
   let movementService = Navigation.create(eventBus, playerId)
   let inventoryService = Inventory.create eventBus
   let equipmentService = Equipment.create worldView eventBus
+
 
   do
     base.IsMouseVisible <- true
@@ -82,6 +92,8 @@ type PomoGame() as this =
       DisplayOrientation.LandscapeLeft ||| DisplayOrientation.LandscapeRight
 
     base.Services.AddService<GraphicsDeviceManager> graphicsDeviceManager
+
+    base.Services.AddService<Projections.ProjectionService> projections
 
     base.Services.AddService<Stores.SkillStore> skillStore
     base.Services.AddService<Stores.ItemStore> itemStore
@@ -139,15 +151,21 @@ type PomoGame() as this =
     }
 
     eventBus.Publish(
-      Combat(ResourcesChanged struct (playerId, playerResources))
+      StateChangeEvent.Combat(
+        ResourcesChanged struct (playerId, playerResources)
+      )
     )
 
     let playerFactions = HashSet [ Entity.Faction.Player ]
 
-    eventBus.Publish(Combat(FactionsChanged struct (playerId, playerFactions)))
+    eventBus.Publish(
+      StateChangeEvent.Combat(FactionsChanged struct (playerId, playerFactions))
+    )
 
     eventBus.Publish(
-      Combat(BaseStatsChanged struct (playerId, playerBaseStats))
+      StateChangeEvent.Combat(
+        BaseStatsChanged struct (playerId, playerBaseStats)
+      )
     )
 
     let inputMap = InputMapping.createDefaultInputMap()
@@ -182,11 +200,17 @@ type PomoGame() as this =
 
       eventBus.Publish(EntityLifecycle(Created enemyEntity))
 
-      eventBus.Publish(Combat(ResourcesChanged struct (id, enemyResources)))
+      eventBus.Publish(
+        StateChangeEvent.Combat(ResourcesChanged struct (id, enemyResources))
+      )
 
-      eventBus.Publish(Combat(FactionsChanged struct (id, enemyFactions)))
+      eventBus.Publish(
+        StateChangeEvent.Combat(FactionsChanged struct (id, enemyFactions))
+      )
 
-      eventBus.Publish(Combat(BaseStatsChanged struct (id, enemyBaseStats)))
+      eventBus.Publish(
+        StateChangeEvent.Combat(BaseStatsChanged struct (id, enemyBaseStats))
+      )
 
     createEnemy enemyId1 (Vector2(300.0f, 100.0f))
     createEnemy enemyId2 (Vector2(350.0f, 150.0f))

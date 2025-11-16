@@ -7,27 +7,19 @@ open FSharp.UMX
 open FSharp.Data.Adaptive
 
 open Pomo.Core
-open Pomo.Core.Domain.World
-open Pomo.Core.Domain.Systems
 open Pomo.Core.Domain.Events
+open Pomo.Core.Systems
 
 
 module Movement =
 
-  type MovementSystem(game: Game) as this =
+  type MovementSystem(game: Game) =
     inherit GameSystem(game)
-
-    let updatedPositions = Projections.UpdatedPositions this.World
-
 
     override val Kind = Movement with get
 
-    override this.Update gameTime =
-      let movements = updatedPositions |> AMap.force
+    override this.Update _ =
+      let movements = this.Projections.UpdatedPositions |> AMap.force
 
       for id, newPosition in movements do
-        this.EventBus.Publish(
-          StateChangeEvent.Physics(
-            PhysicsEvents.PositionChanged struct (id, newPosition)
-          )
-        )
+        this.EventBus.Publish(Physics(PositionChanged struct (id, newPosition)))

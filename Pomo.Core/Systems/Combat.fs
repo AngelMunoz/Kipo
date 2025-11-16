@@ -12,7 +12,7 @@ open Pomo.Core.Domain.Units
 open Pomo.Core.Domain.World
 open Pomo.Core.Domain.Events
 open Pomo.Core.Domain.Skill
-open Pomo.Core.Domain.Systems
+open Pomo.Core.Systems
 open Pomo.Core.Systems.DamageCalculator
 
 module Combat =
@@ -43,15 +43,14 @@ module Combat =
   module private Handlers =
     let applySkillDamage
       (world: World)
-      (eventBus: EventBus)
+      (derivedStats: HashMap<Guid<EntityId>, Entity.DerivedStats>)
+      (positions: HashMap<Guid<EntityId>, Vector2>)
       (casterId: Guid<EntityId>)
       (targetId: Guid<EntityId>)
       (skill: ActiveSkill)
       =
-      let stats = Projections.CalculateDerivedStats world |> AMap.force
-      let positions = Projections.UpdatedPositions world |> AMap.force
 
-      match stats.TryFindV casterId, stats.TryFindV targetId with
+      match derivedStats.TryFindV casterId, derivedStats.TryFindV targetId with
       | ValueSome attackerStats, ValueSome defenderStats ->
         let result =
           if casterId = targetId then
@@ -84,13 +83,21 @@ module Combat =
     let private applyInstantaneousSkillEffects
       (world: World)
       (eventBus: EventBus)
+      (derivedStats: HashMap<Guid<EntityId>, Entity.DerivedStats>)
+      (positions: HashMap<Guid<EntityId>, Vector2>)
       (casterId: Guid<EntityId>)
       (targetId: Guid<EntityId>)
       (activeSkill: ActiveSkill)
       =
-      let positions = Projections.UpdatedPositions world |> AMap.force
 
-      let result = applySkillDamage world eventBus casterId targetId activeSkill
+      let result =
+        applySkillDamage
+          world
+          derivedStats
+          positions
+          casterId
+          targetId
+          activeSkill
 
       let targetPos =
         positions
@@ -143,15 +150,15 @@ module Combat =
           eventBus.Publish intent
 
     let handleEffectDamageIntent
-      (world: World)
+      (derivedStats: HashMap<Guid<EntityId>, Entity.DerivedStats>)
+      (positions: HashMap<Guid<EntityId>, Vector2>)
       (eventBus: EventBus)
       (intent: SystemCommunications.EffectDamageIntent)
       =
-      let stats = Projections.CalculateDerivedStats world |> AMap.force
-      let positions = Projections.UpdatedPositions world |> AMap.force
 
       match
-        stats.TryFindV intent.SourceEntity, stats.TryFindV intent.TargetEntity
+        derivedStats.TryFindV intent.SourceEntity,
+        derivedStats.TryFindV intent.TargetEntity
       with
       | ValueSome attackerStats, ValueSome defenderStats ->
 
@@ -199,6 +206,8 @@ module Combat =
     let handleAbilityIntent
       (world: World)
       (eventBus: EventBus)
+      (derivedStats: HashMap<Guid<EntityId>, Entity.DerivedStats>)
+      (positions: HashMap<Guid<EntityId>, Vector2>)
       (skillStore: Stores.SkillStore)
       (casterId: Guid<EntityId>)
       (skillId: int<SkillId>)
@@ -289,7 +298,6 @@ module Combat =
             )
           | None -> ()
         | Delivery.Instant ->
-          let positions = Projections.UpdatedPositions world |> AMap.force
           let getPosition = fun entityId -> positions.TryFindV entityId
 
           let targetCenter =
@@ -330,18 +338,25 @@ module Combat =
               applyInstantaneousSkillEffects
                 world
                 eventBus
+                derivedStats
+                positions
                 casterId
                 targetId
                 activeSkill
       | _ -> ()
 
     let handleProjectileImpact
-      (world: World, eventBus: EventBus, skillStore: Stores.SkillStore)
+      (
+        world: World,
+        eventBus: EventBus,
+        derivedStats: HashMap<Guid<EntityId>, Entity.DerivedStats>,
+        positions: HashMap<Guid<EntityId>, Vector2>,
+        skillStore: Stores.SkillStore
+      )
       (impact: SystemCommunications.ProjectileImpacted)
       =
       match skillStore.tryFind impact.SkillId with
       | ValueSome(Active skill) ->
-        let positions = Projections.UpdatedPositions world |> AMap.force
         let impactPosition = positions.TryFindV impact.TargetId
 
         match impactPosition with
@@ -380,7 +395,13 @@ module Combat =
 
           for targetId in targets do
             let result =
-              applySkillDamage world eventBus impact.CasterId targetId skill
+              applySkillDamage
+                world
+                derivedStats
+                positions
+                impact.CasterId
+                targetId
+                skill
 
             let targetPos =
               positions
@@ -403,13 +424,14 @@ module Combat =
                 }
                 : SystemCommunications.DamageDealt
               )
-              
+
               let baseMessage = $"-{result.Amount}"
+
               let debugText =
                 match impact.RemainingJumps with
                 | ValueSome jumps -> $" ({jumps} left)"
                 | ValueNone -> ""
-              
+
               let finalMessage = baseMessage + debugText
 
               eventBus.Publish(
@@ -440,13 +462,21 @@ module Combat =
                 )
       | _ -> () // Skill not found
 
-    let handleAbilityIntentEvent
-      (world: World, eventBus: EventBus, skillStore: Stores.SkillStore)
+    let inline handleAbilityIntentEvent
+      (
+        world: World,
+        eventBus: EventBus,
+        derivedStats: HashMap<Guid<EntityId>, Entity.DerivedStats>,
+        positions: HashMap<Guid<EntityId>, Vector2>,
+        skillStore: Stores.SkillStore
+      )
       (event: SystemCommunications.AbilityIntent)
       =
       handleAbilityIntent
         world
         eventBus
+        derivedStats
+        positions
         skillStore
         event.Caster
         event.SkillId
@@ -463,22 +493,36 @@ module Combat =
 
     override this.Initialize() =
       base.Initialize()
+      let derivedStats = this.Projections.DerivedStats |> AMap.force
+      let positions = this.Projections.UpdatedPositions |> AMap.force
 
       eventBus.GetObservableFor<SystemCommunications.AbilityIntent>()
       |> Observable.subscribe(
-        Handlers.handleAbilityIntentEvent(this.World, eventBus, skillStore)
+        Handlers.handleAbilityIntentEvent(
+          this.World,
+          eventBus,
+          derivedStats,
+          positions,
+          skillStore
+        )
       )
       |> subscriptions.Add
 
       eventBus.GetObservableFor<SystemCommunications.ProjectileImpacted>()
       |> Observable.subscribe(
-        Handlers.handleProjectileImpact(this.World, eventBus, skillStore)
+        Handlers.handleProjectileImpact(
+          this.World,
+          eventBus,
+          derivedStats,
+          positions,
+          skillStore
+        )
       )
       |> subscriptions.Add
 
       eventBus.GetObservableFor<SystemCommunications.EffectDamageIntent>()
       |> Observable.subscribe(
-        Handlers.handleEffectDamageIntent this.World eventBus
+        Handlers.handleEffectDamageIntent derivedStats positions eventBus
       )
       |> subscriptions.Add
 
@@ -488,6 +532,6 @@ module Combat =
 
       base.Dispose disposing
 
-    override _.Kind = SystemKind.Combat
+    override _.Kind = Combat
 
     override _.Update gameTime = base.Update gameTime

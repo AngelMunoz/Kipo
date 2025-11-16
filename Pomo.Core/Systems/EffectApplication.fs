@@ -1,19 +1,16 @@
 namespace Pomo.Core.Systems
 
 open System
-open System.Reactive.Disposables
-open System.Collections.Concurrent
 
 open Microsoft.Xna.Framework
 open FSharp.UMX
 open FSharp.Data.Adaptive
 
 open Pomo.Core.Domain.Units
-open Pomo.Core.Domain.Entity
 open Pomo.Core.Domain.Skill
 open Pomo.Core.Domain.Events
 open Pomo.Core.Domain.World
-open Pomo.Core.Domain.Systems
+open Pomo.Core.Systems
 open Pomo.Core.EventBus
 
 module Effects =

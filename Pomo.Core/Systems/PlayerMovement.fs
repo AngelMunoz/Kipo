@@ -5,12 +5,10 @@ open FSharp.UMX
 open FSharp.Data.Adaptive
 
 open Pomo.Core.Domain.Units
-open Pomo.Core.Domain
 open Pomo.Core.Domain.World
-open Pomo.Core.Domain.Systems
 open Pomo.Core.Domain.Events
 open Pomo.Core.Domain.Action
-open Pomo.Core.Domain.Core
+open Pomo.Core.Systems
 
 module PlayerMovement =
 
@@ -53,17 +51,17 @@ module PlayerMovement =
     let velocity = Projections.PlayerVelocity this.World playerId speed
 
     let playerCombatStatuses =
-      Pomo.Core.Projections.CalculateCombatStatuses this.World
+      this.Projections.CombatStatuses
       |> AMap.tryFind playerId
       |> AVal.map(Option.defaultValue IndexList.empty)
 
     let position =
-      Pomo.Core.Projections.UpdatedPositions this.World
+      this.Projections.UpdatedPositions
       |> AMap.tryFind playerId
       |> AVal.map(Option.defaultValue Vector2.Zero)
 
     let movementSpeed =
-      this.World.DerivedStats
+      this.Projections.DerivedStats
       |> AMap.tryFind playerId
       |> AVal.map(Option.map _.MS >> Option.defaultValue 100)
 

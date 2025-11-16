@@ -5,13 +5,11 @@ open Microsoft.Xna.Framework
 open FSharp.UMX
 open FSharp.Data.Adaptive
 
-open Pomo.Core
 open Pomo.Core.Domain
 open Pomo.Core.Domain.Units
-open Pomo.Core.Domain.World
-open Pomo.Core.Domain.Systems
 open Pomo.Core.Domain.Events
 open Pomo.Core.Domain.Projectile
+open Pomo.Core.Systems
 
 module Projectile =
   let private findNextChainTarget
@@ -156,8 +154,8 @@ type ProjectileSystem(game: Game) as this =
   inherit GameSystem(game)
 
   let eventsToPublish =
-    let positions = Projections.UpdatedPositions this.World
-    let liveEntities = Projections.LiveEntities this.World
+    let positions = this.Projections.UpdatedPositions
+    let liveEntities = this.Projections.LiveEntities
 
     this.World.LiveProjectiles
     |> AMap.mapA(Projectile.generateEvents positions liveEntities)

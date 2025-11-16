@@ -12,11 +12,12 @@
     <Compile Include="Domain/Skill.fs" />
     <Compile Include="Domain/Item.fs" />
     <Compile Include="Domain/Events.fs" />
-    <Compile Include="EventBus.fs" />
     <Compile Include="Domain/World.fs" />
+    <Compile Include="EventBus.fs" />
     <Compile Include="Serialization.fs" />
     <Compile Include="Stores.fs" />
     <Compile Include="Projections.fs" />
+    <Compile Include="Systems/World.fs" />
     <Compile Include="Systems/FormulaEvaluator.fs" />
     <Compile Include="Systems/DamageCalculator.fs" />
     <Compile Include="Systems/EffectApplication.fs" />

@@ -212,17 +212,15 @@ module StateUpdate =
       | None -> ()
 
   module Inventory =
-    let inline addItemInstance
-      (world: MutableWorld)
-      (itemInstance: Item.ItemInstance)
-      =
-      world.ItemInstances[itemInstance.InstanceId] <- itemInstance
-
-    let inline removeItemInstance
+    let inline alterItemInstance
       (world: MutableWorld)
       (itemInstanceId: Guid<ItemInstanceId>)
+      (itemInstance: Item.ItemInstance voption)
       =
-      world.ItemInstances.Remove(itemInstanceId) |> ignore
+      match itemInstance with
+      | ValueNone -> world.ItemInstances.Remove itemInstanceId |> ignore
+      | ValueSome itemInstance ->
+        world.ItemInstances[itemInstanceId] <- itemInstance
 
     let inline addItemToInventory
       (world: MutableWorld)
@@ -299,70 +297,71 @@ module StateUpdate =
 
         while events.TryDequeue(&event) do
           match event with
-          | StateChangeEvent.EntityLifecycle event ->
+          | EntityLifecycle event ->
             match event with
-            | EntityLifecycleEvents.Created created ->
-              Entity.addEntity mutableWorld created
-            | EntityLifecycleEvents.Removed removed ->
-              Entity.removeEntity mutableWorld removed
-          | StateChangeEvent.Input event ->
+            | Created created -> Entity.addEntity mutableWorld created
+            | Removed removed -> Entity.removeEntity mutableWorld removed
+          | Input event ->
             match event with
-            | InputEvents.RawStateChanged rawIChanged ->
+            | RawStateChanged rawIChanged ->
               RawInput.updateState mutableWorld rawIChanged
-            | InputEvents.MapChanged iMapChanged ->
+            | MapChanged iMapChanged ->
               InputMapping.updateMap mutableWorld iMapChanged
-            | InputEvents.GameActionStatesChanged gAChanged ->
+            | GameActionStatesChanged gAChanged ->
               InputMapping.updateActionStates mutableWorld gAChanged
-            | InputEvents.QuickSlotsChanged qsChanged ->
+            | QuickSlotsChanged qsChanged ->
               Combat.updateQuickSlots mutableWorld qsChanged
-          | StateChangeEvent.Physics event ->
+          | Physics event ->
             match event with
-            | PhysicsEvents.PositionChanged posChanged ->
+            | PositionChanged posChanged ->
               Entity.updatePosition mutableWorld posChanged
-            | PhysicsEvents.VelocityChanged velChanged ->
+            | VelocityChanged velChanged ->
               Entity.updateVelocity mutableWorld velChanged
-            | PhysicsEvents.MovementStateChanged mStateChanged ->
+            | MovementStateChanged mStateChanged ->
               Entity.updateMovementState mutableWorld mStateChanged
-          | StateChangeEvent.Combat event ->
+          | Combat event ->
             match event with
-            | CombatEvents.ResourcesChanged resChanged ->
+            | ResourcesChanged resChanged ->
               Combat.updateResources mutableWorld resChanged
-            | CombatEvents.FactionsChanged facChanged ->
+            | FactionsChanged facChanged ->
               Combat.updateFactions mutableWorld facChanged
-            | CombatEvents.BaseStatsChanged statsChanged ->
+            | BaseStatsChanged statsChanged ->
               Attributes.updateBaseStats mutableWorld statsChanged
-            | CombatEvents.StatsChanged(entity, newStats) ->
+            | StatsChanged(entity, newStats) ->
               Attributes.updateDerivedStats mutableWorld (entity, newStats)
-            | CombatEvents.EffectApplied(entity, effect) ->
+            | EffectApplied(entity, effect) ->
               Attributes.applyEffect mutableWorld (entity, effect)
-            | CombatEvents.CooldownsChanged cdChanged ->
+            | CooldownsChanged cdChanged ->
               Combat.updateCooldowns mutableWorld cdChanged
-            | CombatEvents.EffectExpired effectExpired ->
+            | EffectExpired effectExpired ->
               Attributes.expireEffect mutableWorld effectExpired
-            | CombatEvents.EffectRefreshed effectRefreshed ->
+            | EffectRefreshed effectRefreshed ->
               Attributes.refreshEffect mutableWorld effectRefreshed
-            | CombatEvents.EffectStackChanged effectStackChanged ->
+            | EffectStackChanged effectStackChanged ->
               Attributes.changeEffectStack mutableWorld effectStackChanged
-            | CombatEvents.InCombatTimerRefreshed entityId ->
+            | InCombatTimerRefreshed entityId ->
               Combat.updateInCombatTimer mutableWorld entityId
-            | CombatEvents.PendingSkillCastSet(entityId, skillId, target) ->
+            | PendingSkillCastSet(entityId, skillId, target) ->
               Combat.setPendingSkillCast mutableWorld entityId skillId target
-            | CombatEvents.PendingSkillCastCleared entityId ->
+            | PendingSkillCastCleared entityId ->
               Combat.clearPendingSkillCast mutableWorld entityId
-          | StateChangeEvent.Inventory event ->
+          | Inventory event ->
             match event with
-            | InventoryEvents.ItemInstanceCreated itemInstance ->
-              Inventory.addItemInstance mutableWorld itemInstance
-            | InventoryEvents.ItemInstanceRemoved itemInstanceId ->
-              Inventory.removeItemInstance mutableWorld itemInstanceId
-            | InventoryEvents.ItemAddedToInventory itemAdded ->
+            | ItemInstanceCreated itemInstance ->
+              Inventory.alterItemInstance
+                mutableWorld
+                itemInstance.InstanceId
+                (ValueSome itemInstance)
+            | ItemInstanceRemoved itemInstanceId ->
+              Inventory.alterItemInstance mutableWorld itemInstanceId ValueNone
+            | ItemAddedToInventory itemAdded ->
               Inventory.addItemToInventory mutableWorld itemAdded
-            | InventoryEvents.ItemRemovedFromInventory itemRemoved ->
+            | ItemRemovedFromInventory itemRemoved ->
               Inventory.removeItemFromInventory mutableWorld itemRemoved
-            | InventoryEvents.ItemEquipped itemEquipped ->
+            | ItemEquipped itemEquipped ->
               Inventory.equipItem mutableWorld itemEquipped
-            | InventoryEvents.ItemUnequipped itemUnequipped ->
+            | ItemUnequipped itemUnequipped ->
               Inventory.unequipItem mutableWorld itemUnequipped
           // Uncategorized
-          | StateChangeEvent.CreateProjectile projParams ->
+          | CreateProjectile projParams ->
             Entity.createProjectile mutableWorld projParams)

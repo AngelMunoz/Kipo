@@ -4,12 +4,9 @@ open System
 open System.Collections.Generic
 open Microsoft.Xna.Framework
 open Microsoft.Xna.Framework.Graphics
-open Pomo.Core
-open Pomo.Core.Domain
 open Pomo.Core.EventBus
 open Pomo.Core.Domain.Events
-open Pomo.Core.Domain.Systems
-open Pomo.Core.Domain.World
+
 
 module Notification =
 

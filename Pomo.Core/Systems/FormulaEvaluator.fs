@@ -2,7 +2,6 @@ namespace Pomo.Core.Systems
 
 open FSharp.Data.Adaptive
 open Pomo.Core.Domain
-open Pomo.Core.Domain.Skill
 open Pomo.Core.Domain.Core
 open Pomo.Core.Domain.Entity
 

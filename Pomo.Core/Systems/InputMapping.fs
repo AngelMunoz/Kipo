@@ -7,11 +7,10 @@ open FSharp.UMX
 open FSharp.Data.Adaptive
 
 open Pomo.Core.Domain.Units
-open Pomo.Core.Domain.World
-open Pomo.Core.Domain.Systems
 open Pomo.Core.Domain.Action
 open Pomo.Core.Domain.Events
 open Pomo.Core.Domain.RawInput
+open Pomo.Core.Systems
 
 module InputMapping =
 

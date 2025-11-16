@@ -14,6 +14,7 @@ open Pomo.Core.Systems.Targeting
 
 module Render =
   open Pomo.Core
+  open Pomo.Core.Domain.Projectile
 
   type DrawCommand =
     | DrawPlayer of rect: Rectangle
@@ -23,12 +24,13 @@ module Render =
 
   let private generateEntityCommands
     (world: World.World)
+    (positions: amap<Guid<EntityId>, Vector2>)
+    (projectiles: amap<Guid<EntityId>, LiveProjectile>)
     (playerId: Guid<EntityId>)
     =
-    Projections.UpdatedPositions world
+    positions
     |> AMap.chooseA(fun entityId pos -> adaptive {
-      let! isProjectile =
-        AMap.keys world.LiveProjectiles |> ASet.contains entityId
+      let! isProjectile = AMap.keys projectiles |> ASet.contains entityId
 
       if isProjectile then
         return None
@@ -43,11 +45,13 @@ module Render =
     })
     |> AMap.fold (fun acc _ cmd -> IndexList.add cmd acc) IndexList.empty
 
-  let private generateProjectileCommands(world: World.World) =
-    world.LiveProjectiles
+  let private generateProjectileCommands
+    (projectiles: amap<Guid<EntityId>, LiveProjectile>)
+    (positions: amap<Guid<EntityId>, Vector2>)
+    =
+    projectiles
     |> AMap.chooseA(fun projectileId _ -> adaptive {
-      let! posOpt =
-        AMap.tryFind projectileId (Projections.UpdatedPositions world)
+      let! posOpt = AMap.tryFind projectileId positions
 
       match posOpt with
       | Some pos ->
@@ -107,11 +111,21 @@ module Render =
   let generateDrawCommands
     (world: World.World)
     (targetingService: TargetingService)
+    (projections: Projections.ProjectionService)
     (playerId: Guid<EntityId>)
     =
     adaptive {
-      let! entityCmds = generateEntityCommands world playerId
-      and! projectileCmds = generateProjectileCommands world
+      let! entityCmds =
+        generateEntityCommands
+          world
+          projections.UpdatedPositions
+          world.LiveProjectiles
+          playerId
+
+      and! projectileCmds =
+        generateProjectileCommands
+          world.LiveProjectiles
+          projections.UpdatedPositions
 
       and! targetingCmds =
         generateTargetingIndicatorCommands world targetingService playerId
@@ -124,11 +138,14 @@ module Render =
 
     let world: World.World = game.Services.GetService<World.World>()
     let targetingService = game.Services.GetService<TargetingService>()
+    let projections = game.Services.GetService<Projections.ProjectionService>()
+
     let spriteBatch = lazy (new SpriteBatch(game.GraphicsDevice))
 
     let mutable texture = Unchecked.defaultof<_>
 
-    let drawCommands = generateDrawCommands world targetingService playerId
+    let drawCommands =
+      generateDrawCommands world targetingService projections playerId
 
     override _.Initialize() : unit =
       base.Initialize()

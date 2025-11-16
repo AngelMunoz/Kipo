@@ -21,15 +21,24 @@ module DebugRender =
   type DebugDrawCommand =
     | DrawActiveEffect of effect: ActiveEffect * entityPosition: Vector2
     | DrawDerivedStats of
-        ownerId: Guid<EntityId> *
-        stats: DerivedStats *
-        resources: Entity.Resource option *
-        entityPosition: Vector2
-    | DrawInventory of ownerId: Guid<EntityId> * inventory: HashSet<Item.ItemInstance> * entityPosition: Vector2
-    | DrawEquipped of ownerId: Guid<EntityId> * equipped: HashMap<Item.Slot, Item.ItemInstance> * entityPosition: Vector2
+      ownerId: Guid<EntityId> *
+      stats: DerivedStats *
+      resources: Entity.Resource option *
+      entityPosition: Vector2
+    | DrawInventory of
+      ownerId: Guid<EntityId> *
+      inventory: HashSet<Item.ItemDefinition> *
+      entityPosition: Vector2
+    | DrawEquipped of
+      ownerId: Guid<EntityId> *
+      equipped: HashMap<Item.Slot, Item.ItemDefinition> *
+      entityPosition: Vector2
 
-  let private generateActiveEffectCommands(world: World.World) =
-    Projections.UpdatedPositions world
+  let private generateActiveEffectCommands
+    (world: World.World)
+    (positions: amap<Guid<EntityId>, Vector2>)
+    =
+    positions
     |> AMap.chooseA(fun entityId pos -> adaptive {
       let! effectsOpt = AMap.tryFind entityId world.ActiveEffects
 
@@ -44,43 +53,47 @@ module DebugRender =
       IndexList.empty
 
   let private generateDerivedStatsCommands
-    (world: World.World, itemStore: ItemStore)
+    (world: World.World)
+    (positions: amap<Guid<EntityId>, Vector2>)
+    (derivedStats: amap<Guid<EntityId>, DerivedStats>)
     (showStats: bool aval)
     =
-    Projections.UpdatedPositions world
+    positions
     |> AMap.chooseA(fun entityId pos -> adaptive {
       let! show = showStats
 
       if not show then
         return None
       else
-        let! statsOpt =
-          Projections.CalculateDerivedStats (world, itemStore) |> AMap.tryFind entityId
-        let! resourcesOpt =
-            world.Resources |> AMap.tryFind entityId
+        let! statsOpt = derivedStats |> AMap.tryFind entityId
+
+        let! resourcesOpt = world.Resources |> AMap.tryFind entityId
 
         return
           statsOpt
           |> Option.map(fun stats ->
-            IndexList.single(DrawDerivedStats(entityId, stats, resourcesOpt, pos)))
+            IndexList.single(
+              DrawDerivedStats(entityId, stats, resourcesOpt, pos)
+            ))
     })
     |> AMap.fold
       (fun acc _ cmds -> IndexList.concat [ acc; cmds ])
       IndexList.empty
 
   let private generateInventoryCommands
-    (world: World.World)
+    (positions: amap<Guid<EntityId>, Vector2>)
+    (inventory: amap<Guid<EntityId>, HashSet<Item.ItemDefinition>>)
     (showInventory: bool aval)
     =
-    Projections.UpdatedPositions world
+    positions
     |> AMap.chooseA(fun entityId pos -> adaptive {
       let! show = showInventory
+
       if not show then
         return None
       else
-        let! inventoryOpt =
-          Projections.getInventory world |> AMap.tryFind entityId
-        
+        let! inventoryOpt = inventory |> AMap.tryFind entityId
+
         return
           inventoryOpt
           |> Option.map(fun inventory ->
@@ -91,18 +104,20 @@ module DebugRender =
       IndexList.empty
 
   let private generateEquippedCommands
-    (world: World.World)
+    (positions: amap<Guid<EntityId>, Vector2>)
+    (equippedItems:
+      amap<Guid<EntityId>, HashMap<Item.Slot, Item.ItemDefinition>>)
     (showInventory: bool aval)
     =
-    Projections.UpdatedPositions world
+    positions
     |> AMap.chooseA(fun entityId pos -> adaptive {
       let! show = showInventory
+
       if not show then
         return None
       else
-        let! equippedOpt =
-          Projections.getEquippedItems world |> AMap.tryFind entityId
-        
+        let! equippedOpt = equippedItems |> AMap.tryFind entityId
+
         return
           equippedOpt
           |> Option.map(fun equipped ->
@@ -113,16 +128,31 @@ module DebugRender =
       IndexList.empty
 
   let private generateDebugCommands
-    (world: World.World, itemStore: ItemStore)
+    (
+      world: World.World,
+      positions: amap<Guid<EntityId>, Vector2>,
+      derivedStats: amap<Guid<EntityId>, DerivedStats>,
+      inventory: amap<Guid<EntityId>, HashSet<Item.ItemDefinition>>,
+      equippedItems:
+        amap<Guid<EntityId>, HashMap<Item.Slot, Item.ItemDefinition>>
+    )
     (showStats: bool aval)
     (showInventory: bool aval)
     =
     adaptive {
-      let! effectCmds = generateActiveEffectCommands world
-      let! statsCmds = generateDerivedStatsCommands (world, itemStore) showStats
-      let! inventoryCmds = generateInventoryCommands world showInventory
-      let! equippedCmds = generateEquippedCommands world showInventory
-      return IndexList.concat [ effectCmds; statsCmds; inventoryCmds; equippedCmds ]
+      let! effectCmds = generateActiveEffectCommands world positions
+
+      and! statsCmds =
+        generateDerivedStatsCommands world positions derivedStats showStats
+
+      and! inventoryCmds =
+        generateInventoryCommands positions inventory showInventory
+
+      and! equippedCmds =
+        generateEquippedCommands positions equippedItems showInventory
+
+      return
+        IndexList.concat [ effectCmds; statsCmds; inventoryCmds; equippedCmds ]
     }
 
   type DebugRenderSystem(game: Game, playerId: Guid<EntityId>) =
@@ -130,12 +160,25 @@ module DebugRender =
 
     let world: World.World = game.Services.GetService<World.World>()
     let itemStore: ItemStore = game.Services.GetService<ItemStore>()
+
+    let projections: Projections.ProjectionService =
+      game.Services.GetService<Projections.ProjectionService>()
+
     let spriteBatch = lazy (new SpriteBatch(game.GraphicsDevice))
     let mutable hudFont = Unchecked.defaultof<_>
 
     let showStats = cval false
     let showInventory = cval false
-    let debugCommands = generateDebugCommands (world, itemStore) showStats showInventory
+
+    let debugCommands =
+      generateDebugCommands
+        (world,
+         projections.UpdatedPositions,
+         projections.DerivedStats,
+         projections.Inventories,
+         projections.EquipedItems)
+        showStats
+        showInventory
 
     let getRemainingDuration (totalGameTime: TimeSpan) (effect: ActiveEffect) =
       match effect.SourceEffect.Duration with
@@ -161,30 +204,45 @@ module DebugRender =
     let formatStats(stats: DerivedStats, resources: Entity.Resource option) =
       let sb = System.Text.StringBuilder()
 
-      let currentHP = resources |> Option.map (fun r -> r.HP) |> Option.defaultValue stats.HP
-      let currentMP = resources |> Option.map (fun r -> r.MP) |> Option.defaultValue stats.MP
+      let currentHP =
+        resources |> Option.map(fun r -> r.HP) |> Option.defaultValue stats.HP
 
-      sb.AppendLine($"HP: %d{currentHP}/%d{stats.HP} | MP: %d{currentMP}/%d{stats.MP}") |> ignore
-      sb.AppendLine($"AP: %d{stats.AP} | DP: %d{stats.DP} | AC: %d{stats.AC}") |> ignore
-      sb.AppendLine($"MA: %d{stats.MA} | MD: %d{stats.MD} | DX: %d{stats.DX}") |> ignore
-      sb.AppendLine($"WT: %d{stats.WT} | DA: %d{stats.DA} | HV: %d{stats.HV}") |> ignore
+      let currentMP =
+        resources |> Option.map(fun r -> r.MP) |> Option.defaultValue stats.MP
+
+      sb.AppendLine(
+        $"HP: %d{currentHP}/%d{stats.HP} | MP: %d{currentMP}/%d{stats.MP}"
+      )
+      |> ignore
+
+      sb.AppendLine($"AP: %d{stats.AP} | DP: %d{stats.DP} | AC: %d{stats.AC}")
+      |> ignore
+
+      sb.AppendLine($"MA: %d{stats.MA} | MD: %d{stats.MD} | DX: %d{stats.DX}")
+      |> ignore
+
+      sb.AppendLine($"WT: %d{stats.WT} | DA: %d{stats.DA} | HV: %d{stats.HV}")
+      |> ignore
+
       sb.AppendLine($"LK: %d{stats.LK} | MS: %d{stats.MS}") |> ignore
 
       if not stats.ElementAttributes.IsEmpty then
-          let attrStr =
-              stats.ElementAttributes
-              |> HashMap.toSeq
-              |> Seq.map (fun (elem, value) -> $"%A{elem}: {value:P0}")
-              |> String.concat " | "
-          sb.AppendLine($"Attr: {attrStr}") |> ignore
+        let attrStr =
+          stats.ElementAttributes
+          |> HashMap.toSeq
+          |> Seq.map(fun (elem, value) -> $"%A{elem}: {value:P0}")
+          |> String.concat " | "
+
+        sb.AppendLine($"Attr: {attrStr}") |> ignore
 
       if not stats.ElementResistances.IsEmpty then
-          let resStr =
-              stats.ElementResistances
-              |> HashMap.toSeq
-              |> Seq.map (fun (elem, value) -> $"%A{elem}: {value:P0}")
-              |> String.concat " | "
-          sb.AppendLine($"Res: {resStr}") |> ignore
+        let resStr =
+          stats.ElementResistances
+          |> HashMap.toSeq
+          |> Seq.map(fun (elem, value) -> $"%A{elem}: {value:P0}")
+          |> String.concat " | "
+
+        sb.AppendLine($"Res: {resStr}") |> ignore
 
       sb.ToString()
 
@@ -193,8 +251,13 @@ module DebugRender =
       |> AMap.tryFind playerId
       |> AVal.map(Option.defaultValue HashMap.empty)
 
-    let toggleSheetState = playerActionStates |> AVal.map (fun s -> s |> HashMap.tryFindV ToggleCharacterSheet)
-    let toggleInventoryState = playerActionStates |> AVal.map (fun s -> s |> HashMap.tryFindV ToggleInventory)
+    let toggleSheetState =
+      playerActionStates
+      |> AVal.map(fun s -> s |> HashMap.tryFindV ToggleCharacterSheet)
+
+    let toggleInventoryState =
+      playerActionStates
+      |> AVal.map(fun s -> s |> HashMap.tryFindV ToggleInventory)
 
     override _.Initialize() : unit =
       base.Initialize()
@@ -247,24 +310,32 @@ module DebugRender =
 
         | DrawInventory(ownerId, inventory, entityPos) ->
           let yOffset = yOffsets.TryFind ownerId |> Option.defaultValue -20.0f
-          let sb = System.Text.StringBuilder()
-          sb.AppendLine("Inventory:") |> ignore
+          let strBuilder = System.Text.StringBuilder()
+          strBuilder.AppendLine("Inventory:") |> ignore
+
           for item in inventory do
-            let itemName = itemStore.tryFind item.ItemId |> ValueOption.map (fun def -> def.Name) |> ValueOption.defaultValue "Unknown"
-            sb.AppendLine($"- {itemName}") |> ignore
-          let text = sb.ToString()
-          let textPosition = Vector2(entityPos.X, entityPos.Y + yOffset + 150.0f)
+            strBuilder.AppendLine $"- {item.Name}" |> ignore
+
+          let text = strBuilder.ToString()
+
+          let textPosition =
+            Vector2(entityPos.X, entityPos.Y + yOffset + 150.0f)
+
           sb.DrawString(hudFont, text, textPosition, Color.White)
 
         | DrawEquipped(ownerId, equipped, entityPos) ->
           let yOffset = yOffsets.TryFind ownerId |> Option.defaultValue -20.0f
-          let sb = System.Text.StringBuilder()
-          sb.AppendLine("Equipped:") |> ignore
-          for KeyValue(slot, item) in equipped do
-            let itemName = itemStore.tryFind item.ItemId |> ValueOption.map (fun def -> def.Name) |> ValueOption.defaultValue "Unknown"
-            sb.AppendLine($"- {slot}: {itemName}") |> ignore
-          let text = sb.ToString()
-          let textPosition = Vector2(entityPos.X, entityPos.Y + yOffset + 250.0f)
+          let strBuilder = System.Text.StringBuilder()
+          strBuilder.AppendLine("Equipped:") |> ignore
+
+          for slot, item in equipped do
+            strBuilder.AppendLine $"- {slot}: {item.Name}" |> ignore
+
+          let text = strBuilder.ToString()
+
+          let textPosition =
+            Vector2(entityPos.X, entityPos.Y + yOffset + 250.0f)
+
           sb.DrawString(hudFont, text, textPosition, Color.LightGreen)
 
       sb.End()

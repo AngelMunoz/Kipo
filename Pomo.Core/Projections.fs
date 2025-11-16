@@ -13,7 +13,19 @@ open Pomo.Core.Domain.Item
 
 module Projections =
 
-  let UpdatedPositions(world: World) =
+  module private Dictionary =
+    open System.Collections.Generic
+
+    let tryFindV
+      (key: 'Key)
+      (dict: IReadOnlyDictionary<'Key, 'Value>)
+      : 'Value voption =
+      match dict.TryGetValue key with
+      | true, value -> ValueSome value
+      | false, _ -> ValueNone
+
+
+  let private updatedPositions(world: World) =
     (world.Velocities, world.Positions)
     ||> AMap.choose2V(fun _ velocity position ->
       match velocity, position with
@@ -25,7 +37,7 @@ module Projections =
       return position + displacement
     })
 
-  let LiveEntities(world: World) =
+  let private liveEntities(world: World) =
     world.Resources
     |> AMap.filter(fun _ resource -> resource.Status = Entity.Status.Alive)
     |> AMap.keys
@@ -40,7 +52,7 @@ module Projections =
     | Skill.EffectKind.ResourceOverTime
     | Skill.EffectKind.Debuff -> None
 
-  let CalculateCombatStatuses(world: World) =
+  let private calculateCombatStatuses(world: World) =
     world.ActiveEffects
     |> AMap.map(fun _ effectList ->
       effectList |> IndexList.choose effectKindToCombatStatus)
@@ -137,7 +149,7 @@ module Projections =
     let applyModifiers
       (stats: Entity.DerivedStats)
       (effects: Skill.ActiveEffect IndexList voption)
-      (equipmentBonuses: StatModifier array)
+      (equipmentBonuses: StatModifier IndexList)
       =
       let fromEffects =
         match effects with
@@ -150,81 +162,52 @@ module Projections =
             | Skill.EffectModifier.AbilityDamageMod _
             | Skill.EffectModifier.DynamicMod _ -> None)
 
-      equipmentBonuses
+      equipmentBonuses.AsArray
       |> Array.append fromEffects
       |> Array.fold applySingleModifier stats
 
-  let getEquipmentStatBonuses(world: World, itemStore: ItemStore) =
-    let equipmentStats =
-      world.EquippedItems
-      |> AMap.mapA(fun _ equippedMap -> adaptive {
-        let! items = world.ItemInstances |> AMap.toAVal
+    let getEquipmentStatBonusesForId
+      (world: World, itemStore: ItemStore, entityId: Guid<EntityId>)
+      =
+      adaptive {
+        let! equipmentStats =
+          world.EquippedItems
+          |> AMap.tryFind entityId
+          |> AVal.map(
+            Option.map(fun map ->
+              map
+              |> HashMap.chooseV(fun _ itemInstanceId ->
+                world.ItemInstances
+                |> Dictionary.tryFindV itemInstanceId
+                |> ValueOption.bind(fun instance ->
+                  itemStore.tryFind instance.ItemId)
+                |> ValueOption.map(fun item ->
+                  match item.Kind with
+                  | Wearable props -> props.Stats
+                  | _ -> Array.empty)))
+          )
 
-        let foundItems =
-          equippedMap
-          |> HashMap.chooseV(fun _ itemInstanceId ->
-            match items |> HashMap.tryFindV itemInstanceId with
-            | ValueSome itemInstance -> itemStore.tryFind itemInstance.ItemId
-            | ValueNone -> ValueNone)
-          |> HashMap.toValueArray
+        let equipmentStats = equipmentStats |> Option.defaultValue HashMap.empty
 
         return
-          foundItems
+          equipmentStats
+          |> HashMap.toValueArray
           |> Array.fold
-            (fun acc item ->
-              match item.Kind with
-              | Wearable wearable -> Array.append acc wearable.Stats
-              | _ -> acc)
-            Array.empty
-      })
+            (fun acc stats -> IndexList.ofArray stats |> IndexList.append acc)
+            IndexList.Empty
+      }
 
-    equipmentStats
-
-
-  let getEquippedItems(world: World, itemStore: ItemStore) =
-    world.EquippedItems
-    |> AMap.mapA(fun _ equippedMap -> adaptive {
-      let! items = world.ItemInstances |> AMap.toAVal
-
-      let foundItems =
-        equippedMap
-        |> HashMap.chooseV(fun _ itemInstanceId ->
-          match items |> HashMap.tryFindV itemInstanceId with
-          | ValueSome itemInstance ->
-            match itemStore.tryFind itemInstance.ItemId with
-            | ValueSome item when item.Kind.IsWearable -> ValueSome item
-            | _ -> ValueNone
-          | ValueNone -> ValueNone)
-        |> HashMap.toValueArray
-      return foundItems |> Array.map(fun item -> item.)
-    })
-
-  let getInventory(world: World) =
-    world.EntityInventories
-    |> AMap.mapA(fun _ inventorySet -> adaptive {
-      let! itemInstances = world.ItemInstances
-      let mutable inventory = HashSet.empty
-
-      for itemInstanceId in inventorySet do
-        match itemInstances |> AMap.tryFindV itemInstanceId with
-        | ValueSome itemInstance -> inventory <- inventory.Add(itemInstance)
-        | ValueNone -> ()
-
-      return inventory
-    })
-
-  let CalculateDerivedStats(world: World, itemStore: ItemStore) =
+  let private calculateDerivedStats (itemStore: ItemStore) (world: World) =
     (world.BaseStats, world.ActiveEffects)
     ||> AMap.choose2V(fun _ baseStats effects ->
-      match baseStats with
-      | ValueSome stats -> ValueSome struct (stats, effects)
-      | _ -> ValueNone)
-    |> AMap.mapA(fun _ struct (baseStats, effects) -> adaptive {
+      baseStats |> ValueOption.map(fun stats -> struct (stats, effects)))
+    |> AMap.mapA(fun entityId struct (baseStats, effects) -> adaptive {
       let! equipmentBonuses =
-        getEquipmentStatBonuses(world, itemStore)
-        |> AMap.fold
-          (fun acc _ bonuses -> Array.append acc bonuses)
-          Array.empty
+        DerivedStatsCalculator.getEquipmentStatBonusesForId(
+          world,
+          itemStore,
+          entityId
+        )
 
       let initialStats = DerivedStatsCalculator.calculateBase baseStats
 
@@ -236,3 +219,46 @@ module Projections =
 
       return finalStats
     })
+
+  let private inventoryDefs(world: World, itemStore: ItemStore) =
+    world.EntityInventories
+    |> AMap.map(fun _ itemIds ->
+      itemIds
+      |> HashSet.chooseV(fun itemId ->
+        match world.ItemInstances |> Dictionary.tryFindV itemId with
+        | ValueSome instance ->
+          match itemStore.tryFind instance.ItemId with
+          | ValueSome def -> ValueSome def
+          | ValueNone -> ValueNone
+        | ValueNone -> ValueNone))
+
+  let private equippedItemDefs(world: World, itemStore: ItemStore) =
+    world.EquippedItems
+    |> AMap.map(fun _ itemIds ->
+      itemIds
+      |> HashMap.chooseV(fun _ itemId ->
+        match world.ItemInstances |> Dictionary.tryFindV itemId with
+        | ValueSome instance ->
+          match itemStore.tryFind instance.ItemId with
+          | ValueSome def -> ValueSome def
+          | ValueNone -> ValueNone
+        | ValueNone -> ValueNone))
+
+  type ProjectionService =
+    abstract UpdatedPositions: amap<Guid<EntityId>, Vector2>
+    abstract LiveEntities: aset<Guid<EntityId>>
+    abstract CombatStatuses: amap<Guid<EntityId>, IndexList<CombatStatus>>
+    abstract DerivedStats: amap<Guid<EntityId>, Entity.DerivedStats>
+    abstract EquipedItems: amap<Guid<EntityId>, HashMap<Slot, ItemDefinition>>
+    abstract Inventories: amap<Guid<EntityId>, HashSet<ItemDefinition>>
+
+
+  let create(itemStore: ItemStore, world: World) =
+    { new ProjectionService with
+        member _.UpdatedPositions = updatedPositions world
+        member _.LiveEntities = liveEntities world
+        member _.CombatStatuses = calculateCombatStatuses world
+        member _.DerivedStats = calculateDerivedStats itemStore world
+        member _.EquipedItems = equippedItemDefs(world, itemStore)
+        member _.Inventories = inventoryDefs(world, itemStore)
+    }

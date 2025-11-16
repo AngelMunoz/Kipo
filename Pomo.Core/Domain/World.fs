@@ -46,7 +46,8 @@ module World =
         Guid<EntityId>,
         struct (int<SkillId> * SystemCommunications.SkillTarget)
        >
-    ItemInstances: cmap<Guid<ItemInstanceId>, ItemInstance>
+    ItemInstances:
+      System.Collections.Generic.Dictionary<Guid<ItemInstanceId>, ItemInstance>
     EntityInventories: cmap<Guid<EntityId>, HashSet<Guid<ItemInstanceId>>>
     EquippedItems: cmap<Guid<EntityId>, HashMap<Slot, Guid<ItemInstanceId>>>
   }
@@ -82,9 +83,15 @@ module World =
         Guid<EntityId>,
         struct (int<SkillId> * SystemCommunications.SkillTarget)
        >
-    abstract ItemInstances: amap<Guid<ItemInstanceId>, ItemInstance>
-    abstract EntityInventories: amap<Guid<EntityId>, HashSet<Guid<ItemInstanceId>>>
-    abstract EquippedItems: amap<Guid<EntityId>, HashMap<Slot, Guid<ItemInstanceId>>>
+
+    abstract ItemInstances:
+      Collections.Generic.IReadOnlyDictionary<Guid<ItemInstanceId>, ItemInstance>
+
+    abstract EntityInventories:
+      amap<Guid<EntityId>, HashSet<Guid<ItemInstanceId>>>
+
+    abstract EquippedItems:
+      amap<Guid<EntityId>, HashMap<Slot, Guid<ItemInstanceId>>>
 
 
   let create(rng: Random) =
@@ -111,7 +118,7 @@ module World =
       LiveProjectiles = cmap()
       InCombatUntil = cmap()
       PendingSkillCast = cmap()
-      ItemInstances = cmap()
+      ItemInstances = Collections.Generic.Dictionary()
       EntityInventories = cmap()
       EquippedItems = cmap()
     }
@@ -142,27 +149,3 @@ module World =
       }
 
     struct (mutableWorld, worldView)
-
-module Systems =
-  open World
-
-  [<Struct>]
-  type SystemKind =
-    | Game
-    | Movement
-    | RawInput
-    | InputMapping
-    | Combat
-    | Effects
-    | ResourceManager
-
-  type GameSystem(game: Game) =
-    inherit GameComponent(game)
-
-    abstract Kind: SystemKind
-    default _.Kind = Game
-
-    member val World = game.Services.GetService<World>() with get
-
-    member val EventBus =
-      game.Services.GetService<Pomo.Core.EventBus.EventBus>() with get
