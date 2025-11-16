@@ -17,10 +17,7 @@ open Pomo.Core.Systems.Targeting
 
 module ActionHandler =
   open Microsoft.Xna.Framework.Input
-
-
-  type ActionHandlerService =
-    abstract member StartListening: unit -> IDisposable
+  open Pomo.Core.Domain.Core
 
   let private createHoveredEntityProjection
     (world: World)
@@ -74,7 +71,7 @@ module ActionHandler =
     ) =
     let hoveredEntityAval = createHoveredEntityProjection world entityId
 
-    { new ActionHandlerService with
+    { new CoreEventListener with
         member _.StartListening() =
           eventBus.GetObservableFor<StateChangeEvent>()
           |> Observable.choose(fun event ->

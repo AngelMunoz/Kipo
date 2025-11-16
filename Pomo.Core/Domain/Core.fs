@@ -11,6 +11,13 @@ module Units =
   [<Measure>]
   type SkillId
 
+  [<Measure>]
+  type ItemId
+
+  [<Measure>]
+  type ItemInstanceId
+
+
 module Core =
   [<Struct>]
   type Element =
@@ -55,6 +62,10 @@ module Core =
     | Additive of addStat: Stat * adStatValue: float
     | Multiplicative of mulStat: Stat * mulStatValue: float
 
+
+  type CoreEventListener =
+
+    abstract member StartListening: unit -> System.IDisposable
 
 
   module Serialization =

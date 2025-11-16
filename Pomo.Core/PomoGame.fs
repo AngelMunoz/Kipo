@@ -35,7 +35,10 @@ open Pomo.Core.Systems.ActionHandler
 open Pomo.Core.Systems.DebugRender
 open Pomo.Core.Systems.Effects
 open Pomo.Core.Systems.ResourceManager
+open Pomo.Core.Systems.Inventory
+open Pomo.Core.Systems.Equipment
 open Pomo.Core.Domain.Units
+open Pomo.Core.Stores
 
 type PomoGame() as this =
   inherit Game()
@@ -58,6 +61,7 @@ type PomoGame() as this =
   // 1. Create both the mutable source of truth and the public read-only view.
   let struct (mutableWorld, worldView) = World.create Random.Shared
   let skillStore = Stores.Skill.create(JsonFileLoader.readSkills deserializer)
+  let itemStore = Stores.Item.create(JsonFileLoader.readItems deserializer)
   let targetingService = Targeting.create(worldView, eventBus, skillStore)
 
   let effectApplicationService =
@@ -67,6 +71,8 @@ type PomoGame() as this =
     ActionHandler.create(worldView, eventBus, targetingService, playerId)
 
   let movementService = Navigation.create(eventBus, playerId)
+  let inventoryService = Inventory.create eventBus
+  let equipmentService = Equipment.create worldView eventBus
 
   do
     base.IsMouseVisible <- true
@@ -78,6 +84,7 @@ type PomoGame() as this =
     base.Services.AddService<GraphicsDeviceManager> graphicsDeviceManager
 
     base.Services.AddService<Stores.SkillStore> skillStore
+    base.Services.AddService<Stores.ItemStore> itemStore
     // 2. Register global services that all systems can safely access.
     base.Services.AddService<EventBus> eventBus
     //    Only the READ-ONLY world view is registered, preventing accidental write access.
@@ -205,6 +212,8 @@ type PomoGame() as this =
     actionHandler.StartListening() |> subs.Add
     movementService.StartListening() |> subs.Add
     effectApplicationService.StartListening() |> subs.Add
+    inventoryService.StartListening() |> subs.Add
+    equipmentService.StartListening() |> subs.Add
 
 
   override _.Dispose(disposing: bool) =

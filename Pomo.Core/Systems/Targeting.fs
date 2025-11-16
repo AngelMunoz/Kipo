@@ -18,11 +18,12 @@ module Targeting =
   open Pomo.Core.Domain.Skill
   open Pomo.Core.Stores
   open Pomo.Core.Domain.Action
+  open Pomo.Core.Domain.Core
 
   let private SKILL_ACTIVATION_RANGE_BUFFER = 5.0f
 
   type TargetingService =
-    inherit System.IDisposable
+    inherit CoreEventListener
     abstract member TargetingMode: Targeting voption aval with get
 
   let skillByEntityAndAction
@@ -257,39 +258,39 @@ module Targeting =
         world = world
       }
 
-    let sub1 =
-      eventBus.GetObservableFor<SystemCommunications.SlotActivated>()
-      |> Observable.subscribe(fun event ->
-        transact(fun () ->
-          _action.Value <- ValueSome event.Slot
-          _entityId.Value <- ValueSome event.CasterId))
 
-    let sub2 =
-      eventBus.GetObservableFor<SystemCommunications.TargetSelected>()
-      |> Observable.subscribe(fun event ->
-        handleSelected(event.Selector, event.Selection))
-
-    let sub3 =
-      eventBus.GetObservableFor<StateChangeEvent>()
-      |> Observable.choose(fun event ->
-        match event with
-        | StateChangeEvent.Input(InputEvents.RawStateChanged(struct (_,
-                                                                     rawInput))) ->
-          Some rawInput
-        | _ -> None)
-      |> Observable.subscribe(fun rawInput ->
-        let currentTargetingMode = targetingMode |> AVal.force
-
-        let onEscape() =
-          transact(fun () ->
-            _action.Value <- ValueNone
-            _entityId.Value <- ValueNone)
-
-        rawInput |> detectEscape onEscape currentTargetingMode)
-
-    let disposable = new CompositeDisposable([ sub1; sub2; sub3 ])
 
     { new TargetingService with
         member _.TargetingMode = targetingMode
-        member _.Dispose() = disposable.Dispose()
+
+        member _.StartListening() =
+          let sub1 =
+            eventBus.GetObservableFor<SystemCommunications.SlotActivated>()
+            |> Observable.subscribe(fun event ->
+              transact(fun () ->
+                _action.Value <- ValueSome event.Slot
+                _entityId.Value <- ValueSome event.CasterId))
+
+          let sub2 =
+            eventBus.GetObservableFor<SystemCommunications.TargetSelected>()
+            |> Observable.subscribe(fun event ->
+              handleSelected(event.Selector, event.Selection))
+
+          let sub3 =
+            eventBus.GetObservableFor<StateChangeEvent>()
+            |> Observable.choose(fun event ->
+              match event with
+              | Input(RawStateChanged struct (_, rawInput)) -> Some rawInput
+              | _ -> None)
+            |> Observable.subscribe(fun rawInput ->
+              let currentTargetingMode = targetingMode |> AVal.force
+
+              let onEscape() =
+                transact(fun () ->
+                  _action.Value <- ValueNone
+                  _entityId.Value <- ValueNone)
+
+              rawInput |> detectEscape onEscape currentTargetingMode)
+
+          new CompositeDisposable([ sub1; sub2; sub3 ])
     }

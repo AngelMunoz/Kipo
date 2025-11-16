@@ -12,6 +12,8 @@ open Pomo.Core.Domain.Entity
 open Pomo.Core.Domain.Units
 open Pomo.Core.Domain.Skill
 open Pomo.Core.Domain.Action
+open Pomo.Core.Domain.Item
+open Pomo.Core.Stores
 
 module DebugRender =
   open Pomo.Core
@@ -23,6 +25,8 @@ module DebugRender =
         stats: DerivedStats *
         resources: Entity.Resource option *
         entityPosition: Vector2
+    | DrawInventory of ownerId: Guid<EntityId> * inventory: HashSet<Item.ItemInstance> * entityPosition: Vector2
+    | DrawEquipped of ownerId: Guid<EntityId> * equipped: HashMap<Item.Slot, Item.ItemInstance> * entityPosition: Vector2
 
   let private generateActiveEffectCommands(world: World.World) =
     Projections.UpdatedPositions world
@@ -40,7 +44,7 @@ module DebugRender =
       IndexList.empty
 
   let private generateDerivedStatsCommands
-    (world: World.World)
+    (world: World.World, itemStore: ItemStore)
     (showStats: bool aval)
     =
     Projections.UpdatedPositions world
@@ -51,7 +55,7 @@ module DebugRender =
         return None
       else
         let! statsOpt =
-          Projections.CalculateDerivedStats world |> AMap.tryFind entityId
+          Projections.CalculateDerivedStats (world, itemStore) |> AMap.tryFind entityId
         let! resourcesOpt =
             world.Resources |> AMap.tryFind entityId
 
@@ -64,25 +68,74 @@ module DebugRender =
       (fun acc _ cmds -> IndexList.concat [ acc; cmds ])
       IndexList.empty
 
-  let private generateDebugCommands
+  let private generateInventoryCommands
     (world: World.World)
+    (showInventory: bool aval)
+    =
+    Projections.UpdatedPositions world
+    |> AMap.chooseA(fun entityId pos -> adaptive {
+      let! show = showInventory
+      if not show then
+        return None
+      else
+        let! inventoryOpt =
+          Projections.getInventory world |> AMap.tryFind entityId
+        
+        return
+          inventoryOpt
+          |> Option.map(fun inventory ->
+            IndexList.single(DrawInventory(entityId, inventory, pos)))
+    })
+    |> AMap.fold
+      (fun acc _ cmds -> IndexList.concat [ acc; cmds ])
+      IndexList.empty
+
+  let private generateEquippedCommands
+    (world: World.World)
+    (showInventory: bool aval)
+    =
+    Projections.UpdatedPositions world
+    |> AMap.chooseA(fun entityId pos -> adaptive {
+      let! show = showInventory
+      if not show then
+        return None
+      else
+        let! equippedOpt =
+          Projections.getEquippedItems world |> AMap.tryFind entityId
+        
+        return
+          equippedOpt
+          |> Option.map(fun equipped ->
+            IndexList.single(DrawEquipped(entityId, equipped, pos)))
+    })
+    |> AMap.fold
+      (fun acc _ cmds -> IndexList.concat [ acc; cmds ])
+      IndexList.empty
+
+  let private generateDebugCommands
+    (world: World.World, itemStore: ItemStore)
     (showStats: bool aval)
+    (showInventory: bool aval)
     =
     adaptive {
       let! effectCmds = generateActiveEffectCommands world
-      let! statsCmds = generateDerivedStatsCommands world showStats
-      return IndexList.concat [ effectCmds; statsCmds ]
+      let! statsCmds = generateDerivedStatsCommands (world, itemStore) showStats
+      let! inventoryCmds = generateInventoryCommands world showInventory
+      let! equippedCmds = generateEquippedCommands world showInventory
+      return IndexList.concat [ effectCmds; statsCmds; inventoryCmds; equippedCmds ]
     }
 
   type DebugRenderSystem(game: Game, playerId: Guid<EntityId>) =
     inherit DrawableGameComponent(game)
 
     let world: World.World = game.Services.GetService<World.World>()
+    let itemStore: ItemStore = game.Services.GetService<ItemStore>()
     let spriteBatch = lazy (new SpriteBatch(game.GraphicsDevice))
     let mutable hudFont = Unchecked.defaultof<_>
 
     let showStats = cval false
-    let debugCommands = generateDebugCommands world showStats
+    let showInventory = cval false
+    let debugCommands = generateDebugCommands (world, itemStore) showStats showInventory
 
     let getRemainingDuration (totalGameTime: TimeSpan) (effect: ActiveEffect) =
       match effect.SourceEffect.Duration with
@@ -139,7 +192,9 @@ module DebugRender =
       world.GameActionStates
       |> AMap.tryFind playerId
       |> AVal.map(Option.defaultValue HashMap.empty)
-      |> AVal.map(fun states -> states |> HashMap.tryFindV ToggleCharacterSheet)
+
+    let toggleSheetState = playerActionStates |> AVal.map (fun s -> s |> HashMap.tryFindV ToggleCharacterSheet)
+    let toggleInventoryState = playerActionStates |> AVal.map (fun s -> s |> HashMap.tryFindV ToggleInventory)
 
     override _.Initialize() : unit =
       base.Initialize()
@@ -147,11 +202,17 @@ module DebugRender =
 
     override _.Update gameTime =
       base.Update gameTime
-      let toggled = playerActionStates |> AVal.force
+      let sheetToggled = toggleSheetState |> AVal.force
+      let inventoryToggled = toggleInventoryState |> AVal.force
 
-      match toggled with
+      match sheetToggled with
       | ValueSome Pressed ->
         transact(fun () -> showStats.Value <- not showStats.Value)
+      | _ -> ()
+
+      match inventoryToggled with
+      | ValueSome Pressed ->
+        transact(fun () -> showInventory.Value <- not showInventory.Value)
       | _ -> ()
 
     override _.Draw gameTime =
@@ -180,9 +241,30 @@ module DebugRender =
 
         | DrawDerivedStats(ownerId, stats, resources, entityPos) ->
           let yOffset = yOffsets.TryFind ownerId |> Option.defaultValue -20.0f
-          // We don't decrement the offset here, because we want the stats block to overlap with the effects list
           let text = formatStats(stats, resources)
           let textPosition = Vector2(entityPos.X, entityPos.Y + yOffset)
           sb.DrawString(hudFont, text, textPosition, Color.Cyan)
+
+        | DrawInventory(ownerId, inventory, entityPos) ->
+          let yOffset = yOffsets.TryFind ownerId |> Option.defaultValue -20.0f
+          let sb = System.Text.StringBuilder()
+          sb.AppendLine("Inventory:") |> ignore
+          for item in inventory do
+            let itemName = itemStore.tryFind item.ItemId |> ValueOption.map (fun def -> def.Name) |> ValueOption.defaultValue "Unknown"
+            sb.AppendLine($"- {itemName}") |> ignore
+          let text = sb.ToString()
+          let textPosition = Vector2(entityPos.X, entityPos.Y + yOffset + 150.0f)
+          sb.DrawString(hudFont, text, textPosition, Color.White)
+
+        | DrawEquipped(ownerId, equipped, entityPos) ->
+          let yOffset = yOffsets.TryFind ownerId |> Option.defaultValue -20.0f
+          let sb = System.Text.StringBuilder()
+          sb.AppendLine("Equipped:") |> ignore
+          for KeyValue(slot, item) in equipped do
+            let itemName = itemStore.tryFind item.ItemId |> ValueOption.map (fun def -> def.Name) |> ValueOption.defaultValue "Unknown"
+            sb.AppendLine($"- {slot}: {itemName}") |> ignore
+          let text = sb.ToString()
+          let textPosition = Vector2(entityPos.X, entityPos.Y + yOffset + 250.0f)
+          sb.DrawString(hudFont, text, textPosition, Color.LightGreen)
 
       sb.End()

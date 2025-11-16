@@ -8,6 +8,8 @@ open Pomo.Core.Domain.Units
 open Pomo.Core.Domain
 open Pomo.Core.Domain.World
 open Pomo.Core.Domain.Core
+open Pomo.Core.Stores
+open Pomo.Core.Domain.Item
 
 module Projections =
 
@@ -32,9 +34,7 @@ module Projections =
     match effect.SourceEffect.Kind with
     | Skill.EffectKind.Stun -> Some CombatStatus.Stunned
     | Skill.EffectKind.Silence -> Some CombatStatus.Silenced
-    | Skill.EffectKind.Taunt ->
-      // TODO: Handle Taunt status
-      None
+    | Skill.EffectKind.Taunt -> None
     | Skill.EffectKind.Buff
     | Skill.EffectKind.DamageOverTime
     | Skill.EffectKind.ResourceOverTime
@@ -46,6 +46,7 @@ module Projections =
       effectList |> IndexList.choose effectKindToCombatStatus)
 
   module private DerivedStatsCalculator =
+
     let calculateBase(baseStats: Entity.BaseStats) : Entity.DerivedStats = {
       AP = baseStats.Power * 2
       AC = baseStats.Power + int(float baseStats.Power * 1.25)
@@ -59,17 +60,14 @@ module Projections =
       HP = baseStats.Charm * 10
       DP = baseStats.Charm + int(float baseStats.Charm * 1.25)
       HV = baseStats.Charm * 2
-      // Movement
       MS = 100
-      // Resources
       HPRegen = 20
       MPRegen = 20
-      // Elements
       ElementAttributes = HashMap.empty
       ElementResistances = HashMap.empty
     }
 
-    let private updateStat
+    let updateStat
       (stats: Entity.DerivedStats)
       (stat: Stat)
       (transformI: int -> int)
@@ -123,7 +121,8 @@ module Projections =
               ElementAttributes = stats.ElementAttributes.Add(element, updated)
         }
 
-    let private applySingleModifier
+
+    let applySingleModifier
       (accStats: Entity.DerivedStats)
       (statModifier: StatModifier)
       =
@@ -138,33 +137,102 @@ module Projections =
     let applyModifiers
       (stats: Entity.DerivedStats)
       (effects: Skill.ActiveEffect IndexList voption)
+      (equipmentBonuses: StatModifier array)
       =
-      match effects with
-      | ValueNone -> stats
-      | ValueSome effectList ->
-        effectList.AsArray
-        |> Array.collect _.SourceEffect.Modifiers
-        |> Array.choose (function
-          | Skill.EffectModifier.StaticMod m -> Some m
-          // TODO: Handle dynamic modifiers
-          | Skill.EffectModifier.AbilityDamageMod _
-          | Skill.EffectModifier.DynamicMod _ -> None)
-        |> Array.fold applySingleModifier stats
+      let fromEffects =
+        match effects with
+        | ValueNone -> [||]
+        | ValueSome effectList ->
+          effectList.AsArray
+          |> Array.collect _.SourceEffect.Modifiers
+          |> Array.choose (function
+            | Skill.EffectModifier.StaticMod m -> Some m
+            | Skill.EffectModifier.AbilityDamageMod _
+            | Skill.EffectModifier.DynamicMod _ -> None)
 
-  let CalculateDerivedStats(world: World) =
+      equipmentBonuses
+      |> Array.append fromEffects
+      |> Array.fold applySingleModifier stats
+
+  let getEquipmentStatBonuses(world: World, itemStore: ItemStore) =
+    let equipmentStats =
+      world.EquippedItems
+      |> AMap.mapA(fun _ equippedMap -> adaptive {
+        let! items = world.ItemInstances |> AMap.toAVal
+
+        let foundItems =
+          equippedMap
+          |> HashMap.chooseV(fun _ itemInstanceId ->
+            match items |> HashMap.tryFindV itemInstanceId with
+            | ValueSome itemInstance -> itemStore.tryFind itemInstance.ItemId
+            | ValueNone -> ValueNone)
+          |> HashMap.toValueArray
+
+        return
+          foundItems
+          |> Array.fold
+            (fun acc item ->
+              match item.Kind with
+              | Wearable wearable -> Array.append acc wearable.Stats
+              | _ -> acc)
+            Array.empty
+      })
+
+    equipmentStats
+
+
+  let getEquippedItems(world: World, itemStore: ItemStore) =
+    world.EquippedItems
+    |> AMap.mapA(fun _ equippedMap -> adaptive {
+      let! items = world.ItemInstances |> AMap.toAVal
+
+      let foundItems =
+        equippedMap
+        |> HashMap.chooseV(fun _ itemInstanceId ->
+          match items |> HashMap.tryFindV itemInstanceId with
+          | ValueSome itemInstance ->
+            match itemStore.tryFind itemInstance.ItemId with
+            | ValueSome item when item.Kind.IsWearable -> ValueSome item
+            | _ -> ValueNone
+          | ValueNone -> ValueNone)
+        |> HashMap.toValueArray
+      return foundItems |> Array.map(fun item -> item.)
+    })
+
+  let getInventory(world: World) =
+    world.EntityInventories
+    |> AMap.mapA(fun _ inventorySet -> adaptive {
+      let! itemInstances = world.ItemInstances
+      let mutable inventory = HashSet.empty
+
+      for itemInstanceId in inventorySet do
+        match itemInstances |> AMap.tryFindV itemInstanceId with
+        | ValueSome itemInstance -> inventory <- inventory.Add(itemInstance)
+        | ValueNone -> ()
+
+      return inventory
+    })
+
+  let CalculateDerivedStats(world: World, itemStore: ItemStore) =
     (world.BaseStats, world.ActiveEffects)
     ||> AMap.choose2V(fun _ baseStats effects ->
       match baseStats with
       | ValueSome stats -> ValueSome struct (stats, effects)
       | _ -> ValueNone)
-    |> AMap.map(fun _ struct (baseStats, effects) ->
+    |> AMap.mapA(fun _ struct (baseStats, effects) -> adaptive {
+      let! equipmentBonuses =
+        getEquipmentStatBonuses(world, itemStore)
+        |> AMap.fold
+          (fun acc _ bonuses -> Array.append acc bonuses)
+          Array.empty
+
       let initialStats = DerivedStatsCalculator.calculateBase baseStats
 
-      // TODO: Apply equipment stats here. This will likely involve another
-      // projection that reads equipped items and aggregates their stat bonuses.
-      let statsWithEquipment = initialStats
-
       let finalStats =
-        DerivedStatsCalculator.applyModifiers statsWithEquipment effects
+        DerivedStatsCalculator.applyModifiers
+          initialStats
+          effects
+          equipmentBonuses
 
-      finalStats)
+      return finalStats
+    })

@@ -11,14 +11,11 @@ open Pomo.Core.Domain.Units
 open Pomo.Core.Domain.World
 
 module Navigation =
-
-  type NavigationService =
-    abstract StartListening: unit -> IDisposable
-
+  open Pomo.Core.Domain.Core
 
   let create(eventBus: EventBus, playerId: Guid<EntityId>) =
 
-    { new NavigationService with
+    { new CoreEventListener with
         member _.StartListening() =
           eventBus.GetObservableFor<SystemCommunications.SetMovementTarget>()
           |> Observable.filter(fun event -> event.EntityId = playerId)

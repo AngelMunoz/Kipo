@@ -14,6 +14,7 @@ open Pomo.Core.Domain.Action
 open Pomo.Core.Domain.Projectile
 open Pomo.Core.Domain.RawInput
 open Pomo.Core.Domain.Skill
+open Pomo.Core.Domain.Item // Added this line
 
 [<Struct>]
 type MovementState =
@@ -96,6 +97,25 @@ module SystemCommunications =
     RemainingJumps: int voption
   }
 
+  [<Struct>]
+  type PickUpItemIntent = {
+    Picker: Guid<EntityId>
+    Item: ItemInstance
+  }
+
+  [<Struct>]
+  type EquipItemIntent = {
+    EntityId: Guid<EntityId>
+    ItemInstanceId: Guid<ItemInstanceId>
+    Slot: Slot
+  }
+
+  [<Struct>]
+  type UnequipItemIntent = {
+    EntityId: Guid<EntityId>
+    Slot: Slot
+  }
+
 // --- State Change Events ---
 
 type EntityLifecycleEvents =
@@ -135,12 +155,25 @@ type CombatEvents =
     target: SystemCommunications.SkillTarget
   | PendingSkillCastCleared of entityId: Guid<EntityId>
 
+type InventoryEvents =
+  | ItemInstanceCreated of itemInstance: ItemInstance
+  | ItemInstanceRemoved of itemInstanceId: Guid<ItemInstanceId>
+  | ItemAddedToInventory of
+    itemAdded: struct (Guid<EntityId> * Guid<ItemInstanceId>)
+  | ItemRemovedFromInventory of
+    itemRemoved: struct (Guid<EntityId> * Guid<ItemInstanceId>)
+  | ItemEquipped of
+    itemEquipped: struct (Guid<EntityId> * Slot * Guid<ItemInstanceId>)
+  | ItemUnequipped of
+    itemUnequipped: struct (Guid<EntityId> * Slot * Guid<ItemInstanceId>)
+
 [<Struct>]
 type StateChangeEvent =
   | EntityLifecycle of entityLifeCycle: EntityLifecycleEvents
   | Input of input: InputEvents
   | Physics of physics: PhysicsEvents
   | Combat of combat: CombatEvents
+  | Inventory of inventory: InventoryEvents // Add this
   // Uncategorized
   | CreateProjectile of
     projParams: struct (Guid<EntityId> * LiveProjectile * Vector2 voption)

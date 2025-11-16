@@ -1,0 +1,48 @@
+{
+  "1": {
+    "Id": 1,
+    "Name": "Simple Sword",
+    "Weight": 5.0,
+    "Kind": {
+      "Type": "Wearable",
+      "Slot": "Weapon",
+      "Stats": [
+        {
+          "type": "Additive",
+          "stat": "AP",
+          "value": 5.0
+        }
+      ]
+    }
+  },
+  "2": {
+    "Id": 2,
+    "Name": "Health Potion",
+    "Weight": 0.5,
+    "Kind": {
+      "Type": "Usable",
+      "Effect": {
+        "Name": "Health Potion",
+        "Kind": "Buff",
+        "DamageSource": "Physical",
+        "Stacking": { "Type": "NoStack" },
+        "Duration": { "Type": "Instant" },
+        "Modifiers": [
+          {
+            "Type": "DynamicMod",
+            "Expression": "50",
+            "TargetStat": "HP"
+          }
+        ]
+      }
+    }
+  },
+  "3": {
+    "Id": 3,
+    "Name": "Rock",
+    "Weight": 1.0,
+    "Kind": {
+      "Type": "NonUsable"
+    }
+  }
+}

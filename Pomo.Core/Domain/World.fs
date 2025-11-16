@@ -6,6 +6,7 @@ open FSharp.Data.Adaptive
 open Microsoft.Xna.Framework
 open System.Collections.Concurrent
 open Pomo.Core.Domain.Units
+open Pomo.Core.Domain.Item
 
 
 module World =
@@ -45,6 +46,9 @@ module World =
         Guid<EntityId>,
         struct (int<SkillId> * SystemCommunications.SkillTarget)
        >
+    ItemInstances: cmap<Guid<ItemInstanceId>, ItemInstance>
+    EntityInventories: cmap<Guid<EntityId>, HashSet<Guid<ItemInstanceId>>>
+    EquippedItems: cmap<Guid<EntityId>, HashMap<Slot, Guid<ItemInstanceId>>>
   }
 
   type World =
@@ -78,6 +82,9 @@ module World =
         Guid<EntityId>,
         struct (int<SkillId> * SystemCommunications.SkillTarget)
        >
+    abstract ItemInstances: amap<Guid<ItemInstanceId>, ItemInstance>
+    abstract EntityInventories: amap<Guid<EntityId>, HashSet<Guid<ItemInstanceId>>>
+    abstract EquippedItems: amap<Guid<EntityId>, HashMap<Slot, Guid<ItemInstanceId>>>
 
 
   let create(rng: Random) =
@@ -104,6 +111,9 @@ module World =
       LiveProjectiles = cmap()
       InCombatUntil = cmap()
       PendingSkillCast = cmap()
+      ItemInstances = cmap()
+      EntityInventories = cmap()
+      EquippedItems = cmap()
     }
 
     let worldView =
@@ -126,6 +136,9 @@ module World =
           member _.LiveProjectiles = mutableWorld.LiveProjectiles
           member _.InCombatUntil = mutableWorld.InCombatUntil
           member _.PendingSkillCast = mutableWorld.PendingSkillCast
+          member _.ItemInstances = mutableWorld.ItemInstances
+          member _.EntityInventories = mutableWorld.EntityInventories
+          member _.EquippedItems = mutableWorld.EquippedItems
       }
 
     struct (mutableWorld, worldView)

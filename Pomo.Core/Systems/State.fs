@@ -15,6 +15,7 @@ open Pomo.Core.Domain.Events
 open Pomo.Core.Domain.World
 open Pomo.Core.Domain.RawInput
 open Pomo.Core.Domain.Skill
+open Pomo.Core.Domain.Item
 
 module StateUpdate =
   let COMBAT_DURATION = TimeSpan.FromSeconds(5.0)
@@ -210,6 +211,64 @@ module StateUpdate =
         world.ActiveEffects[entityId] <- newEffects
       | None -> ()
 
+  module Inventory =
+    let inline addItemInstance
+      (world: MutableWorld)
+      (itemInstance: Item.ItemInstance)
+      =
+      world.ItemInstances[itemInstance.InstanceId] <- itemInstance
+
+    let inline removeItemInstance
+      (world: MutableWorld)
+      (itemInstanceId: Guid<ItemInstanceId>)
+      =
+      world.ItemInstances.Remove(itemInstanceId) |> ignore
+
+    let inline addItemToInventory
+      (world: MutableWorld)
+      struct (entityId: Guid<EntityId>, itemInstanceId: Guid<ItemInstanceId>)
+      =
+      let currentInventory =
+        world.EntityInventories.TryGetValue(entityId)
+        |> Option.defaultValue HashSet.empty
+
+      world.EntityInventories[entityId] <-
+        HashSet.add itemInstanceId currentInventory
+
+    let inline removeItemFromInventory
+      (world: MutableWorld)
+      struct (entityId: Guid<EntityId>, itemInstanceId: Guid<ItemInstanceId>)
+      =
+      let currentInventory =
+        world.EntityInventories.TryGetValue entityId
+        |> Option.defaultValue HashSet.empty
+
+      world.EntityInventories[entityId] <-
+        HashSet.remove itemInstanceId currentInventory
+
+    let inline equipItem
+      (world: MutableWorld)
+      struct (entityId: Guid<EntityId>, slot: Item.Slot,
+              itemInstanceId: Guid<ItemInstanceId>)
+      =
+      let currentEquipped =
+        world.EquippedItems.TryGetValue entityId
+        |> Option.defaultValue HashMap.empty
+
+      world.EquippedItems[entityId] <-
+        HashMap.add slot itemInstanceId currentEquipped
+
+    let inline unequipItem
+      (world: MutableWorld)
+      struct (entityId: Guid<EntityId>, slot: Item.Slot,
+              itemInstanceId: Guid<ItemInstanceId>)
+      =
+      let currentEquipped =
+        world.EquippedItems.TryGetValue entityId
+        |> Option.defaultValue HashMap.empty
+
+      world.EquippedItems[entityId] <- HashMap.remove slot currentEquipped
+
   // The dedicated STATE WRITER system.
   // It receives the MutableWorld via constructor injection, ensuring no other system can access it.
   type StateUpdateSystem(game: Game, mutableWorld: World.MutableWorld) =
@@ -290,6 +349,20 @@ module StateUpdate =
               Combat.setPendingSkillCast mutableWorld entityId skillId target
             | CombatEvents.PendingSkillCastCleared entityId ->
               Combat.clearPendingSkillCast mutableWorld entityId
+          | StateChangeEvent.Inventory event ->
+            match event with
+            | InventoryEvents.ItemInstanceCreated itemInstance ->
+              Inventory.addItemInstance mutableWorld itemInstance
+            | InventoryEvents.ItemInstanceRemoved itemInstanceId ->
+              Inventory.removeItemInstance mutableWorld itemInstanceId
+            | InventoryEvents.ItemAddedToInventory itemAdded ->
+              Inventory.addItemToInventory mutableWorld itemAdded
+            | InventoryEvents.ItemRemovedFromInventory itemRemoved ->
+              Inventory.removeItemFromInventory mutableWorld itemRemoved
+            | InventoryEvents.ItemEquipped itemEquipped ->
+              Inventory.equipItem mutableWorld itemEquipped
+            | InventoryEvents.ItemUnequipped itemUnequipped ->
+              Inventory.unequipItem mutableWorld itemUnequipped
           // Uncategorized
           | StateChangeEvent.CreateProjectile projParams ->
             Entity.createProjectile mutableWorld projParams)

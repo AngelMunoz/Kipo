@@ -19,8 +19,7 @@ open Pomo.Core.EventBus
 module Effects =
 
   module EffectApplication =
-    type EffectApplicationService =
-      abstract member StartListening: unit -> IDisposable
+    open Pomo.Core.Domain.Core
 
     let private createNewActiveEffect
       (intent: SystemCommunications.EffectApplicationIntent)
@@ -111,13 +110,13 @@ module Effects =
 
       event
 
-    let create(world: World, eventBus: EventBus) : EffectApplicationService =
+    let create(world: World, eventBus: EventBus) =
       let handler(intent: SystemCommunications.EffectApplicationIntent) =
         match applyEffect world intent with
         | ValueSome ev -> eventBus.Publish ev
         | ValueNone -> ()
 
-      { new EffectApplicationService with
+      { new CoreEventListener with
           member _.StartListening() =
             eventBus.GetObservableFor<
               SystemCommunications.EffectApplicationIntent
