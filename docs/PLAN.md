@@ -264,12 +264,12 @@ This system is the core of the stat calculation pipeline.
 
 ### 8.5 ✅ Verification Checklist
 
-- [ ] Can an `Items.json` file be created and loaded by a new `ItemStore`?
-- [ ] Can an entity pick up an item, triggering an `ItemAddedToInventory` event and updating the `EntityInventoryComponent`?
-- [ ] Can an entity equip an item from its inventory, triggering `ItemEquipped` and updating `EquippedItemsComponent`?
-- [ ] Does equipping an item with stats cause the `DerivedStats` projection for that entity to update on the next frame?
-- [ ] Does a debug renderer show the updated stats?
-- [ ] Does unequipping the item revert the stats correctly?
+- [x] Can an `Items.json` file be created and loaded by a new `ItemStore`?
+- [x] Can an entity pick up an item, triggering an `ItemAddedToInventory` event and updating the `EntityInventoryComponent`?
+- [x] Can an entity equip an item from its inventory, triggering `ItemEquipped` and updating `EquippedItemsComponent`?
+- [x] Does equipping an item with stats cause the `DerivedStats` projection for that entity to update on the next frame?
+- [x] Does a debug renderer show the updated stats?
+- [x] Does unequipping the item revert the stats correctly?
 
 ## 9. Phase 5: Scenario & Terrain
 
