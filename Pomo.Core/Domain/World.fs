@@ -28,7 +28,9 @@ module World =
     InputMaps: cmap<Guid<EntityId>, InputMap>
     GameActionStates:
       cmap<Guid<EntityId>, HashMap<GameAction, InputActionState>>
-    QuickSlots: cmap<Guid<EntityId>, HashMap<GameAction, SlotProcessing>>
+    ActionSets:
+      cmap<Guid<EntityId>, HashMap<int, HashMap<GameAction, SlotProcessing>>>
+    ActiveActionSets: cmap<Guid<EntityId>, int>
     // entity components
     Positions: cmap<Guid<EntityId>, Vector2>
     Velocities: cmap<Guid<EntityId>, Vector2>
@@ -60,8 +62,10 @@ module World =
     abstract GameActionStates:
       amap<Guid<EntityId>, HashMap<GameAction, InputActionState>>
 
-    abstract QuickSlots:
-      amap<Guid<EntityId>, HashMap<GameAction, SlotProcessing>>
+    abstract ActionSets:
+      amap<Guid<EntityId>, HashMap<int, HashMap<GameAction, SlotProcessing>>>
+
+    abstract ActiveActionSets: amap<Guid<EntityId>, int>
     // entity components
     abstract Positions: amap<Guid<EntityId>, Vector2>
     abstract Velocities: amap<Guid<EntityId>, Vector2>
@@ -108,7 +112,8 @@ module World =
       RawInputStates = cmap()
       InputMaps = cmap()
       GameActionStates = cmap()
-      QuickSlots = cmap()
+      ActionSets = cmap()
+      ActiveActionSets = cmap()
       Resources = cmap()
       Factions = cmap()
       BaseStats = cmap()
@@ -133,7 +138,8 @@ module World =
           member _.RawInputStates = mutableWorld.RawInputStates
           member _.InputMaps = mutableWorld.InputMaps
           member _.GameActionStates = mutableWorld.GameActionStates
-          member _.QuickSlots = mutableWorld.QuickSlots
+          member _.ActionSets = mutableWorld.ActionSets
+          member _.ActiveActionSets = mutableWorld.ActiveActionSets
           member _.Resources = mutableWorld.Resources
           member _.Factions = mutableWorld.Factions
           member _.BaseStats = mutableWorld.BaseStats

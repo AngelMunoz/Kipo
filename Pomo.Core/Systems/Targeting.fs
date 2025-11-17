@@ -248,7 +248,8 @@ module Targeting =
     let _action = cval ValueNone
 
     let skillBeingTargeted =
-      skillByEntityAndAction _entityId _action skillStore world.QuickSlots
+      skillByEntityAndAction _entityId _action skillStore projections.ActionSets
+
 
     let targetingMode =
       skillBeingTargeted

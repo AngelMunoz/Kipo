@@ -112,13 +112,15 @@ module AbilityActivation =
         (eventBus: EventBus)
         (casterId: Guid<EntityId>)
         (skillId: int<SkillId>)
-        (target)
+        target
         =
-        eventBus.Publish<SystemCommunications.AbilityIntent> {
+        let intent: SystemCommunications.AbilityIntent = {
           Caster = casterId
           SkillId = skillId
           Target = target
         }
+
+        eventBus.Publish intent
 
       let private publishMultiPointIntent
         (eventBus: EventBus)
@@ -177,7 +179,7 @@ module AbilityActivation =
       (entityId: Guid<EntityId>)
       =
       match pendingCasts.TryFindV entityId with
-      | ValueSome(struct (skillId, target)) ->
+      | ValueSome struct (skillId, target) ->
         let skill = skillStore.tryFind skillId
 
         match skill with
@@ -210,10 +212,13 @@ module AbilityActivation =
             | OnCooldown -> "Skill is on cooldown"
             | _ -> "Cannot cast skill"
 
-          eventBus.Publish<SystemCommunications.ShowNotification> {
-            Message = message
-            Position = casterPos
-          }
+          eventBus.Publish(
+            {
+              Message = message
+              Position = casterPos
+            }
+            : SystemCommunications.ShowNotification
+          )
         | Ok() ->
           // Validation passed, now check range and publish intent
           let centerTargetPos =
@@ -239,10 +244,13 @@ module AbilityActivation =
                 centerTargetPos
             else
               // This should have been handled by TargetingSystem, but as a fallback
-              eventBus.Publish<SystemCommunications.ShowNotification> {
-                Message = "Target is out of range"
-                Position = casterPos
-              }
+              eventBus.Publish(
+                {
+                  Message = "Target is out of range"
+                  Position = casterPos
+                }
+                : SystemCommunications.ShowNotification
+              )
 
     let handleMovementStateChanged
       (world: World)
@@ -317,7 +325,7 @@ module AbilityActivation =
       |> AMap.toASetValues
 
     let quickSlots =
-      this.World.QuickSlots
+      this.Projections.ActionSets
       |> AMap.tryFind playerId
       |> AVal.map(Option.defaultValue HashMap.empty)
 
@@ -370,10 +378,10 @@ module AbilityActivation =
       let publishNotification(msg: string) =
         let casterPos = playerPosition |> AVal.force
 
-        this.EventBus.Publish<SystemCommunications.ShowNotification> {
-          Message = msg
-          Position = casterPos
-        }
+        this.EventBus.Publish(
+          { Message = msg; Position = casterPos }
+          : SystemCommunications.ShowNotification
+        )
 
       for action in actions do
         match action with
@@ -411,17 +419,20 @@ module AbilityActivation =
 
                 match skill.Targeting with
                 | Self ->
-                  this.EventBus.Publish<SystemCommunications.AbilityIntent> {
-                    Caster = playerId
-                    SkillId = skill.Id
-                    Target = SystemCommunications.TargetSelf
-                  }
+                  this.EventBus.Publish(
+                    {
+                      Caster = playerId
+                      SkillId = skill.Id
+                      Target = SystemCommunications.TargetSelf
+                    }
+                    : SystemCommunications.AbilityIntent
+                  )
                 | _ ->
 
-                  this.EventBus.Publish<SystemCommunications.SlotActivated> {
-                    Slot = action
-                    CasterId = playerId
-                  }
+                  this.EventBus.Publish(
+                    { Slot = action; CasterId = playerId }
+                    : SystemCommunications.SlotActivated
+                  )
               | _ -> () // Should not happen due to earlier validation
             | Error msg ->
               let notificationMsg =

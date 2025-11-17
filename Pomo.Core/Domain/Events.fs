@@ -125,8 +125,10 @@ type InputEvents =
   | MapChanged of iMapChanged: struct (Guid<EntityId> * InputMap)
   | GameActionStatesChanged of
     gAChanged: struct (Guid<EntityId> * HashMap<GameAction, InputActionState>)
-  | QuickSlotsChanged of
-    qsChanged: struct (Guid<EntityId> * HashMap<GameAction, SlotProcessing>)
+  | ActionSetsChanged of
+    asChanged: struct (Guid<EntityId> * HashMap<int, HashMap<GameAction, SlotProcessing>>)
+  | ActiveActionSetChanged of
+    aasChanged: struct (Guid<EntityId> * int)
 
 type PhysicsEvents =
   | PositionChanged of posChanged: struct (Guid<EntityId> * Vector2)

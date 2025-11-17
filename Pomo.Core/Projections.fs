@@ -245,6 +245,13 @@ module Projections =
           | ValueNone -> ValueNone
         | ValueNone -> ValueNone))
 
+  let private activeActionSets(world: World) =
+    (world.ActiveActionSets, world.ActionSets)
+    ||> AMap.choose2V(fun _ set sets ->
+      let sets = defaultValueArg sets HashMap.empty
+
+      set |> ValueOption.bind(fun set -> sets |> HashMap.tryFindV set))
+
   type ProjectionService =
     abstract UpdatedPositions: amap<Guid<EntityId>, Vector2>
     abstract LiveEntities: aset<Guid<EntityId>>
@@ -252,6 +259,9 @@ module Projections =
     abstract DerivedStats: amap<Guid<EntityId>, Entity.DerivedStats>
     abstract EquipedItems: amap<Guid<EntityId>, HashMap<Slot, ItemDefinition>>
     abstract Inventories: amap<Guid<EntityId>, HashSet<ItemDefinition>>
+
+    abstract ActionSets:
+      amap<Guid<EntityId>, HashMap<Action.GameAction, SlotProcessing>>
 
 
   let create(itemStore: ItemStore, world: World) =
@@ -262,4 +272,5 @@ module Projections =
         member _.DerivedStats = calculateDerivedStats itemStore world
         member _.EquipedItems = equippedItemDefs(world, itemStore)
         member _.Inventories = inventoryDefs(world, itemStore)
+        member _.ActionSets = activeActionSets world
     }

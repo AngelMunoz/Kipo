@@ -63,6 +63,14 @@ module ActionHandler =
           None
     }
 
+  let private handleActionSetChange
+    (actionSetChangeState: ValueOption<struct (InputActionState * int)>)
+    (publishChange: int -> unit)
+    =
+    match actionSetChangeState with
+    | ValueSome(Pressed, value) -> publishChange value
+    | _ -> ()
+
   let create
     (
       world: World,
@@ -86,62 +94,123 @@ module ActionHandler =
               else
                 None
             | _ -> None)
-          |> Observable.subscribe(fun actionStates ->
-            let primaryActionState =
-              actionStates |> HashMap.tryFindV GameAction.PrimaryAction
+          |> Observable.subscribe
+            (fun (actionStates: HashMap<GameAction, InputActionState>) ->
+              let primaryActionState =
+                actionStates |> HashMap.tryFindV PrimaryAction
 
-            match primaryActionState with
-            | ValueSome Pressed ->
-              let mouseState =
-                world.RawInputStates
-                |> AMap.tryFind entityId
-                |> AVal.map(Option.map _.Mouse)
-                |> AVal.force
-                |> Option.defaultWith(fun () -> Mouse.GetState())
-
-              let mousePosition =
-                Vector2(
-                  float32 mouseState.Position.X,
-                  float32 mouseState.Position.Y
+              let actionSetChangeState =
+                actionStates
+                |> HashMap.tryFindV SetActionSet1
+                |> ValueOption.map(fun v -> struct (v, 1))
+                |> ValueOption.orElse(
+                  actionStates
+                  |> HashMap.tryFindV SetActionSet2
+                  |> ValueOption.map(fun v -> struct (v, 2))
+                )
+                |> ValueOption.orElse(
+                  actionStates
+                  |> HashMap.tryFindV SetActionSet3
+                  |> ValueOption.map(fun v -> struct (v, 3))
+                )
+                |> ValueOption.orElse(
+                  actionStates
+                  |> HashMap.tryFindV SetActionSet4
+                  |> ValueOption.map(fun v -> struct (v, 4))
+                )
+                |> ValueOption.orElse(
+                  actionStates
+                  |> HashMap.tryFindV SetActionSet5
+                  |> ValueOption.map(fun v -> struct (v, 5))
+                )
+                |> ValueOption.orElse(
+                  actionStates
+                  |> HashMap.tryFindV SetActionSet6
+                  |> ValueOption.map(fun v -> struct (v, 6))
+                )
+                |> ValueOption.orElse(
+                  actionStates
+                  |> HashMap.tryFindV SetActionSet7
+                  |> ValueOption.map(fun v -> struct (v, 7))
+                )
+                |> ValueOption.orElse(
+                  actionStates
+                  |> HashMap.tryFindV SetActionSet8
+                  |> ValueOption.map(fun v -> struct (v, 8))
                 )
 
-              let targetingMode = targetingService.TargetingMode |> AVal.force
+              handleActionSetChange actionSetChangeState (fun value ->
+                eventBus.Publish(
+                  Input(ActiveActionSetChanged struct (entityId, value))
+                ))
 
-              // Get the entity under the cursor AT THIS MOMENT by forcing the projection.
-              let clickedEntity = hoveredEntityAval |> AVal.force
+              match primaryActionState with
+              | ValueSome Pressed ->
+                let mouseState =
+                  world.RawInputStates
+                  |> AMap.tryFind entityId
+                  |> AVal.map(Option.map _.Mouse)
+                  |> AVal.force
+                  |> Option.defaultWith(fun () -> Mouse.GetState())
 
-              match targetingMode with
-              | ValueNone ->
-                // NOT targeting: This is a click to move or attack
-                match clickedEntity with
-                | Some clickedEntityId ->
-                  // An entity was clicked, publish an attack intent
-                  eventBus.Publish(
-                    {
-                      Attacker = entityId
-                      Target = clickedEntityId
-                    }
-                    : SystemCommunications.AttackIntent
-                  )
-                | None ->
-                  // Nothing was clicked, publish a movement command
-                  eventBus.Publish(
-                    {
-                      EntityId = entityId
-                      Target = mousePosition
-                    }
-                    : SystemCommunications.SetMovementTarget
+                let mousePosition =
+                  Vector2(
+                    float32 mouseState.Position.X,
+                    float32 mouseState.Position.Y
                   )
 
-              | ValueSome Self ->
-                // This case should be handled immediately on key press, not click.
-                ()
+                let targetingMode =
+                  targetingService.TargetingMode |> AVal.force
 
-              | ValueSome TargetEntity ->
-                match clickedEntity with
-                | Some clickedEntityId ->
-                  // TODO: Validate if it's an ally/enemy
-                  let selection = SelectedEntity clickedEntityId
+                // Get the entity under the cursor AT THIS MOMENT by forcing the projection.
+                let clickedEntity = hoveredEntityAval |> AVal.force
+
+                match targetingMode with
+                | ValueNone ->
+                  // NOT targeting: This is a click to move or attack
+                  match clickedEntity with
+                  | Some clickedEntityId ->
+                    // An entity was clicked, publish an attack intent
+                    eventBus.Publish(
+                      {
+                        Attacker = entityId
+                        Target = clickedEntityId
+                      }
+                      : SystemCommunications.AttackIntent
+                    )
+                  | None ->
+                    // Nothing was clicked, publish a movement command
+                    eventBus.Publish(
+                      {
+                        EntityId = entityId
+                        Target = mousePosition
+                      }
+                      : SystemCommunications.SetMovementTarget
+                    )
+
+                | ValueSome Self ->
+                  // This case should be handled immediately on key press, not click.
+                  ()
+
+                | ValueSome TargetEntity ->
+                  match clickedEntity with
+                  | Some clickedEntityId ->
+                    // TODO: Validate if it's an ally/enemy
+                    let selection = SelectedEntity clickedEntityId
+
+                    eventBus.Publish(
+                      {
+                        Selector = entityId
+                        Selection = selection
+                      }
+                      : SystemCommunications.TargetSelected
+                    )
+                  | None ->
+                    // Invalid target, do nothing for now
+                    ()
+
+                | ValueSome TargetPosition ->
+                  let selection = SelectedPosition mousePosition
 
                   eventBus.Publish(
                     {
@@ -150,20 +219,6 @@ module ActionHandler =
                     }
                     : SystemCommunications.TargetSelected
                   )
-                | None ->
-                  // Invalid target, do nothing for now
-                  ()
-
-              | ValueSome TargetPosition ->
-                let selection = SelectedPosition mousePosition
-
-                eventBus.Publish(
-                  {
-                    Selector = entityId
-                    Selection = selection
-                  }
-                  : SystemCommunications.TargetSelected
-                )
-            | ValueSome _
-            | ValueNone -> ())
+              | ValueSome _
+              | ValueNone -> ())
     }

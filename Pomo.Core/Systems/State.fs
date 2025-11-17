@@ -105,12 +105,18 @@ module StateUpdate =
       =
       world.Factions[id] <- factions
 
-    let inline updateQuickSlots
+    let inline updateActionSets
       (world: MutableWorld)
       struct (id: Guid<EntityId>,
-              quickSlots: HashMap<Domain.Action.GameAction, SlotProcessing>)
+              actionSets: HashMap<int, HashMap<GameAction, SlotProcessing>>)
       =
-      world.QuickSlots[id] <- quickSlots
+      world.ActionSets[id] <- actionSets
+
+    let inline activeActionSetChanged
+      (world: MutableWorld)
+      struct (id: Guid<EntityId>, activeSet: int)
+      =
+      world.ActiveActionSets[id] <- activeSet
 
     let inline updateCooldowns
       (world: MutableWorld)
@@ -271,8 +277,6 @@ module StateUpdate =
 
       world.EquippedItems[entityId] <- HashMap.remove slot currentEquipped
 
-  // The dedicated STATE WRITER system.
-  // It receives the MutableWorld via constructor injection, ensuring no other system can access it.
   type StateUpdateSystem(game: Game, mutableWorld: World.MutableWorld) =
     inherit GameComponent(game)
 
@@ -294,8 +298,6 @@ module StateUpdate =
       base.Dispose disposing
 
     override this.Update(gameTime) =
-      // This is the one and only place where state is written,
-      // wrapped in a single transaction for efficiency.
       transact(fun () ->
         let mutable event = Unchecked.defaultof<StateChangeEvent>
 
@@ -313,8 +315,10 @@ module StateUpdate =
               InputMapping.updateMap mutableWorld iMapChanged
             | GameActionStatesChanged gAChanged ->
               InputMapping.updateActionStates mutableWorld gAChanged
-            | QuickSlotsChanged qsChanged ->
-              Combat.updateQuickSlots mutableWorld qsChanged
+            | ActionSetsChanged aSChanged ->
+              Combat.updateActionSets mutableWorld aSChanged
+            | ActiveActionSetChanged aasChanged ->
+              Combat.activeActionSetChanged mutableWorld aasChanged
           | Physics event ->
             match event with
             | PositionChanged posChanged ->

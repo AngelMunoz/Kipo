@@ -46,6 +46,7 @@ module Item =
   type ItemInstance = {
     InstanceId: Guid<ItemInstanceId>
     ItemId: int<ItemId>
+    UsesLeft: int voption
   }
 
   module Serialization =

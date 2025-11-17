@@ -150,57 +150,43 @@ type PomoGame() as this =
       Status = Entity.Status.Alive
     }
 
+    let playerFactions = HashSet [ Entity.Faction.Player ]
+    let inputMap = InputMapping.createDefaultInputMap()
+
+
+
     eventBus.Publish(
       StateChangeEvent.Combat(
         ResourcesChanged struct (playerId, playerResources)
-      )
-    )
-
-    let playerFactions = HashSet [ Entity.Faction.Player ]
-
-    eventBus.Publish(
-      StateChangeEvent.Combat(FactionsChanged struct (playerId, playerFactions))
-    )
-
-    eventBus.Publish(
+      ),
+      StateChangeEvent.Combat(FactionsChanged struct (playerId, playerFactions)),
       StateChangeEvent.Combat(
         BaseStatsChanged struct (playerId, playerBaseStats)
-      )
+      ),
+      Input(MapChanged struct (playerId, inputMap))
     )
-
-    let inputMap = InputMapping.createDefaultInputMap()
-
-    eventBus.Publish(Input(MapChanged struct (playerId, inputMap)))
 
     // Equip starting items
     let wizardHat: Item.ItemInstance = {
       Item.InstanceId = Guid.NewGuid() |> UMX.tag
       ItemId = 4 |> UMX.tag
+      UsesLeft = ValueNone
     }
 
     let magicStaff: Item.ItemInstance = {
       Item.InstanceId = Guid.NewGuid() |> UMX.tag
       ItemId = 5 |> UMX.tag
+      UsesLeft = ValueNone
     }
 
-    eventBus.Publish(Inventory(ItemInstanceCreated wizardHat))
-    eventBus.Publish(Inventory(ItemInstanceCreated magicStaff))
-
     eventBus.Publish(
-      Inventory(ItemAddedToInventory struct (playerId, wizardHat.InstanceId))
-    )
-
-    eventBus.Publish(
-      Inventory(ItemAddedToInventory struct (playerId, magicStaff.InstanceId))
-    )
-
-    eventBus.Publish(
+      Inventory(ItemInstanceCreated wizardHat),
+      Inventory(ItemInstanceCreated magicStaff),
+      Inventory(ItemAddedToInventory struct (playerId, wizardHat.InstanceId)),
+      Inventory(ItemAddedToInventory struct (playerId, magicStaff.InstanceId)),
       Inventory(
         ItemEquipped struct (playerId, Item.Slot.Head, wizardHat.InstanceId)
-      )
-    )
-
-    eventBus.Publish(
+      ),
       Inventory(
         ItemEquipped struct (playerId, Item.Slot.Weapon, magicStaff.InstanceId)
       )
@@ -232,17 +218,10 @@ type PomoGame() as this =
         Velocity = Vector2.Zero
       }
 
-      eventBus.Publish(EntityLifecycle(Created enemyEntity))
-
       eventBus.Publish(
-        StateChangeEvent.Combat(ResourcesChanged struct (id, enemyResources))
-      )
-
-      eventBus.Publish(
-        StateChangeEvent.Combat(FactionsChanged struct (id, enemyFactions))
-      )
-
-      eventBus.Publish(
+        EntityLifecycle(Created enemyEntity),
+        StateChangeEvent.Combat(ResourcesChanged struct (id, enemyResources)),
+        StateChangeEvent.Combat(FactionsChanged struct (id, enemyFactions)),
         StateChangeEvent.Combat(BaseStatsChanged struct (id, enemyBaseStats))
       )
 
@@ -252,8 +231,29 @@ type PomoGame() as this =
     createEnemy enemyId4 (Vector2(450.0f, 150.0f))
     createEnemy enemyId5 (Vector2(500.0f, 100.0f))
 
+    let potion: Item.ItemInstance = {
+      InstanceId = %Guid.NewGuid()
+      ItemId = %1
+      UsesLeft = ValueSome 20
+    }
 
-    let quickSlots = [
+    let trollBloodPotion: Item.ItemInstance = {
+      InstanceId = %Guid.NewGuid()
+      ItemId = %6
+      UsesLeft = ValueSome 20
+    }
+
+    eventBus.Publish(
+      Inventory(ItemAddedToInventory struct (playerId, potion.InstanceId)),
+      Inventory(
+        ItemAddedToInventory struct (playerId, trollBloodPotion.InstanceId)
+      ),
+      Inventory(ItemInstanceCreated potion),
+      Inventory(ItemInstanceCreated trollBloodPotion)
+    )
+
+
+    let actionSet1 = [
       UseSlot1, Core.SlotProcessing.Skill %7 // Summon Boulder
       UseSlot2, Core.SlotProcessing.Skill %8 // Catchy Song
       UseSlot3, Core.SlotProcessing.Skill %3
@@ -262,8 +262,15 @@ type PomoGame() as this =
       UseSlot6, Core.SlotProcessing.Skill %5
     ]
 
+    let actionSet2 = [ UseSlot1, Core.SlotProcessing.Item potion.InstanceId ]
+
+    let actionSets = [
+      1, HashMap.ofList actionSet1
+      2, HashMap.ofList actionSet2
+    ]
+
     eventBus.Publish(
-      Input(QuickSlotsChanged struct (playerId, HashMap.ofList quickSlots))
+      Input(ActionSetsChanged struct (playerId, HashMap.ofList actionSets))
     )
 
     // Start listening to action events
