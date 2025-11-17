@@ -290,7 +290,10 @@ type PomoGame() as this =
       UseSlot6, Core.SlotProcessing.Skill %5
     ]
 
-    let actionSet2 = [ UseSlot1, Core.SlotProcessing.Item potion.InstanceId ]
+    let actionSet2 = [
+      UseSlot1, Core.SlotProcessing.Item potion.InstanceId
+      UseSlot2, Core.SlotProcessing.Item trollBloodPotion.InstanceId
+    ]
 
     let actionSets = [
       1, HashMap.ofList actionSet1

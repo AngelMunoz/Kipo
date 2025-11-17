@@ -93,7 +93,7 @@
         "Kind": "ResourceOverTime",
         "DamageSource": "Physical",
         "Stacking": { "Type": "RefreshDuration" },
-        "Duration": { "Type": "Timed", "Seconds": 10.0 },
+        "Duration": { "Type": "Loop", "Interval": 1.5, "Duration": 10 },
         "Modifiers": [
           {
             "Type": "ResourceChange",
