@@ -445,8 +445,20 @@ module AbilityActivation =
                 | Silenced -> "Silenced!"
 
               publishNotification notificationMsg
-          | ValueSome(SlotProcessing.Item itemInstanceId) ->
-            // Item activation logic can be implemented here
-            ()
+          | ValueSome(Item itemInstanceId) ->
+            match this.World.ItemInstances.TryGetValue itemInstanceId with
+            | true, itemInstance ->
+              match itemInstance.UsesLeft with
+              | ValueSome 0 -> publishNotification "Item has no uses left!"
+              | ValueSome _ ->
+                this.EventBus.Publish(
+                  {
+                    EntityId = playerId
+                    ItemInstanceId = itemInstanceId
+                  }
+                  : SystemCommunications.UseItemIntent
+                )
+              | ValueNone -> ()
+            | false, _ -> ()
           | ValueNone -> () // Slot is empty
         | _ -> ()

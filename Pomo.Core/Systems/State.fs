@@ -24,7 +24,7 @@ module StateUpdate =
   /// These functions must run within a transaction block as they mutate changeable values.
   /// </remarks>
   module Entity =
-    let inline addEntity (world: MutableWorld) (entity: Entity.EntitySnapshot) =
+    let addEntity (world: MutableWorld) (entity: Entity.EntitySnapshot) =
       world.Positions[entity.Id] <- entity.Position
       world.Velocities[entity.Id] <- entity.Velocity
 
@@ -370,6 +370,12 @@ module StateUpdate =
               Inventory.equipItem mutableWorld itemEquipped
             | ItemUnequipped itemUnequipped ->
               Inventory.unequipItem mutableWorld itemUnequipped
+            | UpdateItemInstance itemInstance ->
+              Inventory.alterItemInstance
+                mutableWorld
+                itemInstance.InstanceId
+                (ValueSome itemInstance)
+
           // Uncategorized
           | CreateProjectile projParams ->
             Entity.createProjectile mutableWorld projParams)

@@ -161,21 +161,21 @@ module Core =
 
     module StatModifier =
       /// Examples:
-      /// { "type": "Additive", "stat": "MA", "value": 50 }
-      /// { "type": "Multiplicative", "stat": "AP", "value": 1.2 }
+      /// { "Type": "Additive", "Stat": "MA", "Value": 50 }
+      /// { "Type": "Multiplicative", "Stat": "AP", "Value": 1.2 }
       let decoder: Decoder<StatModifier> =
         fun json -> decode {
           let! modifierType =
-            Required.Property.get ("type", Required.string) json
+            Required.Property.get ("Type", Required.string) json
 
           match modifierType with
           | "Additive" ->
-            let! stat = Required.Property.get ("stat", Stat.decoder) json
-            and! value = Required.Property.get ("value", Required.float) json
+            let! stat = Required.Property.get ("Stat", Stat.decoder) json
+            and! value = Required.Property.get ("Value", Required.float) json
             return Additive(stat, value)
           | "Multiplicative" ->
-            let! stat = Required.Property.get ("stat", Stat.decoder) json
-            and! value = Required.Property.get ("value", Required.float) json
+            let! stat = Required.Property.get ("Stat", Stat.decoder) json
+            and! value = Required.Property.get ("Value", Required.float) json
             return Multiplicative(stat, value)
           | _ ->
             return!

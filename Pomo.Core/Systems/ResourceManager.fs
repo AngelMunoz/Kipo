@@ -44,6 +44,34 @@ module ResourceManager =
         )
       | ValueNone -> ()
 
+  let handleResourceRestored
+    (world: World)
+    (eventBus: EventBus)
+    (event: SystemCommunications.ResourceRestored)
+    =
+    // Force the amap to a regular map to get the value now.
+    let resources = world.Resources |> AMap.force
+
+    match resources.TryFindV event.Target with
+    | ValueSome currentResources ->
+      let resources =
+        match event.ResourceType with
+        | Entity.ResourceType.HP ->
+
+          let newHP = min event.Amount (currentResources.HP + event.Amount)
+
+          { currentResources with HP = newHP }
+        | Entity.ResourceType.MP ->
+          let newMP = min event.Amount (currentResources.MP + event.Amount)
+          { currentResources with MP = newMP }
+
+      eventBus.Publish(
+        StateChangeEvent.Combat(
+          ResourcesChanged struct (event.Target, resources)
+        )
+      )
+    | ValueNone -> ()
+
   module private Regeneration =
     let processAutoRegen
       (allResources: HashMap<Guid<EntityId>, Entity.Resource>)
@@ -63,7 +91,7 @@ module ResourceManager =
           match allStats.TryFindV entityId with
           | ValueSome stats ->
             let struct (currentHpAcc, currentMpAcc) =
-              match accumulators.TryGetValue(entityId) with
+              match accumulators.TryGetValue entityId with
               | true, value -> value
               | false, _ -> struct (0.0, 0.0)
 
@@ -80,7 +108,7 @@ module ResourceManager =
             let remainderMpAcc = newMpAcc - float mpToHeal
 
             // Update the mutable dictionary with the new remainder
-            accumulators[entityId] <- (remainderHpAcc, remainderMpAcc)
+            accumulators[entityId] <- remainderHpAcc, remainderMpAcc
 
             if hpToHeal > 0 || mpToHeal > 0 then
               let newHP = min stats.HP (currentResources.HP + hpToHeal)
@@ -116,6 +144,10 @@ module ResourceManager =
       |> Observable.subscribe(
         Handlers.handleDamageDealt this.World this.EventBus
       )
+      |> subscriptions.Add
+
+      this.EventBus.GetObservableFor<SystemCommunications.ResourceRestored>()
+      |> Observable.subscribe(handleResourceRestored this.World this.EventBus)
       |> subscriptions.Add
 
     override _.Dispose disposing =

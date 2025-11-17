@@ -12,8 +12,6 @@ module EventBus =
 
   type EventBus() =
 
-    member _.Publish<'T>([<ParamArray>] events: 'T[]) =
-      for event in events do
-        Events<'T>.Publish event
+    member _.Publish<'T>(event: 'T) = Events<'T>.Publish event
 
     member _.GetObservableFor<'T>() = Events<'T>.Subscribe()

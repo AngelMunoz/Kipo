@@ -30,7 +30,7 @@ module Targeting =
     (entityId: _ aval)
     (action: GameAction voption aval)
     (skillStore: SkillStore)
-    (quickSlots: amap<_, HashMap<GameAction, SlotProcessing>>)
+    (actionSets: amap<Guid<EntityId>, HashMap<GameAction, SlotProcessing>>)
     =
     adaptive {
       let! entityId = entityId
@@ -40,20 +40,19 @@ module Targeting =
       | ValueNone, _
       | ValueSome _, ValueNone -> return ValueNone
       | ValueSome entityId, ValueSome action ->
-        let! found = quickSlots |> AMap.tryFind entityId
+        let! found = actionSets |> AMap.tryFind entityId
 
         match found with
         | None -> return ValueNone
-        | Some quickSlots ->
+        | Some actionSet ->
           return
-            quickSlots
+            actionSet
             |> HashMap.tryFindV action
             |> ValueOption.bind(fun slotProcessing ->
               match slotProcessing with
               | Skill skillId -> ValueSome skillId
               | Item _ -> ValueNone)
-            |> ValueOption.map(fun skillId -> skillStore.tryFind skillId)
-            |> ValueOption.flatten
+            |> ValueOption.bind(fun skillId -> skillStore.tryFind skillId)
     }
 
   let inline detectEscape ([<InlineIfLambda>] onEscape) targetingMode rawInput =
@@ -77,7 +76,7 @@ module Targeting =
     skillBeingTargeted: Skill voption aval
     currentAction:
       struct (cval<Guid<EntityId> voption> * cval<GameAction voption>)
-    positions: HashMap<Guid<EntityId>, Vector2>
+    positions: amap<Guid<EntityId>, Vector2>
   }
 
   module private TargetingHandlers =
@@ -198,6 +197,8 @@ module Targeting =
         } =
       args
 
+    let positions = positions |> AMap.force
+
     let struct (selector, selection) = currentSelection
 
     match _entityId.Value with
@@ -264,7 +265,7 @@ module Targeting =
         eventBus = eventBus
         skillBeingTargeted = skillBeingTargeted
         currentAction = struct (_entityId, _action)
-        positions = projections.UpdatedPositions |> AMap.force
+        positions = projections.UpdatedPositions
       }
 
 

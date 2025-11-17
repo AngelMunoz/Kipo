@@ -8,9 +8,9 @@
       "Slot": "Weapon",
       "Stats": [
         {
-          "type": "Additive",
-          "stat": "AP",
-          "value": 5.0
+          "Type": "Additive",
+          "Stat": "AP",
+          "Value": 5.0
         }
       ]
     }
@@ -23,7 +23,7 @@
       "Type": "Usable",
       "Effect": {
         "Name": "Health Potion",
-        "Kind": "Buff",
+        "Kind": "ResourceOverTime",
         "DamageSource": "Physical",
         "Stacking": { "Type": "NoStack" },
         "Duration": { "Type": "Instant" },
@@ -54,9 +54,9 @@
       "Slot": "Head",
       "Stats": [
         {
-          "type": "Additive",
-          "stat": "MA",
-          "value": 10.0
+          "Type": "Additive",
+          "Stat": "MA",
+          "Value": 10.0
         }
       ]
     }
@@ -70,14 +70,14 @@
       "Slot": "Weapon",
       "Stats": [
         {
-          "type": "Additive",
-          "stat": "MA",
-          "value": 15.0
+          "Type": "Additive",
+          "Stat": "MA",
+          "Value": 15.0
         },
         {
-          "type": "Additive",
-          "stat": "MPRegen",
-          "value": 5.0
+          "Type": "Additive",
+          "Stat": "MPRegen",
+          "Value": 5.0
         }
       ]
     }

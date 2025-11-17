@@ -123,9 +123,23 @@ module Effects =
 
   // Wrapper DU to hold different event types
   [<Struct>]
+  type TickingEffect =
+    | DamageIntent of damage: SystemCommunications.EffectDamageIntent
+    | ResourceIntent of resource: SystemCommunications.EffectResourceIntent
+
+  [<Struct>]
   type private LifecycleEvent =
     | State of state: StateChangeEvent
-    | EffectTick of intent: SystemCommunications.EffectDamageIntent
+    | EffectTick of intent: TickingEffect
+
+  let instantEffects(effects: amap<Guid<EntityId>, IndexList<ActiveEffect>>) =
+    effects
+    |> AMap.map(fun _ effectList ->
+      effectList
+      |> IndexList.filter(fun effect ->
+        match effect.SourceEffect.Duration with
+        | Duration.Instant -> true
+        | _ -> false))
 
   let timedEffects(effects: amap<Guid<EntityId>, IndexList<ActiveEffect>>) =
     effects
@@ -157,7 +171,28 @@ module Effects =
         | _ -> false))
 
   module private Helpers =
+    let generateInstantEvents(effect: ActiveEffect) =
+      match effect.SourceEffect.Duration with
+      | Duration.Instant ->
+        match effect.SourceEffect.Kind with
+        | DamageOverTime ->
+          let intent: SystemCommunications.EffectDamageIntent = {
+            SourceEntity = effect.SourceEntity
+            TargetEntity = effect.TargetEntity
+            Effect = effect.SourceEffect
+          }
 
+          IndexList.single(EffectTick(DamageIntent intent))
+        | ResourceOverTime ->
+          let intent: SystemCommunications.EffectResourceIntent = {
+            SourceEntity = effect.SourceEntity
+            TargetEntity = effect.TargetEntity
+            Effect = effect.SourceEffect
+          }
+
+          IndexList.single(EffectTick(ResourceIntent intent))
+        | _ -> IndexList.empty
+      | _ -> IndexList.empty
 
     let generateIntervalEvents
       (totalGameTime: TimeSpan)
@@ -190,7 +225,15 @@ module Effects =
                       Effect = effect.SourceEffect
                     }
 
-                    IndexList.add (EffectTick intent) acc
+                    IndexList.add (EffectTick(DamageIntent intent)) acc
+                  | ResourceOverTime ->
+                    let intent: SystemCommunications.EffectResourceIntent = {
+                      SourceEntity = effect.SourceEntity
+                      TargetEntity = effect.TargetEntity
+                      Effect = effect.SourceEffect
+                    }
+
+                    IndexList.add (EffectTick(ResourceIntent intent)) acc
                   | _ -> acc
 
                 buildEvents (count - 1) nextAcc
@@ -296,6 +339,13 @@ module Effects =
       return events
     })
 
+  let private calculateInstantEvents
+    (effects: amap<_, IndexList<ActiveEffect>>)
+    =
+    effects
+    |> AMap.map(fun _ effectList ->
+      effectList |> IndexList.collect Helpers.generateInstantEvents)
+
   type EffectProcessingSystem(game: Game) as this =
     inherit GameSystem(game)
 
@@ -312,6 +362,9 @@ module Effects =
       |> permanentLoopEffects
       |> calculatePermanentLoopEvents this.World
 
+    let instantEvents =
+      this.World.ActiveEffects |> instantEffects |> calculateInstantEvents
+
     let allEvents =
       let inline resolve _ a b = IndexList.append a b
 
@@ -319,6 +372,7 @@ module Effects =
         resolve
         timedEvents
         (AMap.unionWith resolve loopEvents permanentLoopEvents)
+      |> AMap.unionWith resolve instantEvents
 
     override _.Kind = Effects
 

@@ -167,5 +167,5 @@ type ProjectileSystem(game: Game) as this =
 
   override this.Update _ =
     let sysEvents, stateEvents = eventsToPublish |> AVal.force
-    this.EventBus.Publish sysEvents.AsArray
-    this.EventBus.Publish stateEvents.AsArray
+    sysEvents |> IndexList.iter this.EventBus.Publish
+    stateEvents |> IndexList.iter this.EventBus.Publish

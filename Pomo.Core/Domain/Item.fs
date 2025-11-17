@@ -121,7 +121,7 @@ module Item =
           let! id = Required.Property.get ("Id", Required.int) json
           and! name = Required.Property.get ("Name", Required.string) json
           and! weight = Required.Property.get ("Weight", Required.int) json
-          and! kind = ItemKind.decoder json
+          and! kind = Required.Property.get ("Kind", ItemKind.decoder) json
 
           return {
             Id = UMX.tag id

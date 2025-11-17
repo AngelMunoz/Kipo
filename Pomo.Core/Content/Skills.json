@@ -105,9 +105,9 @@
           {
             "Type": "StaticMod",
             "StatModifier": {
-              "type": "Additive",
-              "stat": "ElementAttr:Dark",
-              "value": 0.25
+              "Type": "Additive",
+              "Stat": "ElementAttr:Dark",
+              "Value": 0.25
             }
           }
         ]
@@ -138,9 +138,9 @@
           {
             "Type": "StaticMod",
             "StatModifier": {
-              "type": "Additive",
-              "stat": "MA",
-              "value": 25.0
+              "Type": "Additive",
+              "Stat": "MA",
+              "Value": 25.0
             }
           }
         ]

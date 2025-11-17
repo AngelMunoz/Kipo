@@ -79,6 +79,15 @@ module DamageCalculator =
 
     max 0 (int damageAfterMitigation)
 
+  let caculateEffectRestoration
+    (attackerStats: DerivedStats)
+    (formula: Formula.MathExpr)
+    =
+    // 1. Base Restoration Calculation (from effect)
+    let baseRestoration = evaluate attackerStats formula
+
+    max 0 (int baseRestoration)
+
   let calculateFinalDamage
     (rng: Random)
     (attackerStats: DerivedStats)

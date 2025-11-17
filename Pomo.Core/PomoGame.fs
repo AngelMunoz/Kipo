@@ -80,7 +80,7 @@ type PomoGame() as this =
     )
 
   let movementService = Navigation.create(eventBus, playerId)
-  let inventoryService = Inventory.create eventBus
+  let inventoryService = Inventory.create(eventBus, itemStore, worldView)
   let equipmentService = Equipment.create worldView eventBus
 
 
@@ -158,13 +158,20 @@ type PomoGame() as this =
     eventBus.Publish(
       StateChangeEvent.Combat(
         ResourcesChanged struct (playerId, playerResources)
-      ),
-      StateChangeEvent.Combat(FactionsChanged struct (playerId, playerFactions)),
+      )
+    )
+
+    eventBus.Publish(
+      StateChangeEvent.Combat(FactionsChanged struct (playerId, playerFactions))
+    )
+
+    eventBus.Publish(
       StateChangeEvent.Combat(
         BaseStatsChanged struct (playerId, playerBaseStats)
-      ),
-      Input(MapChanged struct (playerId, inputMap))
+      )
     )
+
+    eventBus.Publish(Input(MapChanged struct (playerId, inputMap)))
 
     // Equip starting items
     let wizardHat: Item.ItemInstance = {
@@ -179,14 +186,24 @@ type PomoGame() as this =
       UsesLeft = ValueNone
     }
 
+    eventBus.Publish(Inventory(ItemInstanceCreated wizardHat))
+    eventBus.Publish(Inventory(ItemInstanceCreated magicStaff))
+
     eventBus.Publish(
-      Inventory(ItemInstanceCreated wizardHat),
-      Inventory(ItemInstanceCreated magicStaff),
-      Inventory(ItemAddedToInventory struct (playerId, wizardHat.InstanceId)),
-      Inventory(ItemAddedToInventory struct (playerId, magicStaff.InstanceId)),
+      Inventory(ItemAddedToInventory struct (playerId, wizardHat.InstanceId))
+    )
+
+    eventBus.Publish(
+      Inventory(ItemAddedToInventory struct (playerId, magicStaff.InstanceId))
+    )
+
+    eventBus.Publish(
       Inventory(
         ItemEquipped struct (playerId, Item.Slot.Head, wizardHat.InstanceId)
-      ),
+      )
+    )
+
+    eventBus.Publish(
       Inventory(
         ItemEquipped struct (playerId, Item.Slot.Weapon, magicStaff.InstanceId)
       )
@@ -218,10 +235,17 @@ type PomoGame() as this =
         Velocity = Vector2.Zero
       }
 
+      eventBus.Publish(EntityLifecycle(Created enemyEntity))
+
       eventBus.Publish(
-        EntityLifecycle(Created enemyEntity),
-        StateChangeEvent.Combat(ResourcesChanged struct (id, enemyResources)),
-        StateChangeEvent.Combat(FactionsChanged struct (id, enemyFactions)),
+        StateChangeEvent.Combat(ResourcesChanged struct (id, enemyResources))
+      )
+
+      eventBus.Publish(
+        StateChangeEvent.Combat(FactionsChanged struct (id, enemyFactions))
+      )
+
+      eventBus.Publish(
         StateChangeEvent.Combat(BaseStatsChanged struct (id, enemyBaseStats))
       )
 
@@ -244,13 +268,17 @@ type PomoGame() as this =
     }
 
     eventBus.Publish(
-      Inventory(ItemAddedToInventory struct (playerId, potion.InstanceId)),
+      Inventory(ItemAddedToInventory struct (playerId, potion.InstanceId))
+    )
+
+    eventBus.Publish(
       Inventory(
         ItemAddedToInventory struct (playerId, trollBloodPotion.InstanceId)
-      ),
-      Inventory(ItemInstanceCreated potion),
-      Inventory(ItemInstanceCreated trollBloodPotion)
+      )
     )
+
+    eventBus.Publish(Inventory(ItemInstanceCreated potion))
+    eventBus.Publish(Inventory(ItemInstanceCreated trollBloodPotion))
 
 
     let actionSet1 = [
@@ -273,9 +301,12 @@ type PomoGame() as this =
       Input(ActionSetsChanged struct (playerId, HashMap.ofList actionSets))
     )
 
+    eventBus.Publish(Input(ActiveActionSetChanged struct (playerId, 1)))
+
     // Start listening to action events
     actionHandler.StartListening() |> subs.Add
     movementService.StartListening() |> subs.Add
+    targetingService.StartListening() |> subs.Add
     effectApplicationService.StartListening() |> subs.Add
     inventoryService.StartListening() |> subs.Add
     equipmentService.StartListening() |> subs.Add

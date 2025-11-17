@@ -150,6 +150,37 @@ module Combat =
 
           eventBus.Publish intent
 
+    let handleEffectResourceIntent
+      (derivedStats: HashMap<Guid<EntityId>, Entity.DerivedStats>)
+      (eventBus: EventBus)
+      (intent: SystemCommunications.EffectResourceIntent)
+      =
+
+      match derivedStats.TryFindV intent.SourceEntity with
+      | ValueSome attackerStats ->
+        let totalResourceChangeFromModifiers =
+          intent.Effect.Modifiers
+          |> Array.choose(fun m ->
+            match m with
+            | ResourceChange(resource, formula) ->
+              let changeAmount =
+                DamageCalculator.caculateEffectRestoration
+                  attackerStats
+                  formula
+
+              {
+                Amount = changeAmount
+                ResourceType = resource
+                Target = intent.TargetEntity
+              }
+              : SystemCommunications.ResourceRestored
+              |> Some
+            | _ -> None)
+
+        for resourceChangeEvent in totalResourceChangeFromModifiers do
+          eventBus.Publish resourceChangeEvent
+      | _ -> () // Attacker stats not found
+
     let handleEffectDamageIntent
       (derivedStats: HashMap<Guid<EntityId>, Entity.DerivedStats>)
       (positions: HashMap<Guid<EntityId>, Vector2>)
@@ -524,6 +555,12 @@ module Combat =
       eventBus.GetObservableFor<SystemCommunications.EffectDamageIntent>()
       |> Observable.subscribe(
         Handlers.handleEffectDamageIntent derivedStats positions eventBus
+      )
+      |> subscriptions.Add
+
+      eventBus.GetObservableFor<SystemCommunications.EffectResourceIntent>()
+      |> Observable.subscribe(
+        Handlers.handleEffectResourceIntent derivedStats eventBus
       )
       |> subscriptions.Add
 

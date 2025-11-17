@@ -66,6 +66,13 @@ module SystemCommunications =
   }
 
   [<Struct>]
+  type EffectResourceIntent = {
+    SourceEntity: Guid<EntityId>
+    TargetEntity: Guid<EntityId>
+    Effect: Effect
+  }
+
+  [<Struct>]
   type AttackIntent = {
     Attacker: Guid<EntityId>
     Target: Guid<EntityId>
@@ -85,6 +92,13 @@ module SystemCommunications =
 
   [<Struct>]
   type DamageDealt = { Target: Guid<EntityId>; Amount: int }
+
+  [<Struct>]
+  type ResourceRestored = {
+    Target: Guid<EntityId>
+    ResourceType: ResourceType
+    Amount: int
+  }
 
   [<Struct>]
   type EntityDied = { Target: Guid<EntityId> }
@@ -114,6 +128,19 @@ module SystemCommunications =
   [<Struct>]
   type UnequipItemIntent = { EntityId: Guid<EntityId>; Slot: Slot }
 
+  [<Struct>]
+  type DropItemIntent = {
+    EntityId: Guid<EntityId>
+    ItemInstanceId: Guid<ItemInstanceId>
+    Amount: int voption // ValueNone or higher than instance's usage left means drop all
+  }
+
+  [<Struct>]
+  type UseItemIntent = {
+    EntityId: Guid<EntityId>
+    ItemInstanceId: Guid<ItemInstanceId>
+  }
+
 // --- State Change Events ---
 
 type EntityLifecycleEvents =
@@ -126,9 +153,9 @@ type InputEvents =
   | GameActionStatesChanged of
     gAChanged: struct (Guid<EntityId> * HashMap<GameAction, InputActionState>)
   | ActionSetsChanged of
-    asChanged: struct (Guid<EntityId> * HashMap<int, HashMap<GameAction, SlotProcessing>>)
-  | ActiveActionSetChanged of
-    aasChanged: struct (Guid<EntityId> * int)
+    asChanged:
+      struct (Guid<EntityId> * HashMap<int, HashMap<GameAction, SlotProcessing>>)
+  | ActiveActionSetChanged of aasChanged: struct (Guid<EntityId> * int)
 
 type PhysicsEvents =
   | PositionChanged of posChanged: struct (Guid<EntityId> * Vector2)
@@ -158,6 +185,7 @@ type CombatEvents =
 type InventoryEvents =
   | ItemInstanceCreated of itemInstance: ItemInstance
   | ItemInstanceRemoved of itemInstanceId: Guid<ItemInstanceId>
+  | UpdateItemInstance of itemInstance: ItemInstance
   | ItemAddedToInventory of
     itemAdded: struct (Guid<EntityId> * Guid<ItemInstanceId>)
   | ItemRemovedFromInventory of
