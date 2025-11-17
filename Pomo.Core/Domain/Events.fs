@@ -70,6 +70,7 @@ module SystemCommunications =
     SourceEntity: Guid<EntityId>
     TargetEntity: Guid<EntityId>
     Effect: Effect
+    ActiveEffectId: Guid<EffectId>
   }
 
   [<Struct>]

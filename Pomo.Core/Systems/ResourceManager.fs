@@ -47,22 +47,41 @@ module ResourceManager =
   let handleResourceRestored
     (world: World)
     (eventBus: EventBus)
+    (derivedStats: amap<Guid<EntityId>, Entity.DerivedStats>)
     (event: SystemCommunications.ResourceRestored)
     =
     // Force the amap to a regular map to get the value now.
     let resources = world.Resources |> AMap.force
+    let stats = derivedStats |> AMap.force
+
+    let position =
+      world.Positions
+      |> AMap.force
+      |> HashMap.tryFindV event.Target
+      |> ValueOption.defaultValue Vector2.Zero
 
     match resources.TryFindV event.Target with
     | ValueSome currentResources ->
       let resources =
         match event.ResourceType with
         | Entity.ResourceType.HP ->
+          let maxHP =
+            stats
+            |> HashMap.tryFindV event.Target
+            |> ValueOption.map(fun s -> s.HP)
+            |> ValueOption.defaultValue event.Amount
 
-          let newHP = min event.Amount (currentResources.HP + event.Amount)
+          let newHP = min maxHP (currentResources.HP + event.Amount)
 
           { currentResources with HP = newHP }
         | Entity.ResourceType.MP ->
-          let newMP = min event.Amount (currentResources.MP + event.Amount)
+          let maxMP =
+            stats
+            |> HashMap.tryFindV event.Target
+            |> ValueOption.map(fun s -> s.MP)
+            |> ValueOption.defaultValue event.Amount
+
+          let newMP = min maxMP (currentResources.MP + event.Amount)
           { currentResources with MP = newMP }
 
       eventBus.Publish(
@@ -70,6 +89,13 @@ module ResourceManager =
           ResourcesChanged struct (event.Target, resources)
         )
       )
+
+      eventBus.Publish<SystemCommunications.ShowNotification> {
+        Message =
+          let amount = event.Amount
+          $"%d{amount} {event.ResourceType}"
+        Position = position
+      }
     | ValueNone -> ()
 
   module private Regeneration =
@@ -147,7 +173,12 @@ module ResourceManager =
       |> subscriptions.Add
 
       this.EventBus.GetObservableFor<SystemCommunications.ResourceRestored>()
-      |> Observable.subscribe(handleResourceRestored this.World this.EventBus)
+      |> Observable.subscribe(
+        handleResourceRestored
+          this.World
+          this.EventBus
+          this.Projections.DerivedStats
+      )
       |> subscriptions.Add
 
     override _.Dispose disposing =

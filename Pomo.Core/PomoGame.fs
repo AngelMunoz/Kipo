@@ -257,7 +257,7 @@ type PomoGame() as this =
 
     let potion: Item.ItemInstance = {
       InstanceId = %Guid.NewGuid()
-      ItemId = %1
+      ItemId = %2
       UsesLeft = ValueSome 20
     }
 

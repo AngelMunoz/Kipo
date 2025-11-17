@@ -45,7 +45,6 @@ module Combat =
     let applySkillDamage
       (world: World)
       (derivedStats: HashMap<Guid<EntityId>, Entity.DerivedStats>)
-      (positions: HashMap<Guid<EntityId>, Vector2>)
       (casterId: Guid<EntityId>)
       (targetId: Guid<EntityId>)
       (skill: ActiveSkill)
@@ -67,11 +66,6 @@ module Combat =
               defenderStats
               skill
 
-        let targetPos =
-          positions
-          |> HashMap.tryFindV targetId
-          |> ValueOption.defaultValue Vector2.Zero
-
         result
       | _ ->
           // Caster or target stats not found
@@ -92,13 +86,7 @@ module Combat =
       =
 
       let result =
-        applySkillDamage
-          world
-          derivedStats
-          positions
-          casterId
-          targetId
-          activeSkill
+        applySkillDamage world derivedStats casterId targetId activeSkill
 
       let targetPos =
         positions
@@ -151,10 +139,11 @@ module Combat =
           eventBus.Publish intent
 
     let handleEffectResourceIntent
-      (derivedStats: HashMap<Guid<EntityId>, Entity.DerivedStats>)
+      (derivedStats: amap<Guid<EntityId>, Entity.DerivedStats>)
       (eventBus: EventBus)
       (intent: SystemCommunications.EffectResourceIntent)
       =
+      let derivedStats = derivedStats |> AMap.force
 
       match derivedStats.TryFindV intent.SourceEntity with
       | ValueSome attackerStats ->
@@ -179,14 +168,20 @@ module Combat =
 
         for resourceChangeEvent in totalResourceChangeFromModifiers do
           eventBus.Publish resourceChangeEvent
+
+        eventBus.Publish(
+          EffectExpired struct (intent.TargetEntity, intent.ActiveEffectId)
+        )
       | _ -> () // Attacker stats not found
 
     let handleEffectDamageIntent
-      (derivedStats: HashMap<Guid<EntityId>, Entity.DerivedStats>)
-      (positions: HashMap<Guid<EntityId>, Vector2>)
+      (derivedStats: amap<Guid<EntityId>, Entity.DerivedStats>)
+      (positions: amap<Guid<EntityId>, Vector2>)
       (eventBus: EventBus)
       (intent: SystemCommunications.EffectDamageIntent)
       =
+      let positions = positions |> AMap.force
+      let derivedStats = derivedStats |> AMap.force
 
       match
         derivedStats.TryFindV intent.SourceEntity,
@@ -238,13 +233,16 @@ module Combat =
     let handleAbilityIntent
       (world: World)
       (eventBus: EventBus)
-      (derivedStats: HashMap<Guid<EntityId>, Entity.DerivedStats>)
-      (positions: HashMap<Guid<EntityId>, Vector2>)
+      (derivedStats: amap<Guid<EntityId>, Entity.DerivedStats>)
+      (positions: amap<Guid<EntityId>, Vector2>)
       (skillStore: Stores.SkillStore)
       (casterId: Guid<EntityId>)
       (skillId: int<SkillId>)
       (target: SystemCommunications.SkillTarget)
       =
+      let positions = positions |> AMap.force
+      let derivedStats = derivedStats |> AMap.force
+
       match skillStore.tryFind skillId with
       | ValueSome(Skill.Active activeSkill) ->
         // Apply cost and cooldown now that the ability is confirmed
@@ -381,12 +379,15 @@ module Combat =
       (
         world: World,
         eventBus: EventBus,
-        derivedStats: HashMap<Guid<EntityId>, Entity.DerivedStats>,
-        positions: HashMap<Guid<EntityId>, Vector2>,
+        derivedStats: amap<Guid<EntityId>, Entity.DerivedStats>,
+        positions: amap<Guid<EntityId>, Vector2>,
         skillStore: Stores.SkillStore
       )
       (impact: SystemCommunications.ProjectileImpacted)
       =
+      let positions = positions |> AMap.force
+      let derivedStats = derivedStats |> AMap.force
+
       match skillStore.tryFind impact.SkillId with
       | ValueSome(Active skill) ->
         let impactPosition = positions.TryFindV impact.TargetId
@@ -427,13 +428,7 @@ module Combat =
 
           for targetId in targets do
             let result =
-              applySkillDamage
-                world
-                derivedStats
-                positions
-                impact.CasterId
-                targetId
-                skill
+              applySkillDamage world derivedStats impact.CasterId targetId skill
 
             let targetPos =
               positions
@@ -498,8 +493,8 @@ module Combat =
       (
         world: World,
         eventBus: EventBus,
-        derivedStats: HashMap<Guid<EntityId>, Entity.DerivedStats>,
-        positions: HashMap<Guid<EntityId>, Vector2>,
+        derivedStats: amap<Guid<EntityId>, Entity.DerivedStats>,
+        positions: amap<Guid<EntityId>, Vector2>,
         skillStore: Stores.SkillStore
       )
       (event: SystemCommunications.AbilityIntent)
@@ -525,8 +520,8 @@ module Combat =
 
     override this.Initialize() =
       base.Initialize()
-      let derivedStats = this.Projections.DerivedStats |> AMap.force
-      let positions = this.Projections.UpdatedPositions |> AMap.force
+      let derivedStats = this.Projections.DerivedStats
+      let positions = this.Projections.UpdatedPositions
 
       eventBus.GetObservableFor<SystemCommunications.AbilityIntent>()
       |> Observable.subscribe(

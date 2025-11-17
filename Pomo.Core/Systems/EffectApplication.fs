@@ -31,86 +31,114 @@ module Effects =
         StackCount = 1
       }
 
+    type ApplyEventResult =
+      | Persistent of StateChangeEvent
+      | InstantRes of SystemCommunications.EffectResourceIntent
+      | InstantDmg of SystemCommunications.EffectDamageIntent
+
     let private applyEffect
       (world: World)
       (intent: SystemCommunications.EffectApplicationIntent)
       =
-      let totalGameTime = world.Time |> AVal.map _.TotalGameTime |> AVal.force
-
-      let findExisting(effects: IndexList<ActiveEffect>) =
-        effects
-        |> IndexList.tryFind(fun _ ae ->
-          ae.SourceEffect.Name = intent.Effect.Name)
-
-      let effectsOnTarget =
-        world.ActiveEffects
-        |> AMap.tryFind intent.TargetEntity
-        |> AVal.force
-        |> Option.defaultValue IndexList.empty
-
-      let event =
-        match intent.Effect.Stacking with
-        | NoStack ->
-          if findExisting effectsOnTarget |> Option.isSome then
-            ValueNone
-          else
-            let newEffect = createNewActiveEffect intent totalGameTime
-
-            ValueSome(
-              StateChangeEvent.Combat(
-                EffectApplied struct (intent.TargetEntity, newEffect)
-              )
-            )
-        | RefreshDuration ->
-          match findExisting effectsOnTarget with
-          | Some activeEffect ->
-            let refreshedEffect = {
-              activeEffect with
-                  StartTime = totalGameTime
+      if intent.Effect.Duration.IsInstant then
+        let instantEvent =
+          match intent.Effect.Kind with
+          | ResourceOverTime ->
+            let resIntent: SystemCommunications.EffectResourceIntent = {
+              SourceEntity = intent.SourceEntity
+              TargetEntity = intent.TargetEntity
+              Effect = intent.Effect
+              ActiveEffectId = Guid.NewGuid() |> UMX.tag
             }
 
-            ValueSome(
-              StateChangeEvent.Combat(
-                EffectRefreshed struct (intent.TargetEntity, refreshedEffect.Id)
-              )
-            )
-          | None ->
-            let newEffect = createNewActiveEffect intent totalGameTime
+            InstantRes resIntent |> ValueSome
+          | DamageOverTime ->
+            let dmgIntent: SystemCommunications.EffectDamageIntent = {
+              SourceEntity = intent.SourceEntity
+              TargetEntity = intent.TargetEntity
+              Effect = intent.Effect
+            }
 
-            ValueSome(
-              StateChangeEvent.Combat(
-                EffectApplied struct (intent.TargetEntity, newEffect)
-              )
-            )
-        | AddStack maxStacks ->
-          match findExisting effectsOnTarget with
-          | Some effectToStack ->
-            if effectToStack.StackCount < maxStacks then
-              let newStackCount = effectToStack.StackCount + 1
+            InstantDmg dmgIntent |> ValueSome
+          | _ -> ValueNone
 
-              ValueSome(
-                StateChangeEvent.Combat(
-                  EffectStackChanged
-                    struct (intent.TargetEntity, effectToStack.Id, newStackCount)
-                )
-              )
-            else
+        instantEvent
+      else
+        let totalGameTime = world.Time |> AVal.map _.TotalGameTime |> AVal.force
+
+        let findExisting(effects: IndexList<ActiveEffect>) =
+          effects
+          |> IndexList.tryFind(fun _ ae ->
+            ae.SourceEffect.Name = intent.Effect.Name)
+
+        let effectsOnTarget =
+          world.ActiveEffects
+          |> AMap.tryFind intent.TargetEntity
+          |> AVal.force
+          |> Option.defaultValue IndexList.empty
+
+        let event =
+          match intent.Effect.Stacking with
+          | NoStack ->
+            if findExisting effectsOnTarget |> Option.isSome then
               ValueNone
-          | None ->
-            let newEffect = createNewActiveEffect intent totalGameTime
+            else
+              let newEffect = createNewActiveEffect intent totalGameTime
 
-            ValueSome(
-              StateChangeEvent.Combat(
-                EffectApplied struct (intent.TargetEntity, newEffect)
-              )
-            )
+              EffectApplied struct (intent.TargetEntity, newEffect)
+              |> StateChangeEvent.Combat
+              |> Persistent
+              |> ValueSome
+          | RefreshDuration ->
+            match findExisting effectsOnTarget with
+            | Some activeEffect ->
+              let refreshedEffect = {
+                activeEffect with
+                    StartTime = totalGameTime
+              }
 
-      event
+
+              EffectRefreshed struct (intent.TargetEntity, refreshedEffect.Id)
+              |> StateChangeEvent.Combat
+              |> Persistent
+              |> ValueSome
+            | None ->
+              let newEffect = createNewActiveEffect intent totalGameTime
+
+              EffectApplied struct (intent.TargetEntity, newEffect)
+              |> StateChangeEvent.Combat
+              |> Persistent
+              |> ValueSome
+          | AddStack maxStacks ->
+            match findExisting effectsOnTarget with
+            | Some effectToStack ->
+              if effectToStack.StackCount < maxStacks then
+                let newStackCount = effectToStack.StackCount + 1
+
+
+                EffectStackChanged
+                  struct (intent.TargetEntity, effectToStack.Id, newStackCount)
+                |> StateChangeEvent.Combat
+                |> Persistent
+                |> ValueSome
+              else
+                ValueNone
+            | None ->
+              let newEffect = createNewActiveEffect intent totalGameTime
+
+              EffectApplied struct (intent.TargetEntity, newEffect)
+              |> StateChangeEvent.Combat
+              |> Persistent
+              |> ValueSome
+
+        event
 
     let create(world: World, eventBus: EventBus) =
       let handler(intent: SystemCommunications.EffectApplicationIntent) =
         match applyEffect world intent with
-        | ValueSome ev -> eventBus.Publish ev
+        | ValueSome(Persistent ev) -> eventBus.Publish ev
+        | ValueSome(InstantDmg dmg) -> eventBus.Publish dmg
+        | ValueSome(InstantRes res) -> eventBus.Publish res
         | ValueNone -> ()
 
       { new CoreEventListener with
@@ -131,15 +159,6 @@ module Effects =
   type private LifecycleEvent =
     | State of state: StateChangeEvent
     | EffectTick of intent: TickingEffect
-
-  let instantEffects(effects: amap<Guid<EntityId>, IndexList<ActiveEffect>>) =
-    effects
-    |> AMap.map(fun _ effectList ->
-      effectList
-      |> IndexList.filter(fun effect ->
-        match effect.SourceEffect.Duration with
-        | Duration.Instant -> true
-        | _ -> false))
 
   let timedEffects(effects: amap<Guid<EntityId>, IndexList<ActiveEffect>>) =
     effects
@@ -188,6 +207,7 @@ module Effects =
             SourceEntity = effect.SourceEntity
             TargetEntity = effect.TargetEntity
             Effect = effect.SourceEffect
+            ActiveEffectId = effect.Id
           }
 
           IndexList.single(EffectTick(ResourceIntent intent))
@@ -231,6 +251,7 @@ module Effects =
                       SourceEntity = effect.SourceEntity
                       TargetEntity = effect.TargetEntity
                       Effect = effect.SourceEffect
+                      ActiveEffectId = effect.Id
                     }
 
                     IndexList.add (EffectTick(ResourceIntent intent)) acc
@@ -362,9 +383,6 @@ module Effects =
       |> permanentLoopEffects
       |> calculatePermanentLoopEvents this.World
 
-    let instantEvents =
-      this.World.ActiveEffects |> instantEffects |> calculateInstantEvents
-
     let allEvents =
       let inline resolve _ a b = IndexList.append a b
 
@@ -372,7 +390,6 @@ module Effects =
         resolve
         timedEvents
         (AMap.unionWith resolve loopEvents permanentLoopEvents)
-      |> AMap.unionWith resolve instantEvents
 
     override _.Kind = Effects
 
@@ -384,6 +401,7 @@ module Effects =
           for evt in evts do
             match evt with
             | State stateEvent -> this.EventBus.Publish stateEvent
-            | EffectTick intent -> this.EventBus.Publish intent
+            | EffectTick(DamageIntent dmg) -> this.EventBus.Publish dmg
+            | EffectTick(ResourceIntent res) -> this.EventBus.Publish res
 
       publishEvents(allEvents |> AMap.toASetValues |> ASet.force)
