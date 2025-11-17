@@ -15,6 +15,7 @@ open Pomo.Core.Domain.Projectile
 open Pomo.Core.Domain.RawInput
 open Pomo.Core.Domain.Skill
 open Pomo.Core.Domain.Item // Added this line
+open Pomo.Core.Domain.Core
 
 [<Struct>]
 type MovementState =
@@ -111,10 +112,7 @@ module SystemCommunications =
   }
 
   [<Struct>]
-  type UnequipItemIntent = {
-    EntityId: Guid<EntityId>
-    Slot: Slot
-  }
+  type UnequipItemIntent = { EntityId: Guid<EntityId>; Slot: Slot }
 
 // --- State Change Events ---
 
@@ -128,7 +126,7 @@ type InputEvents =
   | GameActionStatesChanged of
     gAChanged: struct (Guid<EntityId> * HashMap<GameAction, InputActionState>)
   | QuickSlotsChanged of
-    qsChanged: struct (Guid<EntityId> * HashMap<GameAction, int<SkillId>>)
+    qsChanged: struct (Guid<EntityId> * HashMap<GameAction, SlotProcessing>)
 
 type PhysicsEvents =
   | PositionChanged of posChanged: struct (Guid<EntityId> * Vector2)

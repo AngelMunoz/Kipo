@@ -30,7 +30,7 @@ module Targeting =
     (entityId: _ aval)
     (action: GameAction voption aval)
     (skillStore: SkillStore)
-    (quickSlots: amap<_, HashMap<GameAction, _>>)
+    (quickSlots: amap<_, HashMap<GameAction, SlotProcessing>>)
     =
     adaptive {
       let! entityId = entityId
@@ -48,6 +48,10 @@ module Targeting =
           return
             quickSlots
             |> HashMap.tryFindV action
+            |> ValueOption.bind(fun slotProcessing ->
+              match slotProcessing with
+              | Skill skillId -> ValueSome skillId
+              | Item _ -> ValueNone)
             |> ValueOption.map(fun skillId -> skillStore.tryFind skillId)
             |> ValueOption.flatten
     }

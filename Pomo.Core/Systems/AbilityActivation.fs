@@ -386,7 +386,7 @@ module AbilityActivation =
         | UseSlot7
         | UseSlot8 ->
           match slots |> HashMap.tryFindV action with
-          | ValueSome skillId ->
+          | ValueSome(SlotProcessing.Skill skillId) ->
             let validationContext = {
               SkillStore = skillStore
               Statuses = statuses
@@ -434,5 +434,8 @@ module AbilityActivation =
                 | Silenced -> "Silenced!"
 
               publishNotification notificationMsg
+          | ValueSome(SlotProcessing.Item itemInstanceId) ->
+            // Item activation logic can be implemented here
+            ()
           | ValueNone -> () // Slot is empty
         | _ -> ()

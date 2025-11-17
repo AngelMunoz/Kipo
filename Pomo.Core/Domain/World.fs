@@ -13,6 +13,7 @@ module World =
   open Pomo.Core.Domain.Events
   open RawInput
   open Action
+  open Core
 
   [<Struct>]
   type Time = {
@@ -27,7 +28,7 @@ module World =
     InputMaps: cmap<Guid<EntityId>, InputMap>
     GameActionStates:
       cmap<Guid<EntityId>, HashMap<GameAction, InputActionState>>
-    QuickSlots: cmap<Guid<EntityId>, HashMap<GameAction, int<SkillId>>>
+    QuickSlots: cmap<Guid<EntityId>, HashMap<GameAction, SlotProcessing>>
     // entity components
     Positions: cmap<Guid<EntityId>, Vector2>
     Velocities: cmap<Guid<EntityId>, Vector2>
@@ -59,7 +60,8 @@ module World =
     abstract GameActionStates:
       amap<Guid<EntityId>, HashMap<GameAction, InputActionState>>
 
-    abstract QuickSlots: amap<Guid<EntityId>, HashMap<GameAction, int<SkillId>>>
+    abstract QuickSlots:
+      amap<Guid<EntityId>, HashMap<GameAction, SlotProcessing>>
     // entity components
     abstract Positions: amap<Guid<EntityId>, Vector2>
     abstract Velocities: amap<Guid<EntityId>, Vector2>

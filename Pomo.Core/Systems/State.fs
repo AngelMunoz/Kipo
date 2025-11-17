@@ -91,6 +91,8 @@ module StateUpdate =
       world.GameActionStates[id] <- states
 
   module Combat =
+    open Pomo.Core.Domain.Core
+
     let inline updateResources
       (world: MutableWorld)
       struct (id: Guid<EntityId>, resources: Domain.Entity.Resource)
@@ -106,8 +108,7 @@ module StateUpdate =
     let inline updateQuickSlots
       (world: MutableWorld)
       struct (id: Guid<EntityId>,
-              quickSlots:
-                HashMap<Domain.Action.GameAction, int<Domain.Units.SkillId>>)
+              quickSlots: HashMap<Domain.Action.GameAction, SlotProcessing>)
       =
       world.QuickSlots[id] <- quickSlots
 

@@ -254,12 +254,12 @@ type PomoGame() as this =
 
 
     let quickSlots = [
-      UseSlot1, UMX.tag 7 // Summon Boulder
-      UseSlot2, UMX.tag 8 // Catchy Song
-      UseSlot3, UMX.tag 3
-      UseSlot4, UMX.tag 6
-      UseSlot5, UMX.tag 4
-      UseSlot6, UMX.tag 5
+      UseSlot1, Core.SlotProcessing.Skill %7 // Summon Boulder
+      UseSlot2, Core.SlotProcessing.Skill %8 // Catchy Song
+      UseSlot3, Core.SlotProcessing.Skill %3
+      UseSlot4, Core.SlotProcessing.Skill %6
+      UseSlot5, Core.SlotProcessing.Skill %4
+      UseSlot6, Core.SlotProcessing.Skill %5
     ]
 
     eventBus.Publish(

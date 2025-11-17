@@ -19,6 +19,8 @@ module Units =
 
 
 module Core =
+  open FSharp.UMX
+
   [<Struct>]
   type Element =
     | Fire
@@ -62,6 +64,10 @@ module Core =
     | Additive of addStat: Stat * adStatValue: float
     | Multiplicative of mulStat: Stat * mulStatValue: float
 
+  [<Struct>]
+  type SlotProcessing =
+    | Skill of skillId: int<Units.SkillId>
+    | Item of itemInstanceId: Guid<Units.ItemInstanceId>
 
   type CoreEventListener =
 
