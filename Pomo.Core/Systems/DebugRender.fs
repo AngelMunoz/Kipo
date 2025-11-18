@@ -13,6 +13,8 @@ open Pomo.Core.Domain.Units
 open Pomo.Core.Domain.Skill
 open Pomo.Core.Domain.Action
 open Pomo.Core.Domain.Item
+open Pomo.Core.Domain.Item
+open Pomo.Core.Domain.AI
 open Pomo.Core.Stores
 
 module DebugRender =
@@ -32,6 +34,10 @@ module DebugRender =
     | DrawEquipped of
       ownerId: Guid<EntityId> *
       equipped: HashMap<Item.Slot, Item.ItemDefinition> *
+      entityPosition: Vector2
+    | DrawAIState of
+      ownerId: Guid<EntityId> *
+      state: AIState *
       entityPosition: Vector2
 
   let private generateActiveEffectCommands
@@ -127,6 +133,25 @@ module DebugRender =
       (fun acc _ cmds -> IndexList.concat [ acc; cmds ])
       IndexList.empty
 
+  let private generateAIStateCommands
+    (positions: amap<Guid<EntityId>, Vector2>)
+    (aiControllers: amap<Guid<EntityId>, AIController>)
+    =
+    positions
+    |> AMap.chooseA(fun entityId pos -> adaptive {
+      let! controllerOpt = aiControllers |> AMap.tryFind entityId
+
+      return
+        controllerOpt
+        |> Option.map(fun controller ->
+          IndexList.single(
+            DrawAIState(entityId, controller.currentState, pos)
+          ))
+    })
+    |> AMap.fold
+      (fun acc _ cmds -> IndexList.concat [ acc; cmds ])
+      IndexList.empty
+
   let private generateDebugCommands
     (
       world: World.World,
@@ -151,8 +176,16 @@ module DebugRender =
       and! equippedCmds =
         generateEquippedCommands positions equippedItems showInventory
 
+      and! aiStateCmds = generateAIStateCommands positions world.AIControllers
+
       return
-        IndexList.concat [ effectCmds; statsCmds; inventoryCmds; equippedCmds ]
+        IndexList.concat [
+          effectCmds
+          statsCmds
+          inventoryCmds
+          equippedCmds
+          aiStateCmds
+        ]
     }
 
   type DebugRenderSystem(game: Game, playerId: Guid<EntityId>) =
@@ -337,5 +370,14 @@ module DebugRender =
             Vector2(entityPos.X, entityPos.Y + yOffset + 250.0f)
 
           sb.DrawString(hudFont, text, textPosition, Color.LightGreen)
+
+        | DrawAIState(ownerId, state, entityPos) ->
+          let yOffset = yOffsets.TryFind ownerId |> Option.defaultValue -20.0f
+          let text = $"AI: %A{state}"
+          let textPosition = Vector2(entityPos.X, entityPos.Y + yOffset - 20.0f)
+
+          yOffsets <- yOffsets |> HashMap.add ownerId (yOffset - 35.0f)
+
+          sb.DrawString(hudFont, text, textPosition, Color.Red)
 
       sb.End()

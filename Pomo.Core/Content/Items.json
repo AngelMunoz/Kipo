@@ -57,6 +57,11 @@
           "Type": "Additive",
           "Stat": "MA",
           "Value": 10.0
+        },
+        {
+          "Type": "Additive",
+          "Stat": "MS",
+          "Value": 50
         }
       ]
     }

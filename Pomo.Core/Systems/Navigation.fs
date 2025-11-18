@@ -13,12 +13,11 @@ open Pomo.Core.Domain.World
 module Navigation =
   open Pomo.Core.Domain.Core
 
-  let create(eventBus: EventBus, playerId: Guid<EntityId>) =
+  let create(eventBus: EventBus) =
 
     { new CoreEventListener with
         member _.StartListening() =
           eventBus.GetObservableFor<SystemCommunications.SetMovementTarget>()
-          |> Observable.filter(fun event -> event.EntityId = playerId)
           |> Observable.subscribe(fun event ->
             // Here we would implement pathfinding logic to move the entity
             // towards the targetPosition. For now, we just set the MovementState.

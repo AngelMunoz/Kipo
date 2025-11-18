@@ -14,7 +14,8 @@ open Pomo.Core.Domain.Action
 open Pomo.Core.Domain.Projectile
 open Pomo.Core.Domain.RawInput
 open Pomo.Core.Domain.Skill
-open Pomo.Core.Domain.Item // Added this line
+open Pomo.Core.Domain.Item
+open Pomo.Core.Domain.AI
 open Pomo.Core.Domain.Core
 
 [<Struct>]
@@ -196,13 +197,18 @@ type InventoryEvents =
   | ItemUnequipped of
     itemUnequipped: struct (Guid<EntityId> * Slot * Guid<ItemInstanceId>)
 
+type AIStateChange =
+  | ControllerUpdated of
+    struct (Guid<EntityId> * Pomo.Core.Domain.AI.AIController)
+
 [<Struct>]
 type StateChangeEvent =
   | EntityLifecycle of entityLifeCycle: EntityLifecycleEvents
   | Input of input: InputEvents
   | Physics of physics: PhysicsEvents
   | Combat of combat: CombatEvents
-  | Inventory of inventory: InventoryEvents // Add this
+  | Inventory of inventory: InventoryEvents
+  | AI of ai: AIStateChange
   // Uncategorized
   | CreateProjectile of
     projParams: struct (Guid<EntityId> * LiveProjectile * Vector2 voption)

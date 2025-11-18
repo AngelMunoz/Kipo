@@ -16,6 +16,7 @@ open Pomo.Core.Domain.World
 open Pomo.Core.Domain.RawInput
 open Pomo.Core.Domain.Skill
 open Pomo.Core.Domain.Item
+open Pomo.Core.Domain.AI
 
 module StateUpdate =
   let COMBAT_DURATION = TimeSpan.FromSeconds(5.0)
@@ -277,6 +278,13 @@ module StateUpdate =
 
       world.EquippedItems[entityId] <- HashMap.remove slot currentEquipped
 
+  module AI =
+    let inline updateController
+      (world: MutableWorld)
+      (entityId: Guid<EntityId>, controller: AI.AIController)
+      =
+      world.AIControllers[entityId] <- controller
+
   type StateUpdateSystem(game: Game, mutableWorld: World.MutableWorld) =
     inherit GameComponent(game)
 
@@ -375,6 +383,10 @@ module StateUpdate =
                 mutableWorld
                 itemInstance.InstanceId
                 (ValueSome itemInstance)
+          | AI event ->
+            match event with
+            | ControllerUpdated(entityId, controller) ->
+              AI.updateController mutableWorld (entityId, controller)
 
           // Uncategorized
           | CreateProjectile projParams ->

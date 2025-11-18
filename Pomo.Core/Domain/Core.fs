@@ -17,6 +17,9 @@ module Units =
   [<Measure>]
   type ItemInstanceId
 
+  [<Measure>]
+  type AiArchetypeId
+
 
 module Core =
   open FSharp.UMX

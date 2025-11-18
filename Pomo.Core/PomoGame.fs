@@ -28,6 +28,7 @@ open Pomo.Core.Systems.PlayerMovement
 open Pomo.Core.Systems.Targeting
 open Pomo.Core.Systems.Navigation
 open Pomo.Core.Systems.AbilityActivation
+open Pomo.Core.Systems.UnitMovement
 open Pomo.Core.Systems.Combat
 open Pomo.Core.Systems.Notification
 open Pomo.Core.Systems.Projectile
@@ -79,7 +80,7 @@ type PomoGame() as this =
       playerId
     )
 
-  let movementService = Navigation.create(eventBus, playerId)
+  let movementService = Navigation.create(eventBus)
   let inventoryService = Inventory.create(eventBus, itemStore, worldView)
   let equipmentService = Equipment.create worldView eventBus
 
@@ -108,6 +109,7 @@ type PomoGame() as this =
     base.Components.Add(new RawInputSystem(this, playerId))
     base.Components.Add(new InputMappingSystem(this, playerId))
     base.Components.Add(new PlayerMovementSystem(this, playerId))
+    base.Components.Add(new UnitMovementSystem(this, playerId))
     base.Components.Add(new AbilityActivationSystem(this, playerId))
     base.Components.Add(new CombatSystem(this))
     base.Components.Add(new ResourceManagerSystem(this))
@@ -117,6 +119,7 @@ type PomoGame() as this =
     base.Components.Add(new EffectProcessingSystem(this))
     base.Components.Add(new RenderSystem(this, playerId))
     base.Components.Add(new DebugRenderSystem(this, playerId))
+    base.Components.Add(new AISystem(this, worldView, eventBus, skillStore))
     base.Components.Add(new StateUpdateSystem(this, mutableWorld))
 
 
@@ -254,6 +257,33 @@ type PomoGame() as this =
     createEnemy enemyId3 (Vector2(400.0f, 100.0f))
     createEnemy enemyId4 (Vector2(450.0f, 150.0f))
     createEnemy enemyId5 (Vector2(500.0f, 100.0f))
+
+    // AI Controller Setup
+    let createAIController (entityId: Guid<EntityId>) (spawnPos: Vector2) =
+      let controller: AI.AIController = {
+        controlledEntityId = entityId
+        archetypeId = %1
+        currentState = AI.AIState.Idle
+        stateEnterTime = TimeSpan.Zero
+        spawnPosition = spawnPos
+        absoluteWaypoints = ValueNone
+        waypointIndex = 0
+        lastDecisionTime = TimeSpan.Zero
+        currentTarget = ValueNone
+        memories = HashMap.empty
+      }
+
+      eventBus.Publish(
+        StateChangeEvent.AI(
+          AIStateChange.ControllerUpdated struct (entityId, controller)
+        )
+      )
+
+    createAIController enemyId1 (Vector2(300.0f, 100.0f))
+    createAIController enemyId2 (Vector2(350.0f, 150.0f))
+    createAIController enemyId3 (Vector2(400.0f, 100.0f))
+    createAIController enemyId4 (Vector2(450.0f, 150.0f))
+    createAIController enemyId5 (Vector2(500.0f, 100.0f))
 
     let potion: Item.ItemInstance = {
       InstanceId = %Guid.NewGuid()

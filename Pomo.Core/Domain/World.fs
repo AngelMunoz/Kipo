@@ -6,7 +6,9 @@ open FSharp.Data.Adaptive
 open Microsoft.Xna.Framework
 open System.Collections.Concurrent
 open Pomo.Core.Domain.Units
+open Pomo.Core.Domain.Units
 open Pomo.Core.Domain.Item
+open Pomo.Core.Domain.AI
 
 
 module World =
@@ -51,6 +53,7 @@ module World =
     ItemInstances: ConcurrentDictionary<Guid<ItemInstanceId>, ItemInstance>
     EntityInventories: cmap<Guid<EntityId>, HashSet<Guid<ItemInstanceId>>>
     EquippedItems: cmap<Guid<EntityId>, HashMap<Slot, Guid<ItemInstanceId>>>
+    AIControllers: cmap<Guid<EntityId>, AI.AIController>
   }
 
   type World =
@@ -97,6 +100,8 @@ module World =
     abstract EquippedItems:
       amap<Guid<EntityId>, HashMap<Slot, Guid<ItemInstanceId>>>
 
+    abstract AIControllers: amap<Guid<EntityId>, AI.AIController>
+
 
   let create(rng: Random) =
     let mutableWorld: MutableWorld = {
@@ -126,6 +131,7 @@ module World =
       ItemInstances = ConcurrentDictionary()
       EntityInventories = cmap()
       EquippedItems = cmap()
+      AIControllers = cmap()
     }
 
     let worldView =
@@ -152,6 +158,7 @@ module World =
           member _.ItemInstances = mutableWorld.ItemInstances
           member _.EntityInventories = mutableWorld.EntityInventories
           member _.EquippedItems = mutableWorld.EquippedItems
+          member _.AIControllers = mutableWorld.AIControllers
       }
 
     struct (mutableWorld, worldView)
