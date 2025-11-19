@@ -652,15 +652,11 @@ module Skill =
               Required.Property.get ("AbilityDamageValue", Formula.decoder) json
 
             and! element =
-              Optional.Property.get
+              VOptional.Property.get
                 ("Element", Serialization.Element.decoder)
                 json
 
-            return
-              AbilityDamageMod(
-                abilityDamageValue,
-                element |> Option.toValueOption
-              )
+            return AbilityDamageMod(abilityDamageValue, element)
           | "resourcechange" ->
             let! resource =
               Required.Property.get
@@ -732,11 +728,11 @@ module Skill =
               ("Type", Serialization.ResourceType.decoder)
               json
 
-          and! amount = Optional.Property.get ("Amount", Required.int) json
+          and! amount = VOptional.Property.get ("Amount", Required.int) json
 
           return {
             ResourceType = resourceType
-            Amount = amount |> Option.toValueOption
+            Amount = amount
           }
         }
 
@@ -826,8 +822,8 @@ module Skill =
                   Required.Property.get ("Radius", Required.float) json
 
                 and! maxTargets =
-                  Optional.Property.get ("MaxTargets", Required.int) json
-                  |> Result.map(Option.defaultValue 1)
+                  VOptional.Property.get ("MaxTargets", Required.int) json
+                  |> Result.map(ValueOption.defaultValue 1)
 
                 return Circle(float32 radius, maxTargets)
               | "cone" ->
@@ -838,8 +834,8 @@ module Skill =
                   Required.Property.get ("Length", Required.float) json
 
                 and! maxTargets =
-                  Optional.Property.get ("MaxTargets", Required.int) json
-                  |> Result.map(Option.defaultValue 1)
+                  VOptional.Property.get ("MaxTargets", Required.int) json
+                  |> Result.map(ValueOption.defaultValue 1)
 
                 return Cone(float32 angle, float32 length, maxTargets)
               | "line" ->
@@ -847,8 +843,8 @@ module Skill =
                   Required.Property.get ("Width", Required.float) json
 
                 and! maxTargets =
-                  Optional.Property.get ("MaxTargets", Required.int) json
-                  |> Result.map(Option.defaultValue 1)
+                  VOptional.Property.get ("MaxTargets", Required.int) json
+                  |> Result.map(ValueOption.defaultValue 1)
 
                 return Line(float32 width, maxTargets)
               | "multipoint" ->
@@ -887,32 +883,33 @@ module Skill =
       let private complexDecoder: Decoder<CastOrigin> =
         fun json -> decode {
           let! offset =
-            Optional.Property.array ("CasterOffset", Required.float) json
+            VOptional.Property.array ("CasterOffset", Required.float) json
 
           match offset with
-          | Some [| x; y |] -> return CasterOffset struct (float32 x, float32 y)
-          | Some _ ->
+          | ValueSome [| x; y |] ->
+            return CasterOffset struct (float32 x, float32 y)
+          | ValueSome _ ->
             return!
               DecodeError.ofError(
                 json.Clone(),
                 "CasterOffset requires exactly 2 float values"
               )
               |> Error
-          | None ->
+          | ValueNone ->
             let! targetOffset =
-              Optional.Property.array ("TargetOffset", Required.float) json
+              VOptional.Property.array ("TargetOffset", Required.float) json
 
             match targetOffset with
-            | Some [| x; y |] ->
+            | ValueSome [| x; y |] ->
               return TargetOffset struct (float32 x, float32 y)
-            | Some _ ->
+            | ValueSome _ ->
               return!
                 DecodeError.ofError(
                   json.Clone(),
                   "TargetOffset requires exactly 2 float values"
                 )
                 |> Error
-            | None ->
+            | ValueNone ->
               return!
                 DecodeError.ofError(
                   json.Clone(),
@@ -983,13 +980,13 @@ module Skill =
           and! damageSource =
             Required.Property.get ("DamageSource", DamageSource.decoder) json
 
-          and! cost = Optional.Property.get ("Cost", ResourceCost.decoder) json
+          and! cost = VOptional.Property.get ("Cost", ResourceCost.decoder) json
 
           and! cooldownOpt =
-            Optional.Property.get ("Cooldown", Required.float) json
+            VOptional.Property.get ("Cooldown", Required.float) json
 
           and! castingTimeOpt =
-            Optional.Property.get ("CastingTime", Required.float) json
+            VOptional.Property.get ("CastingTime", Required.float) json
 
           and! targeting =
             Required.Property.get ("Targeting", Targeting.decoder) json
@@ -997,12 +994,13 @@ module Skill =
           and! area = Required.Property.get ("Area", SkillArea.decoder) json
 
           and! rangeOpt =
-            Optional.Property.array ("Range", Required.float) json
+            VOptional.Property.array ("Range", Required.float) json
             |> Result.bind(fun arr ->
               match arr with
-              | Some [| value; size |] -> float32(value * size) |> Some |> Ok
-              | Some [| value |] -> float32 value |> Some |> Ok
-              | Some arr ->
+              | ValueSome [| value; size |] ->
+                float32(value * size) |> ValueSome |> Ok
+              | ValueSome [| value |] -> float32 value |> ValueSome |> Ok
+              | ValueSome arr ->
                 let joined = String.Join(", ", arr)
 
                 DecodeError.ofError(
@@ -1010,15 +1008,16 @@ module Skill =
                   $"Range array must have either one or two float values: {joined}"
                 )
                 |> Error
-              | None -> Ok None)
+              | ValueNone -> Ok ValueNone)
 
-          and! formula = Optional.Property.get ("Formula", Formula.decoder) json
+          and! formula =
+            VOptional.Property.get ("Formula", Formula.decoder) json
 
           and! delivery =
             Required.Property.get ("Delivery", Delivery.decoder) json
 
           and! elementFormula =
-            Optional.Property.get
+            VOptional.Property.get
               ("ElementFormula", ElementFormula.decoder)
               json
 
@@ -1034,21 +1033,15 @@ module Skill =
             Description = description
             Intent = intent
             DamageSource = damageSource
-            Cost = cost |> Option.toValueOption
-            Cooldown =
-              cooldownOpt
-              |> Option.map TimeSpan.FromSeconds
-              |> Option.toValueOption
-            CastingTime =
-              castingTimeOpt
-              |> Option.map TimeSpan.FromSeconds
-              |> Option.toValueOption
+            Cost = cost
+            Cooldown = cooldownOpt |> ValueOption.map TimeSpan.FromSeconds
+            CastingTime = castingTimeOpt |> ValueOption.map TimeSpan.FromSeconds
             Targeting = targeting
             Area = area
-            Range = rangeOpt |> Option.toValueOption
+            Range = rangeOpt
             Delivery = delivery
-            Formula = formula |> Option.toValueOption
-            ElementFormula = elementFormula |> Option.toValueOption
+            Formula = formula
+            ElementFormula = elementFormula
             Effects = effects
             Origin = origin
           }

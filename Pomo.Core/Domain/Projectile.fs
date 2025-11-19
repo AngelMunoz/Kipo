@@ -97,11 +97,11 @@ module Projectile =
             Required.Property.get ("CollisionMode", CollisionMode.decoder) json
 
           and! kind =
-            Optional.Property.get ("Kind", ProjectileKind.decoder) json
+            VOptional.Property.get ("Kind", ProjectileKind.decoder) json
 
           return {
             Speed = float32 speed
             Collision = collision
-            Variations = kind |> Option.toValueOption
+            Variations = kind
           }
         }
