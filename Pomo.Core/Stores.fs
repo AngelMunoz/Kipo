@@ -11,6 +11,7 @@ open Pomo.Core.Domain
 open Pomo.Core.Domain.Units
 open Pomo.Core.Domain.Skill
 open Pomo.Core.Domain.Item
+open Pomo.Core.Domain.AI
 open Pomo.Core.Serialization
 
 module JsonFileLoader =
@@ -51,6 +52,23 @@ module JsonFileLoader =
     with ex ->
       Error $"Failed to load file '{filePath}': {ex.Message}"
 
+  let readAIArchetypes (deserializer: JDeckDeserializer) (filePath: string) =
+    try
+      let json =
+        Path.Combine(AppContext.BaseDirectory, filePath) |> File.ReadAllBytes
+
+      match deserializer.Deserialize<AI.AIArchetype array> json with
+      | Ok result ->
+        let mutable newMap = HashMap.empty<int<AiArchetypeId>, AI.AIArchetype>
+
+        for archetype in result do
+          newMap <- HashMap.add archetype.id archetype newMap
+
+        Ok newMap
+      | Error decodeError -> Error $"Deserialization error: {decodeError}"
+    with ex ->
+      Error $"Failed to load file '{filePath}': {ex.Message}"
+
 
 module Stores =
   open Pomo.Core.Domain.Units
@@ -64,6 +82,14 @@ module Stores =
     abstract member find: itemId: int<ItemId> -> Item.ItemDefinition
     abstract member tryFind: itemId: int<ItemId> -> Item.ItemDefinition voption
     abstract member all: unit -> seq<Item.ItemDefinition>
+
+  type AIArchetypeStore =
+    abstract member find: archetypeId: int<AiArchetypeId> -> AI.AIArchetype
+
+    abstract member tryFind:
+      archetypeId: int<AiArchetypeId> -> AI.AIArchetype voption
+
+    abstract member all: unit -> seq<AI.AIArchetype>
 
   module Skill =
 
@@ -102,3 +128,27 @@ module Stores =
         }
 
       | Error errMsg -> failwith $"Failed to create ItemStore: {errMsg}"
+
+  module AIArchetype =
+
+    let create
+      (loader:
+        string -> Result<HashMap<int<AiArchetypeId>, AI.AIArchetype>, string>)
+      =
+      match loader "Content/AIArchetypes.json" with
+      | Ok archetypeMap ->
+
+        { new AIArchetypeStore with
+            member _.all() : AI.AIArchetype seq =
+              archetypeMap |> HashMap.toValueSeq
+
+            member _.find(archetypeId: int<AiArchetypeId>) : AI.AIArchetype =
+              HashMap.find archetypeId archetypeMap
+
+            member _.tryFind
+              (archetypeId: int<AiArchetypeId>)
+              : AI.AIArchetype voption =
+              HashMap.tryFindV archetypeId archetypeMap
+        }
+
+      | Error errMsg -> failwith $"Failed to create AIArchetypeStore: {errMsg}"

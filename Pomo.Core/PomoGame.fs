@@ -63,6 +63,10 @@ type PomoGame() as this =
   let struct (mutableWorld, worldView) = World.create Random.Shared
   let skillStore = Stores.Skill.create(JsonFileLoader.readSkills deserializer)
   let itemStore = Stores.Item.create(JsonFileLoader.readItems deserializer)
+
+  let aiArchetypeStore =
+    Stores.AIArchetype.create(JsonFileLoader.readAIArchetypes deserializer)
+
   let projections = Projections.create(itemStore, worldView)
 
   let targetingService =
@@ -98,6 +102,7 @@ type PomoGame() as this =
 
     base.Services.AddService<Stores.SkillStore> skillStore
     base.Services.AddService<Stores.ItemStore> itemStore
+    base.Services.AddService<Stores.AIArchetypeStore> aiArchetypeStore
     // 2. Register global services that all systems can safely access.
     base.Services.AddService<EventBus> eventBus
     //    Only the READ-ONLY world view is registered, preventing accidental write access.
@@ -119,7 +124,11 @@ type PomoGame() as this =
     base.Components.Add(new EffectProcessingSystem(this))
     base.Components.Add(new RenderSystem(this, playerId))
     base.Components.Add(new DebugRenderSystem(this, playerId))
-    base.Components.Add(new AISystem(this, worldView, eventBus, skillStore))
+
+    base.Components.Add(
+      new AISystem(this, worldView, eventBus, skillStore, aiArchetypeStore)
+    )
+
     base.Components.Add(new StateUpdateSystem(this, mutableWorld))
 
 
@@ -259,10 +268,14 @@ type PomoGame() as this =
     createEnemy enemyId5 (Vector2(500.0f, 100.0f))
 
     // AI Controller Setup
-    let createAIController (entityId: Guid<EntityId>) (spawnPos: Vector2) =
+    let createAIController
+      (entityId: Guid<EntityId>)
+      (spawnPos: Vector2)
+      (archetypeId: int<AiArchetypeId>)
+      =
       let controller: AI.AIController = {
         controlledEntityId = entityId
-        archetypeId = %1
+        archetypeId = archetypeId
         currentState = AI.AIState.Idle
         stateEnterTime = TimeSpan.Zero
         spawnPosition = spawnPos
@@ -279,11 +292,11 @@ type PomoGame() as this =
         )
       )
 
-    createAIController enemyId1 (Vector2(300.0f, 100.0f))
-    createAIController enemyId2 (Vector2(350.0f, 150.0f))
-    createAIController enemyId3 (Vector2(400.0f, 100.0f))
-    createAIController enemyId4 (Vector2(450.0f, 150.0f))
-    createAIController enemyId5 (Vector2(500.0f, 100.0f))
+    createAIController enemyId1 (Vector2(300.0f, 100.0f)) %1
+    createAIController enemyId2 (Vector2(350.0f, 150.0f)) %2 // Patrolling Guard
+    createAIController enemyId3 (Vector2(400.0f, 100.0f)) %1
+    createAIController enemyId4 (Vector2(450.0f, 150.0f)) %1
+    createAIController enemyId5 (Vector2(500.0f, 100.0f)) %1
 
     let potion: Item.ItemInstance = {
       InstanceId = %Guid.NewGuid()

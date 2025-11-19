@@ -437,45 +437,44 @@ module AISystemLogic =
 
 
 type AISystem
-  (game: Game, world: World, eventBus: EventBus, skillStore: SkillStore) =
+  (
+    game: Game,
+    world: World.World,
+    eventBus: EventBus,
+    skillStore: SkillStore,
+    archetypeStore: AIArchetypeStore
+  ) =
   inherit GameComponent(game)
 
-  let defaultArchetype = {
-    id = %1
-    name = "Basic Enemy"
+  let fallbackArchetype = {
+    id = %0
+    name = "Fallback"
     behaviorType = Aggressive
     perceptionConfig = {
       visualRange = 150.0f
       fov = 360.0f
       memoryDuration = TimeSpan.FromSeconds 5.0
     }
-    cuePriorities = [|
-      {
-        cueType = Visual
-        minStrength = Weak
-        priority = 10
-        response = Engage
-      }
-    |]
+    cuePriorities = [||]
     decisionInterval = TimeSpan.FromSeconds 0.5
   }
 
   let adaptiveLogic =
     world.AIControllers
     |> AMap.mapA(fun _ controller ->
+      let archetype =
+        archetypeStore.tryFind controller.archetypeId
+        |> ValueOption.defaultValue fallbackArchetype
+
       AISystemLogic.processAndGenerateCommands
         controller
-        defaultArchetype
+        archetype
         world
         skillStore
         (world.Time |> AVal.map(fun t -> t.TotalGameTime)))
 
   override this.Update(gameTime) =
     let results = adaptiveLogic |> AMap.force
-
-    // For now, I will just publish the commands.
-    // Updating the AIController state (memories, etc.) is tricky without an event.
-    // I'll add a TODO to handle state persistence properly via events.
 
     for id, struct (updatedController, command) in results do
       match command with
@@ -484,4 +483,9 @@ type AISystem
         eventBus.Publish cmd
       | ValueNone -> ()
 
-      eventBus.Publish(AI(ControllerUpdated struct (id, updatedController)))
+      // Only publish if state changed or significant update occurred
+      // Optimization: Check for equality before publishing
+      let currentControllers = world.AIControllers |> AMap.force
+
+      if updatedController <> currentControllers[id] then
+        eventBus.Publish(AI(ControllerUpdated struct (id, updatedController)))

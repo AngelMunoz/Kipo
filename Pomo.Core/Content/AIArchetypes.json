@@ -17,5 +17,30 @@
       }
     ],
     "DecisionInterval": 0.5
+  },
+  {
+    "Id": 2,
+    "Name": "Patrolling Guard",
+    "BehaviorType": "Patrol",
+    "PerceptionConfig": {
+      "VisualRange": 200.0,
+      "Fov": 180.0,
+      "MemoryDuration": 10.0
+    },
+    "CuePriorities": [
+      {
+        "CueType": "Visual",
+        "MinStrength": "Moderate",
+        "Priority": 10,
+        "Response": "Investigate"
+      },
+      {
+        "CueType": "Damage",
+        "MinStrength": "Weak",
+        "Priority": 20,
+        "Response": "Engage"
+      }
+    ],
+    "DecisionInterval": 1.0
   }
 ]
