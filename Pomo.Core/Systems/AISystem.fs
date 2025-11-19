@@ -288,7 +288,7 @@ module AISystemLogic =
         let! currentTick = currentTick
         let timeSinceLastDecision = currentTick - controller.lastDecisionTime
 
-        let struct (command, shouldUpdateTime, newWaypointIndex) =
+        let struct (command, shouldUpdateTime, newWaypointIndex, newState) =
           if timeSinceLastDecision >= archetype.decisionInterval then
             let bestCue = Decision.selectBestCue cues archetype.cuePriorities
 
@@ -297,7 +297,21 @@ module AISystemLogic =
               let cmd =
                 Decision.generateCommand cue priority controller skillStore
 
-              struct (cmd, true, controller.waypointIndex)
+              let state =
+                match priority.response with
+                | Engage ->
+                  match cue.sourceEntityId with
+                  | ValueSome _ -> AIState.Chasing
+                  | ValueNone -> AIState.Investigating
+                | Investigate -> AIState.Investigating
+                | Evade
+                | Flee ->
+                  match cue.sourceEntityId with
+                  | ValueSome _ -> AIState.Fleeing
+                  | ValueNone -> AIState.Fleeing
+                | Ignore -> AIState.Idle
+
+              struct (cmd, true, controller.waypointIndex, state)
             | None ->
               let navigateSpawn =
                 ValueSome(
@@ -313,14 +327,21 @@ module AISystemLogic =
               | ValueNone
               | ValueSome [||] ->
                 match archetype.behaviorType with
-                | Patrol -> struct (ValueNone, true, controller.waypointIndex)
+                | Patrol ->
+                  struct (ValueNone,
+                          true,
+                          controller.waypointIndex,
+                          AIState.Idle)
                 | Aggressive
                 | Defensive
                 | Supporter
                 | Ambusher
                 | Turret
                 | Passive ->
-                  struct (navigateSpawn, true, controller.waypointIndex)
+                  struct (navigateSpawn,
+                          true,
+                          controller.waypointIndex,
+                          AIState.Idle)
               | ValueSome waypoints ->
                 match archetype.behaviorType with
                 | Patrol ->
@@ -341,7 +362,7 @@ module AISystemLogic =
                       : SystemCommunications.SetMovementTarget
                     )
 
-                  struct (cmd, true, nextIdx)
+                  struct (cmd, true, nextIdx, AIState.Patrolling)
                 | Aggressive ->
                   let targetWaypoint = waypoints |> Array.randomChoice
 
@@ -355,20 +376,34 @@ module AISystemLogic =
                       : SystemCommunications.SetMovementTarget
                     )
 
-                  struct (cmd, true, controller.waypointIndex)
+                  struct (cmd,
+                          true,
+                          controller.waypointIndex,
+                          AIState.Patrolling)
                 | Defensive
                 | Supporter
                 | Ambusher
                 | Passive ->
-                  struct (navigateSpawn, true, controller.waypointIndex)
-                | Turret -> struct (ValueNone, true, controller.waypointIndex)
+                  struct (navigateSpawn,
+                          true,
+                          controller.waypointIndex,
+                          AIState.Idle)
+                | Turret ->
+                  struct (ValueNone,
+                          true,
+                          controller.waypointIndex,
+                          AIState.Idle)
           else
-            struct (ValueNone, false, controller.waypointIndex)
+            struct (ValueNone,
+                    false,
+                    controller.waypointIndex,
+                    controller.currentState)
 
         let updatedController = {
           controller with
               memories = updatedMemories
               waypointIndex = newWaypointIndex
+              currentState = newState
               lastDecisionTime =
                 if shouldUpdateTime then
                   currentTick
