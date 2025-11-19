@@ -1,0 +1,21 @@
+[
+  {
+    "Id": 1,
+    "Name": "Basic Enemy",
+    "BehaviorType": "Aggressive",
+    "PerceptionConfig": {
+      "VisualRange": 150.0,
+      "Fov": 360.0,
+      "MemoryDuration": 5.0
+    },
+    "CuePriorities": [
+      {
+        "CueType": "Visual",
+        "MinStrength": "Weak",
+        "Priority": 10,
+        "Response": "Engage"
+      }
+    ],
+    "DecisionInterval": 0.5
+  }
+]
