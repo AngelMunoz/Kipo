@@ -21,11 +21,11 @@ module Perception =
     (controllerFactions: Faction HashSet)
     (targetFactions: Faction HashSet)
     =
-    let isEnemy = controllerFactions.Contains Faction.Enemy
-    let isAlly = controllerFactions.Contains Faction.Ally
-    let targetIsPlayer = targetFactions.Contains Faction.Player
-    let targetIsAlly = targetFactions.Contains Faction.Ally
-    let targetIsEnemy = targetFactions.Contains Faction.Enemy
+    let isEnemy = controllerFactions.Contains Enemy
+    let isAlly = controllerFactions.Contains Ally
+    let targetIsPlayer = targetFactions.Contains Player
+    let targetIsAlly = targetFactions.Contains Ally
+    let targetIsEnemy = targetFactions.Contains Enemy
     isEnemy && (targetIsPlayer || targetIsAlly) || isAlly && targetIsEnemy
 
   let gatherVisualCues
@@ -37,13 +37,12 @@ module Perception =
     (currentTick: TimeSpan)
     =
     adaptive {
-      let! positions = positions.Content
-      let! factions = factions.Content
-
       let cues =
         positions
-        |> HashMap.choose(fun entityId pos ->
-          match HashMap.tryFind entityId factions with
+        |> AMap.chooseA(fun entityId pos -> adaptive {
+          let! factions = factions |> AMap.tryFind entityId
+
+          match factions with
           | Some targetFactions ->
             let dist = distance controllerPos pos
 
@@ -57,20 +56,22 @@ module Perception =
                 elif dist < config.visualRange * 0.8f then Moderate
                 else Weak
 
-              Some {
-                cueType = Visual
-                strength = strength
-                sourceEntityId = ValueSome entityId
-                position = pos
-                timestamp = currentTick
-              }
+              return
+                Some {
+                  cueType = Visual
+                  strength = strength
+                  sourceEntityId = ValueSome entityId
+                  position = pos
+                  timestamp = currentTick
+                }
             else
-              None
-          | _ -> None)
+              return None
+          | _ -> return None
+        })
 
-      let gatheredCues =
+      let! gatheredCues =
         cues
-        |> HashMap.fold
+        |> AMap.fold
           (fun (acc: ResizeArray<_>) _ cue ->
             acc.Add cue
             acc)
@@ -265,27 +266,142 @@ module AISystemLogic =
       let targetWaypoint = waypoints |> Array.randomChoice
       struct (targetWaypoint, controller.waypointIndex)
 
+  let private determineState (response: ResponseType) (cue: PerceptionCue) =
+    match response with
+    | Engage ->
+      match cue.sourceEntityId with
+      | ValueSome _ -> Chasing
+      | ValueNone -> Investigating
+    | Investigate -> Investigating
+    | Evade
+    | Flee ->
+      match cue.sourceEntityId with
+      | ValueSome _ -> Fleeing
+      | ValueNone -> Fleeing
+    | Ignore -> AIState.Idle
+
+  let private handleBestCue
+    (cue: PerceptionCue)
+    (priority: CuePriority)
+    (controller: AIController)
+    (skillStore: SkillStore)
+    =
+    let cmd = Decision.generateCommand cue priority controller skillStore
+    let state = determineState priority.response cue
+    struct (cmd, true, controller.waypointIndex, state)
+
+  let private getNavigateToSpawnCommand(controller: AIController) =
+    ValueSome(
+      {
+        SystemCommunications.SetMovementTarget.EntityId =
+          controller.controlledEntityId
+        Target = controller.spawnPosition
+      }
+      : SystemCommunications.SetMovementTarget
+    )
+
+  let private handlePatrol
+    (controller: AIController)
+    (currentPos: Vector2)
+    (waypoints: Vector2[])
+    =
+    let struct (targetWaypoint, nextIdx) =
+      selectNextWaypoint Patrol controller currentPos waypoints
+
+    let cmd =
+      ValueSome(
+        {
+          SystemCommunications.SetMovementTarget.EntityId =
+            controller.controlledEntityId
+          Target = targetWaypoint
+        }
+        : SystemCommunications.SetMovementTarget
+      )
+
+    struct (cmd, true, nextIdx, Patrolling)
+
+  let private handleAggressive
+    (controller: AIController)
+    (waypoints: Vector2[])
+    =
+    let targetWaypoint = waypoints |> Array.randomChoice
+
+    let cmd =
+      ValueSome(
+        {
+          SystemCommunications.SetMovementTarget.EntityId =
+            controller.controlledEntityId
+          Target = targetWaypoint
+        }
+        : SystemCommunications.SetMovementTarget
+      )
+
+    struct (cmd, true, controller.waypointIndex, Patrolling)
+
+  let private handleNoCue
+    (controller: AIController)
+    (archetype: AIArchetype)
+    (currentPos: Vector2)
+    =
+    let navigateSpawn = getNavigateToSpawnCommand controller
+
+    match controller.absoluteWaypoints with
+    | ValueNone
+    | ValueSome [||] ->
+      // No waypoints behavior
+      match archetype.behaviorType with
+      | Patrol ->
+        struct (ValueNone, true, controller.waypointIndex, AIState.Idle)
+      | Aggressive
+      | Defensive
+      | Supporter
+      | Ambusher
+      | Turret
+      | Passive ->
+        struct (navigateSpawn, true, controller.waypointIndex, AIState.Idle)
+
+    | ValueSome waypoints ->
+      // Waypoints available behavior
+      match archetype.behaviorType with
+      | Patrol -> handlePatrol controller currentPos waypoints
+      | Aggressive -> handleAggressive controller waypoints
+      | Defensive
+      | Supporter
+      | Ambusher
+      | Passive ->
+        struct (navigateSpawn, true, controller.waypointIndex, AIState.Idle)
+      | Turret ->
+        struct (ValueNone, true, controller.waypointIndex, AIState.Idle)
 
   let processAndGenerateCommands
     (controller: AIController)
     (archetype: AIArchetype)
     (world: World)
     (skillStore: SkillStore)
-    (currentTick: TimeSpan aval)
+    (currentTickAval: TimeSpan aval)
     =
     adaptive {
-      let! positions = world.Positions.Content
-      let! factions = world.Factions.Content
+      let positions = world.Positions
+      let factions = world.Factions
+      let! currentTick = currentTickAval
 
-      match
-        HashMap.tryFind controller.controlledEntityId positions,
-        HashMap.tryFind controller.controlledEntityId factions
-      with
+      let! controlledPosition =
+        positions |> AMap.tryFind controller.controlledEntityId
+
+      let! controlledFactions =
+        factions |> AMap.tryFind controller.controlledEntityId
+
+      match controlledPosition, controlledFactions with
       | Some pos, Some facs ->
         let! struct (cues, updatedMemories) =
-          Perception.gatherCues controller archetype world pos facs currentTick
+          Perception.gatherCues
+            controller
+            archetype
+            world
+            pos
+            facs
+            currentTickAval
 
-        let! currentTick = currentTick
         let timeSinceLastDecision = currentTick - controller.lastDecisionTime
 
         let struct (command, shouldUpdateTime, newWaypointIndex, newState) =
@@ -294,105 +410,8 @@ module AISystemLogic =
 
             match bestCue with
             | Some struct (cue, priority) ->
-              let cmd =
-                Decision.generateCommand cue priority controller skillStore
-
-              let state =
-                match priority.response with
-                | Engage ->
-                  match cue.sourceEntityId with
-                  | ValueSome _ -> AIState.Chasing
-                  | ValueNone -> AIState.Investigating
-                | Investigate -> AIState.Investigating
-                | Evade
-                | Flee ->
-                  match cue.sourceEntityId with
-                  | ValueSome _ -> AIState.Fleeing
-                  | ValueNone -> AIState.Fleeing
-                | Ignore -> AIState.Idle
-
-              struct (cmd, true, controller.waypointIndex, state)
-            | None ->
-              let navigateSpawn =
-                ValueSome(
-                  {
-                    SystemCommunications.SetMovementTarget.EntityId =
-                      controller.controlledEntityId
-                    Target = controller.spawnPosition
-                  }
-                  : SystemCommunications.SetMovementTarget
-                )
-
-              match controller.absoluteWaypoints with
-              | ValueNone
-              | ValueSome [||] ->
-                match archetype.behaviorType with
-                | Patrol ->
-                  struct (ValueNone,
-                          true,
-                          controller.waypointIndex,
-                          AIState.Idle)
-                | Aggressive
-                | Defensive
-                | Supporter
-                | Ambusher
-                | Turret
-                | Passive ->
-                  struct (navigateSpawn,
-                          true,
-                          controller.waypointIndex,
-                          AIState.Idle)
-              | ValueSome waypoints ->
-                match archetype.behaviorType with
-                | Patrol ->
-                  let struct (targetWaypoint, nextIdx) =
-                    selectNextWaypoint
-                      archetype.behaviorType
-                      controller
-                      pos
-                      waypoints
-
-                  let cmd =
-                    ValueSome(
-                      {
-                        SystemCommunications.SetMovementTarget.EntityId =
-                          controller.controlledEntityId
-                        Target = targetWaypoint
-                      }
-                      : SystemCommunications.SetMovementTarget
-                    )
-
-                  struct (cmd, true, nextIdx, AIState.Patrolling)
-                | Aggressive ->
-                  let targetWaypoint = waypoints |> Array.randomChoice
-
-                  let cmd =
-                    ValueSome(
-                      {
-                        SystemCommunications.SetMovementTarget.EntityId =
-                          controller.controlledEntityId
-                        Target = targetWaypoint
-                      }
-                      : SystemCommunications.SetMovementTarget
-                    )
-
-                  struct (cmd,
-                          true,
-                          controller.waypointIndex,
-                          AIState.Patrolling)
-                | Defensive
-                | Supporter
-                | Ambusher
-                | Passive ->
-                  struct (navigateSpawn,
-                          true,
-                          controller.waypointIndex,
-                          AIState.Idle)
-                | Turret ->
-                  struct (ValueNone,
-                          true,
-                          controller.waypointIndex,
-                          AIState.Idle)
+              handleBestCue cue priority controller skillStore
+            | None -> handleNoCue controller archetype pos
           else
             struct (ValueNone,
                     false,
@@ -428,7 +447,7 @@ type AISystem
     perceptionConfig = {
       visualRange = 150.0f
       fov = 360.0f
-      memoryDuration = TimeSpan.FromSeconds(5.0)
+      memoryDuration = TimeSpan.FromSeconds 5.0
     }
     cuePriorities = [|
       {
@@ -438,7 +457,7 @@ type AISystem
         response = Engage
       }
     |]
-    decisionInterval = TimeSpan.FromSeconds(0.5)
+    decisionInterval = TimeSpan.FromSeconds 0.5
   }
 
   let adaptiveLogic =
@@ -465,8 +484,4 @@ type AISystem
         eventBus.Publish cmd
       | ValueNone -> ()
 
-      eventBus.Publish(
-        StateChangeEvent.AI(
-          AIStateChange.ControllerUpdated struct (id, updatedController)
-        )
-      )
+      eventBus.Publish(AI(ControllerUpdated struct (id, updatedController)))
