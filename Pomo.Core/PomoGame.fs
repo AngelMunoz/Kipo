@@ -68,6 +68,10 @@ type PomoGame() as this =
   let aiArchetypeStore =
     Stores.AIArchetype.create(JsonFileLoader.readAIArchetypes deserializer)
 
+  let mapStore =
+    Stores.Map.create MapLoader.loadMap [ "Content/Maps/Proto.xml" ]
+
+
   let projections = Projections.create(itemStore, worldView)
 
   let targetingService =
@@ -105,7 +109,9 @@ type PomoGame() as this =
     base.Services.AddService<SkillStore> skillStore
     base.Services.AddService<ItemStore> itemStore
     base.Services.AddService<AIArchetypeStore> aiArchetypeStore
+    base.Services.AddService<MapStore> mapStore
     base.Services.AddService<EventBus> eventBus
+
     base.Services.AddService<World.World> worldView
 
     base.Services.AddService<TargetingService> targetingService
@@ -121,9 +127,12 @@ type PomoGame() as this =
     base.Components.Add(new MovementSystem(this))
     base.Components.Add(new NotificationSystem(this, eventBus))
     base.Components.Add(new EffectProcessingSystem(this))
-    base.Components.Add(new TerrainRenderSystem(this, "Content/Maps/Proto.xml"))
+    let terrainRenderSystem = new TerrainRenderSystem(this, "Proto1")
+    base.Components.Add(terrainRenderSystem)
     base.Components.Add(new RenderSystem(this, playerId))
-    base.Components.Add(new DebugRenderSystem(this, playerId))
+
+    let debugRenderSystem = new DebugRenderSystem(this, playerId, "Proto1")
+    base.Components.Add(debugRenderSystem)
 
     base.Components.Add(
       new AISystem(this, worldView, eventBus, skillStore, aiArchetypeStore)

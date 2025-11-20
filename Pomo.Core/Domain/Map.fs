@@ -97,6 +97,7 @@ module Map =
   }
 
   type MapDefinition = {
+    Key: string
     Version: string
     TiledVersion: string
     Orientation: Orientation

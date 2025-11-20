@@ -306,7 +306,13 @@ module MapLoader =
       |> Seq.map parseObjectGroup
       |> IndexList.ofSeq
 
+    let properties = parseProperties mapElem
+
+    let key =
+      properties |> HashMap.tryFind "MapKey" |> Option.defaultValue "Unknown"
+
     {
+      Key = key
       Version = version
       TiledVersion = tiledVersion
       Orientation = orientation

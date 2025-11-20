@@ -3,7 +3,8 @@ namespace Pomo.Core.Systems
 open System
 open Microsoft.Xna.Framework
 open Microsoft.Xna.Framework.Graphics
-
+open Pomo.Core.Domain.Map
+open Pomo.Core.Stores
 open FSharp.UMX
 open FSharp.Data.Adaptive
 
@@ -39,6 +40,13 @@ module DebugRender =
       ownerId: Guid<EntityId> *
       state: AIState *
       entityPosition: Vector2
+    | DrawMapObject of
+      points: IndexList<Vector2> voption *
+      position: Vector2 *
+      width: float32 *
+      height: float32 *
+      rotation: float32 *
+      color: Color
 
   let private generateActiveEffectCommands
     (world: World.World)
@@ -152,6 +160,39 @@ module DebugRender =
       (fun acc _ cmds -> IndexList.concat [ acc; cmds ])
       IndexList.empty
 
+  let private generateMapObjectCommands(map: MapDefinition voption) =
+    match map with
+    | ValueSome map ->
+      map.ObjectGroups
+      |> IndexList.collect(fun group ->
+        if group.Visible then
+          group.Objects
+          |> IndexList.map(fun obj ->
+            let color =
+              match obj.Type with
+              | ValueSome Wall -> Color.Red
+              | ValueSome Spawn -> Color.Green
+              | ValueSome Zone ->
+                if obj.Name.Contains("Void") then Color.Purple
+                elif obj.Name.Contains("Slow") then Color.Yellow
+                elif obj.Name.Contains("Speed") then Color.Cyan
+                elif obj.Name.Contains("Healing") then Color.LimeGreen
+                elif obj.Name.Contains("Damaging") then Color.Orange
+                else Color.Blue
+              | _ -> Color.White
+
+            DrawMapObject(
+              obj.Points,
+              Vector2(obj.X, obj.Y),
+              obj.Width,
+              obj.Height,
+              obj.Rotation,
+              color
+            ))
+        else
+          IndexList.empty)
+    | ValueNone -> IndexList.empty
+
   let private generateDebugCommands
     (
       world: World.World,
@@ -159,7 +200,8 @@ module DebugRender =
       derivedStats: amap<Guid<EntityId>, DerivedStats>,
       inventory: amap<Guid<EntityId>, HashSet<Item.ItemDefinition>>,
       equippedItems:
-        amap<Guid<EntityId>, HashMap<Item.Slot, Item.ItemDefinition>>
+        amap<Guid<EntityId>, HashMap<Item.Slot, Item.ItemDefinition>>,
+      map: MapDefinition voption
     )
     (showStats: bool aval)
     (showInventory: bool aval)
@@ -185,10 +227,97 @@ module DebugRender =
           inventoryCmds
           equippedCmds
           aiStateCmds
+          generateMapObjectCommands map
         ]
     }
 
-  type DebugRenderSystem(game: Game, playerId: Guid<EntityId>) =
+  let private drawLine
+    (sb: SpriteBatch)
+    (pixel: Texture2D)
+    (start: Vector2)
+    (end': Vector2)
+    (color: Color)
+    =
+    let edge = end' - start
+    let angle = float32(Math.Atan2(float edge.Y, float edge.X))
+
+    sb.Draw(
+      pixel,
+      Microsoft.Xna.Framework.Rectangle(
+        int start.X,
+        int start.Y,
+        int(edge.Length()),
+        1
+      ),
+      Nullable(),
+      color,
+      angle,
+      Vector2.Zero,
+      SpriteEffects.None,
+      0.0f
+    )
+
+  let private rotate (point: Vector2) (radians: float32) =
+    let c = float32(Math.Cos(float radians))
+    let s = float32(Math.Sin(float radians))
+    Vector2(point.X * c - point.Y * s, point.X * s + point.Y * c)
+
+  let private drawPolygon
+    (sb: SpriteBatch)
+    (pixel: Texture2D)
+    (points: IndexList<Vector2>)
+    (position: Vector2)
+    (rotation: float32)
+    (color: Color)
+    =
+    let count = points.Count
+    let radians = MathHelper.ToRadians(rotation)
+
+    for i in 0 .. count - 1 do
+      let p1 = rotate points.[i] radians + position
+      let p2 = rotate points.[(i + 1) % count] radians + position
+      drawLine sb pixel p1 p2 color
+
+  let private drawEllipse
+    (sb: SpriteBatch)
+    (pixel: Texture2D)
+    (position: Vector2)
+    (width: float32)
+    (height: float32)
+    (rotation: float32)
+    (color: Color)
+    =
+    let segments = 32
+    let radiusX = width / 2.0f
+    let radiusY = height / 2.0f
+
+    let centerOffset = Vector2(radiusX, radiusY)
+    let step = MathHelper.TwoPi / float32 segments
+    let radians = MathHelper.ToRadians(rotation)
+
+    for i in 0 .. segments - 1 do
+      let theta1 = float32 i * step
+      let theta2 = float32(i + 1) * step
+
+      // Points relative to center of ellipse
+      let localP1 = Vector2(radiusX * cos theta1, radiusY * sin theta1)
+      let localP2 = Vector2(radiusX * cos theta2, radiusY * sin theta2)
+
+      // Points relative to top-left (0,0)
+      let p1Unrotated = localP1 + centerOffset
+      let p2Unrotated = localP2 + centerOffset
+
+      // Rotate around (0,0)
+      let p1Rotated = rotate p1Unrotated radians
+      let p2Rotated = rotate p2Unrotated radians
+
+      // Translate to world position
+      let p1 = p1Rotated + position
+      let p2 = p2Rotated + position
+
+      drawLine sb pixel p1 p2 color
+
+  type DebugRenderSystem(game: Game, playerId: Guid<EntityId>, mapKey: string) =
     inherit DrawableGameComponent(game)
 
     let world: World.World = game.Services.GetService<World.World>()
@@ -197,7 +326,10 @@ module DebugRender =
     let projections: Projections.ProjectionService =
       game.Services.GetService<Projections.ProjectionService>()
 
+    let mapStore = game.Services.GetService<MapStore>()
+
     let spriteBatch = lazy (new SpriteBatch(game.GraphicsDevice))
+    let mutable pixel: Texture2D voption = ValueNone
     let mutable hudFont = Unchecked.defaultof<_>
 
     let showStats = cval false
@@ -209,7 +341,8 @@ module DebugRender =
          projections.UpdatedPositions,
          projections.DerivedStats,
          projections.Inventories,
-         projections.EquipedItems)
+         projections.EquipedItems,
+         mapStore.tryFind mapKey)
         showStats
         showInventory
 
@@ -296,6 +429,10 @@ module DebugRender =
       base.Initialize()
       hudFont <- game.Content.Load<SpriteFont>("Fonts/Hud")
 
+      let p = new Texture2D(game.GraphicsDevice, 1, 1)
+      p.SetData([| Color.White |])
+      pixel <- ValueSome p
+
     override _.Update gameTime =
       base.Update gameTime
       let sheetToggled = toggleSheetState |> AVal.force
@@ -378,6 +515,17 @@ module DebugRender =
 
           yOffsets <- yOffsets |> HashMap.add ownerId (yOffset - 35.0f)
 
+          yOffsets <- yOffsets |> HashMap.add ownerId (yOffset - 35.0f)
+
           sb.DrawString(hudFont, text, textPosition, Color.Red)
+
+        | DrawMapObject(points, position, width, height, rotation, color) ->
+          match pixel with
+          | ValueSome px ->
+            match points with
+            | ValueSome pts -> drawPolygon sb px pts position rotation color
+            | ValueNone ->
+              drawEllipse sb px position width height rotation color
+          | ValueNone -> ()
 
       sb.End()
