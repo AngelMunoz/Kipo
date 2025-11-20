@@ -38,6 +38,7 @@ open Pomo.Core.Systems.Effects
 open Pomo.Core.Systems.ResourceManager
 open Pomo.Core.Systems.Inventory
 open Pomo.Core.Systems.Equipment
+open Pomo.Core.Systems.TerrainRenderSystem
 open Pomo.Core.Domain.Units
 open Pomo.Core.Stores
 
@@ -122,6 +123,7 @@ type PomoGame() as this =
     base.Components.Add(new MovementSystem(this))
     base.Components.Add(new NotificationSystem(this, eventBus))
     base.Components.Add(new EffectProcessingSystem(this))
+    base.Components.Add(new TerrainRenderSystem(this, "Content/Maps/Proto.xml"))
     base.Components.Add(new RenderSystem(this, playerId))
     base.Components.Add(new DebugRenderSystem(this, playerId))
 

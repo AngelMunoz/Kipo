@@ -13,6 +13,7 @@
     <Compile Include="Domain/Item.fs" />
     <Compile Include="Domain/AI.fs" />
     <Compile Include="Domain/Events.fs" />
+    <Compile Include="Domain/Map.fs" />
     <Compile Include="Domain/World.fs" />
     <Compile Include="EventBus.fs" />
     <Compile Include="Serialization.fs" />
@@ -35,6 +36,8 @@
     <Compile Include="Systems/Navigation.fs" />
     <Compile Include="Systems/Movement.fs" />
     <Compile Include="Systems/UnitMovement.fs" />
+    <Compile Include="Systems/MapLoader.fs" />
+    <Compile Include="Systems/TerrainRenderSystem.fs" />
     <Compile Include="Systems/Render.fs" />
     <Compile Include="Systems/DebugRender.fs" />
     <Compile Include="Systems/State.fs" />

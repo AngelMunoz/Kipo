@@ -20,6 +20,15 @@ module Units =
   [<Measure>]
   type AiArchetypeId
 
+  [<Measure>]
+  type TileId
+
+  [<Measure>]
+  type LayerId
+
+  [<Measure>]
+  type ObjectId
+
 
 module Core =
   open FSharp.UMX
