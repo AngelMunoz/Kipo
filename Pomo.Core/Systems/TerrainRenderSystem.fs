@@ -175,7 +175,5 @@ module TerrainRenderSystem =
                       sb.Draw(texture, Vector2(drawX, drawY), Color.White)
                   | ValueNone -> ()
 
-                  | ValueNone -> ()
-
         sb.End()
       | _ -> ()

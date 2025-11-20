@@ -4,6 +4,7 @@ open System
 open Microsoft.Xna.Framework
 open Microsoft.Xna.Framework.Graphics
 open Pomo.Core.Domain.Map
+open Pomo.Core.Domain.Spatial
 open Pomo.Core.Stores
 open FSharp.UMX
 open FSharp.Data.Adaptive
@@ -47,6 +48,7 @@ module DebugRender =
       height: float32 *
       rotation: float32 *
       color: Color
+    | DrawSpatialGrid of grid: SpatialGrid
 
   let private generateActiveEffectCommands
     (world: World.World)
@@ -201,7 +203,8 @@ module DebugRender =
       inventory: amap<Guid<EntityId>, HashSet<Item.ItemDefinition>>,
       equippedItems:
         amap<Guid<EntityId>, HashMap<Item.Slot, Item.ItemDefinition>>,
-      map: MapDefinition voption
+      map: MapDefinition voption,
+      spatialGrid: amap<GridCell, IndexList<Guid<EntityId>>>
     )
     (showStats: bool aval)
     (showInventory: bool aval)
@@ -220,6 +223,8 @@ module DebugRender =
 
       and! aiStateCmds = generateAIStateCommands positions world.AIControllers
 
+      let! spatialGrid = spatialGrid |> AMap.toAVal
+
       return
         IndexList.concat [
           effectCmds
@@ -228,6 +233,7 @@ module DebugRender =
           equippedCmds
           aiStateCmds
           generateMapObjectCommands map
+          IndexList.single(DrawSpatialGrid spatialGrid)
         ]
     }
 
@@ -342,7 +348,8 @@ module DebugRender =
          projections.DerivedStats,
          projections.Inventories,
          projections.EquipedItems,
-         mapStore.tryFind mapKey)
+         mapStore.tryFind mapKey,
+         projections.SpatialGrid)
         showStats
         showInventory
 
@@ -526,6 +533,53 @@ module DebugRender =
             | ValueSome pts -> drawPolygon sb px pts position rotation color
             | ValueNone ->
               drawEllipse sb px position width height rotation color
+              drawEllipse sb px position width height rotation color
+          | ValueNone -> ()
+
+        | DrawSpatialGrid grid ->
+          match pixel with
+          | ValueSome px ->
+            for (cell, entities: IndexList<Guid<EntityId>>) in
+              grid |> HashMap.toSeq do
+              let cellSize = 64.0f
+              let x = float32 cell.X * cellSize
+              let y = float32 cell.Y * cellSize
+
+              let rect =
+                Microsoft.Xna.Framework.Rectangle(
+                  int x,
+                  int y,
+                  int cellSize,
+                  int cellSize
+                )
+
+              // Draw cell border
+              let color =
+                if entities.Count > 0 then Color.Red else Color.Gray * 0.5f
+
+              drawLine sb px (Vector2(x, y)) (Vector2(x + cellSize, y)) color
+
+              drawLine
+                sb
+                px
+                (Vector2(x + cellSize, y))
+                (Vector2(x + cellSize, y + cellSize))
+                color
+
+              drawLine
+                sb
+                px
+                (Vector2(x + cellSize, y + cellSize))
+                (Vector2(x, y + cellSize))
+                color
+
+              drawLine sb px (Vector2(x, y + cellSize)) (Vector2(x, y)) color
+
+              // Draw entity count
+              if entities.Count > 0 then
+                let text = $"{entities.Count}"
+                let textPos = Vector2(x + 5.0f, y + 5.0f)
+                sb.DrawString(hudFont, text, textPos, Color.White)
           | ValueNone -> ()
 
       sb.End()
