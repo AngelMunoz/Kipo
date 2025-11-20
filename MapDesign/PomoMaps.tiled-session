@@ -10,6 +10,10 @@
         "": {
             "scaleInDock": 1
         },
+        "/home/amunoz/repos/Kipo/Pomo.Core/Content/Maps/Proto.xml#ProtoTileset": {
+            "dynamicWrapping": true,
+            "scaleInEditor": 1
+        },
         "Proto.xml": {
             "scale": 0.8216733870967741,
             "selectedLayer": 0,
@@ -32,6 +36,10 @@
         }
     },
     "last.imagePath": "/home/amunoz/repos/Kipo/Pomo.Core/Content/Tiles/64x64",
+    "last.worldFilePath": "/home/amunoz/repos/Kipo/MapDesign",
+    "loadedWorlds": [
+        "/home/amunoz/repos/Kipo/MapDesign/Pomo.world"
+    ],
     "map.height": 15,
     "map.lastUsedFormat": "tmx",
     "map.orientation": "3",

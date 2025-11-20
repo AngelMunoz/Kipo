@@ -56,10 +56,16 @@ module Map =
   }
 
   [<Struct>]
+  type MapObjectType =
+    | Wall
+    | Zone
+    | Spawn
+
+  [<Struct>]
   type MapObject = {
     Id: int<ObjectId>
     Name: string
-    Type: string
+    Type: MapObjectType voption
     X: float32
     Y: float32
     Width: float32

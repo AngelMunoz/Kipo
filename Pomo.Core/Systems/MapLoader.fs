@@ -172,7 +172,15 @@ module MapLoader =
   let private parseObject(element: XElement) : MapObject =
     let id = attrInt "id" 0 element
     let name = attrString "name" "" element
-    let type' = attrString "type" "" element
+
+    let parseMapObjectType(s: string) =
+      match s.ToLowerInvariant() with
+      | "wall" -> ValueSome Wall
+      | "zone" -> ValueSome Zone
+      | "spawn" -> ValueSome Spawn
+      | _ -> ValueNone
+
+    let type' = attrString "type" "" element |> parseMapObjectType
     let x = attrFloat "x" 0.0f element
     let y = attrFloat "y" 0.0f element
     let width = attrFloat "width" 0.0f element
