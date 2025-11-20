@@ -15,8 +15,9 @@ module TerrainRenderSystem =
     let mutable mapDefinition: MapDefinition voption = ValueNone
     let mutable tilesetTexture: Texture2D voption = ValueNone
     let mutable spriteBatch: SpriteBatch voption = ValueNone
+    let tileTextures = Collections.Generic.Dictionary<int, Texture2D>()
 
-    override this.LoadContent() =
+    override this_.LoadContent() =
       spriteBatch <- ValueSome(new SpriteBatch(game.GraphicsDevice))
 
       // Load the map
@@ -25,10 +26,8 @@ module TerrainRenderSystem =
 
       ()
 
-    member val TileTextures =
-      System.Collections.Generic.Dictionary<int, Texture2D>()
 
-    override this.Initialize() =
+    override _.Initialize() =
       base.Initialize()
 
       match mapDefinition with
@@ -45,15 +44,14 @@ module TerrainRenderSystem =
             let assetPath = cleanPath tileDef.ImageSource
 
             try
-              let texture = game.Content.Load<Texture2D>(assetPath)
-              this.TileTextures.[globalId] <- texture
+              let texture = game.Content.Load<Texture2D> assetPath
+              tileTextures[globalId] <- texture
             with e ->
-              Console.WriteLine(
+              Console.WriteLine
                 $"Failed to load texture: {assetPath} - {e.Message}"
-              )
       | ValueNone -> ()
 
-    override this.Draw(gameTime) =
+    override _.Draw _ =
       match spriteBatch, mapDefinition with
       | ValueSome sb, ValueSome map ->
         sb.Begin(
@@ -110,8 +108,8 @@ module TerrainRenderSystem =
                   | ValueSome tile ->
                     let gid = int tile.TileId
 
-                    if this.TileTextures.ContainsKey(gid) then
-                      let texture = this.TileTextures.[gid]
+                    if tileTextures.ContainsKey(gid) then
+                      let texture = tileTextures[gid]
 
                       // Calculate position based on Stagger settings
                       let tileW = float32 map.TileWidth
@@ -125,7 +123,7 @@ module TerrainRenderSystem =
                           // Staggered X
                           let xStep = tileW / 2.0f
                           let yStep = tileH
-                          let px = (float32 x) * xStep
+                          let px = float32 x * xStep
 
                           let isStaggeredCol =
                             match index with
@@ -135,14 +133,14 @@ module TerrainRenderSystem =
                           let yOffset =
                             if isStaggeredCol then tileH / 2.0f else 0.0f
 
-                          let py = (float32 y) * yStep + yOffset
+                          let py = float32 y * yStep + yOffset
                           px, py
 
                         | Staggered, ValueSome Y, ValueSome index ->
                           // Staggered Y
                           let xStep = tileW
                           let yStep = tileH / 2.0f
-                          let py = (float32 y) * yStep
+                          let py = float32 y * yStep
 
                           let isStaggeredRow =
                             match index with
@@ -152,12 +150,12 @@ module TerrainRenderSystem =
                           let xOffset =
                             if isStaggeredRow then tileW / 2.0f else 0.0f
 
-                          let px = (float32 x) * xStep + xOffset
+                          let px = float32 x * xStep + xOffset
                           px, py
 
                         | Isometric, _, _ ->
                           // Standard Isometric (Diamond)
-                          let originX = (float32 map.Width) * tileW / 2.0f
+                          let originX = float32 map.Width * tileW / 2.0f
 
                           let px =
                             originX + (float32 x - float32 y) * tileW / 2.0f
@@ -167,11 +165,11 @@ module TerrainRenderSystem =
 
                         | _ ->
                           // Orthogonal or fallback
-                          (float32 x) * tileW, (float32 y) * tileH
+                          float32 x * tileW, float32 y * tileH
 
                       // Adjust for texture height (bottom-align)
                       let drawX = posX
-                      let drawY = posY + tileH - (float32 texture.Height)
+                      let drawY = posY + tileH - float32 texture.Height
 
                       sb.Draw(texture, Vector2(drawX, drawY), Color.White)
                   | ValueNone -> ()

@@ -93,6 +93,7 @@ type PomoGame() as this =
   do
     base.IsMouseVisible <- true
     base.Content.RootDirectory <- "Content"
+    base.Window.AllowUserResizing <- true
 
     graphicsDeviceManager.SupportedOrientations <-
       DisplayOrientation.LandscapeLeft ||| DisplayOrientation.LandscapeRight
@@ -101,17 +102,14 @@ type PomoGame() as this =
 
     base.Services.AddService<Projections.ProjectionService> projections
 
-    base.Services.AddService<Stores.SkillStore> skillStore
-    base.Services.AddService<Stores.ItemStore> itemStore
-    base.Services.AddService<Stores.AIArchetypeStore> aiArchetypeStore
-    // 2. Register global services that all systems can safely access.
+    base.Services.AddService<SkillStore> skillStore
+    base.Services.AddService<ItemStore> itemStore
+    base.Services.AddService<AIArchetypeStore> aiArchetypeStore
     base.Services.AddService<EventBus> eventBus
-    //    Only the READ-ONLY world view is registered, preventing accidental write access.
     base.Services.AddService<World.World> worldView
 
     base.Services.AddService<TargetingService> targetingService
 
-    // 3. Instantiate and add game components (systems).
     base.Components.Add(new RawInputSystem(this, playerId))
     base.Components.Add(new InputMappingSystem(this, playerId))
     base.Components.Add(new PlayerMovementSystem(this, playerId))
@@ -134,7 +132,7 @@ type PomoGame() as this =
     base.Components.Add(new StateUpdateSystem(this, mutableWorld))
 
 
-  override this.Initialize() =
+  override _.Initialize() =
     base.Initialize()
 
     LocalizationManager.DefaultCultureCode |> LocalizationManager.SetCulture
@@ -372,10 +370,6 @@ type PomoGame() as this =
   // e.g., this.Content.Load<Texture2D>("textureName")
 
   override _.Update gameTime =
-    // Update game logic here
-    // e.g., update game entities, handle input, etc.
-    // This call now triggers MovementSystem (publishes events) and then
-    // StateUpdateSystem (drains event queue and modifies state).
     transact(fun () ->
       let previous = mutableWorld.Time.Value.TotalGameTime
 
@@ -390,5 +384,4 @@ type PomoGame() as this =
 
   override _.Draw gameTime =
     base.GraphicsDevice.Clear Color.Peru
-    // Draw game content here
     base.Draw gameTime
