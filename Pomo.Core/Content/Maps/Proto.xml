@@ -1,0 +1,303 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<map version="1.10" tiledversion="1.11.2" orientation="staggered" renderorder="left-down" width="15" height="15" tilewidth="64" tileheight="32" infinite="0" staggeraxis="x" staggerindex="odd" nextlayerid="7" nextobjectid="113">
+ <tileset firstgid="1" name="ProtoTileset" tilewidth="64" tileheight="64" tilecount="66" columns="0">
+  <grid orientation="orthogonal" width="1" height="1"/>
+  <tile id="0">
+   <image source="../Tiles/64x64/Arc_EW.png" width="64" height="64"/>
+  </tile>
+  <tile id="1">
+   <image source="../Tiles/64x64/Arc_NS.png" width="64" height="64"/>
+  </tile>
+  <tile id="2">
+   <image source="../Tiles/64x64/Arc_Rounded_EW.png" width="64" height="64"/>
+  </tile>
+  <tile id="3">
+   <image source="../Tiles/64x64/Arc_Rounded_NS.png" width="64" height="64"/>
+  </tile>
+  <tile id="4">
+   <image source="../Tiles/64x64/CircleInner_NE.png" width="64" height="64"/>
+  </tile>
+  <tile id="5">
+   <image source="../Tiles/64x64/CircleInner_NW.png" width="64" height="64"/>
+  </tile>
+  <tile id="6">
+   <image source="../Tiles/64x64/CircleInner_SE.png" width="64" height="64"/>
+  </tile>
+  <tile id="7">
+   <image source="../Tiles/64x64/CircleInner_SW.png" width="64" height="64"/>
+  </tile>
+  <tile id="8">
+   <image source="../Tiles/64x64/Cube.png" width="64" height="64"/>
+  </tile>
+  <tile id="9">
+   <image source="../Tiles/64x64/Cylinder.png" width="64" height="64"/>
+  </tile>
+  <tile id="10">
+   <image source="../Tiles/64x64/HalfBlock.png" width="64" height="64"/>
+  </tile>
+  <tile id="11">
+   <image source="../Tiles/64x64/InnerCorner_NE.png" width="64" height="64"/>
+  </tile>
+  <tile id="12">
+   <image source="../Tiles/64x64/InnerCorner_NW.png" width="64" height="64"/>
+  </tile>
+  <tile id="13">
+   <image source="../Tiles/64x64/InnerCorner_SE.png" width="64" height="64"/>
+  </tile>
+  <tile id="14">
+   <image source="../Tiles/64x64/InnerCorner_SW.png" width="64" height="64"/>
+  </tile>
+  <tile id="15">
+   <image source="../Tiles/64x64/OuterCorner_NE.png" width="64" height="64"/>
+  </tile>
+  <tile id="16">
+   <image source="../Tiles/64x64/OuterCorner_NW.png" width="64" height="64"/>
+  </tile>
+  <tile id="17">
+   <image source="../Tiles/64x64/OuterCorner_Rounded_NE.png" width="64" height="64"/>
+  </tile>
+  <tile id="18">
+   <image source="../Tiles/64x64/OuterCorner_Rounded_NW.png" width="64" height="64"/>
+  </tile>
+  <tile id="19">
+   <image source="../Tiles/64x64/OuterCorner_Rounded_SE.png" width="64" height="64"/>
+  </tile>
+  <tile id="20">
+   <image source="../Tiles/64x64/OuterCorner_Rounded_SW.png" width="64" height="64"/>
+  </tile>
+  <tile id="21">
+   <image source="../Tiles/64x64/OuterCorner_SE.png" width="64" height="64"/>
+  </tile>
+  <tile id="22">
+   <image source="../Tiles/64x64/OuterCorner_SW.png" width="64" height="64"/>
+  </tile>
+  <tile id="23">
+   <image source="../Tiles/64x64/Pillar.png" width="64" height="64"/>
+  </tile>
+  <tile id="24">
+   <image source="../Tiles/64x64/Pit.png" width="64" height="64"/>
+  </tile>
+  <tile id="25">
+   <image source="../Tiles/64x64/Roll_E.png" width="64" height="64"/>
+  </tile>
+  <tile id="26">
+   <image source="../Tiles/64x64/Roll_N.png" width="64" height="64"/>
+  </tile>
+  <tile id="27">
+   <image source="../Tiles/64x64/Roll_S.png" width="64" height="64"/>
+  </tile>
+  <tile id="28">
+   <image source="../Tiles/64x64/Roll_W.png" width="64" height="64"/>
+  </tile>
+  <tile id="29">
+   <image source="../Tiles/64x64/Slice_NE.png" width="64" height="64"/>
+  </tile>
+  <tile id="30">
+   <image source="../Tiles/64x64/Slice_NW.png" width="64" height="64"/>
+  </tile>
+  <tile id="31">
+   <image source="../Tiles/64x64/Slice_SE.png" width="64" height="64"/>
+  </tile>
+  <tile id="32">
+   <image source="../Tiles/64x64/Slice_SW.png" width="64" height="64"/>
+  </tile>
+  <tile id="33">
+   <image source="../Tiles/64x64/Slope_E.png" width="64" height="64"/>
+  </tile>
+  <tile id="34">
+   <image source="../Tiles/64x64/Slope_N.png" width="64" height="64"/>
+  </tile>
+  <tile id="35">
+   <image source="../Tiles/64x64/Slope_S.png" width="64" height="64"/>
+  </tile>
+  <tile id="36">
+   <image source="../Tiles/64x64/Slope_W.png" width="64" height="64"/>
+  </tile>
+  <tile id="37">
+   <image source="../Tiles/64x64/Sphere.png" width="64" height="64"/>
+  </tile>
+  <tile id="38">
+   <image source="../Tiles/64x64/Stairs_E.png" width="64" height="64"/>
+  </tile>
+  <tile id="39">
+   <image source="../Tiles/64x64/Stairs_InnerCorner_NE.png" width="64" height="64"/>
+  </tile>
+  <tile id="40">
+   <image source="../Tiles/64x64/Stairs_InnerCorner_NW.png" width="64" height="64"/>
+  </tile>
+  <tile id="41">
+   <image source="../Tiles/64x64/Stairs_InnerCorner_SE.png" width="64" height="64"/>
+  </tile>
+  <tile id="42">
+   <image source="../Tiles/64x64/Stairs_InnerCorner_SW.png" width="64" height="64"/>
+  </tile>
+  <tile id="43">
+   <image source="../Tiles/64x64/Stairs_N.png" width="64" height="64"/>
+  </tile>
+  <tile id="44">
+   <image source="../Tiles/64x64/Stairs_OuterCorner_NE.png" width="64" height="64"/>
+  </tile>
+  <tile id="45">
+   <image source="../Tiles/64x64/Stairs_OuterCorner_NW.png" width="64" height="64"/>
+  </tile>
+  <tile id="46">
+   <image source="../Tiles/64x64/Stairs_OuterCorner_SE.png" width="64" height="64"/>
+  </tile>
+  <tile id="47">
+   <image source="../Tiles/64x64/Stairs_OuterCorner_SW.png" width="64" height="64"/>
+  </tile>
+  <tile id="48">
+   <image source="../Tiles/64x64/Stairs_S.png" width="64" height="64"/>
+  </tile>
+  <tile id="49">
+   <image source="../Tiles/64x64/Stairs_W.png" width="64" height="64"/>
+  </tile>
+  <tile id="50">
+   <image source="../Tiles/64x64/Stand_E.png" width="64" height="64"/>
+  </tile>
+  <tile id="51">
+   <image source="../Tiles/64x64/Stand_N.png" width="64" height="64"/>
+  </tile>
+  <tile id="52">
+   <image source="../Tiles/64x64/Stand_S.png" width="64" height="64"/>
+  </tile>
+  <tile id="53">
+   <image source="../Tiles/64x64/Stand_W.png" width="64" height="64"/>
+  </tile>
+  <tile id="54">
+   <image source="../Tiles/64x64/Tube_EW.png" width="64" height="64"/>
+  </tile>
+  <tile id="55">
+   <image source="../Tiles/64x64/Tube_NS.png" width="64" height="64"/>
+  </tile>
+  <tile id="56">
+   <image source="../Tiles/64x64/Tunnel_EW.png" width="64" height="64"/>
+  </tile>
+  <tile id="57">
+   <image source="../Tiles/64x64/Tunnel_NS.png" width="64" height="64"/>
+  </tile>
+  <tile id="58">
+   <image source="../Tiles/64x64/Tunnel_Rounded_EW.png" width="64" height="64"/>
+  </tile>
+  <tile id="59">
+   <image source="../Tiles/64x64/Tunnel_Rounded_NS.png" width="64" height="64"/>
+  </tile>
+  <tile id="60">
+   <image source="../Tiles/64x64/Wall_EW.png" width="64" height="64"/>
+  </tile>
+  <tile id="61">
+   <image source="../Tiles/64x64/Wall_NS.png" width="64" height="64"/>
+  </tile>
+  <tile id="62">
+   <image source="../Tiles/64x64/WallEnd_E.png" width="64" height="64"/>
+  </tile>
+  <tile id="63">
+   <image source="../Tiles/64x64/WallEnd_N.png" width="64" height="64"/>
+  </tile>
+  <tile id="64">
+   <image source="../Tiles/64x64/WallEnd_S.png" width="64" height="64"/>
+  </tile>
+  <tile id="65">
+   <image source="../Tiles/64x64/WallEnd_W.png" width="64" height="64"/>
+  </tile>
+ </tileset>
+ <layer id="1" name="BaseLayer" width="15" height="15">
+  <data encoding="csv">
+11,11,11,11,11,11,11,11,11,11,11,11,11,11,11,
+11,11,11,11,11,11,11,11,11,11,11,11,11,11,11,
+11,11,0,11,11,11,11,0,11,11,11,11,11,11,11,
+11,0,0,11,11,11,0,0,11,11,11,11,11,11,11,
+11,0,11,11,11,11,0,0,0,11,11,11,11,0,11,
+11,0,0,11,11,11,0,11,0,11,11,11,11,0,11,
+11,11,11,11,11,11,11,11,11,11,11,11,0,0,11,
+11,11,11,11,11,11,11,11,11,11,11,11,0,0,11,
+11,11,11,11,11,11,11,11,11,11,11,0,0,0,11,
+11,11,11,11,11,11,11,11,11,11,11,11,11,11,11,
+11,11,11,11,11,11,11,11,11,11,11,11,11,11,11,
+11,11,11,11,11,11,11,11,11,11,11,11,11,11,11,
+11,11,11,11,11,11,11,11,11,11,11,11,11,11,11,
+11,11,11,11,11,11,11,11,11,11,11,11,11,11,11,
+11,11,11,11,11,11,11,11,11,11,11,11,11,11,11
+</data>
+ </layer>
+ <layer id="3" name="SecondFloor" width="15" height="15">
+  <data encoding="csv">
+0,0,0,0,0,0,0,0,0,0,0,0,0,9,9,
+0,0,0,0,0,0,0,0,0,0,0,9,9,9,9,
+0,0,0,0,0,0,0,0,0,0,0,9,9,0,0,
+0,0,0,0,0,0,0,0,0,0,50,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
+</data>
+ </layer>
+ <objectgroup id="4" name="Objects">
+  <object id="2" gid="59" x="160.909" y="47.2727" width="64" height="64">
+   <properties>
+    <property name="Kind" value="Portal"/>
+   </properties>
+  </object>
+  <object id="4" gid="61" x="6" y="367.5" width="64" height="64">
+   <properties>
+    <property name="Kind" value="Wall"/>
+   </properties>
+  </object>
+  <object id="8" gid="64" x="42.75" y="364.25" width="64" height="64">
+   <properties>
+    <property name="Kind" value="Wall"/>
+   </properties>
+  </object>
+  <object id="9" gid="2147483709" x="28.125" y="311.875" width="64" height="64">
+   <properties>
+    <property name="Kind" value="Wall"/>
+   </properties>
+  </object>
+  <object id="10" gid="61" x="60.875" y="306.5" width="64" height="64">
+   <properties>
+    <property name="Kind" value="Wall"/>
+   </properties>
+  </object>
+  <object id="11" gid="57" x="448.333" y="32" width="64" height="64">
+   <properties>
+    <property name="Kind" value="Portal"/>
+   </properties>
+  </object>
+  <object id="112" gid="10" x="227.827" y="306.534" width="64" height="64">
+   <properties>
+    <property name="Kind" value="Wall"/>
+   </properties>
+  </object>
+ </objectgroup>
+ <objectgroup id="5" name="Collisions">
+  <object id="100" name="Ground" type="Walkable" x="12.6667" y="0" width="481.333" height="470">
+   <properties>
+    <property name="Elevation" type="int" value="0"/>
+   </properties>
+  </object>
+  <object id="102" name="Void" type="Flyable" x="196.088" y="69.3315" width="119.27" height="114.75" rotation="358.86">
+   <properties>
+    <property name="Elevation" type="int" value="0"/>
+   </properties>
+  </object>
+  <object id="103" name="Mud" type="Zone" x="173" y="365" width="290" height="50">
+   <properties>
+    <property name="Effect" value="Slow"/>
+    <property name="Value" type="float" value="0.5"/>
+   </properties>
+  </object>
+  <object id="111" name="Platform" x="355.333" y="64">
+   <properties>
+    <property name="Elevation" type="int" value="1"/>
+   </properties>
+   <polygon points="-2.33333,-0.291667 29.375,16.1667 125.083,-31.9583 91.6667,-49.6667 92,-63.3333 62.3333,-63.6667 -4,-31.6667 27.875,-16.0417"/>
+  </object>
+ </objectgroup>
+</map>
