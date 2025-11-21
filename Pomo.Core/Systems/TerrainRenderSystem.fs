@@ -3,6 +3,7 @@ namespace Pomo.Core.Systems
 open System
 open Microsoft.Xna.Framework
 open Microsoft.Xna.Framework.Graphics
+open FSharp.Data.Adaptive
 open Pomo.Core.Domain.Map
 open Pomo.Core
 open FSharp.Data.Adaptive
@@ -11,8 +12,11 @@ open Pomo.Core.Stores
 
 module TerrainRenderSystem =
 
-  type TerrainRenderSystem(game: Game, mapKey: string) =
+  type TerrainRenderSystem
+    (game: Game, mapKey: string, [<Struct>] ?layersToRender: string seq) =
     inherit DrawableGameComponent(game)
+
+    let layersToRender = layersToRender |> ValueOption.map HashSet.ofSeq
 
     let mutable mapDefinition: MapDefinition voption = ValueNone
     let mutable tilesetTexture: Texture2D voption = ValueNone
@@ -61,6 +65,13 @@ module TerrainRenderSystem =
           SamplerState.PointClamp
         )
 
+        let layers =
+          match layersToRender with
+          | ValueSome names ->
+            map.Layers
+            |> IndexList.filter(fun l -> names |> HashSet.contains l.Name)
+          | ValueNone -> map.Layers
+
         // Render order: RightDown is standard
         // For staggered iso, we iterate Y then X usually, or just iterate the array.
 
@@ -69,7 +80,7 @@ module TerrainRenderSystem =
         // top-down/isometric projection with overlapping tiles, we must draw back-to-front.
         // (0,0) is top-left (back), (W,H) is bottom-right (front).
 
-        for layer in map.Layers do
+        for layer in layers do
           if layer.Visible then
             // For Staggered X, we must draw "Unstaggered" columns (High) then "Staggered" columns (Low)
             // for each row to ensure correct occlusion.

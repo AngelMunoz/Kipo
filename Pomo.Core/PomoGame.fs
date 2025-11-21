@@ -129,9 +129,14 @@ type PomoGame() as this =
     base.Components.Add(new MovementSystem(this))
     base.Components.Add(new NotificationSystem(this, eventBus))
     base.Components.Add(new EffectProcessingSystem(this))
-    let terrainRenderSystem = new TerrainRenderSystem(this, "Proto1")
-    base.Components.Add(terrainRenderSystem)
-    base.Components.Add(new RenderSystem(this, playerId))
+
+    base.Components.Add(
+      new RenderOrchestratorSystem.RenderOrchestratorSystem(
+        this,
+        "Proto1",
+        playerId
+      )
+    )
 
     let debugRenderSystem = new DebugRenderSystem(this, playerId, "Proto1")
     base.Components.Add(debugRenderSystem)

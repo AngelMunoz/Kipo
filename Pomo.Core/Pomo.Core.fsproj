@@ -41,6 +41,7 @@
     <Compile Include="Systems/MapLoader.fs" />
     <Compile Include="Systems/TerrainRenderSystem.fs" />
     <Compile Include="Systems/Render.fs" />
+    <Compile Include="Systems/RenderOrchestratorSystem.fs" />
     <Compile Include="Systems/DebugRender.fs" />
     <Compile Include="Systems/State.fs" />
     <Compile Include="Systems/Inventory.fs" />

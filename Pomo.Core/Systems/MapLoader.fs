@@ -167,6 +167,7 @@ module MapLoader =
       Tiles = tiles
       Opacity = opacity
       Visible = visible
+      Properties = parseProperties element
     }
 
   let private parseObject(element: XElement) : MapObject =

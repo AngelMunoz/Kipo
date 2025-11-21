@@ -53,6 +53,7 @@ module Map =
     Tiles: MapTile voption[,] // 2D array of potential tiles
     Opacity: float32
     Visible: bool
+    Properties: HashMap<string, string>
   }
 
   [<Struct>]
