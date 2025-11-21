@@ -138,11 +138,16 @@ module SystemCommunications =
     Amount: int voption // ValueNone or higher than instance's usage left means drop all
   }
 
-  [<Struct>]
   type UseItemIntent = {
     EntityId: Guid<EntityId>
     ItemInstanceId: Guid<ItemInstanceId>
   }
+
+  [<Struct>]
+  type CollisionEvents =
+    | EntityCollision of entity: struct (Guid<EntityId> * Guid<EntityId>)
+    | MapObjectCollision of
+      object: struct (Guid<EntityId> * MapObject * Vector2)
 
 // --- State Change Events ---
 
@@ -202,10 +207,6 @@ type AIStateChange =
   | ControllerUpdated of
     struct (Guid<EntityId> * Pomo.Core.Domain.AI.AIController)
 
-type CollisionEvents =
-  | EntityCollision of struct (Guid<EntityId> * Guid<EntityId>)
-  | MapObjectCollision of struct (Guid<EntityId> * MapObject)
-
 [<Struct>]
 type StateChangeEvent =
   | EntityLifecycle of entityLifeCycle: EntityLifecycleEvents
@@ -214,7 +215,6 @@ type StateChangeEvent =
   | Combat of combat: CombatEvents
   | Inventory of inventory: InventoryEvents
   | AI of ai: AIStateChange
-  | Collision of collision: CollisionEvents
   // Uncategorized
   | CreateProjectile of
     projParams: struct (Guid<EntityId> * LiveProjectile * Vector2 voption)

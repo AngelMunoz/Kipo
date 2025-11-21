@@ -15,6 +15,7 @@ open Pomo.Core.Domain.Events
 open Pomo.Core.Systems.Systems
 
 module Collision =
+  open Pomo.Core.Domain
 
   // Helper to get entities in nearby cells
   let getNearbyEntities
@@ -74,9 +75,8 @@ module Collision =
                 // Simple radius check (assuming 32.0f radius for now)
                 if distance < 64.0f then
                   this.EventBus.Publish(
-                    StateChangeEvent.Collision(
-                      CollisionEvents.EntityCollision struct (entityId, otherId)
-                    )
+                    SystemCommunications.EntityCollision
+                      struct (entityId, otherId)
                   )
               | ValueNone -> ()
         | ValueNone -> ()
@@ -89,16 +89,25 @@ module Collision =
           | ValueSome pos ->
             for group in mapDef.ObjectGroups do
               for obj in group.Objects do
-                let entityPoly = getEntityPolygon pos
-                let objPoly = getMapObjectPolygon obj
+                let isCollidable =
+                  match obj.Type with
+                  | ValueSome MapObjectType.Wall -> true
+                  | _ -> false
 
-                if intersects entityPoly objPoly then
-                  // Debug log
-                  // Console.WriteLine($"Collision detected with {obj.Name} (ID: {obj.Id})")
-                  this.EventBus.Publish(
-                    StateChangeEvent.Collision(
-                      CollisionEvents.MapObjectCollision struct (entityId, obj)
+                if isCollidable then
+                  let entityPoly = getEntityPolygon pos
+                  let objPoly = getMapObjectPolygon obj
+
+                  match Spatial.intersectsMTV entityPoly objPoly with
+                  | ValueSome mtv ->
+                    Console.WriteLine(
+                      $"[CollisionSystem] Collision with {obj.Name} (ID: {obj.Id}). MTV: {mtv}"
                     )
-                  )
+
+                    this.EventBus.Publish(
+                      SystemCommunications.MapObjectCollision
+                        struct (entityId, obj, mtv)
+                    )
+                  | ValueNone -> ()
           | ValueNone -> ()
       | ValueNone -> ()

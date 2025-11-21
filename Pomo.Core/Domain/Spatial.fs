@@ -52,6 +52,49 @@ module Spatial =
       let projB = project axis polyB
       overlap projA projB)
 
+  let intersectsMTV
+    (polyA: IndexList<Vector2>)
+    (polyB: IndexList<Vector2>)
+    : Vector2 voption =
+    let axesA = getAxes polyA
+    let axesB = getAxes polyB
+    let allAxes = IndexList.append axesA axesB
+
+    let mutable minOverlap = Single.MaxValue
+    let mutable mtvAxis = Vector2.Zero
+    let mutable separated = false
+
+    for axis in allAxes do
+      if not separated then
+        let minA, maxA = project axis polyA
+        let minB, maxB = project axis polyB
+
+        if not(overlap (minA, maxA) (minB, maxB)) then
+          separated <- true
+        else
+          let o = Math.Min(maxA, maxB) - Math.Max(minA, minB)
+
+          if o < minOverlap then
+            minOverlap <- o
+            mtvAxis <- axis
+
+    if separated then
+      ValueNone
+    else
+      // Calculate centers for direction
+      let centerA =
+        polyA |> Seq.fold (+) Vector2.Zero |> (fun s -> s / float32 polyA.Count)
+
+      let centerB =
+        polyB |> Seq.fold (+) Vector2.Zero |> (fun s -> s / float32 polyB.Count)
+
+      let direction = centerA - centerB
+
+      if Vector2.Dot(direction, mtvAxis) < 0.0f then
+        mtvAxis <- -mtvAxis
+
+      ValueSome(mtvAxis * minOverlap)
+
   let getEntityPolygon(pos: Vector2) =
     IndexList.ofList [
       Vector2(pos.X - 16.0f, pos.Y - 16.0f)
