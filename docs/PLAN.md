@@ -310,12 +310,16 @@ This system is the core of the stat calculation pipeline.
 
 ### 9.5 ✅ Verification Checklist
 
-- [ ] Can a map file exported from Tiled (`.json`) be successfully parsed into a `MapDefinition`?
-- [ ] Does the `TerrainRenderSystem` correctly draw the tilemap in an isometric view?
-- [ ] Do entities correctly collide with tiles marked as `Blocked`?
-- [ ] Does the `MovementSystem` prevent entities from moving into blocked spaces?
-- [ ] Can the `SpatialGrid` be queried to find entities within a specific area?
-- [ ] Does a debug renderer correctly visualize the collision shapes of entities and the spatial grid boundaries?
+- [x] Can a map file exported from Tiled (`.xml`) be successfully parsed into a `MapDefinition`?
+- [x] Does the `TerrainRenderSystem` correctly draw the tilemap with data-driven layer ordering?
+- [x] Does the `CollisionSystem` detect and publish events for entity-wall collisions?
+- [x] Do `PlayerMovementSystem` and `UnitMovementSystem` react to wall collisions to prevent entities from moving into blocked spaces?
+- [x] Can the `SpatialGrid` be queried via a helper function (`Collision.getNearbyEntities`) to find entities in a specific area?
+- [x] Does a debug renderer correctly visualize collision shapes and the spatial grid, rendering on top of all game elements?
+- [ ] Is there a reactive `Projections.getNearbyEntities` that uses the spatial grid for efficient, declarative queries (e.g., for AI)?
+- [ ] Is the `CombatSystem`'s AoE logic refactored to use the `SpatialGrid` for efficient target acquisition instead of iterating all entities?
+- [ ] Is map loading fully dynamic, allowing systems like the `RenderOrchestrator` to react to map changes at runtime?
+- [ ] (Optional Refactor) Has the duplicated collision response logic in `PlayerMovementSystem` and `UnitMovementSystem` been unified for better maintainability?
 
 ## 10. Phase 6: AI
 
