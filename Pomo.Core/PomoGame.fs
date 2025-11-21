@@ -138,7 +138,7 @@ type PomoGame() as this =
       )
     )
 
-    let debugRenderSystem = new DebugRenderSystem(this, playerId, "Proto1")
+    let debugRenderSystem = new DebugRenderSystem(this, playerId, "Proto1", DrawOrder = 999)
     base.Components.Add(debugRenderSystem)
 
     base.Components.Add(
