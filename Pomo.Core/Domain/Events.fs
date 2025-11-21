@@ -15,6 +15,7 @@ open Pomo.Core.Domain.Projectile
 open Pomo.Core.Domain.RawInput
 open Pomo.Core.Domain.Skill
 open Pomo.Core.Domain.Item
+open Pomo.Core.Domain.Map
 open Pomo.Core.Domain.AI
 open Pomo.Core.Domain.Core
 
@@ -201,6 +202,10 @@ type AIStateChange =
   | ControllerUpdated of
     struct (Guid<EntityId> * Pomo.Core.Domain.AI.AIController)
 
+type CollisionEvents =
+  | EntityCollision of struct (Guid<EntityId> * Guid<EntityId>)
+  | MapObjectCollision of struct (Guid<EntityId> * MapObject)
+
 [<Struct>]
 type StateChangeEvent =
   | EntityLifecycle of entityLifeCycle: EntityLifecycleEvents
@@ -209,6 +214,7 @@ type StateChangeEvent =
   | Combat of combat: CombatEvents
   | Inventory of inventory: InventoryEvents
   | AI of ai: AIStateChange
+  | Collision of collision: CollisionEvents
   // Uncategorized
   | CreateProjectile of
     projParams: struct (Guid<EntityId> * LiveProjectile * Vector2 voption)

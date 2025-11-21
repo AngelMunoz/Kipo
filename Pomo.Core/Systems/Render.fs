@@ -36,7 +36,14 @@ module Render =
         return None
       else
         let size = Vector2(32.0f, 32.0f)
-        let rect = Rectangle(int pos.X, int pos.Y, int size.X, int size.Y)
+
+        let rect =
+          Rectangle(
+            int(pos.X - size.X / 2.0f),
+            int(pos.Y - size.Y / 2.0f),
+            int size.X,
+            int size.Y
+          )
 
         if entityId = playerId then
           return Some(DrawPlayer rect)

@@ -389,5 +389,6 @@ module StateUpdate =
               AI.updateController mutableWorld (entityId, controller)
 
           // Uncategorized
+          | Collision _ -> () // TODO: Handle collision state updates if needed (e.g. apply damage, stop movement)
           | CreateProjectile projParams ->
             Entity.createProjectile mutableWorld projParams)

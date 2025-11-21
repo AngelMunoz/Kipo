@@ -48,7 +48,8 @@ module DebugRender =
       height: float32 *
       rotation: float32 *
       color: Color
-    | DrawSpatialGrid of grid: SpatialGrid
+    | DrawEntityBounds of position: Vector2
+    | DrawSpatialGrid of grid: HashMap<GridCell, IndexList<Guid<EntityId>>>
 
   let private generateActiveEffectCommands
     (world: World.World)
@@ -195,6 +196,17 @@ module DebugRender =
           IndexList.empty)
     | ValueNone -> IndexList.empty
 
+  let private generateEntityBoundsCommands
+    (positions: amap<Guid<EntityId>, Vector2>)
+    =
+    positions
+    |> AMap.chooseA(fun _ pos -> adaptive {
+      return Some(IndexList.single(DrawEntityBounds pos))
+    })
+    |> AMap.fold
+      (fun acc _ cmds -> IndexList.concat [ acc; cmds ])
+      IndexList.empty
+
   let private generateDebugCommands
     (
       world: World.World,
@@ -223,6 +235,8 @@ module DebugRender =
 
       and! aiStateCmds = generateAIStateCommands positions world.AIControllers
 
+      and! entityBoundsCmds = generateEntityBoundsCommands positions
+
       let! spatialGrid = spatialGrid |> AMap.toAVal
 
       return
@@ -232,6 +246,7 @@ module DebugRender =
           inventoryCmds
           equippedCmds
           aiStateCmds
+          entityBoundsCmds
           generateMapObjectCommands map
           IndexList.single(DrawSpatialGrid spatialGrid)
         ]
@@ -534,6 +549,14 @@ module DebugRender =
             | ValueNone ->
               drawEllipse sb px position width height rotation color
               drawEllipse sb px position width height rotation color
+              drawEllipse sb px position width height rotation color
+          | ValueNone -> ()
+
+        | DrawEntityBounds position ->
+          match pixel with
+          | ValueSome px ->
+            let poly = Spatial.getEntityPolygon position
+            drawPolygon sb px poly Vector2.Zero 0.0f Color.Red
           | ValueNone -> ()
 
         | DrawSpatialGrid grid ->

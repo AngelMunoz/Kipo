@@ -41,6 +41,7 @@ open Pomo.Core.Systems.Equipment
 open Pomo.Core.Systems.TerrainRenderSystem
 open Pomo.Core.Domain.Units
 open Pomo.Core.Stores
+open Pomo.Core.Systems.Collision
 
 type PomoGame() as this =
   inherit Game()
@@ -124,6 +125,7 @@ type PomoGame() as this =
     base.Components.Add(new CombatSystem(this))
     base.Components.Add(new ResourceManagerSystem(this))
     base.Components.Add(new ProjectileSystem(this))
+    base.Components.Add(new CollisionSystem(this, "Proto1"))
     base.Components.Add(new MovementSystem(this))
     base.Components.Add(new NotificationSystem(this, eventBus))
     base.Components.Add(new EffectProcessingSystem(this))
@@ -272,9 +274,6 @@ type PomoGame() as this =
 
     createEnemy enemyId1 (Vector2(300.0f, 100.0f))
     createEnemy enemyId2 (Vector2(350.0f, 150.0f))
-    createEnemy enemyId3 (Vector2(400.0f, 100.0f))
-    createEnemy enemyId4 (Vector2(450.0f, 150.0f))
-    createEnemy enemyId5 (Vector2(500.0f, 100.0f))
 
     // AI Controller Setup
     let createAIController

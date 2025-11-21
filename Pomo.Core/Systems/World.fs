@@ -16,6 +16,7 @@ module Systems =
     | Combat
     | Effects
     | ResourceManager
+    | Collision
 
   type GameSystem(game: Game) =
     inherit GameComponent(game)
