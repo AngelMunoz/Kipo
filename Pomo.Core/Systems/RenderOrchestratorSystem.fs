@@ -63,7 +63,8 @@ module RenderOrchestratorSystem =
             layersToRender = layerNames
           ) // Explicitly qualified
         // Scale groupIndex to get distinct DrawOrder values
-        terrainRenderer.DrawOrder <- groupIndex * 10
+        terrainRenderer.DrawOrder <- Render.Layer.TerrainBase + groupIndex * 20
+
         game.Components.Add terrainRenderer
 
         createdComponents <-
@@ -73,7 +74,7 @@ module RenderOrchestratorSystem =
       // Create and add RenderSystem for entities, using convention for RenderGroup = 1
       let entityRenderer = new Render.RenderSystem(game, playerId) // Explicitly qualified
       // Entities get DrawOrder 10 times their conventional RenderGroup (1)
-      entityRenderer.DrawOrder <- 1 * 10
+      entityRenderer.DrawOrder <- Render.Layer.Entities
       game.Components.Add entityRenderer
       createdComponents <- entityRenderer :> IGameComponent :: createdComponents
 

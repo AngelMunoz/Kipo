@@ -16,6 +16,18 @@ module Spatial =
     Y = int(position.Y / cellSize)
   }
 
+  let getCellsInRadius (cellSize: float32) (center: Vector2) (radius: float32) =
+    let minX = int((center.X - radius) / cellSize)
+    let maxX = int((center.X + radius) / cellSize)
+    let minY = int((center.Y - radius) / cellSize)
+    let maxY = int((center.Y + radius) / cellSize)
+
+    IndexList.ofArray [|
+      for x in minX..maxX do
+        for y in minY..maxY do
+          { X = x; Y = y }
+    |]
+
   // SAT Helpers
   let getAxes(points: IndexList<Vector2>) =
     points
@@ -129,3 +141,39 @@ module Spatial =
         ]
 
       corners |> IndexList.map(fun p -> rotate p radians + pos)
+
+  let isPointInCone
+    (origin: Vector2)
+    (direction: Vector2)
+    (angleDegrees: float32)
+    (length: float32)
+    (point: Vector2)
+    =
+    let distanceSquared = Vector2.DistanceSquared(origin, point)
+
+    if distanceSquared > length * length then
+      false
+    else
+      let toPoint = Vector2.Normalize(point - origin)
+      let angleRadians = MathHelper.ToRadians(angleDegrees / 2.0f)
+      let dot = Vector2.Dot(direction, toPoint)
+      let cosAngle = MathF.Cos angleRadians
+      dot >= cosAngle
+
+  let isPointInLine
+    (start: Vector2)
+    (endPoint: Vector2)
+    (width: float32)
+    (point: Vector2)
+    =
+    let lineVec = endPoint - start
+    let lineLenSq = lineVec.LengthSquared()
+
+    if lineLenSq = 0.0f then
+      Vector2.DistanceSquared(start, point) <= width / 2.0f * (width / 2.0f)
+    else
+      let t = Vector2.Dot(point - start, lineVec) / lineLenSq
+      let tClamped = Math.Clamp(t, 0.0f, 1.0f)
+      let projection = start + lineVec * tClamped
+      let distSq = Vector2.DistanceSquared(point, projection)
+      distSq <= width / 2.0f * (width / 2.0f)

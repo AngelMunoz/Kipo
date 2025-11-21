@@ -30,6 +30,18 @@ module Units =
   type ObjectId
 
 
+module Render =
+  [<RequireQualifiedAccess>]
+  module Layer =
+    let TerrainBase = 0
+    let Items = 100
+    let Entities = 200
+    let Projectiles = 250
+    let VFX = 300
+    let UI = 1000
+    let Debug = 9999
+
+
 module Core =
   open FSharp.UMX
 

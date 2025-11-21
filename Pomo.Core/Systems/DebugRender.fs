@@ -15,9 +15,11 @@ open Pomo.Core.Domain.Units
 open Pomo.Core.Domain.Skill
 open Pomo.Core.Domain.Action
 open Pomo.Core.Domain.Item
-open Pomo.Core.Domain.Item
 open Pomo.Core.Domain.AI
 open Pomo.Core.Stores
+open Pomo.Core.EventBus
+open Pomo.Core.Systems
+open Pomo.Core.Domain.Events
 
 module DebugRender =
   open Pomo.Core
@@ -50,6 +52,17 @@ module DebugRender =
       color: Color
     | DrawEntityBounds of position: Vector2
     | DrawSpatialGrid of grid: HashMap<GridCell, IndexList<Guid<EntityId>>>
+    | DrawCone of
+      origin: Vector2 *
+      direction: Vector2 *
+      angle: float32 *
+      length: float32 *
+      color: Color
+    | DrawLineShape of
+      start: Vector2 *
+      end': Vector2 *
+      width: float32 *
+      color: Color
 
   let private generateActiveEffectCommands
     (world: World.World)
@@ -338,6 +351,87 @@ module DebugRender =
 
       drawLine sb pixel p1 p2 color
 
+  let private drawCone
+    (sb: SpriteBatch)
+    (pixel: Texture2D)
+    (origin: Vector2)
+    (direction: Vector2)
+    (angle: float32)
+    (length: float32)
+    (color: Color)
+    =
+    let halfAngleRad = MathHelper.ToRadians(angle / 2.0f)
+    let baseAngle = float32(Math.Atan2(float direction.Y, float direction.X))
+
+    let leftAngle = baseAngle - halfAngleRad
+    let rightAngle = baseAngle + halfAngleRad
+
+    let leftPoint =
+      origin
+      + Vector2(
+        length * float32(Math.Cos(float leftAngle)),
+        length * float32(Math.Sin(float leftAngle))
+      )
+
+    let rightPoint =
+      origin
+      + Vector2(
+        length * float32(Math.Cos(float rightAngle)),
+        length * float32(Math.Sin(float rightAngle))
+      )
+
+    drawLine sb pixel origin leftPoint color
+    drawLine sb pixel origin rightPoint color
+
+    // Draw arc
+    let segments = 10
+    let angleStep = (rightAngle - leftAngle) / float32 segments
+
+    for i in 0 .. segments - 1 do
+      let a1 = leftAngle + float32 i * angleStep
+      let a2 = leftAngle + float32(i + 1) * angleStep
+
+      let p1 =
+        origin
+        + Vector2(
+          length * float32(Math.Cos(float a1)),
+          length * float32(Math.Sin(float a1))
+        )
+
+      let p2 =
+        origin
+        + Vector2(
+          length * float32(Math.Cos(float a2)),
+          length * float32(Math.Sin(float a2))
+        )
+
+      drawLine sb pixel p1 p2 color
+
+  let private drawLineShape
+    (sb: SpriteBatch)
+    (pixel: Texture2D)
+    (start: Vector2)
+    (end': Vector2)
+    (width: float32)
+    (color: Color)
+    =
+    let edge = end' - start
+    let length = edge.Length()
+
+    if length > 0.0f then
+      let direction = Vector2.Normalize edge
+      let perpendicular = Vector2(-direction.Y, direction.X) * (width / 2.0f)
+
+      let p1 = start + perpendicular
+      let p2 = start - perpendicular
+      let p3 = end' - perpendicular
+      let p4 = end' + perpendicular
+
+      drawLine sb pixel p1 p2 color
+      drawLine sb pixel p2 p3 color
+      drawLine sb pixel p3 p4 color
+      drawLine sb pixel p4 p1 color
+
   type DebugRenderSystem(game: Game, playerId: Guid<EntityId>, mapKey: string) =
     inherit DrawableGameComponent(game)
 
@@ -355,6 +449,10 @@ module DebugRender =
 
     let showStats = cval false
     let showInventory = cval false
+
+    let transientCommands = ResizeArray<struct (DebugDrawCommand * TimeSpan)>()
+    let skillStore = game.Services.GetService<SkillStore>()
+    let subscriptions = new System.Reactive.Disposables.CompositeDisposable()
 
     let debugCommands =
       generateDebugCommands
@@ -453,7 +551,175 @@ module DebugRender =
 
       let p = new Texture2D(game.GraphicsDevice, 1, 1)
       p.SetData([| Color.White |])
+      p.SetData([| Color.White |])
       pixel <- ValueSome p
+
+      let eventBus = game.Services.GetService<EventBus>()
+
+      eventBus.GetObservableFor<SystemCommunications.AbilityIntent>()
+      |> FSharp.Control.Reactive.Observable.subscribe(fun intent ->
+        match skillStore.tryFind intent.SkillId with
+        | ValueSome(Active skill) ->
+          let casterPos =
+            projections.UpdatedPositions
+            |> AMap.tryFind intent.Caster
+            |> AVal.force
+            |> Option.defaultValue Vector2.Zero
+
+          let targetPos =
+            match intent.Target with
+            | SystemCommunications.TargetPosition pos -> pos
+            | SystemCommunications.TargetEntity id ->
+              projections.UpdatedPositions
+              |> AMap.tryFind id
+              |> AVal.force
+              |> Option.defaultValue casterPos
+            | _ -> casterPos
+
+          let color = Color.Orange
+
+          let command =
+            match skill.Area with
+            | Cone(angle, length, _) ->
+              let direction =
+                if Vector2.DistanceSquared(casterPos, targetPos) > 0.001f then
+                  Vector2.Normalize(targetPos - casterPos)
+                else
+                  Vector2.UnitX
+
+              Some(DrawCone(casterPos, direction, angle, length, color))
+            | Line(width, length, _) ->
+              let direction =
+                if Vector2.DistanceSquared(casterPos, targetPos) > 0.001f then
+                  Vector2.Normalize(targetPos - casterPos)
+                else
+                  Vector2.UnitX
+
+              let endPoint = casterPos + direction * length
+              Some(DrawLineShape(casterPos, endPoint, width, color))
+            | Circle(radius, _) ->
+              // Represent circle as two ellipses (cross) or just one
+              // For now, let's use a simple way or add DrawCircle if needed.
+              // We can reuse DrawMapObject's ellipse logic or just add DrawCircle.
+              // Let's use DrawCone with 360 angle? No, DrawCone logic might fail.
+              // Let's just skip Circle for now or add DrawCircle later.
+              None
+            | AdaptiveCone(effectiveWidth, _, _) ->
+              let distance = Vector2.Distance(casterPos, targetPos)
+
+              let angle =
+                if distance > 0.001f then
+                  2.0f
+                  * float32(
+                    Math.Atan(float(effectiveWidth / (2.0f * distance)))
+                  )
+                else
+                  MathHelper.Pi
+
+              let angle = Math.Min(angle, MathHelper.Pi)
+
+              let direction =
+                if distance > 0.001f then
+                  Vector2.Normalize(targetPos - casterPos)
+                else
+                  Vector2.UnitX
+
+              // Use distance as length for visualization? Or skill length?
+              // Skill length is usually the max range.
+              // But for adaptive cone, the "cone" is conceptual.
+              // Let's use distance as length to show the cone reaching the target.
+              Some(
+                DrawCone(
+                  casterPos,
+                  direction,
+                  MathHelper.ToDegrees angle,
+                  distance,
+                  color
+                )
+              )
+            | _ -> None
+
+          match command with
+          | Some cmd ->
+            transientCommands.Add(struct (cmd, TimeSpan.FromSeconds 2.0))
+          | None -> ()
+        | _ -> ())
+      |> subscriptions.Add
+
+      eventBus.GetObservableFor<SystemCommunications.ProjectileImpacted>()
+      |> FSharp.Control.Reactive.Observable.subscribe(fun impact ->
+        match skillStore.tryFind impact.SkillId with
+        | ValueSome(Active skill) ->
+          let casterPos =
+            projections.UpdatedPositions
+            |> AMap.tryFind impact.CasterId
+            |> AVal.force
+            |> Option.defaultValue Vector2.Zero
+
+          let impactPos =
+            projections.UpdatedPositions
+            |> AMap.tryFind impact.TargetId
+            |> AVal.force
+            |> Option.defaultValue Vector2.Zero
+
+          let color = Color.Red
+
+          let command =
+            match skill.Area with
+            | Cone(angle, length, _) ->
+              let direction =
+                if Vector2.DistanceSquared(casterPos, impactPos) > 0.001f then
+                  Vector2.Normalize(impactPos - casterPos)
+                else
+                  Vector2.UnitX
+
+              Some(DrawCone(impactPos, direction, angle, length, color))
+            | Line(width, length, _) ->
+              let direction =
+                if Vector2.DistanceSquared(casterPos, impactPos) > 0.001f then
+                  Vector2.Normalize(impactPos - casterPos)
+                else
+                  Vector2.UnitX
+
+              let endPoint = impactPos + direction * length
+              Some(DrawLineShape(impactPos, endPoint, width, color))
+            | AdaptiveCone(effectiveWidth, _, _) ->
+              let distance = Vector2.Distance(casterPos, impactPos)
+
+              let angle =
+                if distance > 0.001f then
+                  2.0f
+                  * float32(
+                    Math.Atan(float(effectiveWidth / (2.0f * distance)))
+                  )
+                else
+                  MathHelper.Pi
+
+              let angle = Math.Min(angle, MathHelper.Pi)
+
+              let direction =
+                if distance > 0.001f then
+                  Vector2.Normalize(impactPos - casterPos)
+                else
+                  Vector2.UnitX
+
+              Some(
+                DrawCone(
+                  impactPos,
+                  direction,
+                  MathHelper.ToDegrees angle,
+                  distance,
+                  color
+                )
+              )
+            | _ -> None
+
+          match command with
+          | Some cmd ->
+            transientCommands.Add(struct (cmd, TimeSpan.FromSeconds 2.0))
+          | None -> ()
+        | _ -> ())
+      |> subscriptions.Add
 
     override _.Update gameTime =
       base.Update gameTime
@@ -476,6 +742,19 @@ module DebugRender =
       let sb = spriteBatch.Value
       let commandsToExecute = AVal.force debugCommands
       let totalGameTime = world.Time |> AVal.map _.TotalGameTime |> AVal.force
+
+      // Prune expired transient commands
+      let activeTransient = ResizeArray()
+
+      for struct (cmd, duration) in transientCommands do
+        let newDuration = duration - gameTime.ElapsedGameTime
+
+        if newDuration > TimeSpan.Zero then
+          activeTransient.Add(struct (cmd, newDuration))
+
+      transientCommands.Clear()
+      transientCommands.AddRange activeTransient
+
       let mutable yOffsets = HashMap.empty<Guid<EntityId>, float32>
 
       sb.Begin()
@@ -604,5 +883,19 @@ module DebugRender =
                 let textPos = Vector2(x + 5.0f, y + 5.0f)
                 sb.DrawString(hudFont, text, textPos, Color.White)
           | ValueNone -> ()
+        | DrawCone(origin, direction, angle, length, color) -> ()
+        | DrawLineShape(start, end', width, color) -> ()
+
+      for struct (cmd, _) in transientCommands do
+        match cmd with
+        | DrawCone(origin, direction, angle, length, color) ->
+          match pixel with
+          | ValueSome px -> drawCone sb px origin direction angle length color
+          | ValueNone -> ()
+        | DrawLineShape(start, end', width, color) ->
+          match pixel with
+          | ValueSome px -> drawLineShape sb px start end' width color
+          | ValueNone -> ()
+        | _ -> ()
 
       sb.End()

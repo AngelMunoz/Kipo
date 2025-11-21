@@ -127,7 +127,11 @@ type PomoGame() as this =
     base.Components.Add(new ProjectileSystem(this))
     base.Components.Add(new CollisionSystem(this, "Proto1"))
     base.Components.Add(new MovementSystem(this))
-    base.Components.Add(new NotificationSystem(this, eventBus))
+
+    base.Components.Add(
+      new NotificationSystem(this, eventBus, DrawOrder = Render.Layer.UI)
+    )
+
     base.Components.Add(new EffectProcessingSystem(this))
 
     base.Components.Add(
@@ -138,8 +142,14 @@ type PomoGame() as this =
       )
     )
 
-    let debugRenderSystem = new DebugRenderSystem(this, playerId, "Proto1", DrawOrder = 999)
-    base.Components.Add(debugRenderSystem)
+    base.Components.Add(
+      new DebugRenderSystem(
+        this,
+        playerId,
+        "Proto1",
+        DrawOrder = Render.Layer.Debug
+      )
+    )
 
     base.Components.Add(
       new AISystem(this, worldView, eventBus, skillStore, aiArchetypeStore)
@@ -351,16 +361,25 @@ type PomoGame() as this =
       UseSlot2, Core.SlotProcessing.Item trollBloodPotion.InstanceId
     ]
 
+    let actionSet3 = [
+      UseSlot1, Core.SlotProcessing.Skill %9 // Dragon's Breath
+      UseSlot2, Core.SlotProcessing.Skill %10 // Railgun
+      UseSlot3, Core.SlotProcessing.Skill %11 // Ice Shard
+      UseSlot4, Core.SlotProcessing.Skill %12 // Piercing Bolt
+      UseSlot5, Core.SlotProcessing.Skill %13 // Fan of Knives
+    ]
+
     let actionSets = [
       1, HashMap.ofList actionSet1
       2, HashMap.ofList actionSet2
+      3, HashMap.ofList actionSet3
     ]
 
     eventBus.Publish(
       Input(ActionSetsChanged struct (playerId, HashMap.ofList actionSets))
     )
 
-    eventBus.Publish(Input(ActiveActionSetChanged struct (playerId, 1)))
+    eventBus.Publish(Input(ActiveActionSetChanged struct (playerId, 3)))
 
     // Start listening to action events
     actionHandler.StartListening() |> subs.Add
