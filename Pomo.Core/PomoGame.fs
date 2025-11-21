@@ -38,8 +38,10 @@ open Pomo.Core.Systems.Effects
 open Pomo.Core.Systems.ResourceManager
 open Pomo.Core.Systems.Inventory
 open Pomo.Core.Systems.Equipment
+open Pomo.Core.Systems.TerrainRenderSystem
 open Pomo.Core.Domain.Units
 open Pomo.Core.Stores
+open Pomo.Core.Systems.Collision
 
 type PomoGame() as this =
   inherit Game()
@@ -67,6 +69,10 @@ type PomoGame() as this =
   let aiArchetypeStore =
     Stores.AIArchetype.create(JsonFileLoader.readAIArchetypes deserializer)
 
+  let mapStore =
+    Stores.Map.create MapLoader.loadMap [ "Content/Maps/Proto.xml" ]
+
+
   let projections = Projections.create(itemStore, worldView)
 
   let targetingService =
@@ -92,6 +98,7 @@ type PomoGame() as this =
   do
     base.IsMouseVisible <- true
     base.Content.RootDirectory <- "Content"
+    base.Window.AllowUserResizing <- true
 
     graphicsDeviceManager.SupportedOrientations <-
       DisplayOrientation.LandscapeLeft ||| DisplayOrientation.LandscapeRight
@@ -100,17 +107,16 @@ type PomoGame() as this =
 
     base.Services.AddService<Projections.ProjectionService> projections
 
-    base.Services.AddService<Stores.SkillStore> skillStore
-    base.Services.AddService<Stores.ItemStore> itemStore
-    base.Services.AddService<Stores.AIArchetypeStore> aiArchetypeStore
-    // 2. Register global services that all systems can safely access.
+    base.Services.AddService<SkillStore> skillStore
+    base.Services.AddService<ItemStore> itemStore
+    base.Services.AddService<AIArchetypeStore> aiArchetypeStore
+    base.Services.AddService<MapStore> mapStore
     base.Services.AddService<EventBus> eventBus
-    //    Only the READ-ONLY world view is registered, preventing accidental write access.
+
     base.Services.AddService<World.World> worldView
 
     base.Services.AddService<TargetingService> targetingService
 
-    // 3. Instantiate and add game components (systems).
     base.Components.Add(new RawInputSystem(this, playerId))
     base.Components.Add(new InputMappingSystem(this, playerId))
     base.Components.Add(new PlayerMovementSystem(this, playerId))
@@ -119,11 +125,31 @@ type PomoGame() as this =
     base.Components.Add(new CombatSystem(this))
     base.Components.Add(new ResourceManagerSystem(this))
     base.Components.Add(new ProjectileSystem(this))
+    base.Components.Add(new CollisionSystem(this, "Proto1"))
     base.Components.Add(new MovementSystem(this))
-    base.Components.Add(new NotificationSystem(this, eventBus))
+
+    base.Components.Add(
+      new NotificationSystem(this, eventBus, DrawOrder = Render.Layer.UI)
+    )
+
     base.Components.Add(new EffectProcessingSystem(this))
-    base.Components.Add(new RenderSystem(this, playerId))
-    base.Components.Add(new DebugRenderSystem(this, playerId))
+
+    base.Components.Add(
+      new RenderOrchestratorSystem.RenderOrchestratorSystem(
+        this,
+        "Proto1",
+        playerId
+      )
+    )
+
+    base.Components.Add(
+      new DebugRenderSystem(
+        this,
+        playerId,
+        "Proto1",
+        DrawOrder = Render.Layer.Debug
+      )
+    )
 
     base.Components.Add(
       new AISystem(this, worldView, eventBus, skillStore, aiArchetypeStore)
@@ -132,7 +158,7 @@ type PomoGame() as this =
     base.Components.Add(new StateUpdateSystem(this, mutableWorld))
 
 
-  override this.Initialize() =
+  override _.Initialize() =
     base.Initialize()
 
     LocalizationManager.DefaultCultureCode |> LocalizationManager.SetCulture
@@ -263,9 +289,6 @@ type PomoGame() as this =
 
     createEnemy enemyId1 (Vector2(300.0f, 100.0f))
     createEnemy enemyId2 (Vector2(350.0f, 150.0f))
-    createEnemy enemyId3 (Vector2(400.0f, 100.0f))
-    createEnemy enemyId4 (Vector2(450.0f, 150.0f))
-    createEnemy enemyId5 (Vector2(500.0f, 100.0f))
 
     // AI Controller Setup
     let createAIController
@@ -338,16 +361,25 @@ type PomoGame() as this =
       UseSlot2, Core.SlotProcessing.Item trollBloodPotion.InstanceId
     ]
 
+    let actionSet3 = [
+      UseSlot1, Core.SlotProcessing.Skill %9 // Dragon's Breath
+      UseSlot2, Core.SlotProcessing.Skill %10 // Railgun
+      UseSlot3, Core.SlotProcessing.Skill %11 // Ice Shard
+      UseSlot4, Core.SlotProcessing.Skill %12 // Piercing Bolt
+      UseSlot5, Core.SlotProcessing.Skill %13 // Fan of Knives
+    ]
+
     let actionSets = [
       1, HashMap.ofList actionSet1
       2, HashMap.ofList actionSet2
+      3, HashMap.ofList actionSet3
     ]
 
     eventBus.Publish(
       Input(ActionSetsChanged struct (playerId, HashMap.ofList actionSets))
     )
 
-    eventBus.Publish(Input(ActiveActionSetChanged struct (playerId, 1)))
+    eventBus.Publish(Input(ActiveActionSetChanged struct (playerId, 3)))
 
     // Start listening to action events
     actionHandler.StartListening() |> subs.Add
@@ -370,10 +402,6 @@ type PomoGame() as this =
   // e.g., this.Content.Load<Texture2D>("textureName")
 
   override _.Update gameTime =
-    // Update game logic here
-    // e.g., update game entities, handle input, etc.
-    // This call now triggers MovementSystem (publishes events) and then
-    // StateUpdateSystem (drains event queue and modifies state).
     transact(fun () ->
       let previous = mutableWorld.Time.Value.TotalGameTime
 
@@ -388,5 +416,4 @@ type PomoGame() as this =
 
   override _.Draw gameTime =
     base.GraphicsDevice.Clear Color.Peru
-    // Draw game content here
     base.Draw gameTime

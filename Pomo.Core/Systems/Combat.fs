@@ -20,26 +20,61 @@ module Combat =
   open System.Reactive.Disposables
 
   module private AreaOfEffect =
-    let private getPotentialTargets (world: World) (casterId: Guid<EntityId>) =
-      // For now, all entities except the caster are potential targets.
-      // This could be filtered by faction in the future.
-      world.Positions
-      |> AMap.force
-      |> HashMap.filter(fun entityId _ -> entityId <> casterId)
-
     let findTargetsInCircle
-      (world: World)
+      (getNearbyEntities: Vector2 -> float32 -> alist<Guid<EntityId> * Vector2>)
       (casterId: Guid<EntityId>)
       (center: Vector2)
       (radius: float32)
       (maxTargets: int)
       =
-      getPotentialTargets world casterId
-      |> HashMap.toList
-      |> List.filter(fun (_, pos) -> Vector2.Distance(center, pos) <= radius)
-      |> List.sortBy(fun (_, pos) -> Vector2.DistanceSquared(center, pos))
-      |> List.truncate maxTargets
-      |> List.map fst
+      let nearby = getNearbyEntities center radius |> AList.force
+
+      nearby
+      |> IndexList.filter(fun (id, _) -> id <> casterId)
+      |> IndexList.sortBy(fun (_, pos) -> Vector2.DistanceSquared(center, pos))
+      |> IndexList.toArray
+      |> Array.truncate maxTargets
+      |> Array.map fst
+
+    let findTargetsInCone
+      (getNearbyEntities: Vector2 -> float32 -> alist<Guid<EntityId> * Vector2>)
+      (casterId: Guid<EntityId>)
+      (origin: Vector2)
+      (direction: Vector2)
+      (angle: float32)
+      (length: float32)
+      (maxTargets: int)
+      =
+      let nearby = getNearbyEntities origin length |> AList.force
+
+      nearby
+      |> IndexList.filter(fun (id, pos) ->
+        id <> casterId
+        && Spatial.isPointInCone origin direction angle length pos)
+      |> IndexList.sortBy(fun (_, pos) -> Vector2.DistanceSquared(origin, pos))
+      |> IndexList.toArray
+      |> Array.truncate maxTargets
+      |> Array.map fst
+
+    let findTargetsInLine
+      (getNearbyEntities: Vector2 -> float32 -> alist<Guid<EntityId> * Vector2>)
+      (casterId: Guid<EntityId>)
+      (start: Vector2)
+      (endPoint: Vector2)
+      (width: float32)
+      (maxTargets: int)
+      =
+      // Radius for broad phase is half the length + half the width, roughly, or just length from start
+      let length = Vector2.Distance(start, endPoint)
+      let nearby = getNearbyEntities start (length + width) |> AList.force
+
+      nearby
+      |> IndexList.filter(fun (id, pos) ->
+        id <> casterId && Spatial.isPointInLine start endPoint width pos)
+      |> IndexList.sortBy(fun (_, pos) -> Vector2.DistanceSquared(start, pos))
+      |> IndexList.toArray
+      |> Array.truncate maxTargets
+      |> Array.map fst
 
   module private Handlers =
     let applySkillDamage
@@ -230,12 +265,14 @@ module Combat =
           )
       | _ -> () // Attacker or defender stats not found
 
+
     let handleAbilityIntent
       (world: World)
       (eventBus: EventBus)
       (derivedStats: amap<Guid<EntityId>, Entity.DerivedStats>)
       (positions: amap<Guid<EntityId>, Vector2>)
       (skillStore: Stores.SkillStore)
+      (getNearbyEntities: Vector2 -> float32 -> alist<Guid<EntityId> * Vector2>)
       (casterId: Guid<EntityId>)
       (skillId: int<SkillId>)
       (target: SystemCommunications.SkillTarget)
@@ -343,26 +380,71 @@ module Combat =
               match activeSkill.Area with
               | Point ->
                 match target with
-                | SystemCommunications.TargetSelf -> [ casterId ]
-                | SystemCommunications.TargetEntity targetId -> [ targetId ]
-                | SystemCommunications.TargetPosition _ -> [] // Can't target entities with a point on the ground
+                | SystemCommunications.TargetSelf -> Array.singleton casterId
+                | SystemCommunications.TargetEntity targetId ->
+                  Array.singleton targetId
+                | SystemCommunications.TargetPosition _ -> Array.empty // Can't target entities with a point on the ground
               | Circle(radius, maxTargets) ->
+
                 AreaOfEffect.findTargetsInCircle
-                  world
+                  getNearbyEntities
                   casterId
                   center
                   radius
                   maxTargets
               | Cone(angle, length, maxTargets) ->
-                  // TODO: Implement findTargetsInCone
-                  []
-              | Line(width, maxTargets) ->
-                  // TODO: Implement findTargetsInLine
-                  []
+                let direction =
+                  match target with
+                  | SystemCommunications.TargetPosition pos ->
+                    Vector2.Normalize(pos - center)
+                  | SystemCommunications.TargetEntity targetId ->
+                    let targetPos =
+                      positions
+                      |> HashMap.tryFindV targetId
+                      |> ValueOption.defaultValue center
+
+                    Vector2.Normalize(targetPos - center)
+                  | _ -> Vector2.UnitX // Default direction if self-targeted?
+
+                AreaOfEffect.findTargetsInCone
+                  getNearbyEntities
+                  casterId
+                  center
+                  direction
+                  angle
+                  length
+                  maxTargets
+              | Line(width, length, maxTargets) ->
+                let endPoint =
+                  match target with
+                  | SystemCommunications.TargetPosition pos ->
+                    // If target is a position, that defines the direction.
+                    // But Line implies a specific length.
+                    // So we calculate the end point based on direction and length.
+                    let direction = Vector2.Normalize(pos - center)
+                    center + direction * length
+                  | SystemCommunications.TargetEntity targetId ->
+                    let targetPos =
+                      positions
+                      |> HashMap.tryFindV targetId
+                      |> ValueOption.defaultValue center
+
+                    let direction = Vector2.Normalize(targetPos - center)
+                    center + direction * length
+                  | _ -> center + Vector2.UnitX * length
+
+                AreaOfEffect.findTargetsInLine
+                  getNearbyEntities
+                  casterId
+                  center
+                  endPoint
+                  width
+                  maxTargets
               | MultiPoint _ ->
-                  // This is for spawning multiple projectiles, which is handled in AbilityActivation.
-                  // If an instant skill has this, it's probably a bug in the skill definition.
-                  []
+                // This is for spawning multiple projectiles, which is handled in AbilityActivation.
+                // If an instant skill has this, it's probably a bug in the skill definition.
+                Array.empty
+              | AdaptiveCone _ -> Array.empty
 
             for targetId in targets do
               applyInstantaneousSkillEffects
@@ -381,7 +463,8 @@ module Combat =
         eventBus: EventBus,
         derivedStats: amap<Guid<EntityId>, Entity.DerivedStats>,
         positions: amap<Guid<EntityId>, Vector2>,
-        skillStore: Stores.SkillStore
+        skillStore: Stores.SkillStore,
+        getNearbyEntities: Vector2 -> float32 -> alist<Guid<EntityId> * Vector2>
       )
       (impact: SystemCommunications.ProjectileImpacted)
       =
@@ -397,34 +480,54 @@ module Combat =
         | ValueSome center ->
           let targets =
             match skill.Area with
-            | Point -> [ impact.TargetId ]
+            | Point -> Array.singleton impact.TargetId
             | Circle(radius, maxTargets) ->
+
               AreaOfEffect.findTargetsInCircle
-                world
+                getNearbyEntities
                 impact.CasterId
                 center
                 radius
                 maxTargets
             | Cone(angle, length, maxTargets) ->
-              // TODO: Implement proper Cone logic for projectile impact.
-              AreaOfEffect.findTargetsInCircle
-                world
+              // For projectile impact, direction is from caster to impact point
+              let casterPos =
+                positions
+                |> HashMap.tryFindV impact.CasterId
+                |> ValueOption.defaultValue center
+
+              let direction = Vector2.Normalize(center - casterPos)
+
+              AreaOfEffect.findTargetsInCone
+                getNearbyEntities
                 impact.CasterId
                 center
-                32.0f
-                maxTargets // Placeholder radius
-            | Line(width, maxTargets) ->
-              // TODO: Implement proper Line logic for projectile impact.
-              AreaOfEffect.findTargetsInCircle
-                world
+                direction
+                angle
+                length
+                maxTargets
+            | Line(width, length, maxTargets) ->
+              // For projectile impact, line is along the trajectory
+              let casterPos =
+                positions
+                |> HashMap.tryFindV impact.CasterId
+                |> ValueOption.defaultValue center
+
+              let direction = Vector2.Normalize(center - casterPos)
+              let endPoint = center + direction * length
+
+              AreaOfEffect.findTargetsInLine
+                getNearbyEntities
                 impact.CasterId
                 center
-                32.0f
-                maxTargets // Placeholder radius
+                endPoint
+                width
+                maxTargets
             | MultiPoint _ ->
-                // This shouldn't happen. MultiPoint is for firing multiple projectiles,
-                // not for the area of a single projectile impact.
-                [ impact.TargetId ]
+              // This shouldn't happen. MultiPoint is for firing multiple projectiles,
+              // not for the area of a single projectile impact.
+              Array.singleton impact.TargetId
+            | AdaptiveCone _ -> Array.singleton impact.TargetId
 
           for targetId in targets do
             let result =
@@ -495,7 +598,8 @@ module Combat =
         eventBus: EventBus,
         derivedStats: amap<Guid<EntityId>, Entity.DerivedStats>,
         positions: amap<Guid<EntityId>, Vector2>,
-        skillStore: Stores.SkillStore
+        skillStore: Stores.SkillStore,
+        getNearbyEntities: Vector2 -> float32 -> alist<Guid<EntityId> * Vector2>
       )
       (event: SystemCommunications.AbilityIntent)
       =
@@ -505,6 +609,7 @@ module Combat =
         derivedStats
         positions
         skillStore
+        getNearbyEntities
         event.Caster
         event.SkillId
         event.Target
@@ -522,6 +627,7 @@ module Combat =
       base.Initialize()
       let derivedStats = this.Projections.DerivedStats
       let positions = this.Projections.UpdatedPositions
+      let getNearbyEntities = this.Projections.GetNearbyEntities
 
       eventBus.GetObservableFor<SystemCommunications.AbilityIntent>()
       |> Observable.subscribe(
@@ -530,7 +636,8 @@ module Combat =
           eventBus,
           derivedStats,
           positions,
-          skillStore
+          skillStore,
+          getNearbyEntities
         )
       )
       |> subscriptions.Add
@@ -542,7 +649,8 @@ module Combat =
           eventBus,
           derivedStats,
           positions,
-          skillStore
+          skillStore,
+          getNearbyEntities
         )
       )
       |> subscriptions.Add

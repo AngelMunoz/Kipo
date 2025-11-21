@@ -146,10 +146,63 @@ module AbilityActivation =
             skillId
             (SystemCommunications.TargetPosition pointTargetPos)
 
+      let private publishAdaptiveConeIntent
+        (eventBus: EventBus)
+        (casterId: Guid<EntityId>)
+        (skillId: int<SkillId>)
+        (casterPos: Vector2)
+        (targetPos: Vector2)
+        (effectiveWidth: float32)
+        (length: float32)
+        (count: int)
+        =
+        let distance = Vector2.Distance(casterPos, targetPos)
+
+        let angle =
+          if distance > 0.001f then
+            2.0f * float32(Math.Atan(float(effectiveWidth / (2.0f * distance))))
+          else
+            MathHelper.Pi // 180 degrees if right on top
+
+        // Clamp angle to max 180 degrees to be safe
+        let angle = Math.Min(angle, MathHelper.Pi)
+
+        let direction =
+          if distance > 0.001f then
+            Vector2.Normalize(targetPos - casterPos)
+          else
+            Vector2.UnitX
+
+        let baseAngle =
+          float32(Math.Atan2(float direction.Y, float direction.X))
+
+        let halfAngleRad = angle / 2.0f
+        let startAngle = baseAngle - halfAngleRad
+
+        let angleStep = if count > 1 then angle / float32(count - 1) else 0.0f
+
+        for i in 0 .. count - 1 do
+          let currentAngle = startAngle + float32 i * angleStep
+
+          let offsetDirection =
+            Vector2(
+              float32(Math.Cos(float currentAngle)),
+              float32(Math.Sin(float currentAngle))
+            )
+
+          let endPoint = casterPos + offsetDirection * length
+
+          publishSingleIntent
+            eventBus
+            casterId
+            skillId
+            (SystemCommunications.TargetPosition endPoint)
+
       let publish
         (eventBus: EventBus)
         (rng: Random)
         (casterId: Guid<EntityId>)
+        (casterPos: Vector2)
         (skill: ActiveSkill)
         target
         (center: Vector2)
@@ -159,6 +212,16 @@ module AbilityActivation =
         | Circle _
         | Cone _
         | Line _ -> publishSingleIntent eventBus casterId skill.Id target
+        | AdaptiveCone(effectiveWidth, length, count) ->
+          publishAdaptiveConeIntent
+            eventBus
+            casterId
+            skill.Id
+            casterPos
+            center
+            effectiveWidth
+            length
+            count
         | MultiPoint(radius, count) ->
           publishMultiPointIntent
             eventBus
@@ -239,6 +302,7 @@ module AbilityActivation =
                 eventBus
                 rng
                 casterId
+                casterPos
                 skill
                 target
                 centerTargetPos

@@ -15,6 +15,7 @@ open Pomo.Core.Domain.Projectile
 open Pomo.Core.Domain.RawInput
 open Pomo.Core.Domain.Skill
 open Pomo.Core.Domain.Item
+open Pomo.Core.Domain.Map
 open Pomo.Core.Domain.AI
 open Pomo.Core.Domain.Core
 
@@ -137,11 +138,16 @@ module SystemCommunications =
     Amount: int voption // ValueNone or higher than instance's usage left means drop all
   }
 
-  [<Struct>]
   type UseItemIntent = {
     EntityId: Guid<EntityId>
     ItemInstanceId: Guid<ItemInstanceId>
   }
+
+  [<Struct>]
+  type CollisionEvents =
+    | EntityCollision of entity: struct (Guid<EntityId> * Guid<EntityId>)
+    | MapObjectCollision of
+      object: struct (Guid<EntityId> * MapObject * Vector2)
 
 // --- State Change Events ---
 

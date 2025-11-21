@@ -91,6 +91,12 @@ module Stores =
 
     abstract member all: unit -> seq<AI.AIArchetype>
 
+  type MapStore =
+    abstract member find: key: string -> Map.MapDefinition
+    abstract member tryFind: key: string -> Map.MapDefinition voption
+    abstract member all: unit -> seq<Map.MapDefinition>
+
+
   module Skill =
 
     let create(loader: string -> Result<HashMap<int<SkillId>, Skill>, string>) =
@@ -152,3 +158,18 @@ module Stores =
         }
 
       | Error errMsg -> failwith $"Failed to create AIArchetypeStore: {errMsg}"
+
+  module Map =
+
+    let create (loader: string -> Map.MapDefinition) (mapPaths: string list) =
+      let maps =
+        mapPaths
+        |> List.map loader
+        |> List.map(fun m -> m.Key, m)
+        |> HashMap.ofList
+
+      { new MapStore with
+          member _.find(key) = HashMap.find key maps
+          member _.tryFind(key) = HashMap.tryFindV key maps
+          member _.all() = maps |> HashMap.toValueSeq
+      }

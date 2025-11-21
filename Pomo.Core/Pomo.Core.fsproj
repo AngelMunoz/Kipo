@@ -11,6 +11,8 @@
     <Compile Include="Domain/Projectile.fs" />
     <Compile Include="Domain/Skill.fs" />
     <Compile Include="Domain/Item.fs" />
+    <Compile Include="Domain/Map.fs" />
+    <Compile Include="Domain/Spatial.fs" />
     <Compile Include="Domain/AI.fs" />
     <Compile Include="Domain/Events.fs" />
     <Compile Include="Domain/World.fs" />
@@ -35,7 +37,11 @@
     <Compile Include="Systems/Navigation.fs" />
     <Compile Include="Systems/Movement.fs" />
     <Compile Include="Systems/UnitMovement.fs" />
+    <Compile Include="Systems/CollisionSystem.fs" />
+    <Compile Include="Systems/MapLoader.fs" />
+    <Compile Include="Systems/TerrainRenderSystem.fs" />
     <Compile Include="Systems/Render.fs" />
+    <Compile Include="Systems/RenderOrchestratorSystem.fs" />
     <Compile Include="Systems/DebugRender.fs" />
     <Compile Include="Systems/State.fs" />
     <Compile Include="Systems/Inventory.fs" />
@@ -51,6 +57,9 @@
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
     <Content Include="Content/Skills.json">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+    <Content Include="Content/Maps/Proto.xml">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
   </ItemGroup>

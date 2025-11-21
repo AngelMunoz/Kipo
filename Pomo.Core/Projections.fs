@@ -10,6 +10,7 @@ open Pomo.Core.Domain.World
 open Pomo.Core.Domain.Core
 open Pomo.Core.Stores
 open Pomo.Core.Domain.Item
+open Pomo.Core.Domain.Spatial
 
 module Projections =
 
@@ -252,6 +253,55 @@ module Projections =
 
       set |> ValueOption.bind(fun set -> sets |> HashMap.tryFindV set))
 
+  let private spatialGrid(updatedPositions: amap<Guid<EntityId>, Vector2>) =
+    adaptive {
+      let! updatedPositions =
+        updatedPositions
+        |> AMap.toASet
+        |> ASet.map(fun (key, pos) ->
+          let cell = Spatial.getGridCell 64.0f pos
+          cell, key)
+        |> ASet.fold
+          (fun acc (cell, key) ->
+            match acc |> HashMap.tryFindV cell with
+            | ValueSome list ->
+              acc |> HashMap.add cell (IndexList.add key list)
+            | ValueNone -> acc |> HashMap.add cell (IndexList.ofList [ key ]))
+          HashMap.empty
+
+      return updatedPositions
+    }
+    |> AMap.ofAVal
+
+  let getNearbyEntities
+    (grid: amap<GridCell, IndexList<Guid<EntityId>>>)
+    (positions: amap<Guid<EntityId>, Vector2>)
+    (center: Vector2)
+    (radius: float32)
+    =
+    adaptive {
+      let! grid = grid |> AMap.toAVal
+      let! positions = positions |> AMap.toAVal
+
+      let cells = Spatial.getCellsInRadius 64.0f center radius
+
+      let potentialTargets =
+        cells
+        |> IndexList.collect(fun cell ->
+          match grid |> HashMap.tryFindV cell with
+          | ValueSome list -> list
+          | ValueNone -> IndexList.empty)
+
+      return
+        potentialTargets
+        |> IndexList.choose(fun entityId ->
+          match positions |> HashMap.tryFindV entityId with
+          | ValueSome pos when Vector2.Distance(pos, center) <= radius ->
+            Some(entityId, pos)
+          | _ -> None)
+    }
+    |> AList.ofAVal
+
   type ProjectionService =
     abstract UpdatedPositions: amap<Guid<EntityId>, Vector2>
     abstract LiveEntities: aset<Guid<EntityId>>
@@ -263,6 +313,11 @@ module Projections =
     abstract ActionSets:
       amap<Guid<EntityId>, HashMap<Action.GameAction, SlotProcessing>>
 
+    abstract SpatialGrid: amap<GridCell, IndexList<Guid<EntityId>>>
+
+    abstract GetNearbyEntities:
+      Vector2 -> float32 -> alist<Guid<EntityId> * Vector2>
+
 
   let create(itemStore: ItemStore, world: World) =
     { new ProjectionService with
@@ -273,4 +328,8 @@ module Projections =
         member _.EquipedItems = equippedItemDefs(world, itemStore)
         member _.Inventories = inventoryDefs(world, itemStore)
         member _.ActionSets = activeActionSets world
+        member _.SpatialGrid = spatialGrid(updatedPositions world)
+
+        member this.GetNearbyEntities center radius =
+          getNearbyEntities this.SpatialGrid this.UpdatedPositions center radius
     }

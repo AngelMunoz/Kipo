@@ -1,0 +1,419 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<map version="1.10" tiledversion="1.11.2" class="Map" orientation="staggered" renderorder="right-down" width="30" height="30" tilewidth="64" tileheight="32" infinite="0" staggeraxis="x" staggerindex="odd" nextlayerid="11" nextobjectid="156">
+ <properties>
+  <property name="MapKey" value="Proto1"/>
+ </properties>
+ <tileset firstgid="1" name="ProtoTileset" tilewidth="64" tileheight="64" tilecount="66" columns="0">
+  <grid orientation="orthogonal" width="1" height="1"/>
+  <tile id="0">
+   <image source="../Tiles/64x64/Arc_EW.png" width="64" height="64"/>
+  </tile>
+  <tile id="1">
+   <image source="../Tiles/64x64/Arc_NS.png" width="64" height="64"/>
+  </tile>
+  <tile id="2">
+   <image source="../Tiles/64x64/Arc_Rounded_EW.png" width="64" height="64"/>
+  </tile>
+  <tile id="3">
+   <image source="../Tiles/64x64/Arc_Rounded_NS.png" width="64" height="64"/>
+  </tile>
+  <tile id="4">
+   <image source="../Tiles/64x64/CircleInner_NE.png" width="64" height="64"/>
+  </tile>
+  <tile id="5">
+   <image source="../Tiles/64x64/CircleInner_NW.png" width="64" height="64"/>
+  </tile>
+  <tile id="6">
+   <image source="../Tiles/64x64/CircleInner_SE.png" width="64" height="64"/>
+  </tile>
+  <tile id="7">
+   <image source="../Tiles/64x64/CircleInner_SW.png" width="64" height="64"/>
+  </tile>
+  <tile id="8">
+   <image source="../Tiles/64x64/Cube.png" width="64" height="64"/>
+  </tile>
+  <tile id="9">
+   <image source="../Tiles/64x64/Cylinder.png" width="64" height="64"/>
+  </tile>
+  <tile id="10">
+   <image source="../Tiles/64x64/HalfBlock.png" width="64" height="64"/>
+  </tile>
+  <tile id="11">
+   <image source="../Tiles/64x64/InnerCorner_NE.png" width="64" height="64"/>
+  </tile>
+  <tile id="12">
+   <image source="../Tiles/64x64/InnerCorner_NW.png" width="64" height="64"/>
+  </tile>
+  <tile id="13">
+   <image source="../Tiles/64x64/InnerCorner_SE.png" width="64" height="64"/>
+  </tile>
+  <tile id="14">
+   <image source="../Tiles/64x64/InnerCorner_SW.png" width="64" height="64"/>
+  </tile>
+  <tile id="15">
+   <image source="../Tiles/64x64/OuterCorner_NE.png" width="64" height="64"/>
+  </tile>
+  <tile id="16">
+   <image source="../Tiles/64x64/OuterCorner_NW.png" width="64" height="64"/>
+  </tile>
+  <tile id="17">
+   <image source="../Tiles/64x64/OuterCorner_Rounded_NE.png" width="64" height="64"/>
+  </tile>
+  <tile id="18">
+   <image source="../Tiles/64x64/OuterCorner_Rounded_NW.png" width="64" height="64"/>
+  </tile>
+  <tile id="19">
+   <image source="../Tiles/64x64/OuterCorner_Rounded_SE.png" width="64" height="64"/>
+  </tile>
+  <tile id="20">
+   <image source="../Tiles/64x64/OuterCorner_Rounded_SW.png" width="64" height="64"/>
+  </tile>
+  <tile id="21">
+   <image source="../Tiles/64x64/OuterCorner_SE.png" width="64" height="64"/>
+  </tile>
+  <tile id="22">
+   <image source="../Tiles/64x64/OuterCorner_SW.png" width="64" height="64"/>
+  </tile>
+  <tile id="23">
+   <image source="../Tiles/64x64/Pillar.png" width="64" height="64"/>
+  </tile>
+  <tile id="24">
+   <image source="../Tiles/64x64/Pit.png" width="64" height="64"/>
+  </tile>
+  <tile id="25">
+   <image source="../Tiles/64x64/Roll_E.png" width="64" height="64"/>
+  </tile>
+  <tile id="26">
+   <image source="../Tiles/64x64/Roll_N.png" width="64" height="64"/>
+  </tile>
+  <tile id="27">
+   <image source="../Tiles/64x64/Roll_S.png" width="64" height="64"/>
+  </tile>
+  <tile id="28">
+   <image source="../Tiles/64x64/Roll_W.png" width="64" height="64"/>
+  </tile>
+  <tile id="29">
+   <image source="../Tiles/64x64/Slice_NE.png" width="64" height="64"/>
+  </tile>
+  <tile id="30">
+   <image source="../Tiles/64x64/Slice_NW.png" width="64" height="64"/>
+  </tile>
+  <tile id="31">
+   <image source="../Tiles/64x64/Slice_SE.png" width="64" height="64"/>
+  </tile>
+  <tile id="32">
+   <image source="../Tiles/64x64/Slice_SW.png" width="64" height="64"/>
+  </tile>
+  <tile id="33">
+   <image source="../Tiles/64x64/Slope_E.png" width="64" height="64"/>
+  </tile>
+  <tile id="34">
+   <image source="../Tiles/64x64/Slope_N.png" width="64" height="64"/>
+  </tile>
+  <tile id="35">
+   <image source="../Tiles/64x64/Slope_S.png" width="64" height="64"/>
+  </tile>
+  <tile id="36">
+   <image source="../Tiles/64x64/Slope_W.png" width="64" height="64"/>
+  </tile>
+  <tile id="37">
+   <image source="../Tiles/64x64/Sphere.png" width="64" height="64"/>
+  </tile>
+  <tile id="38">
+   <image source="../Tiles/64x64/Stairs_E.png" width="64" height="64"/>
+  </tile>
+  <tile id="39">
+   <image source="../Tiles/64x64/Stairs_InnerCorner_NE.png" width="64" height="64"/>
+  </tile>
+  <tile id="40">
+   <image source="../Tiles/64x64/Stairs_InnerCorner_NW.png" width="64" height="64"/>
+  </tile>
+  <tile id="41">
+   <image source="../Tiles/64x64/Stairs_InnerCorner_SE.png" width="64" height="64"/>
+  </tile>
+  <tile id="42">
+   <image source="../Tiles/64x64/Stairs_InnerCorner_SW.png" width="64" height="64"/>
+  </tile>
+  <tile id="43">
+   <image source="../Tiles/64x64/Stairs_N.png" width="64" height="64"/>
+  </tile>
+  <tile id="44">
+   <image source="../Tiles/64x64/Stairs_OuterCorner_NE.png" width="64" height="64"/>
+  </tile>
+  <tile id="45">
+   <image source="../Tiles/64x64/Stairs_OuterCorner_NW.png" width="64" height="64"/>
+  </tile>
+  <tile id="46">
+   <image source="../Tiles/64x64/Stairs_OuterCorner_SE.png" width="64" height="64"/>
+  </tile>
+  <tile id="47">
+   <image source="../Tiles/64x64/Stairs_OuterCorner_SW.png" width="64" height="64"/>
+  </tile>
+  <tile id="48">
+   <image source="../Tiles/64x64/Stairs_S.png" width="64" height="64"/>
+  </tile>
+  <tile id="49">
+   <image source="../Tiles/64x64/Stairs_W.png" width="64" height="64"/>
+  </tile>
+  <tile id="50">
+   <image source="../Tiles/64x64/Stand_E.png" width="64" height="64"/>
+  </tile>
+  <tile id="51">
+   <image source="../Tiles/64x64/Stand_N.png" width="64" height="64"/>
+  </tile>
+  <tile id="52">
+   <image source="../Tiles/64x64/Stand_S.png" width="64" height="64"/>
+  </tile>
+  <tile id="53">
+   <image source="../Tiles/64x64/Stand_W.png" width="64" height="64"/>
+  </tile>
+  <tile id="54">
+   <image source="../Tiles/64x64/Tube_EW.png" width="64" height="64"/>
+  </tile>
+  <tile id="55">
+   <image source="../Tiles/64x64/Tube_NS.png" width="64" height="64"/>
+  </tile>
+  <tile id="56">
+   <image source="../Tiles/64x64/Tunnel_EW.png" width="64" height="64"/>
+  </tile>
+  <tile id="57">
+   <image source="../Tiles/64x64/Tunnel_NS.png" width="64" height="64"/>
+  </tile>
+  <tile id="58">
+   <image source="../Tiles/64x64/Tunnel_Rounded_EW.png" width="64" height="64"/>
+  </tile>
+  <tile id="59">
+   <image source="../Tiles/64x64/Tunnel_Rounded_NS.png" width="64" height="64"/>
+  </tile>
+  <tile id="60">
+   <image source="../Tiles/64x64/Wall_EW.png" width="64" height="64"/>
+  </tile>
+  <tile id="61">
+   <image source="../Tiles/64x64/Wall_NS.png" width="64" height="64"/>
+  </tile>
+  <tile id="62">
+   <image source="../Tiles/64x64/WallEnd_E.png" width="64" height="64"/>
+  </tile>
+  <tile id="63">
+   <image source="../Tiles/64x64/WallEnd_N.png" width="64" height="64"/>
+  </tile>
+  <tile id="64">
+   <image source="../Tiles/64x64/WallEnd_S.png" width="64" height="64"/>
+  </tile>
+  <tile id="65">
+   <image source="../Tiles/64x64/WallEnd_W.png" width="64" height="64"/>
+  </tile>
+ </tileset>
+ <layer id="1" name="Terrain" class="Terrain" width="30" height="30" locked="1">
+  <properties>
+   <property name="RenderGroup" type="int" value="0"/>
+  </properties>
+  <data encoding="csv">
+9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,0,9,9,9,9,9,9,9,9,9,
+9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,
+9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,
+9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,
+9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,
+9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,
+9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,
+9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,
+9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,
+9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,
+9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,
+9,9,9,9,9,9,9,9,9,9,0,0,0,0,0,0,0,0,0,0,9,9,9,9,9,9,9,9,9,9,
+9,9,9,9,9,9,9,9,9,9,0,0,0,0,0,0,0,0,0,0,9,9,9,9,9,9,9,9,9,9,
+9,9,9,9,9,9,9,9,9,9,0,0,0,0,0,0,0,0,0,0,9,9,9,9,9,9,9,9,9,9,
+9,9,9,9,9,9,9,9,9,9,0,0,0,0,0,0,0,0,0,0,9,9,9,9,9,9,9,9,9,9,
+9,9,9,9,9,9,9,9,9,9,0,0,0,0,0,0,0,0,0,0,9,9,9,9,9,9,9,9,9,9,
+9,9,9,9,9,9,9,9,9,9,0,0,0,0,0,0,0,0,0,0,9,9,9,9,9,9,9,9,9,9,
+9,9,9,9,9,9,9,9,9,9,0,0,0,0,0,0,0,0,0,0,9,9,9,9,9,9,9,9,9,9,
+9,9,9,9,9,9,9,9,9,9,0,0,0,0,0,0,0,0,0,0,9,9,9,9,9,9,9,9,9,9,
+9,9,9,9,9,9,9,9,9,9,0,0,0,0,0,0,0,0,0,0,9,9,9,9,9,9,9,9,9,9,
+9,9,9,9,9,9,9,9,9,9,0,0,0,0,0,0,0,0,0,0,9,9,9,9,9,9,9,9,9,9,
+9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,
+9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,
+9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,
+9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,
+9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,
+9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,
+9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,
+9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,
+9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9
+</data>
+ </layer>
+ <layer id="3" name="Decoration" class="Decoration" width="30" height="30">
+  <properties>
+   <property name="RenderGroup" type="int" value="2"/>
+  </properties>
+  <data encoding="csv">
+60,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,25,0,0,0,0,0,0,0,0,0,0,59,
+0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,25,0,0,0,0,0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,25,0,0,0,0,0,0,0,0,0,0,0,0,0,
+0,0,0,0,0,8,0,0,0,0,0,0,0,0,0,25,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+0,0,0,7,0,10,0,6,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,26,0,0,
+0,0,0,0,0,5,0,0,0,0,0,0,0,0,25,0,0,0,0,0,0,0,0,0,0,9,9,0,0,0,
+0,0,0,0,0,0,0,0,0,0,0,0,0,25,0,0,0,0,0,0,0,0,0,9,9,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,9,9,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0,0,0,25,0,0,0,0,0,0,29,9,0,0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+0,0,0,0,0,61,61,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+0,0,0,61,61,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+0,61,61,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,62,62,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,62,62,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,62,0,0,0,
+0,0,0,0,0,61,61,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,62,62,0,0,0,0,0,0,
+0,0,0,61,61,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,62,62,0,0,0,0,
+0,0,61,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0,0,0,63,0,0,0,0,0,64,0,0,0,0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,24,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,9,51,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+0,0,0,0,0,9,9,0,0,0,0,0,0,0,0,24,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+0,0,0,54,9,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,24,0,0,0,0,0,0,0,35,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,36,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,24,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+57,0,0,0,0,0,0,0,0,0,0,66,0,0,0,0,0,0,0,65,0,0,0,0,0,0,0,0,0,58,
+0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
+</data>
+ </layer>
+ <objectgroup id="7" name="Collisions">
+  <object id="113" type="Wall" x="159.455" y="800">
+   <polygon points="0.636364,0.181818 -23.0909,11.5455 -42.1818,11.1818 -53.7273,4.54545 -55,-4.36364 120.545,-92 133.614,-93.6136 149.068,-86.0227 150.045,-74.4773"/>
+  </object>
+  <object id="114" type="Wall" x="359.636" y="931.364">
+   <polygon points="0,0 16.3636,8.72727 32.0909,1.18182 32.2727,-2.36364 45.7273,-8.63636 32.6957,-15.2727 21.8854,-10.2095 16.5652,-10.8419"/>
+  </object>
+  <object id="115" type="Wall" x="439.984" y="652.087">
+   <polygon points="0.0869565,-0.130435 -17.5375,-8.77075 -32.3083,-1.35573 -32.2727,2.36364 -45.7708,8.89723 -33.5653,15.1857 -19.9289,7.51385 -15.7391,8.05929"/>
+  </object>
+  <object id="116" type="Wall" x="583.691" y="652.25">
+   <polygon points="-0.0869565,-0.130435 17.5375,-8.77075 32.3083,-1.35573 32.2727,2.36364 45.7708,8.89723 33.5653,15.1857 19.9289,7.51385 15.7391,8.05929"/>
+  </object>
+  <object id="117" type="Wall" x="664.184" y="931.665">
+   <polygon points="0.0869565,0.130435 -17.5375,8.77075 -32.3083,1.35573 -32.2727,-2.36364 -45.7708,-8.89723 -33.5653,-15.1857 -19.9289,-7.51385 -15.7391,-8.05929"/>
+  </object>
+  <object id="118" type="Wall" x="500.152" y="888.033" width="22.7228" height="10.0652">
+   <ellipse/>
+  </object>
+  <object id="119" type="Wall" x="500.355" y="824.183" width="22.7228" height="10.0652">
+   <ellipse/>
+  </object>
+  <object id="120" type="Wall" x="500.014" y="759.842" width="22.7228" height="10.0652">
+   <ellipse/>
+  </object>
+  <object id="121" type="Wall" x="500.014" y="695.78" width="22.7228" height="10.0652">
+   <ellipse/>
+  </object>
+  <object id="125" type="Wall" x="736.364" y="832.182">
+   <polygon points="0,-0.272727 31.6364,-16.1818 95.8182,15.6364 63.4545,32"/>
+  </object>
+  <object id="126" type="Wall" x="714.364" y="554.727">
+   <polygon points="0,0 127.818,64 138.828,58.2525 10.2828,-5.0202"/>
+  </object>
+  <object id="127" type="Wall" x="714.141" y="458.969">
+   <polygon points="0,0 159.452,80.0961 173.187,72.9031 12.8277,-6.28279"/>
+  </object>
+  <object id="128" type="Wall" x="245.001" y="394.452">
+   <polygon points="0,0 -188.688,96.6613 -203.166,89.2252 -15.1797,-7.58217"/>
+  </object>
+  <object id="129" type="Wall" x="245.113" y="554.487">
+   <polygon points="0,0 -160.325,79.9713 -170.912,74.8106 -12.8287,-6.35544"/>
+  </object>
+  <object id="131" type="Wall" x="608" y="320">
+   <polygon points="0,0 32,16 320,-128 288,-144"/>
+  </object>
+  <object id="132" type="Wall" x="416" y="288">
+   <polygon points="0,0 -32,16 0,32 32,16"/>
+  </object>
+  <object id="133" type="Wall" x="448" y="240">
+   <polygon points="0,0 -32,16 0,32 32,16"/>
+  </object>
+  <object id="134" type="Wall" x="480" y="192">
+   <polygon points="0,0 -32,16 0,32 32,16"/>
+  </object>
+  <object id="135" type="Wall" x="512" y="144">
+   <polygon points="0,0 -32,16 0,32 32,16"/>
+  </object>
+  <object id="136" type="Wall" x="544" y="96">
+   <polygon points="0,0 -32,16 0,32 32,16"/>
+  </object>
+  <object id="137" type="Wall" x="576" y="48">
+   <polygon points="0,0 -32,16 0,32 32,16"/>
+  </object>
+  <object id="139" type="Wall" x="608" y="0">
+   <polygon points="0,0 -32,16 0,32 32,16"/>
+  </object>
+  <object id="140" type="Wall" x="96" y="192">
+   <polygon points="0,0 32,16 25.375,9.71875 19.375,2.1875 19.4375,-2.6875 22.625,-8.1875 26.6875,-11.9375 32,-16"/>
+  </object>
+  <object id="141" type="Wall" x="288" y="192">
+   <polygon points="0,0 -32,16 -25.375,9.71875 -19.375,2.1875 -19.4375,-2.6875 -22.625,-8.1875 -26.6875,-11.9375 -32,-16"/>
+  </object>
+  <object id="142" type="Wall" x="193.125" y="233.25" rotation="90">
+   <polygon points="6.36364,0.545455 -9.63636,-31.4545 -4.74432,-18.4744 -3.15341,-7.63636 -2.875,4.30682 -3.35795,14.5284 -6,22.375 -9.63636,32.5455"/>
+  </object>
+  <object id="143" type="Wall" x="192.875" y="150.852" rotation="-90">
+   <polygon points="6.36364,-0.545455 -9.63636,31.4545 -4.74432,18.4744 -3.15341,7.63636 -2.875,-4.30682 -3.35795,-14.5284 -6,-22.375 -9.63636,-32.5455"/>
+  </object>
+  <object id="144" type="Wall" x="169.875" y="181.25" width="44.125" height="17.6875">
+   <ellipse/>
+  </object>
+ </objectgroup>
+ <objectgroup id="5" name="Zones">
+  <object id="150" name="Void Pit" type="Zone" x="352" y="608">
+   <properties>
+    <property name="Disallow" value="Walking"/>
+   </properties>
+   <polygon points="0,0 -32,16 32,48 64,32 96,48 128,32 160,48 192,32 224,48 256,32 288,48 320,32 288,16 320,0 288,-16 320,-32 288,-48 320,-64 288,-80 320,-96 288,-112 320,-128 288,-144 320,-160 288,-176 320,-192 288,-208 320,-224 288,-240 320,-256 288,-272 256,-288 224,-272 192,-288 160,-272 128,-288 96,-272 64,-288 32,-272 0,-288 -32,-272 0,-256 -32,-240 0,-224 -32,-208 0,-192 -32,-176 0,-160 -32,-144 0,-128 -32,-112 0,-96 -32,-80 0,-64 -32,-48 0,-32 -32,-16"/>
+  </object>
+  <object id="152" name="Slow Zone" type="Zone" x="73" y="517.5">
+   <properties>
+    <property name="Effect" value="Slow"/>
+    <property name="Modifier" type="float" value="0.5"/>
+    <property name="Stat" value="MS"/>
+   </properties>
+   <polygon points="0,0 66.5,-25 73.5,-51.5 128,-51.5 152.5,-47 111.5,-22.5 164.5,-12.5 108.5,6 80.5,35.5 35.5,36 42,0.5 8,28 7.5,10.5"/>
+  </object>
+  <object id="153" name="Speed Zone" type="Zone" x="857.218" y="569.757" rotation="24.8718">
+   <properties>
+    <property name="Effect" value="Slow"/>
+    <property name="Modifier" type="float" value="1.5"/>
+    <property name="Stat" value="MS"/>
+   </properties>
+   <polygon points="0,0 -71.1489,-12.4286 -78.6383,-25.6029 -136.948,-25.6029 -163.161,-23.3657 -119.295,-11.1857 -176,-6.21429 -116.085,2.98286 -86.1277,17.6486 -37.9818,17.8971 -44.9362,0.248571 -8.55927,13.92 -8.02432,5.22"/>
+  </object>
+  <object id="154" name="Healing Zone" type="Zone" x="754" y="725" width="142" height="59">
+   <properties>
+    <property name="Amount" type="float" value="20"/>
+    <property name="Effect" value="ResourceChange"/>
+    <property name="Resource" value="HP"/>
+   </properties>
+   <ellipse/>
+  </object>
+  <object id="155" name="Damaging Zone" type="Zone" x="646" y="99.5" width="142" height="59">
+   <properties>
+    <property name="Amount" type="float" value="-20"/>
+    <property name="Effect" value="ResourceChange"/>
+    <property name="Resource" value="HP"/>
+   </properties>
+   <ellipse/>
+  </object>
+ </objectgroup>
+ <objectgroup id="8" name="Gameplay">
+  <object id="145" name="GateA" type="Spawn" x="17.25" y="896" width="30.5" height="30.5">
+   <ellipse/>
+  </object>
+  <object id="147" name="GateB" type="Spawn" x="16" y="1" width="30.5" height="30.5">
+   <ellipse/>
+  </object>
+  <object id="148" name="GateC" type="Spawn" x="946.25" y="16.75" width="30.5" height="30.5">
+   <ellipse/>
+  </object>
+  <object id="149" name="GateD" type="Spawn" x="945.5" y="912" width="30.5" height="30.5">
+   <ellipse/>
+  </object>
+ </objectgroup>
+ <objectgroup id="9" name="Triggers"/>
+</map>

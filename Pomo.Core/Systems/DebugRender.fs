@@ -3,7 +3,9 @@ namespace Pomo.Core.Systems
 open System
 open Microsoft.Xna.Framework
 open Microsoft.Xna.Framework.Graphics
-
+open Pomo.Core.Domain.Map
+open Pomo.Core.Domain.Spatial
+open Pomo.Core.Stores
 open FSharp.UMX
 open FSharp.Data.Adaptive
 
@@ -13,9 +15,11 @@ open Pomo.Core.Domain.Units
 open Pomo.Core.Domain.Skill
 open Pomo.Core.Domain.Action
 open Pomo.Core.Domain.Item
-open Pomo.Core.Domain.Item
 open Pomo.Core.Domain.AI
 open Pomo.Core.Stores
+open Pomo.Core.EventBus
+open Pomo.Core.Systems
+open Pomo.Core.Domain.Events
 
 module DebugRender =
   open Pomo.Core
@@ -39,6 +43,26 @@ module DebugRender =
       ownerId: Guid<EntityId> *
       state: AIState *
       entityPosition: Vector2
+    | DrawMapObject of
+      points: IndexList<Vector2> voption *
+      position: Vector2 *
+      width: float32 *
+      height: float32 *
+      rotation: float32 *
+      color: Color
+    | DrawEntityBounds of position: Vector2
+    | DrawSpatialGrid of grid: HashMap<GridCell, IndexList<Guid<EntityId>>>
+    | DrawCone of
+      origin: Vector2 *
+      direction: Vector2 *
+      angle: float32 *
+      length: float32 *
+      color: Color
+    | DrawLineShape of
+      start: Vector2 *
+      end': Vector2 *
+      width: float32 *
+      color: Color
 
   let private generateActiveEffectCommands
     (world: World.World)
@@ -152,6 +176,50 @@ module DebugRender =
       (fun acc _ cmds -> IndexList.concat [ acc; cmds ])
       IndexList.empty
 
+  let private generateMapObjectCommands(map: MapDefinition voption) =
+    match map with
+    | ValueSome map ->
+      map.ObjectGroups
+      |> IndexList.collect(fun group ->
+        if group.Visible then
+          group.Objects
+          |> IndexList.map(fun obj ->
+            let color =
+              match obj.Type with
+              | ValueSome Wall -> Color.Red
+              | ValueSome Spawn -> Color.Green
+              | ValueSome Zone ->
+                if obj.Name.Contains("Void") then Color.Purple
+                elif obj.Name.Contains("Slow") then Color.Yellow
+                elif obj.Name.Contains("Speed") then Color.Cyan
+                elif obj.Name.Contains("Healing") then Color.LimeGreen
+                elif obj.Name.Contains("Damaging") then Color.Orange
+                else Color.Blue
+              | _ -> Color.White
+
+            DrawMapObject(
+              obj.Points,
+              Vector2(obj.X, obj.Y),
+              obj.Width,
+              obj.Height,
+              obj.Rotation,
+              color
+            ))
+        else
+          IndexList.empty)
+    | ValueNone -> IndexList.empty
+
+  let private generateEntityBoundsCommands
+    (positions: amap<Guid<EntityId>, Vector2>)
+    =
+    positions
+    |> AMap.chooseA(fun _ pos -> adaptive {
+      return Some(IndexList.single(DrawEntityBounds pos))
+    })
+    |> AMap.fold
+      (fun acc _ cmds -> IndexList.concat [ acc; cmds ])
+      IndexList.empty
+
   let private generateDebugCommands
     (
       world: World.World,
@@ -159,7 +227,9 @@ module DebugRender =
       derivedStats: amap<Guid<EntityId>, DerivedStats>,
       inventory: amap<Guid<EntityId>, HashSet<Item.ItemDefinition>>,
       equippedItems:
-        amap<Guid<EntityId>, HashMap<Item.Slot, Item.ItemDefinition>>
+        amap<Guid<EntityId>, HashMap<Item.Slot, Item.ItemDefinition>>,
+      map: MapDefinition voption,
+      spatialGrid: amap<GridCell, IndexList<Guid<EntityId>>>
     )
     (showStats: bool aval)
     (showInventory: bool aval)
@@ -178,6 +248,10 @@ module DebugRender =
 
       and! aiStateCmds = generateAIStateCommands positions world.AIControllers
 
+      and! entityBoundsCmds = generateEntityBoundsCommands positions
+
+      let! spatialGrid = spatialGrid |> AMap.toAVal
+
       return
         IndexList.concat [
           effectCmds
@@ -185,10 +259,180 @@ module DebugRender =
           inventoryCmds
           equippedCmds
           aiStateCmds
+          entityBoundsCmds
+          generateMapObjectCommands map
+          IndexList.single(DrawSpatialGrid spatialGrid)
         ]
     }
 
-  type DebugRenderSystem(game: Game, playerId: Guid<EntityId>) =
+  let private drawLine
+    (sb: SpriteBatch)
+    (pixel: Texture2D)
+    (start: Vector2)
+    (end': Vector2)
+    (color: Color)
+    =
+    let edge = end' - start
+    let angle = float32(Math.Atan2(float edge.Y, float edge.X))
+
+    sb.Draw(
+      pixel,
+      Microsoft.Xna.Framework.Rectangle(
+        int start.X,
+        int start.Y,
+        int(edge.Length()),
+        1
+      ),
+      Nullable(),
+      color,
+      angle,
+      Vector2.Zero,
+      SpriteEffects.None,
+      0.0f
+    )
+
+  let private rotate (point: Vector2) (radians: float32) =
+    let c = float32(Math.Cos(float radians))
+    let s = float32(Math.Sin(float radians))
+    Vector2(point.X * c - point.Y * s, point.X * s + point.Y * c)
+
+  let private drawPolygon
+    (sb: SpriteBatch)
+    (pixel: Texture2D)
+    (points: IndexList<Vector2>)
+    (position: Vector2)
+    (rotation: float32)
+    (color: Color)
+    =
+    let count = points.Count
+    let radians = MathHelper.ToRadians(rotation)
+
+    for i in 0 .. count - 1 do
+      let p1 = rotate points.[i] radians + position
+      let p2 = rotate points.[(i + 1) % count] radians + position
+      drawLine sb pixel p1 p2 color
+
+  let private drawEllipse
+    (sb: SpriteBatch)
+    (pixel: Texture2D)
+    (position: Vector2)
+    (width: float32)
+    (height: float32)
+    (rotation: float32)
+    (color: Color)
+    =
+    let segments = 32
+    let radiusX = width / 2.0f
+    let radiusY = height / 2.0f
+
+    let centerOffset = Vector2(radiusX, radiusY)
+    let step = MathHelper.TwoPi / float32 segments
+    let radians = MathHelper.ToRadians(rotation)
+
+    for i in 0 .. segments - 1 do
+      let theta1 = float32 i * step
+      let theta2 = float32(i + 1) * step
+
+      // Points relative to center of ellipse
+      let localP1 = Vector2(radiusX * cos theta1, radiusY * sin theta1)
+      let localP2 = Vector2(radiusX * cos theta2, radiusY * sin theta2)
+
+      // Points relative to top-left (0,0)
+      let p1Unrotated = localP1 + centerOffset
+      let p2Unrotated = localP2 + centerOffset
+
+      // Rotate around (0,0)
+      let p1Rotated = rotate p1Unrotated radians
+      let p2Rotated = rotate p2Unrotated radians
+
+      // Translate to world position
+      let p1 = p1Rotated + position
+      let p2 = p2Rotated + position
+
+      drawLine sb pixel p1 p2 color
+
+  let private drawCone
+    (sb: SpriteBatch)
+    (pixel: Texture2D)
+    (origin: Vector2)
+    (direction: Vector2)
+    (angle: float32)
+    (length: float32)
+    (color: Color)
+    =
+    let halfAngleRad = MathHelper.ToRadians(angle / 2.0f)
+    let baseAngle = float32(Math.Atan2(float direction.Y, float direction.X))
+
+    let leftAngle = baseAngle - halfAngleRad
+    let rightAngle = baseAngle + halfAngleRad
+
+    let leftPoint =
+      origin
+      + Vector2(
+        length * float32(Math.Cos(float leftAngle)),
+        length * float32(Math.Sin(float leftAngle))
+      )
+
+    let rightPoint =
+      origin
+      + Vector2(
+        length * float32(Math.Cos(float rightAngle)),
+        length * float32(Math.Sin(float rightAngle))
+      )
+
+    drawLine sb pixel origin leftPoint color
+    drawLine sb pixel origin rightPoint color
+
+    // Draw arc
+    let segments = 10
+    let angleStep = (rightAngle - leftAngle) / float32 segments
+
+    for i in 0 .. segments - 1 do
+      let a1 = leftAngle + float32 i * angleStep
+      let a2 = leftAngle + float32(i + 1) * angleStep
+
+      let p1 =
+        origin
+        + Vector2(
+          length * float32(Math.Cos(float a1)),
+          length * float32(Math.Sin(float a1))
+        )
+
+      let p2 =
+        origin
+        + Vector2(
+          length * float32(Math.Cos(float a2)),
+          length * float32(Math.Sin(float a2))
+        )
+
+      drawLine sb pixel p1 p2 color
+
+  let private drawLineShape
+    (sb: SpriteBatch)
+    (pixel: Texture2D)
+    (start: Vector2)
+    (end': Vector2)
+    (width: float32)
+    (color: Color)
+    =
+    let edge = end' - start
+    let length = edge.Length()
+
+    if length > 0.0f then
+      let direction = Vector2.Normalize edge
+      let perpendicular = Vector2(-direction.Y, direction.X) * (width / 2.0f)
+
+      let p1 = start + perpendicular
+      let p2 = start - perpendicular
+      let p3 = end' - perpendicular
+      let p4 = end' + perpendicular
+
+      drawLine sb pixel p1 p2 color
+      drawLine sb pixel p2 p3 color
+      drawLine sb pixel p3 p4 color
+      drawLine sb pixel p4 p1 color
+
+  type DebugRenderSystem(game: Game, playerId: Guid<EntityId>, mapKey: string) =
     inherit DrawableGameComponent(game)
 
     let world: World.World = game.Services.GetService<World.World>()
@@ -197,11 +441,18 @@ module DebugRender =
     let projections: Projections.ProjectionService =
       game.Services.GetService<Projections.ProjectionService>()
 
+    let mapStore = game.Services.GetService<MapStore>()
+
     let spriteBatch = lazy (new SpriteBatch(game.GraphicsDevice))
+    let mutable pixel: Texture2D voption = ValueNone
     let mutable hudFont = Unchecked.defaultof<_>
 
     let showStats = cval false
     let showInventory = cval false
+
+    let transientCommands = ResizeArray<struct (DebugDrawCommand * TimeSpan)>()
+    let skillStore = game.Services.GetService<SkillStore>()
+    let subscriptions = new System.Reactive.Disposables.CompositeDisposable()
 
     let debugCommands =
       generateDebugCommands
@@ -209,7 +460,9 @@ module DebugRender =
          projections.UpdatedPositions,
          projections.DerivedStats,
          projections.Inventories,
-         projections.EquipedItems)
+         projections.EquipedItems,
+         mapStore.tryFind mapKey,
+         projections.SpatialGrid)
         showStats
         showInventory
 
@@ -296,6 +549,178 @@ module DebugRender =
       base.Initialize()
       hudFont <- game.Content.Load<SpriteFont>("Fonts/Hud")
 
+      let p = new Texture2D(game.GraphicsDevice, 1, 1)
+      p.SetData([| Color.White |])
+      p.SetData([| Color.White |])
+      pixel <- ValueSome p
+
+      let eventBus = game.Services.GetService<EventBus>()
+
+      eventBus.GetObservableFor<SystemCommunications.AbilityIntent>()
+      |> FSharp.Control.Reactive.Observable.subscribe(fun intent ->
+        match skillStore.tryFind intent.SkillId with
+        | ValueSome(Active skill) ->
+          let casterPos =
+            projections.UpdatedPositions
+            |> AMap.tryFind intent.Caster
+            |> AVal.force
+            |> Option.defaultValue Vector2.Zero
+
+          let targetPos =
+            match intent.Target with
+            | SystemCommunications.TargetPosition pos -> pos
+            | SystemCommunications.TargetEntity id ->
+              projections.UpdatedPositions
+              |> AMap.tryFind id
+              |> AVal.force
+              |> Option.defaultValue casterPos
+            | _ -> casterPos
+
+          let color = Color.Orange
+
+          let command =
+            match skill.Area with
+            | Cone(angle, length, _) ->
+              let direction =
+                if Vector2.DistanceSquared(casterPos, targetPos) > 0.001f then
+                  Vector2.Normalize(targetPos - casterPos)
+                else
+                  Vector2.UnitX
+
+              Some(DrawCone(casterPos, direction, angle, length, color))
+            | Line(width, length, _) ->
+              let direction =
+                if Vector2.DistanceSquared(casterPos, targetPos) > 0.001f then
+                  Vector2.Normalize(targetPos - casterPos)
+                else
+                  Vector2.UnitX
+
+              let endPoint = casterPos + direction * length
+              Some(DrawLineShape(casterPos, endPoint, width, color))
+            | Circle(radius, _) ->
+              // Represent circle as two ellipses (cross) or just one
+              // For now, let's use a simple way or add DrawCircle if needed.
+              // We can reuse DrawMapObject's ellipse logic or just add DrawCircle.
+              // Let's use DrawCone with 360 angle? No, DrawCone logic might fail.
+              // Let's just skip Circle for now or add DrawCircle later.
+              None
+            | AdaptiveCone(effectiveWidth, _, _) ->
+              let distance = Vector2.Distance(casterPos, targetPos)
+
+              let angle =
+                if distance > 0.001f then
+                  2.0f
+                  * float32(
+                    Math.Atan(float(effectiveWidth / (2.0f * distance)))
+                  )
+                else
+                  MathHelper.Pi
+
+              let angle = Math.Min(angle, MathHelper.Pi)
+
+              let direction =
+                if distance > 0.001f then
+                  Vector2.Normalize(targetPos - casterPos)
+                else
+                  Vector2.UnitX
+
+              // Use distance as length for visualization? Or skill length?
+              // Skill length is usually the max range.
+              // But for adaptive cone, the "cone" is conceptual.
+              // Let's use distance as length to show the cone reaching the target.
+              Some(
+                DrawCone(
+                  casterPos,
+                  direction,
+                  MathHelper.ToDegrees angle,
+                  distance,
+                  color
+                )
+              )
+            | _ -> None
+
+          match command with
+          | Some cmd ->
+            transientCommands.Add(struct (cmd, TimeSpan.FromSeconds 2.0))
+          | None -> ()
+        | _ -> ())
+      |> subscriptions.Add
+
+      eventBus.GetObservableFor<SystemCommunications.ProjectileImpacted>()
+      |> FSharp.Control.Reactive.Observable.subscribe(fun impact ->
+        match skillStore.tryFind impact.SkillId with
+        | ValueSome(Active skill) ->
+          let casterPos =
+            projections.UpdatedPositions
+            |> AMap.tryFind impact.CasterId
+            |> AVal.force
+            |> Option.defaultValue Vector2.Zero
+
+          let impactPos =
+            projections.UpdatedPositions
+            |> AMap.tryFind impact.TargetId
+            |> AVal.force
+            |> Option.defaultValue Vector2.Zero
+
+          let color = Color.Red
+
+          let command =
+            match skill.Area with
+            | Cone(angle, length, _) ->
+              let direction =
+                if Vector2.DistanceSquared(casterPos, impactPos) > 0.001f then
+                  Vector2.Normalize(impactPos - casterPos)
+                else
+                  Vector2.UnitX
+
+              Some(DrawCone(impactPos, direction, angle, length, color))
+            | Line(width, length, _) ->
+              let direction =
+                if Vector2.DistanceSquared(casterPos, impactPos) > 0.001f then
+                  Vector2.Normalize(impactPos - casterPos)
+                else
+                  Vector2.UnitX
+
+              let endPoint = impactPos + direction * length
+              Some(DrawLineShape(impactPos, endPoint, width, color))
+            | AdaptiveCone(effectiveWidth, _, _) ->
+              let distance = Vector2.Distance(casterPos, impactPos)
+
+              let angle =
+                if distance > 0.001f then
+                  2.0f
+                  * float32(
+                    Math.Atan(float(effectiveWidth / (2.0f * distance)))
+                  )
+                else
+                  MathHelper.Pi
+
+              let angle = Math.Min(angle, MathHelper.Pi)
+
+              let direction =
+                if distance > 0.001f then
+                  Vector2.Normalize(impactPos - casterPos)
+                else
+                  Vector2.UnitX
+
+              Some(
+                DrawCone(
+                  impactPos,
+                  direction,
+                  MathHelper.ToDegrees angle,
+                  distance,
+                  color
+                )
+              )
+            | _ -> None
+
+          match command with
+          | Some cmd ->
+            transientCommands.Add(struct (cmd, TimeSpan.FromSeconds 2.0))
+          | None -> ()
+        | _ -> ())
+      |> subscriptions.Add
+
     override _.Update gameTime =
       base.Update gameTime
       let sheetToggled = toggleSheetState |> AVal.force
@@ -317,6 +742,19 @@ module DebugRender =
       let sb = spriteBatch.Value
       let commandsToExecute = AVal.force debugCommands
       let totalGameTime = world.Time |> AVal.map _.TotalGameTime |> AVal.force
+
+      // Prune expired transient commands
+      let activeTransient = ResizeArray()
+
+      for struct (cmd, duration) in transientCommands do
+        let newDuration = duration - gameTime.ElapsedGameTime
+
+        if newDuration > TimeSpan.Zero then
+          activeTransient.Add(struct (cmd, newDuration))
+
+      transientCommands.Clear()
+      transientCommands.AddRange activeTransient
+
       let mutable yOffsets = HashMap.empty<Guid<EntityId>, float32>
 
       sb.Begin()
@@ -378,6 +816,86 @@ module DebugRender =
 
           yOffsets <- yOffsets |> HashMap.add ownerId (yOffset - 35.0f)
 
+          yOffsets <- yOffsets |> HashMap.add ownerId (yOffset - 35.0f)
+
           sb.DrawString(hudFont, text, textPosition, Color.Red)
+
+        | DrawMapObject(points, position, width, height, rotation, color) ->
+          match pixel with
+          | ValueSome px ->
+            match points with
+            | ValueSome pts -> drawPolygon sb px pts position rotation color
+            | ValueNone ->
+              drawEllipse sb px position width height rotation color
+              drawEllipse sb px position width height rotation color
+              drawEllipse sb px position width height rotation color
+          | ValueNone -> ()
+
+        | DrawEntityBounds position ->
+          match pixel with
+          | ValueSome px ->
+            let poly = Spatial.getEntityPolygon position
+            drawPolygon sb px poly Vector2.Zero 0.0f Color.Red
+          | ValueNone -> ()
+
+        | DrawSpatialGrid grid ->
+          match pixel with
+          | ValueSome px ->
+            for (cell, entities: IndexList<Guid<EntityId>>) in
+              grid |> HashMap.toSeq do
+              let cellSize = 64.0f
+              let x = float32 cell.X * cellSize
+              let y = float32 cell.Y * cellSize
+
+              let rect =
+                Microsoft.Xna.Framework.Rectangle(
+                  int x,
+                  int y,
+                  int cellSize,
+                  int cellSize
+                )
+
+              // Draw cell border
+              let color =
+                if entities.Count > 0 then Color.Red else Color.Gray * 0.5f
+
+              drawLine sb px (Vector2(x, y)) (Vector2(x + cellSize, y)) color
+
+              drawLine
+                sb
+                px
+                (Vector2(x + cellSize, y))
+                (Vector2(x + cellSize, y + cellSize))
+                color
+
+              drawLine
+                sb
+                px
+                (Vector2(x + cellSize, y + cellSize))
+                (Vector2(x, y + cellSize))
+                color
+
+              drawLine sb px (Vector2(x, y + cellSize)) (Vector2(x, y)) color
+
+              // Draw entity count
+              if entities.Count > 0 then
+                let text = $"{entities.Count}"
+                let textPos = Vector2(x + 5.0f, y + 5.0f)
+                sb.DrawString(hudFont, text, textPos, Color.White)
+          | ValueNone -> ()
+        | DrawCone(origin, direction, angle, length, color) -> ()
+        | DrawLineShape(start, end', width, color) -> ()
+
+      for struct (cmd, _) in transientCommands do
+        match cmd with
+        | DrawCone(origin, direction, angle, length, color) ->
+          match pixel with
+          | ValueSome px -> drawCone sb px origin direction angle length color
+          | ValueNone -> ()
+        | DrawLineShape(start, end', width, color) ->
+          match pixel with
+          | ValueSome px -> drawLineShape sb px start end' width color
+          | ValueNone -> ()
+        | _ -> ()
 
       sb.End()

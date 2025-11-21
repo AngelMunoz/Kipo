@@ -162,8 +162,12 @@ module Skill =
     | Point
     | Circle of radius: float32 * maxCircleTargets: int
     | Cone of angle: float32 * length: float32 * maxConeTargets: int
-    | Line of width: float32 * maxLineTargets: int
+    | Line of width: float32 * length: float32 * maxLineTargets: int
     | MultiPoint of radius: float32 * maxPointTargets: int
+    | AdaptiveCone of
+      effectiveWidth: float32 *
+      length: float32 *
+      maxTargets: int
 
   [<Struct>]
   type CastOrigin =
@@ -842,17 +846,36 @@ module Skill =
                 let! width =
                   Required.Property.get ("Width", Required.float) json
 
+                and! length =
+                  Required.Property.get ("Length", Required.float) json
+
                 and! maxTargets =
                   VOptional.Property.get ("MaxTargets", Required.int) json
                   |> Result.map(ValueOption.defaultValue 1)
 
-                return Line(float32 width, maxTargets)
+                return Line(float32 width, float32 length, maxTargets)
               | "multipoint" ->
                 let! radius =
                   Required.Property.get ("Radius", Required.float) json
 
                 and! count = Required.Property.get ("Count", Required.int) json
                 return MultiPoint(float32 radius, count)
+              | "adaptivecone" ->
+                let! effectiveWidth =
+                  Required.Property.get ("EffectiveWidth", Required.float) json
+
+                and! length =
+                  Required.Property.get ("Length", Required.float) json
+
+                and! maxTargets =
+                  Required.Property.get ("MaxTargets", Required.int) json
+
+                return
+                  AdaptiveCone(
+                    float32 effectiveWidth,
+                    float32 length,
+                    maxTargets
+                  )
               | _ ->
                 return!
                   DecodeError.ofError(

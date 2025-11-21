@@ -1,5 +1,6 @@
 namespace Pomo.Core.Systems
 
+open System
 open Microsoft.Xna.Framework
 open FSharp.UMX
 open FSharp.Data.Adaptive
@@ -71,7 +72,51 @@ module PlayerMovement =
     // A mutable variable scoped to the system is acceptable for this kind of internal bookkeeping.
     let mutable lastVelocity = Vector2.Zero
 
+    let mutable sub: IDisposable = null
+
+    let collisionEvents =
+      System.Collections.Concurrent.ConcurrentQueue<
+        SystemCommunications.CollisionEvents
+       >()
+
+    override _.Initialize() =
+      base.Initialize()
+
+      sub <-
+        this.EventBus.GetObservableFor<SystemCommunications.CollisionEvents>()
+        |> Observable.subscribe(fun e -> collisionEvents.Enqueue(e))
+
+    override _.Dispose(disposing) =
+      if disposing then
+        sub.Dispose()
+
+      base.Dispose(disposing)
+
     override this.Update _ =
+      // Process collisions
+      let mutable accumulatedMtv = Vector2.Zero
+
+      let mutable collisionEvent =
+        Unchecked.defaultof<SystemCommunications.CollisionEvents>
+
+      while collisionEvents.TryDequeue(&collisionEvent) do
+        match collisionEvent with
+        | SystemCommunications.CollisionEvents.MapObjectCollision(eId, _, mtv) when
+          eId = playerId
+          ->
+          // Apply MTV to current position
+          let currentPos = position |> AVal.force
+          let newPos = currentPos + mtv
+
+          this.EventBus.Publish(
+            StateChangeEvent.Physics(
+              PhysicsEvents.PositionChanged struct (playerId, newPos)
+            )
+          )
+
+          accumulatedMtv <- accumulatedMtv + mtv
+        | _ -> ()
+
       let currentVelocity = velocity |> AVal.force
       let statuses = playerCombatStatuses |> AVal.force
 
@@ -118,23 +163,57 @@ module PlayerMovement =
             let direction = Vector2.Normalize(destination - position)
             let adjustedVelocity = direction * float32 movementSpeed
 
-            if currentVelocity <> adjustedVelocity then
+            // Apply collision sliding
+            let finalVelocity =
+              if accumulatedMtv <> Vector2.Zero then
+                let normal = Vector2.Normalize(accumulatedMtv)
+                // If moving against the normal (into the wall)
+                if Vector2.Dot(adjustedVelocity, normal) < 0.0f then
+                  // Project velocity onto the tangent (slide)
+                  adjustedVelocity
+                  - normal * Vector2.Dot(adjustedVelocity, normal)
+                else
+                  adjustedVelocity
+              else
+                adjustedVelocity
+
+            if finalVelocity <> lastVelocity then
               this.EventBus.Publish(
                 StateChangeEvent.Physics(
-                  PhysicsEvents.VelocityChanged
-                    struct (playerId, adjustedVelocity)
+                  PhysicsEvents.VelocityChanged struct (playerId, finalVelocity)
                 )
               )
 
-            lastVelocity <- adjustedVelocity
+            lastVelocity <- finalVelocity
 
         | Some Idle ->
-          if currentVelocity <> lastVelocity then
+          // Even in Idle, we might have velocity from input (if we treat Idle as "not auto-moving" but manual moving?)
+          // Wait, PlayerMovement usually uses Input for velocity, but here it checks MovementState.
+          // The Projections.PlayerVelocity calculates velocity from Input.
+          // But the code below ignores `currentVelocity` (from Input) and uses `MovingTo` logic?
+
+          // Ah, lines 172+ handle Idle.
+          // But wait, the `currentVelocity` variable (line 116) comes from Input Projection.
+          // If `MovementState` is Idle, we should use `currentVelocity` (Input).
+
+          let mutable targetVelocity = currentVelocity
+
+          // Apply collision sliding to Input velocity
+          if
+            accumulatedMtv <> Vector2.Zero && targetVelocity <> Vector2.Zero
+          then
+            let normal = Vector2.Normalize(accumulatedMtv)
+
+            if Vector2.Dot(targetVelocity, normal) < 0.0f then
+              targetVelocity <-
+                targetVelocity - normal * Vector2.Dot(targetVelocity, normal)
+
+          if targetVelocity <> lastVelocity then
             this.EventBus.Publish(
               StateChangeEvent.Physics(
-                PhysicsEvents.VelocityChanged struct (playerId, currentVelocity)
+                PhysicsEvents.VelocityChanged struct (playerId, targetVelocity)
               )
             )
 
-            lastVelocity <- currentVelocity
+            lastVelocity <- targetVelocity
         | None -> ()
