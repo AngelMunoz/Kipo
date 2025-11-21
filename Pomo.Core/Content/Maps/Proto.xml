@@ -205,6 +205,9 @@
   </tile>
  </tileset>
  <layer id="1" name="Terrain" class="Terrain" width="30" height="30" locked="1">
+  <properties>
+   <property name="RenderGroup" type="int" value="0"/>
+  </properties>
   <data encoding="csv">
 9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,0,9,9,9,9,9,9,9,9,9,
 9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,
@@ -239,6 +242,9 @@
 </data>
  </layer>
  <layer id="3" name="Decoration" class="Decoration" width="30" height="30">
+  <properties>
+   <property name="RenderGroup" type="int" value="2"/>
+  </properties>
   <data encoding="csv">
 60,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,25,0,0,0,0,0,0,0,0,0,0,59,
 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,25,0,0,0,0,0,0,0,0,0,0,0,0,

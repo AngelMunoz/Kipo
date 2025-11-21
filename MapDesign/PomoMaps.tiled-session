@@ -49,6 +49,7 @@
     "openFiles": [
     ],
     "project": "PomoMaps.tiled-project",
+    "property.type": "int",
     "recentFiles": [
         "Proto.xml"
     ],
