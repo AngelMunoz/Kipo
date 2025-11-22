@@ -43,6 +43,53 @@ open Pomo.Core.Domain.Units
 open Pomo.Core.Stores
 open Pomo.Core.Systems.Collision
 
+namespace Pomo.Core
+
+open System
+open System.Collections.Generic
+open System.Globalization
+open type System.Net.Mime.MediaTypeNames
+
+open Microsoft.Xna.Framework
+open Microsoft.Xna.Framework.Graphics
+open Microsoft.Xna.Framework.Input
+
+open FSharp.Data.Adaptive
+open FSharp.UMX
+
+open Pomo.Core.Localization
+open Pomo.Core
+open Pomo.Core.EventBus
+open Pomo.Core.Domain
+open Pomo.Core.Domain.Action
+open Pomo.Core.Domain.Events
+open Pomo.Core.Domain.Map
+open Pomo.Core.Systems
+open Pomo.Core.Systems.StateUpdate
+open Pomo.Core.Systems.Movement
+open Pomo.Core.Systems.Render
+open Pomo.Core.Systems.RawInput
+open Pomo.Core.Systems.InputMapping
+open Pomo.Core.Systems.PlayerMovement
+open Pomo.Core.Systems.Targeting
+open Pomo.Core.Systems.Navigation
+open Pomo.Core.Systems.AbilityActivation
+open Pomo.Core.Systems.UnitMovement
+open Pomo.Core.Systems.Combat
+open Pomo.Core.Systems.Notification
+open Pomo.Core.Systems.Projectile
+open Pomo.Core.Systems.ActionHandler
+open Pomo.Core.Systems.DebugRender
+open Pomo.Core.Systems.Effects
+open Pomo.Core.Systems.ResourceManager
+open Pomo.Core.Systems.Inventory
+open Pomo.Core.Systems.Equipment
+open Pomo.Core.Systems.TerrainRenderSystem
+open Pomo.Core.Systems.EntitySpawnerLogic
+open Pomo.Core.Domain.Units
+open Pomo.Core.Stores
+open Pomo.Core.Systems.Collision
+
 type PomoGame() as this =
   inherit Game()
 
@@ -53,11 +100,6 @@ type PomoGame() as this =
   let deserializer = Serialization.create()
 
   let playerId = %Guid.NewGuid()
-  let enemyId1 = %Guid.NewGuid()
-  let enemyId2 = %Guid.NewGuid()
-  let enemyId3 = %Guid.NewGuid()
-  let enemyId4 = %Guid.NewGuid()
-  let enemyId5 = %Guid.NewGuid()
 
   let eventBus = new EventBus()
 
@@ -135,6 +177,10 @@ type PomoGame() as this =
     base.Components.Add(new EffectProcessingSystem(this))
 
     base.Components.Add(
+      new EntitySpawnerSystem(this, aiArchetypeStore, itemStore)
+    )
+
+    base.Components.Add(
       new RenderOrchestratorSystem.RenderOrchestratorSystem(
         this,
         "Proto1",
@@ -163,223 +209,61 @@ type PomoGame() as this =
 
     LocalizationManager.DefaultCultureCode |> LocalizationManager.SetCulture
 
-    // Player Setup
-    let playerEntity: Entity.EntitySnapshot = {
-      Id = playerId
-      Position = Vector2(100.0f, 100.0f)
-      Velocity = Vector2.Zero
-    }
+    // --- Map Based Spawning ---
+    let mapKey = "Proto1"
+    let mapDef = mapStore.find mapKey
 
-    eventBus.Publish(EntityLifecycle(Created playerEntity))
+    let mutable playerSpawned = false
+    let mutable enemyCount = 0
 
-    let playerBaseStats: Entity.BaseStats = {
-      Power = 10
-      Magic = 50
-      Sense = 20
-      Charm = 30
-    }
+    let maxEnemies =
+      mapDef.Properties
+      |> HashMap.tryFind "MaxEnemyEntities"
+      |> Option.bind(fun v ->
+        match System.Int32.TryParse v with
+        | true, i -> Some i
+        | _ -> None)
+      |> Option.defaultValue 5
 
-    let maxPlayerHP = playerBaseStats.Charm * 10
-    let maxPlayerMP = playerBaseStats.Magic * 5
+    // Find Object Groups
+    for group in mapDef.ObjectGroups do
+      for obj in group.Objects do
+        match obj.Type with
+        | ValueSome MapObjectType.Spawn ->
+          // Check for Player Spawn
+          let isPlayerSpawn =
+            obj.Properties
+            |> HashMap.tryFind "PlayerSpawn"
+            |> Option.map(fun v -> v.ToLower() = "true")
+            |> Option.defaultValue false
 
-    let playerResources: Entity.Resource = {
-      HP = maxPlayerHP
-      MP = maxPlayerMP
-      Status = Entity.Status.Alive
-    }
+          if isPlayerSpawn && not playerSpawned then
+            // Spawn Player 1 here
+            let intent: SystemCommunications.SpawnEntityIntent = {
+              EntityId = playerId
+              Type = SystemCommunications.SpawnType.Player 0
+              Position = Vector2(obj.X, obj.Y)
+            }
 
-    let playerFactions = HashSet [ Entity.Faction.Player ]
-    let inputMap = InputMapping.createDefaultInputMap()
+            eventBus.Publish intent
+            playerSpawned <- true
 
+          // Check for AI Spawn
+          elif not isPlayerSpawn && enemyCount < maxEnemies then
+            let enemyId = Guid.NewGuid() |> UMX.tag
+            // Determine archetype (could come from property in future)
+            let archetypeId = %1
 
+            let intent: SystemCommunications.SpawnEntityIntent = {
+              EntityId = enemyId
+              Type = SystemCommunications.SpawnType.Enemy archetypeId
+              Position = Vector2(obj.X, obj.Y)
+            }
 
-    eventBus.Publish(
-      StateChangeEvent.Combat(
-        ResourcesChanged struct (playerId, playerResources)
-      )
-    )
+            eventBus.Publish intent
+            enemyCount <- enemyCount + 1
 
-    eventBus.Publish(
-      StateChangeEvent.Combat(FactionsChanged struct (playerId, playerFactions))
-    )
-
-    eventBus.Publish(
-      StateChangeEvent.Combat(
-        BaseStatsChanged struct (playerId, playerBaseStats)
-      )
-    )
-
-    eventBus.Publish(Input(MapChanged struct (playerId, inputMap)))
-
-    // Equip starting items
-    let wizardHat: Item.ItemInstance = {
-      Item.InstanceId = Guid.NewGuid() |> UMX.tag
-      ItemId = 4 |> UMX.tag
-      UsesLeft = ValueNone
-    }
-
-    let magicStaff: Item.ItemInstance = {
-      Item.InstanceId = Guid.NewGuid() |> UMX.tag
-      ItemId = 5 |> UMX.tag
-      UsesLeft = ValueNone
-    }
-
-    eventBus.Publish(Inventory(ItemInstanceCreated wizardHat))
-    eventBus.Publish(Inventory(ItemInstanceCreated magicStaff))
-
-    eventBus.Publish(
-      Inventory(ItemAddedToInventory struct (playerId, wizardHat.InstanceId))
-    )
-
-    eventBus.Publish(
-      Inventory(ItemAddedToInventory struct (playerId, magicStaff.InstanceId))
-    )
-
-    eventBus.Publish(
-      Inventory(
-        ItemEquipped struct (playerId, Item.Slot.Head, wizardHat.InstanceId)
-      )
-    )
-
-    eventBus.Publish(
-      Inventory(
-        ItemEquipped struct (playerId, Item.Slot.Weapon, magicStaff.InstanceId)
-      )
-    )
-
-    // Enemy Setup
-    let enemyBaseStats: Entity.BaseStats = {
-      Power = 2
-      Magic = 2
-      Sense = 2
-      Charm = 200
-    }
-
-    let maxEnemyHP = enemyBaseStats.Charm * 10
-    let maxEnemyMP = enemyBaseStats.Magic * 5
-
-    let enemyResources: Entity.Resource = {
-      HP = maxEnemyHP
-      MP = maxEnemyMP
-      Status = Entity.Status.Alive
-    }
-
-    let enemyFactions = HashSet [ Entity.Faction.Enemy ]
-
-    let createEnemy (id: Guid<EntityId>) (pos: Vector2) =
-      let enemyEntity: Entity.EntitySnapshot = {
-        Id = id
-        Position = pos
-        Velocity = Vector2.Zero
-      }
-
-      eventBus.Publish(EntityLifecycle(Created enemyEntity))
-
-      eventBus.Publish(
-        StateChangeEvent.Combat(ResourcesChanged struct (id, enemyResources))
-      )
-
-      eventBus.Publish(
-        StateChangeEvent.Combat(FactionsChanged struct (id, enemyFactions))
-      )
-
-      eventBus.Publish(
-        StateChangeEvent.Combat(BaseStatsChanged struct (id, enemyBaseStats))
-      )
-
-    createEnemy enemyId1 (Vector2(300.0f, 100.0f))
-    createEnemy enemyId2 (Vector2(350.0f, 150.0f))
-
-    // AI Controller Setup
-    let createAIController
-      (entityId: Guid<EntityId>)
-      (spawnPos: Vector2)
-      (archetypeId: int<AiArchetypeId>)
-      =
-      let controller: AI.AIController = {
-        controlledEntityId = entityId
-        archetypeId = archetypeId
-        currentState = AI.AIState.Idle
-        stateEnterTime = TimeSpan.Zero
-        spawnPosition = spawnPos
-        absoluteWaypoints = ValueNone
-        waypointIndex = 0
-        lastDecisionTime = TimeSpan.Zero
-        currentTarget = ValueNone
-        memories = HashMap.empty
-      }
-
-      eventBus.Publish(
-        StateChangeEvent.AI(
-          AIStateChange.ControllerUpdated struct (entityId, controller)
-        )
-      )
-
-    createAIController enemyId1 (Vector2(300.0f, 100.0f)) %1
-    createAIController enemyId2 (Vector2(350.0f, 150.0f)) %2 // Patrolling Guard
-    createAIController enemyId3 (Vector2(400.0f, 100.0f)) %1
-    createAIController enemyId4 (Vector2(450.0f, 150.0f)) %1
-    createAIController enemyId5 (Vector2(500.0f, 100.0f)) %1
-
-    let potion: Item.ItemInstance = {
-      InstanceId = %Guid.NewGuid()
-      ItemId = %2
-      UsesLeft = ValueSome 20
-    }
-
-    let trollBloodPotion: Item.ItemInstance = {
-      InstanceId = %Guid.NewGuid()
-      ItemId = %6
-      UsesLeft = ValueSome 20
-    }
-
-    eventBus.Publish(
-      Inventory(ItemAddedToInventory struct (playerId, potion.InstanceId))
-    )
-
-    eventBus.Publish(
-      Inventory(
-        ItemAddedToInventory struct (playerId, trollBloodPotion.InstanceId)
-      )
-    )
-
-    eventBus.Publish(Inventory(ItemInstanceCreated potion))
-    eventBus.Publish(Inventory(ItemInstanceCreated trollBloodPotion))
-
-
-    let actionSet1 = [
-      UseSlot1, Core.SlotProcessing.Skill %7 // Summon Boulder
-      UseSlot2, Core.SlotProcessing.Skill %8 // Catchy Song
-      UseSlot3, Core.SlotProcessing.Skill %3
-      UseSlot4, Core.SlotProcessing.Skill %6
-      UseSlot5, Core.SlotProcessing.Skill %4
-      UseSlot6, Core.SlotProcessing.Skill %5
-    ]
-
-    let actionSet2 = [
-      UseSlot1, Core.SlotProcessing.Item potion.InstanceId
-      UseSlot2, Core.SlotProcessing.Item trollBloodPotion.InstanceId
-    ]
-
-    let actionSet3 = [
-      UseSlot1, Core.SlotProcessing.Skill %9 // Dragon's Breath
-      UseSlot2, Core.SlotProcessing.Skill %10 // Railgun
-      UseSlot3, Core.SlotProcessing.Skill %11 // Ice Shard
-      UseSlot4, Core.SlotProcessing.Skill %12 // Piercing Bolt
-      UseSlot5, Core.SlotProcessing.Skill %13 // Fan of Knives
-    ]
-
-    let actionSets = [
-      1, HashMap.ofList actionSet1
-      2, HashMap.ofList actionSet2
-      3, HashMap.ofList actionSet3
-    ]
-
-    eventBus.Publish(
-      Input(ActionSetsChanged struct (playerId, HashMap.ofList actionSets))
-    )
-
-    eventBus.Publish(Input(ActiveActionSetChanged struct (playerId, 3)))
+        | _ -> ()
 
     // Start listening to action events
     actionHandler.StartListening() |> subs.Add
@@ -396,11 +280,6 @@ type PomoGame() as this =
 
     base.Dispose disposing
 
-  override _.LoadContent() = base.LoadContent()
-
-  // Load game content here
-  // e.g., this.Content.Load<Texture2D>("textureName")
-
   override _.Update gameTime =
     transact(fun () ->
       let previous = mutableWorld.Time.Value.TotalGameTime
@@ -412,7 +291,6 @@ type PomoGame() as this =
       })
 
     base.Update gameTime
-
 
   override _.Draw gameTime =
     base.GraphicsDevice.Clear Color.Peru

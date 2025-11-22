@@ -641,7 +641,8 @@ module DebugRender =
 
           match command with
           | Some cmd ->
-            transientCommands.Add(struct (cmd, TimeSpan.FromSeconds 2.0))
+            transientCommands.Add
+              struct (cmd, Core.Constants.Debug.TransientCommandDuration)
           | None -> ()
         | _ -> ())
       |> subscriptions.Add
@@ -716,7 +717,9 @@ module DebugRender =
 
           match command with
           | Some cmd ->
-            transientCommands.Add(struct (cmd, TimeSpan.FromSeconds 2.0))
+            transientCommands.Add(
+              struct (cmd, Core.Constants.Debug.TransientCommandDuration)
+            )
           | None -> ()
         | _ -> ())
       |> subscriptions.Add
@@ -763,10 +766,14 @@ module DebugRender =
         match command with
         | DrawActiveEffect(effect, entityPos) ->
           let yOffset =
-            yOffsets.TryFind effect.TargetEntity |> Option.defaultValue -20.0f
+            yOffsets.TryFind effect.TargetEntity
+            |> Option.defaultValue Core.Constants.Debug.StatYOffset
 
           yOffsets <-
-            yOffsets |> HashMap.add effect.TargetEntity (yOffset - 15.0f)
+            yOffsets
+            |> HashMap.add
+              effect.TargetEntity
+              (yOffset + Core.Constants.Debug.EffectYOffset)
 
           let struct (text, textPosition) =
             drawActiveEffect(effect, entityPos, yOffset, totalGameTime)
@@ -774,13 +781,19 @@ module DebugRender =
           sb.DrawString(hudFont, text, textPosition, Color.Yellow)
 
         | DrawDerivedStats(ownerId, stats, resources, entityPos) ->
-          let yOffset = yOffsets.TryFind ownerId |> Option.defaultValue -20.0f
+          let yOffset =
+            yOffsets.TryFind ownerId
+            |> Option.defaultValue Core.Constants.Debug.StatYOffset
+
           let text = formatStats(stats, resources)
           let textPosition = Vector2(entityPos.X, entityPos.Y + yOffset)
           sb.DrawString(hudFont, text, textPosition, Color.Cyan)
 
         | DrawInventory(ownerId, inventory, entityPos) ->
-          let yOffset = yOffsets.TryFind ownerId |> Option.defaultValue -20.0f
+          let yOffset =
+            yOffsets.TryFind ownerId
+            |> Option.defaultValue Core.Constants.Debug.StatYOffset
+
           let strBuilder = System.Text.StringBuilder()
           strBuilder.AppendLine("Inventory:") |> ignore
 
@@ -790,12 +803,18 @@ module DebugRender =
           let text = strBuilder.ToString()
 
           let textPosition =
-            Vector2(entityPos.X, entityPos.Y + yOffset + 150.0f)
+            Vector2(
+              entityPos.X,
+              entityPos.Y + yOffset + Core.Constants.Debug.InventoryYOffset
+            )
 
           sb.DrawString(hudFont, text, textPosition, Color.White)
 
         | DrawEquipped(ownerId, equipped, entityPos) ->
-          let yOffset = yOffsets.TryFind ownerId |> Option.defaultValue -20.0f
+          let yOffset =
+            yOffsets.TryFind ownerId
+            |> Option.defaultValue Core.Constants.Debug.StatYOffset
+
           let strBuilder = System.Text.StringBuilder()
           strBuilder.AppendLine("Equipped:") |> ignore
 

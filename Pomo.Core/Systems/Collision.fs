@@ -64,7 +64,7 @@ module Collision =
       for entityId in liveEntities do
         match positions |> HashMap.tryFindV entityId with
         | ValueSome pos ->
-          let cell = getGridCell 64.0f pos
+          let cell = getGridCell Core.Constants.Collision.GridCellSize pos
           let nearbyEntities = getNearbyTo cell
 
           for otherId in nearbyEntities do
@@ -72,8 +72,8 @@ module Collision =
               match positions |> HashMap.tryFindV otherId with
               | ValueSome otherPos ->
                 let distance = Vector2.Distance(pos, otherPos)
-                // Simple radius check (assuming 32.0f radius for now)
-                if distance < 64.0f then
+                // Simple radius check
+                if distance < Core.Constants.Entity.CollisionDistance then
                   this.EventBus.Publish(
                     SystemCommunications.EntityCollision
                       struct (entityId, otherId)

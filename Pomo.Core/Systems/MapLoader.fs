@@ -341,4 +341,5 @@ module MapLoader =
       Layers = layers
       ObjectGroups = objectGroups
       BackgroundColor = ValueNone
+      Properties = properties
     }

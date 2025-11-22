@@ -109,11 +109,13 @@ module Spatial =
       ValueSome(mtvAxis * minOverlap)
 
   let getEntityPolygon(pos: Vector2) =
+    let halfSize = Core.Constants.Entity.Size.X / 2.0f // Assuming square
+
     IndexList.ofList [
-      Vector2(pos.X - 16.0f, pos.Y - 16.0f)
-      Vector2(pos.X + 16.0f, pos.Y - 16.0f)
-      Vector2(pos.X + 16.0f, pos.Y + 16.0f)
-      Vector2(pos.X - 16.0f, pos.Y + 16.0f)
+      Vector2(pos.X - halfSize, pos.Y - halfSize)
+      Vector2(pos.X + halfSize, pos.Y - halfSize)
+      Vector2(pos.X + halfSize, pos.Y + halfSize)
+      Vector2(pos.X - halfSize, pos.Y + halfSize)
     ]
 
   let rotate (v: Vector2) (radians: float32) =

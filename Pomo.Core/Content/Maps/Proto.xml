@@ -1,7 +1,8 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<map version="1.10" tiledversion="1.11.2" class="Map" orientation="staggered" renderorder="right-down" width="30" height="30" tilewidth="64" tileheight="32" infinite="0" staggeraxis="x" staggerindex="odd" nextlayerid="11" nextobjectid="156">
+<map version="1.10" tiledversion="1.11.2" class="Map" orientation="staggered" renderorder="right-down" width="30" height="30" tilewidth="64" tileheight="32" infinite="0" staggeraxis="x" staggerindex="odd" nextlayerid="11" nextobjectid="164">
  <properties>
   <property name="MapKey" value="Proto1"/>
+  <property name="MaxEnemyEntities" type="int" value="20"/>
  </properties>
  <tileset firstgid="1" name="ProtoTileset" tilewidth="64" tileheight="64" tilecount="66" columns="0">
   <grid orientation="orthogonal" width="1" height="1"/>
@@ -360,21 +361,21 @@
   <object id="144" type="Wall" x="169.875" y="181.25" width="44.125" height="17.6875">
    <ellipse/>
   </object>
- </objectgroup>
- <objectgroup id="5" name="Zones">
-  <object id="150" name="Void Pit" type="Zone" x="352" y="608">
+  <object id="150" name="Void Pit" type="Wall" x="352" y="608">
    <properties>
     <property name="Disallow" value="Walking"/>
    </properties>
    <polygon points="0,0 -32,16 32,48 64,32 96,48 128,32 160,48 192,32 224,48 256,32 288,48 320,32 288,16 320,0 288,-16 320,-32 288,-48 320,-64 288,-80 320,-96 288,-112 320,-128 288,-144 320,-160 288,-176 320,-192 288,-208 320,-224 288,-240 320,-256 288,-272 256,-288 224,-272 192,-288 160,-272 128,-288 96,-272 64,-288 32,-272 0,-288 -32,-272 0,-256 -32,-240 0,-224 -32,-208 0,-192 -32,-176 0,-160 -32,-144 0,-128 -32,-112 0,-96 -32,-80 0,-64 -32,-48 0,-32 -32,-16"/>
   </object>
+ </objectgroup>
+ <objectgroup id="5" name="Zones">
   <object id="152" name="Slow Zone" type="Zone" x="73" y="517.5">
    <properties>
     <property name="Effect" value="Slow"/>
     <property name="Modifier" type="float" value="0.5"/>
     <property name="Stat" value="MS"/>
    </properties>
-   <polygon points="0,0 66.5,-25 73.5,-51.5 128,-51.5 152.5,-47 111.5,-22.5 164.5,-12.5 108.5,6 80.5,35.5 35.5,36 42,0.5 8,28 7.5,10.5"/>
+   <polygon points="0,0 66.5,-25 73.5,-51.5 128,-51.5 220.321,-125.345 220.248,-45.8866 201.919,24.9185 108.5,6 80.5,35.5 35.5,36 42,0.5 8,28 7.5,10.5"/>
   </object>
   <object id="153" name="Speed Zone" type="Zone" x="857.218" y="569.757" rotation="24.8718">
    <properties>
@@ -382,9 +383,9 @@
     <property name="Modifier" type="float" value="1.5"/>
     <property name="Stat" value="MS"/>
    </properties>
-   <polygon points="0,0 -71.1489,-12.4286 -78.6383,-25.6029 -136.948,-25.6029 -163.161,-23.3657 -119.295,-11.1857 -176,-6.21429 -116.085,2.98286 -86.1277,17.6486 -37.9818,17.8971 -44.9362,0.248571 -8.55927,13.92 -8.02432,5.22"/>
+   <polygon points="88.5444,-39.7591 -71.1489,-12.4286 -78.6383,-25.6029 -136.948,-25.6029 -163.161,-23.3657 -119.295,-11.1857 -176,-6.21429 -116.085,2.98286 -86.1277,17.6486 -37.9818,17.8971 -44.9362,0.248571 -8.55927,13.92 105.139,35.2468"/>
   </object>
-  <object id="154" name="Healing Zone" type="Zone" x="754" y="725" width="142" height="59">
+  <object id="154" name="Healing Zone" type="Zone" x="822.99" y="677.058" width="142" height="59">
    <properties>
     <property name="Amount" type="float" value="20"/>
     <property name="Effect" value="ResourceChange"/>
@@ -392,7 +393,7 @@
    </properties>
    <ellipse/>
   </object>
-  <object id="155" name="Damaging Zone" type="Zone" x="646" y="99.5" width="142" height="59">
+  <object id="155" name="Damaging Zone" type="Zone" x="824.907" y="770.695" width="142" height="59">
    <properties>
     <property name="Amount" type="float" value="-20"/>
     <property name="Effect" value="ResourceChange"/>
@@ -403,17 +404,35 @@
  </objectgroup>
  <objectgroup id="8" name="Gameplay">
   <object id="145" name="GateA" type="Spawn" x="17.25" y="896" width="30.5" height="30.5">
+   <properties>
+    <property name="PlayerSpawn" type="bool" value="true"/>
+   </properties>
    <ellipse/>
   </object>
   <object id="147" name="GateB" type="Spawn" x="16" y="1" width="30.5" height="30.5">
+   <properties>
+    <property name="PlayerSpawn" type="bool" value="true"/>
+   </properties>
    <ellipse/>
   </object>
   <object id="148" name="GateC" type="Spawn" x="946.25" y="16.75" width="30.5" height="30.5">
+   <properties>
+    <property name="PlayerSpawn" type="bool" value="true"/>
+   </properties>
    <ellipse/>
   </object>
   <object id="149" name="GateD" type="Spawn" x="945.5" y="912" width="30.5" height="30.5">
+   <properties>
+    <property name="PlayerSpawn" type="bool" value="true"/>
+   </properties>
    <ellipse/>
   </object>
+  <object id="156" name="AI Spawn" type="Spawn" x="716.881" y="356.355" width="235.255" height="104.07" rotation="323.505"/>
+  <object id="159" name="AI Spawn" type="Spawn" x="119.856" y="9.93931" width="415.112" height="83.0223"/>
+  <object id="160" name="AI Spawn" type="Spawn" x="509.747" y="194.097" width="358.382" height="135.922" rotation="330.727"/>
+  <object id="161" name="AI Spawn" type="Spawn" x="570.475" y="840.175" width="296.147" height="137.013" rotation="298.595"/>
+  <object id="162" name="AI Spawn" type="Spawn" x="375.618" y="906.374" width="235.255" height="104.07" rotation="271.153"/>
+  <object id="163" name="AI Spawn" type="Spawn" x="298.763" y="99.9776" width="115.764" height="183.585"/>
  </objectgroup>
  <objectgroup id="9" name="Triggers"/>
 </map>

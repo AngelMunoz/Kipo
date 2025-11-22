@@ -172,3 +172,19 @@ module Entity =
               DecodeError.ofError(json.Clone(), $"Unknown Stage: {other}")
               |> Error
         }
+
+    module BaseStats =
+      let decoder: Decoder<BaseStats> =
+        fun json -> decode {
+          let! power = Required.Property.get ("Power", Required.int) json
+          and! magic = Required.Property.get ("Magic", Required.int) json
+          and! sense = Required.Property.get ("Sense", Required.int) json
+          and! charm = Required.Property.get ("Charm", Required.int) json
+
+          return {
+            Power = power
+            Magic = magic
+            Sense = sense
+            Charm = charm
+          }
+        }

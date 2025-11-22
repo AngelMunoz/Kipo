@@ -65,6 +65,7 @@ type AIArchetype = {
   perceptionConfig: PerceptionConfig
   cuePriorities: CuePriority[]
   decisionInterval: TimeSpan
+  baseStats: BaseStats
 }
 
 // --- Runtime State ---
@@ -248,6 +249,9 @@ module Serialization =
         and! decisionIntervalSeconds =
           Required.Property.get ("DecisionInterval", Required.float) json
 
+        and! baseStats =
+          Required.Property.get ("BaseStats", Pomo.Core.Domain.Entity.Serialization.BaseStats.decoder) json
+
         return {
           id = UMX.tag id
           name = name
@@ -255,5 +259,6 @@ module Serialization =
           perceptionConfig = perceptionConfig
           cuePriorities = cuePriorities
           decisionInterval = TimeSpan.FromSeconds decisionIntervalSeconds
+          baseStats = baseStats
         }
       }

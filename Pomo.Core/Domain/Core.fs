@@ -44,6 +44,37 @@ module Render =
 
 module Core =
   open FSharp.UMX
+  open System
+  open Microsoft.Xna.Framework
+
+  module Constants =
+    module Entity =
+      let Size = Vector2(16.0f, 16.0f)
+      let CollisionRadius = 16.0f
+      let CollisionDistance = 32.0f
+
+    module Projectile =
+      let Size = Vector2(8.0f, 8.0f)
+
+    module UI =
+      let TargetingIndicatorSize = Vector2(64.0f, 64.0f)
+
+    module Collision =
+      let GridCellSize = 64.0f
+
+    module Spawning =
+      let DefaultDuration = TimeSpan.FromSeconds(1.0)
+
+    module AI =
+      let WaypointReachedThreshold = 64.0f
+
+    module Debug =
+      let StatYOffset = -20.0f
+      let EffectYOffset = -15.0f
+      let InventoryYOffset = 150.0f
+      let TransientCommandDuration = TimeSpan.FromSeconds(2.0)
+
+
 
   [<Struct>]
   type Element =

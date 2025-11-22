@@ -114,4 +114,5 @@ module Map =
     Layers: IndexList<MapLayer>
     ObjectGroups: IndexList<ObjectGroup>
     BackgroundColor: Color voption
+    Properties: HashMap<string, string>
   }

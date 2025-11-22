@@ -231,7 +231,7 @@ module AISystemLogic =
       let targetWaypoint = waypoints[currentIdx]
 
       let dist = Vector2.Distance(currentPos, targetWaypoint)
-      let hasReached = dist < 64.0f // Threshold
+      let hasReached = dist < Core.Constants.AI.WaypointReachedThreshold // Threshold
 
       if hasReached then
         let nextIdx = (controller.waypointIndex + 1) % waypoints.Length
@@ -457,6 +457,12 @@ type AISystem
     }
     cuePriorities = [||]
     decisionInterval = TimeSpan.FromSeconds 0.5
+    baseStats = {
+      Power = 1
+      Magic = 1
+      Sense = 1
+      Charm = 1
+    }
   }
 
   let adaptiveLogic =

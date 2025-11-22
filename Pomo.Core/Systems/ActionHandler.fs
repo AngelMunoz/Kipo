@@ -46,7 +46,7 @@ module ActionHandler =
                 if entityId = playerId then
                   None
                 else
-                  let entitySize = Vector2(32.0f, 32.0f)
+                  let entitySize = Core.Constants.Entity.Size
 
                   let entityBounds =
                     Microsoft.Xna.Framework.Rectangle(

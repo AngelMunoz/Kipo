@@ -34,7 +34,7 @@ module Render =
       if isProjectile then
         return None
       else
-        let size = Vector2(32.0f, 32.0f)
+        let size = Core.Constants.Entity.Size
 
         let rect =
           Rectangle(
@@ -61,7 +61,7 @@ module Render =
 
       match posOpt with
       | Some pos ->
-        let projectileSize = Vector2(8.0f, 8.0f)
+        let projectileSize = Core.Constants.Projectile.Size
 
         let rect =
           Rectangle(
@@ -100,7 +100,7 @@ module Render =
               float32 mouseState.Position.Y
             )
 
-          let indicatorSize = Vector2(64.0f, 64.0f)
+          let indicatorSize = Core.Constants.UI.TargetingIndicatorSize
 
           let rect =
             Rectangle(
