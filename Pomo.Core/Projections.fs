@@ -260,9 +260,9 @@ module Projections =
         |> AMap.toASet
         |> ASet.map(fun (key, pos) ->
           let cell = Spatial.getGridCell 64.0f pos
-          cell, key)
+          struct (cell, key))
         |> ASet.fold
-          (fun acc (cell, key) ->
+          (fun acc struct (cell, key) ->
             match acc |> HashMap.tryFindV cell with
             | ValueSome list ->
               acc |> HashMap.add cell (IndexList.add key list)
@@ -297,7 +297,7 @@ module Projections =
         |> IndexList.choose(fun entityId ->
           match positions |> HashMap.tryFindV entityId with
           | ValueSome pos when Vector2.Distance(pos, center) <= radius ->
-            Some(entityId, pos)
+            Some struct (entityId, pos)
           | _ -> None)
     }
     |> AList.ofAVal
@@ -316,7 +316,7 @@ module Projections =
     abstract SpatialGrid: amap<GridCell, IndexList<Guid<EntityId>>>
 
     abstract GetNearbyEntities:
-      Vector2 -> float32 -> alist<Guid<EntityId> * Vector2>
+      Vector2 -> float32 -> alist<struct (Guid<EntityId> * Vector2)>
 
 
   let create(itemStore: ItemStore, world: World) =

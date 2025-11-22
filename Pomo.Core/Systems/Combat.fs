@@ -21,7 +21,8 @@ module Combat =
 
   module private AreaOfEffect =
     let findTargetsInCircle
-      (getNearbyEntities: Vector2 -> float32 -> alist<Guid<EntityId> * Vector2>)
+      (getNearbyEntities:
+        Vector2 -> float32 -> alist<struct (Guid<EntityId> * Vector2)>)
       (casterId: Guid<EntityId>)
       (center: Vector2)
       (radius: float32)
@@ -29,15 +30,21 @@ module Combat =
       =
       let nearby = getNearbyEntities center radius |> AList.force
 
-      nearby
-      |> IndexList.filter(fun (id, _) -> id <> casterId)
-      |> IndexList.sortBy(fun (_, pos) -> Vector2.DistanceSquared(center, pos))
-      |> IndexList.toArray
-      |> Array.truncate maxTargets
-      |> Array.map fst
+      let targets =
+        nearby
+        |> IndexList.filter(fun struct (id, _) -> id <> casterId)
+        |> IndexList.sortBy(fun struct (_, pos) ->
+          Vector2.DistanceSquared(center, pos))
+        |> IndexList.map(fun struct (id, _) -> id)
+
+      if maxTargets >= IndexList.count targets then
+        targets
+      else
+        targets |> IndexList.take maxTargets
 
     let findTargetsInCone
-      (getNearbyEntities: Vector2 -> float32 -> alist<Guid<EntityId> * Vector2>)
+      (getNearbyEntities:
+        Vector2 -> float32 -> alist<struct (Guid<EntityId> * Vector2)>)
       (casterId: Guid<EntityId>)
       (origin: Vector2)
       (direction: Vector2)
@@ -47,17 +54,23 @@ module Combat =
       =
       let nearby = getNearbyEntities origin length |> AList.force
 
-      nearby
-      |> IndexList.filter(fun (id, pos) ->
-        id <> casterId
-        && Spatial.isPointInCone origin direction angle length pos)
-      |> IndexList.sortBy(fun (_, pos) -> Vector2.DistanceSquared(origin, pos))
-      |> IndexList.toArray
-      |> Array.truncate maxTargets
-      |> Array.map fst
+      let targets =
+        nearby
+        |> IndexList.filter(fun struct (id, pos) ->
+          id <> casterId
+          && Spatial.isPointInCone origin direction angle length pos)
+        |> IndexList.sortBy(fun struct (_, pos) ->
+          Vector2.DistanceSquared(origin, pos))
+        |> IndexList.map(fun struct (id, _) -> id)
+
+      if maxTargets >= IndexList.count targets then
+        targets
+      else
+        targets |> IndexList.take maxTargets
 
     let findTargetsInLine
-      (getNearbyEntities: Vector2 -> float32 -> alist<Guid<EntityId> * Vector2>)
+      (getNearbyEntities:
+        Vector2 -> float32 -> alist<struct (Guid<EntityId> * Vector2)>)
       (casterId: Guid<EntityId>)
       (start: Vector2)
       (endPoint: Vector2)
@@ -68,13 +81,18 @@ module Combat =
       let length = Vector2.Distance(start, endPoint)
       let nearby = getNearbyEntities start (length + width) |> AList.force
 
-      nearby
-      |> IndexList.filter(fun (id, pos) ->
-        id <> casterId && Spatial.isPointInLine start endPoint width pos)
-      |> IndexList.sortBy(fun (_, pos) -> Vector2.DistanceSquared(start, pos))
-      |> IndexList.toArray
-      |> Array.truncate maxTargets
-      |> Array.map fst
+      let targets =
+        nearby
+        |> IndexList.filter(fun struct (id, pos) ->
+          id <> casterId && Spatial.isPointInLine start endPoint width pos)
+        |> IndexList.sortBy(fun struct (_, pos) ->
+          Vector2.DistanceSquared(start, pos))
+        |> IndexList.map(fun struct (id, _) -> id)
+
+      if maxTargets >= IndexList.count targets then
+        targets
+      else
+        targets |> IndexList.take maxTargets
 
   module private Handlers =
     let applySkillDamage
@@ -272,7 +290,8 @@ module Combat =
       (derivedStats: amap<Guid<EntityId>, Entity.DerivedStats>)
       (positions: amap<Guid<EntityId>, Vector2>)
       (skillStore: Stores.SkillStore)
-      (getNearbyEntities: Vector2 -> float32 -> alist<Guid<EntityId> * Vector2>)
+      (getNearbyEntities:
+        Vector2 -> float32 -> alist<struct (Guid<EntityId> * Vector2)>)
       (casterId: Guid<EntityId>)
       (skillId: int<SkillId>)
       (target: SystemCommunications.SkillTarget)
@@ -365,12 +384,12 @@ module Combat =
             )
           | None -> ()
         | Delivery.Instant ->
-          let getPosition = fun entityId -> positions.TryFindV entityId
 
           let targetCenter =
             match target with
-            | SystemCommunications.TargetSelf -> getPosition casterId
-            | SystemCommunications.TargetEntity targetId -> getPosition targetId
+            | SystemCommunications.TargetSelf -> positions.TryFindV casterId
+            | SystemCommunications.TargetEntity targetId ->
+              positions.TryFindV targetId
             | SystemCommunications.TargetPosition pos -> ValueSome pos
 
           match targetCenter with
@@ -380,10 +399,10 @@ module Combat =
               match activeSkill.Area with
               | Point ->
                 match target with
-                | SystemCommunications.TargetSelf -> Array.singleton casterId
+                | SystemCommunications.TargetSelf -> IndexList.single casterId
                 | SystemCommunications.TargetEntity targetId ->
-                  Array.singleton targetId
-                | SystemCommunications.TargetPosition _ -> Array.empty // Can't target entities with a point on the ground
+                  IndexList.single targetId
+                | SystemCommunications.TargetPosition _ -> IndexList.empty // Can't target entities with a point on the ground
               | Circle(radius, maxTargets) ->
 
                 AreaOfEffect.findTargetsInCircle
@@ -443,8 +462,8 @@ module Combat =
               | MultiPoint _ ->
                 // This is for spawning multiple projectiles, which is handled in AbilityActivation.
                 // If an instant skill has this, it's probably a bug in the skill definition.
-                Array.empty
-              | AdaptiveCone _ -> Array.empty
+                IndexList.empty
+              | AdaptiveCone _ -> IndexList.empty
 
             for targetId in targets do
               applyInstantaneousSkillEffects
@@ -464,7 +483,8 @@ module Combat =
         derivedStats: amap<Guid<EntityId>, Entity.DerivedStats>,
         positions: amap<Guid<EntityId>, Vector2>,
         skillStore: Stores.SkillStore,
-        getNearbyEntities: Vector2 -> float32 -> alist<Guid<EntityId> * Vector2>
+        getNearbyEntities:
+          Vector2 -> float32 -> alist<struct (Guid<EntityId> * Vector2)>
       )
       (impact: SystemCommunications.ProjectileImpacted)
       =
@@ -480,7 +500,7 @@ module Combat =
         | ValueSome center ->
           let targets =
             match skill.Area with
-            | Point -> Array.singleton impact.TargetId
+            | Point -> IndexList.single impact.TargetId
             | Circle(radius, maxTargets) ->
 
               AreaOfEffect.findTargetsInCircle
@@ -526,8 +546,8 @@ module Combat =
             | MultiPoint _ ->
               // This shouldn't happen. MultiPoint is for firing multiple projectiles,
               // not for the area of a single projectile impact.
-              Array.singleton impact.TargetId
-            | AdaptiveCone _ -> Array.singleton impact.TargetId
+              IndexList.single impact.TargetId
+            | AdaptiveCone _ -> IndexList.single impact.TargetId
 
           for targetId in targets do
             let result =
@@ -599,7 +619,8 @@ module Combat =
         derivedStats: amap<Guid<EntityId>, Entity.DerivedStats>,
         positions: amap<Guid<EntityId>, Vector2>,
         skillStore: Stores.SkillStore,
-        getNearbyEntities: Vector2 -> float32 -> alist<Guid<EntityId> * Vector2>
+        getNearbyEntities:
+          Vector2 -> float32 -> alist<struct (Guid<EntityId> * Vector2)>
       )
       (event: SystemCommunications.AbilityIntent)
       =

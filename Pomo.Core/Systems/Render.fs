@@ -23,7 +23,6 @@ module Render =
     | DrawTargetingIndicator of rect: Rectangle
 
   let private generateEntityCommands
-    (world: World.World)
     (positions: amap<Guid<EntityId>, Vector2>)
     (projectiles: amap<Guid<EntityId>, LiveProjectile>)
     (playerId: Guid<EntityId>)
@@ -124,7 +123,6 @@ module Render =
     adaptive {
       let! entityCmds =
         generateEntityCommands
-          world
           projections.UpdatedPositions
           world.LiveProjectiles
           playerId

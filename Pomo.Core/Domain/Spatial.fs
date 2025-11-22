@@ -49,9 +49,10 @@ module Spatial =
     // IndexList doesn't have min/max directly, so convert to seq or fold
     let min = dots |> Seq.min
     let max = dots |> Seq.max
-    min, max
+    struct (min, max)
 
-  let overlap (minA, maxA) (minB, maxB) = not(maxA < minB || maxB < minA)
+  let overlap struct (minA, maxA) struct (minB, maxB) =
+    not(maxA < minB || maxB < minA)
 
   let intersects (polyA: IndexList<Vector2>) (polyB: IndexList<Vector2>) =
     let axesA = getAxes polyA
@@ -78,8 +79,8 @@ module Spatial =
 
     for axis in allAxes do
       if not separated then
-        let minA, maxA = project axis polyA
-        let minB, maxB = project axis polyB
+        let struct (minA, maxA) = project axis polyA
+        let struct (minB, maxB) = project axis polyB
 
         if not(overlap (minA, maxA) (minB, maxB)) then
           separated <- true
@@ -120,8 +121,8 @@ module Spatial =
     let sin = MathF.Sin radians
     Vector2(v.X * cos - v.Y * sin, v.X * sin + v.Y * cos)
 
-  let getMapObjectPolygon(obj: Pomo.Core.Domain.Map.MapObject) =
-    let radians = MathHelper.ToRadians(obj.Rotation)
+  let getMapObjectPolygon(obj: Map.MapObject) =
+    let radians = MathHelper.ToRadians obj.Rotation
     let pos = Vector2(obj.X, obj.Y)
 
     match obj.Points with

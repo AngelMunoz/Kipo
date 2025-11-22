@@ -25,7 +25,7 @@ module RenderOrchestratorSystem =
     inherit GameComponent(game)
 
     // Store the components this orchestrator creates so they can be removed if needed
-    let mutable createdComponents: IGameComponent list = [] // Renamed 'component' to 'comp' related vars where needed
+    let createdComponents = ResizeArray() // Renamed 'component' to 'comp' related vars where needed
 
     override _.Initialize() =
       base.Initialize()
@@ -38,7 +38,7 @@ module RenderOrchestratorSystem =
       for comp in createdComponents do // Renamed 'component' to 'comp'
         game.Components.Remove(comp) |> ignore
 
-      createdComponents <- []
+      createdComponents.Clear()
 
       // Group map layers by their RenderGroup property
       let layerGroups =
@@ -60,34 +60,33 @@ module RenderOrchestratorSystem =
           new TerrainRenderSystem.TerrainRenderSystem(
             game,
             mapKey,
-            layersToRender = layerNames
-          ) // Explicitly qualified
-        // Scale groupIndex to get distinct DrawOrder values
-        terrainRenderer.DrawOrder <- Render.Layer.TerrainBase + groupIndex * 20
+            layersToRender = layerNames,
+            // Scale groupIndex to get distinct DrawOrder values
+            DrawOrder = Render.Layer.TerrainBase + groupIndex * 20
+          )
 
         game.Components.Add terrainRenderer
 
-        createdComponents <-
-          terrainRenderer :> IGameComponent :: createdComponents
+        createdComponents.Add(terrainRenderer :> IGameComponent)
 
 
       // Create and add RenderSystem for entities, using convention for RenderGroup = 1
-      let entityRenderer = new Render.RenderSystem(game, playerId) // Explicitly qualified
       // Entities get DrawOrder 10 times their conventional RenderGroup (1)
-      entityRenderer.DrawOrder <- Render.Layer.Entities
-      game.Components.Add entityRenderer
-      createdComponents <- entityRenderer :> IGameComponent :: createdComponents
+      let entityRenderer =
+        new Render.RenderSystem(
+          game,
+          playerId,
+          DrawOrder = Render.Layer.Entities
+        )
 
-    // For safety, add DebugRenderSystem last and ensure it has a high DrawOrder
-    // if it's managed by this orchestrator, or ensure it's added separately with higher order.
-    // Assuming DebugRenderSystem is added by PomoGame and will handle its own DrawOrder for now.
+      game.Components.Add entityRenderer
+      createdComponents.Add(entityRenderer :> IGameComponent)
 
     override _.Dispose(disposing) =
       if disposing then
-        // Remove all components created by this orchestrator when it's disposed
         for comp in createdComponents do // Renamed 'component' to 'comp'
           game.Components.Remove(comp) |> ignore
 
-        createdComponents <- [] // Clear the list
+        createdComponents.Clear()
 
       base.Dispose(disposing)

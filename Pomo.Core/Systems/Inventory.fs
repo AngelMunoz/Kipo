@@ -39,10 +39,9 @@ module Inventory =
       | ValueSome itemDef ->
         match itemDef.Kind with
         | Item.ItemKind.Usable props ->
-          if
-            itemInstance.UsesLeft.IsSome && itemInstance.UsesLeft.Value > 0
-          then
-            // publsh effect application intent
+          match itemInstance.UsesLeft with
+          | ValueNone ->
+            // infinite uses, so just publish effect application intent
             eventBus.Publish(
               {
                 SourceEntity = intent.EntityId
@@ -51,22 +50,32 @@ module Inventory =
               }
               : SystemCommunications.EffectApplicationIntent
             )
-            // decrement usages left and publish update event
-            eventBus.Publish(
-              Inventory(
-                UpdateItemInstance {
-                  itemInstance with
-                      UsesLeft =
-                        itemInstance.UsesLeft
-                        |> ValueOption.map(fun uses -> uses - 1)
-                }
-              )
-            )
+          | ValueSome usesLeft ->
 
-            ()
-          else
-            // no uses left or infinite uses
-            ()
+            if usesLeft > 0 then
+              // publsh effect application intent
+              eventBus.Publish(
+                {
+                  SourceEntity = intent.EntityId
+                  TargetEntity = intent.EntityId
+                  Effect = props.Effect
+                }
+                : SystemCommunications.EffectApplicationIntent
+              )
+              // decrement usages left and publish update event
+              eventBus.Publish(
+                Inventory(
+                  UpdateItemInstance {
+                    itemInstance with
+                        UsesLeft =
+                          itemInstance.UsesLeft
+                          |> ValueOption.map(fun uses -> uses - 1)
+                  }
+                )
+              )
+            else
+              // no uses left or infinite uses
+              ()
         | Item.ItemKind.NonUsable ->
           // cannot use non-usable items
           ()

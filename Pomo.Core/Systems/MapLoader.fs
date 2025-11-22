@@ -13,43 +13,46 @@ open FSharp.Data.Adaptive
 module MapLoader =
   open System.Diagnostics
 
-  let private xname name = XName.Get name
+  let inline private xname name = XName.Get name
 
-  let private attr (name: string) (element: XElement) =
-    let a = element.Attribute(xname name)
-    if isNull a then None else Some a.Value
+  let inline private attr (name: string) (element: XElement) =
+    match element.Attribute(xname name) with
+    | Null -> ValueNone
+    | a -> ValueSome a.Value
 
-  let private attrString (name: string) (def: string) (element: XElement) =
-    match attr name element with
-    | Some v -> v
-    | None -> def
+  let private attrInt (name: string) (element: XElement) =
+    attr name element
+    |> ValueOption.bind(fun v ->
+      match Int32.TryParse(v, CultureInfo.InvariantCulture) with
+      | true, parsed -> ValueSome parsed
+      | false, _ -> ValueNone)
 
-  let private attrInt (name: string) (def: int) (element: XElement) =
-    match attr name element with
-    | Some v -> Int32.Parse(v, CultureInfo.InvariantCulture)
-    | None -> def
+  let private attrFloat (name: string) (element: XElement) =
+    attr name element
+    |> ValueOption.bind(fun v ->
+      match
+        Single.TryParse(v, NumberStyles.Float, CultureInfo.InvariantCulture)
+      with
+      | true, parsed -> ValueSome parsed
+      | false, _ -> ValueNone)
 
-  let private attrFloat (name: string) (def: float32) (element: XElement) =
-    match attr name element with
-    | Some v -> Single.Parse(v, CultureInfo.InvariantCulture)
-    | None -> def
+  let private attrBool (name: string) (element: XElement) =
+    attr name element
+    |> ValueOption.bind(fun v ->
+      match v.ToLower() with
+      | "1"
+      | "true" -> ValueSome true
+      | "0"
+      | "false" -> ValueSome false
+      | _ -> ValueNone)
 
-  let private attrBool (name: string) (def: bool) (element: XElement) =
-    match attr name element with
-    | Some v -> if v = "1" || v.ToLower() = "true" then true else false
-    | None -> def
-
-  let private parseInt(s: string) =
-    Debug.WriteLine(s)
-    Int32.Parse(s, CultureInfo.InvariantCulture)
-
-  let private parseFloat(s: string) =
+  let inline private parseFloat(s: string) =
     Single.Parse(s, CultureInfo.InvariantCulture)
 
-  let private parseBool(s: string) =
+  let inline private parseBool(s: string) =
     if s = "1" || s.ToLower() = "true" then true else false
 
-  let private parseGid(s: string) =
+  let inline private parseGid(s: string) =
     let raw = UInt32.Parse(s, CultureInfo.InvariantCulture)
     // Mask out the flipping flags (top 3 bits)
     // 0x1FFFFFFF is the mask for the lower 29 bits
@@ -70,34 +73,34 @@ module MapLoader =
       |> HashMap.ofSeq
 
   let private parseTileset(element: XElement) : Tileset =
-    let firstGid = attrInt "firstgid" 1 element
-    let name = attrString "name" "" element
-    let tileWidth = attrInt "tilewidth" 0 element
-    let tileHeight = attrInt "tileheight" 0 element
-    let tileCount = attrInt "tilecount" 0 element
-    let columns = attrInt "columns" 0 element
+    let firstGid = attrInt "firstgid" element
+    let name = attr "name" element
+    let tileWidth = attrInt "tilewidth" element
+    let tileHeight = attrInt "tileheight" element
+    let tileCount = attrInt "tilecount" element
+    let columns = attrInt "columns" element
 
     let tiles =
       element.Elements(xname "tile")
       |> Seq.map(fun t ->
-        let id = attrInt "id" 0 t
+        let id = attrInt "id" t |> ValueOption.defaultValue 0
         let imageElem = t.Element(xname "image")
 
         let source =
           if not(isNull imageElem) then
-            attrString "source" "" imageElem
+            attr "source" imageElem |> ValueOption.defaultValue String.Empty
           else
-            ""
+            String.Empty
 
         let width =
           if not(isNull imageElem) then
-            attrInt "width" 0 imageElem
+            attrInt "width" imageElem |> ValueOption.defaultValue 0
           else
             0
 
         let height =
           if not(isNull imageElem) then
-            attrInt "height" 0 imageElem
+            attrInt "height" imageElem |> ValueOption.defaultValue 0
           else
             0
 
@@ -112,12 +115,12 @@ module MapLoader =
       |> HashMap.ofSeq
 
     {
-      FirstGid = firstGid
-      Name = name
-      TileWidth = tileWidth
-      TileHeight = tileHeight
-      TileCount = tileCount
-      Columns = columns
+      FirstGid = firstGid |> ValueOption.defaultValue 0
+      Name = name |> ValueOption.defaultValue String.Empty
+      TileWidth = tileWidth |> ValueOption.defaultValue 0
+      TileHeight = tileHeight |> ValueOption.defaultValue 0
+      TileCount = tileCount |> ValueOption.defaultValue 0
+      Columns = columns |> ValueOption.defaultValue 0
       Tiles = tiles
     }
 
@@ -126,13 +129,13 @@ module MapLoader =
     (width: int)
     (height: int)
     : MapLayer =
-    let id = attrInt "id" 0 element
-    let name = attrString "name" "" element
-    let opacity = attrFloat "opacity" 1.0f element
-    let visible = attrBool "visible" true element
+    let id = attrInt "id" element |> ValueOption.defaultValue 0
+    let name = attr "name" element |> ValueOption.defaultValue String.Empty
+    let opacity = attrFloat "opacity" element |> ValueOption.defaultValue 1.0f
+    let visible = attrBool "visible" element |> ValueOption.defaultValue true
 
     let dataElem = element.Element(xname "data")
-    let encoding = attrString "encoding" "xml" dataElem
+    let encoding = attr "encoding" dataElem |> ValueOption.defaultValue "xml"
 
     let tiles = Array2D.zeroCreate<MapTile voption> width height
 
@@ -171,8 +174,8 @@ module MapLoader =
     }
 
   let private parseObject(element: XElement) : MapObject =
-    let id = attrInt "id" 0 element
-    let name = attrString "name" "" element
+    let id = attrInt "id" element |> ValueOption.defaultValue 0
+    let name = attr "name" element |> ValueOption.defaultValue String.Empty
 
     let parseMapObjectType(s: string) =
       match s.ToLowerInvariant() with
@@ -181,20 +184,22 @@ module MapLoader =
       | "spawn" -> ValueSome Spawn
       | _ -> ValueNone
 
-    let type' = attrString "type" "" element |> parseMapObjectType
-    let x = attrFloat "x" 0.0f element
-    let y = attrFloat "y" 0.0f element
-    let width = attrFloat "width" 0.0f element
-    let height = attrFloat "height" 0.0f element
-    let rotation = attrFloat "rotation" 0.0f element
-    let gid = attr "gid" element |> Option.map parseGid |> ValueOption.ofOption
+    let type' = attr "type" element |> ValueOption.bind parseMapObjectType
+
+    let x = attrFloat "x" element |> ValueOption.defaultValue 0.0f
+    let y = attrFloat "y" element |> ValueOption.defaultValue 0.0f
+    let width = attrFloat "width" element |> ValueOption.defaultValue 0.0f
+    let height = attrFloat "height" element |> ValueOption.defaultValue 0.0f
+    let rotation = attrFloat "rotation" element |> ValueOption.defaultValue 0.0f
+
+    let gid = attr "gid" element |> ValueOption.map parseGid
 
     let points =
       let polygon = element.Element(xname "polygon")
       let polyline = element.Element(xname "polyline")
 
       if not(isNull polygon) then
-        let pts = attrString "points" "" polygon
+        let pts = attr "points" polygon |> ValueOption.defaultValue ""
 
         ValueSome(
           pts.Split(' ')
@@ -204,7 +209,7 @@ module MapLoader =
           |> IndexList.ofArray
         )
       elif not(isNull polyline) then
-        let pts = attrString "points" "" polyline
+        let pts = attr "points" polyline |> ValueOption.defaultValue ""
 
         ValueSome(
           pts.Split(' ')
@@ -231,10 +236,10 @@ module MapLoader =
     }
 
   let private parseObjectGroup(element: XElement) : ObjectGroup =
-    let id = attrInt "id" 0 element
-    let name = attrString "name" "" element
-    let opacity = attrFloat "opacity" 1.0f element
-    let visible = attrBool "visible" true element
+    let id = attrInt "id" element |> ValueOption.defaultValue 0
+    let name = attr "name" element |> ValueOption.defaultValue String.Empty
+    let opacity = attrFloat "opacity" element |> ValueOption.defaultValue 1.0f
+    let visible = attrBool "visible" element |> ValueOption.defaultValue true
 
     let objects =
       element.Elements(xname "object") |> Seq.map parseObject |> IndexList.ofSeq
@@ -251,15 +256,22 @@ module MapLoader =
     let doc = XDocument.Load(Path.Combine(AppContext.BaseDirectory, path))
     let mapElem = doc.Element(xname "map")
 
-    let version = attrString "version" "1.0" mapElem
-    let tiledVersion = attrString "tiledversion" "" mapElem
-    let orientationStr = attrString "orientation" "orthogonal" mapElem
-    let renderOrderStr = attrString "renderorder" "right-down" mapElem
-    let width = attrInt "width" 0 mapElem
-    let height = attrInt "height" 0 mapElem
-    let tileWidth = attrInt "tilewidth" 0 mapElem
-    let tileHeight = attrInt "tileheight" 0 mapElem
-    let infinite = attrInt "infinite" 0 mapElem = 1
+    let version = attr "version" mapElem |> ValueOption.defaultValue "1.0"
+
+    let tiledVersion =
+      attr "tiledversion" mapElem |> ValueOption.defaultValue ""
+
+    let orientationStr =
+      attr "orientation" mapElem |> ValueOption.defaultValue "orthogonal"
+
+    let renderOrderStr =
+      attr "renderorder" mapElem |> ValueOption.defaultValue "right-down"
+
+    let width = attrInt "width" mapElem |> ValueOption.defaultValue 0
+    let height = attrInt "height" mapElem |> ValueOption.defaultValue 0
+    let tileWidth = attrInt "tilewidth" mapElem |> ValueOption.defaultValue 0
+    let tileHeight = attrInt "tileheight" mapElem |> ValueOption.defaultValue 0
+    let infinite = attrBool "infinite" mapElem |> ValueOption.defaultValue false
 
     let staggerAxisStr = attr "staggeraxis" mapElem
     let staggerIndexStr = attr "staggerindex" mapElem
@@ -282,14 +294,14 @@ module MapLoader =
 
     let staggerAxis =
       match staggerAxisStr with
-      | Some "x" -> ValueSome X
-      | Some "y" -> ValueSome Y
+      | ValueSome "x" -> ValueSome X
+      | ValueSome "y" -> ValueSome Y
       | _ -> ValueNone
 
     let staggerIndex =
       match staggerIndexStr with
-      | Some "odd" -> ValueSome Odd
-      | Some "even" -> ValueSome Even
+      | ValueSome "odd" -> ValueSome Odd
+      | ValueSome "even" -> ValueSome Even
       | _ -> ValueNone
 
     let tilesets =

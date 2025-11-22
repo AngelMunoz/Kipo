@@ -22,17 +22,17 @@ module Collision =
     (grid: HashMap<GridCell, IndexList<Guid<EntityId>>>)
     (cell: GridCell)
     =
-    let neighborOffsets =
+    let neighborOffsets: IndexList<struct (int * int)> =
       IndexList.ofList [
-        struct (-1, -1)
-        (0, -1)
-        (1, -1)
-        (-1, 0)
-        (0, 0)
-        (1, 0)
-        (-1, 1)
-        (0, 1)
-        (1, 1)
+        -1, -1
+        0, -1
+        1, -1
+        -1, 0
+        0, 0
+        1, 0
+        -1, 1
+        0, 1
+        1, 1
       ]
 
     neighborOffsets

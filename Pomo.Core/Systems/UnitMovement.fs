@@ -11,7 +11,7 @@ open Pomo.Core.Systems.Systems
 
 module UnitMovement =
 
-  type UnitMovementSystem(game: Game, playerId: Guid<EntityId>) =
+  type UnitMovementSystem(game: Game, playerId: Guid<EntityId>) as this =
     inherit GameSystem(game)
 
     // Mutable state to track last known velocities to avoid spamming events
@@ -25,6 +25,15 @@ module UnitMovement =
         SystemCommunications.CollisionEvents
        >()
 
+    let movementStates =
+      this.World.MovementStates |> AMap.filter(fun id _ -> id <> playerId)
+
+    let positions =
+      this.World.Positions |> AMap.filter(fun id _ -> id <> playerId)
+
+    let derivedStats =
+      this.Projections.DerivedStats |> AMap.filter(fun id _ -> id <> playerId)
+
     override val Kind = Movement with get
 
     override this.Initialize() =
@@ -33,6 +42,7 @@ module UnitMovement =
       sub <-
         this.EventBus.GetObservableFor<SystemCommunications.CollisionEvents>()
         |> Observable.subscribe(fun e -> collisionEvents.Enqueue(e))
+
 
     override this.Dispose(disposing) =
       if disposing then
@@ -59,11 +69,7 @@ module UnitMovement =
           | ValueSome currentPos ->
             let newPos = currentPos + mtv
 
-            this.EventBus.Publish(
-              StateChangeEvent.Physics(
-                PhysicsEvents.PositionChanged struct (eId, newPos)
-              )
-            )
+            this.EventBus.Publish(Physics(PositionChanged struct (eId, newPos)))
 
             match frameCollisions.TryGetValue eId with
             | true, existing -> frameCollisions[eId] <- existing + mtv
@@ -71,20 +77,11 @@ module UnitMovement =
           | ValueNone -> ()
         | _ -> ()
 
-      let movementStates =
-        this.World.MovementStates
-        |> AMap.filter(fun id _ -> id <> playerId)
-        |> AMap.force
+      let movementStates = movementStates |> AMap.force
 
-      let positions =
-        this.World.Positions
-        |> AMap.filter(fun id _ -> id <> playerId)
-        |> AMap.force
+      let positions = positions |> AMap.force
 
-      let derivedStats =
-        this.Projections.DerivedStats
-        |> AMap.filter(fun id _ -> id <> playerId)
-        |> AMap.force
+      let derivedStats = derivedStats |> AMap.force
 
       // We iterate over all entities that have a movement state
       for entityId, state in movementStates do
@@ -103,15 +100,11 @@ module UnitMovement =
             if distance < threshold then
               // Arrived
               this.EventBus.Publish(
-                StateChangeEvent.Physics(
-                  PhysicsEvents.VelocityChanged struct (entityId, Vector2.Zero)
-                )
+                Physics(VelocityChanged struct (entityId, Vector2.Zero))
               )
 
               this.EventBus.Publish(
-                StateChangeEvent.Physics(
-                  PhysicsEvents.MovementStateChanged struct (entityId, Idle)
-                )
+                Physics(MovementStateChanged struct (entityId, Idle))
               )
 
               lastVelocities[entityId] <- Vector2.Zero
@@ -139,10 +132,7 @@ module UnitMovement =
 
               if finalVelocity <> lastVel then
                 this.EventBus.Publish(
-                  StateChangeEvent.Physics(
-                    PhysicsEvents.VelocityChanged
-                      struct (entityId, finalVelocity)
-                  )
+                  Physics(VelocityChanged struct (entityId, finalVelocity))
                 )
 
                 lastVelocities[entityId] <- finalVelocity
@@ -154,9 +144,7 @@ module UnitMovement =
             && lastVelocities[entityId] <> Vector2.Zero
           then
             this.EventBus.Publish(
-              StateChangeEvent.Physics(
-                PhysicsEvents.VelocityChanged struct (entityId, Vector2.Zero)
-              )
+              Physics(VelocityChanged struct (entityId, Vector2.Zero))
             )
 
             lastVelocities[entityId] <- Vector2.Zero

@@ -109,9 +109,7 @@ module PlayerMovement =
           let newPos = currentPos + mtv
 
           this.EventBus.Publish(
-            StateChangeEvent.Physics(
-              PhysicsEvents.PositionChanged struct (playerId, newPos)
-            )
+            Physics(PositionChanged struct (playerId, newPos))
           )
 
           accumulatedMtv <- accumulatedMtv + mtv
@@ -127,9 +125,7 @@ module PlayerMovement =
         // If stunned or rooted, ensure velocity is zero.
         if lastVelocity <> Vector2.Zero then
           this.EventBus.Publish(
-            StateChangeEvent.Physics(
-              PhysicsEvents.VelocityChanged struct (playerId, Vector2.Zero)
-            )
+            Physics(VelocityChanged struct (playerId, Vector2.Zero))
           )
 
           lastVelocity <- Vector2.Zero
@@ -148,15 +144,11 @@ module PlayerMovement =
           if distance < threshold then
             // We've arrived. Stop moving and return to Idle state.
             this.EventBus.Publish(
-              StateChangeEvent.Physics(
-                PhysicsEvents.VelocityChanged struct (playerId, Vector2.Zero)
-              )
+              Physics(VelocityChanged struct (playerId, Vector2.Zero))
             )
 
             this.EventBus.Publish(
-              StateChangeEvent.Physics(
-                PhysicsEvents.MovementStateChanged struct (playerId, Idle)
-              )
+              Physics(MovementStateChanged struct (playerId, Idle))
             )
           else
             // Still moving towards the destination.
@@ -166,7 +158,7 @@ module PlayerMovement =
             // Apply collision sliding
             let finalVelocity =
               if accumulatedMtv <> Vector2.Zero then
-                let normal = Vector2.Normalize(accumulatedMtv)
+                let normal = Vector2.Normalize accumulatedMtv
                 // If moving against the normal (into the wall)
                 if Vector2.Dot(adjustedVelocity, normal) < 0.0f then
                   // Project velocity onto the tangent (slide)
@@ -179,23 +171,12 @@ module PlayerMovement =
 
             if finalVelocity <> lastVelocity then
               this.EventBus.Publish(
-                StateChangeEvent.Physics(
-                  PhysicsEvents.VelocityChanged struct (playerId, finalVelocity)
-                )
+                Physics(VelocityChanged struct (playerId, finalVelocity))
               )
 
             lastVelocity <- finalVelocity
 
         | Some Idle ->
-          // Even in Idle, we might have velocity from input (if we treat Idle as "not auto-moving" but manual moving?)
-          // Wait, PlayerMovement usually uses Input for velocity, but here it checks MovementState.
-          // The Projections.PlayerVelocity calculates velocity from Input.
-          // But the code below ignores `currentVelocity` (from Input) and uses `MovingTo` logic?
-
-          // Ah, lines 172+ handle Idle.
-          // But wait, the `currentVelocity` variable (line 116) comes from Input Projection.
-          // If `MovementState` is Idle, we should use `currentVelocity` (Input).
-
           let mutable targetVelocity = currentVelocity
 
           // Apply collision sliding to Input velocity
@@ -210,9 +191,7 @@ module PlayerMovement =
 
           if targetVelocity <> lastVelocity then
             this.EventBus.Publish(
-              StateChangeEvent.Physics(
-                PhysicsEvents.VelocityChanged struct (playerId, targetVelocity)
-              )
+              Physics(VelocityChanged struct (playerId, targetVelocity))
             )
 
             lastVelocity <- targetVelocity

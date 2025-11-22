@@ -33,6 +33,7 @@ module AbilityActivation =
 
   let private SKILL_ACTIVATION_RANGE_BUFFER = 5.0f
 
+  [<Struct>]
   type ValidationError =
     | NotEnoughResources
     | OnCooldown

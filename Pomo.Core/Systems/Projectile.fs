@@ -34,9 +34,9 @@ module Projectile =
         return None
     })
     |> AMap.sortBy(fun _ distance -> distance)
-    |> AList.toAVal
 
   let generateEvents
+    (rng: Random)
     (positions: amap<Guid<EntityId>, Vector2>)
     (liveEntities: aset<Guid<EntityId>>)
     (projectileId: Guid<EntityId>)
@@ -77,7 +77,7 @@ module Projectile =
         let! nextTarget = adaptive {
           match projectile.Info.Variations with
           | ValueSome(Chained(jumpsLeft, maxRange)) when jumpsLeft >= 0 ->
-            let! nextTarget =
+            let nextTarget =
               findNextChainTarget
                 positions
                 liveEntities
@@ -86,14 +86,16 @@ module Projectile =
                 targetPos
                 maxRange
 
-            let targets = nextTarget.AsArray
+            let! selectedTarget = adaptive {
+              let! targetListSize = AList.count nextTarget
 
-            let selectedTarget =
-              match targets with
-              | [||] -> ValueNone
-              | targets ->
-                let selected, _ = Array.randomChoice targets
-                ValueSome selected
+              if targetListSize = 0 then
+                return ValueNone
+              else
+                let index = rng.Next(0, targetListSize)
+                let! selected = nextTarget |> AList.tryAt index
+                return Option.toValueOption selected |> ValueOption.map fst
+            }
 
             match selectedTarget with
             | ValueSome newTargetId ->
@@ -158,7 +160,9 @@ type ProjectileSystem(game: Game) as this =
     let liveEntities = this.Projections.LiveEntities
 
     this.World.LiveProjectiles
-    |> AMap.mapA(Projectile.generateEvents positions liveEntities)
+    |> AMap.mapA(
+      Projectile.generateEvents this.World.Rng positions liveEntities
+    )
     |> AMap.fold
       (fun (sysAcc, stateAcc) _ struct (sysEvents, stateEvents) ->
         (IndexList.append sysEvents sysAcc,
