@@ -26,6 +26,7 @@ module Render =
     (positions: amap<Guid<EntityId>, Vector2>)
     (projectiles: amap<Guid<EntityId>, LiveProjectile>)
     (playerId: Guid<EntityId>)
+    (cameraService: Core.CameraService)
     =
     positions
     |> AMap.chooseA(fun entityId pos -> adaptive {
@@ -36,7 +37,8 @@ module Render =
       else
         let size = Core.Constants.Entity.Size
 
-        let rect =
+        // Check if entity is within any camera's viewport (for split-screen)
+        let entityRect =
           Rectangle(
             int(pos.X - size.X / 2.0f),
             int(pos.Y - size.Y / 2.0f),
@@ -44,10 +46,38 @@ module Render =
             int size.Y
           )
 
-        if entityId = playerId then
-          return Some(DrawPlayer rect)
+        // Add padding to prevent entities from popping in/out at viewport boundaries
+        let cullingPadding = 64.0f // Add 64 pixels of padding around viewport
+
+        // Get all camera viewports and check if entity is within any of them
+        let isVisible =
+          cameraService.GetAllCameras()
+          |> Array.exists(fun struct (_, camera) ->
+            let paddedViewportRect =
+              Rectangle(
+                int(
+                  camera.Position.X
+                  - float32 camera.Viewport.Width / (2.0f * camera.Zoom)
+                  - cullingPadding
+                ),
+                int(
+                  camera.Position.Y
+                  - float32 camera.Viewport.Height / (2.0f * camera.Zoom)
+                  - cullingPadding
+                ),
+                int(float32 camera.Viewport.Width / camera.Zoom + 2.0f * cullingPadding),
+                int(float32 camera.Viewport.Height / camera.Zoom + 2.0f * cullingPadding)
+              )
+
+            paddedViewportRect.Intersects entityRect)
+
+        if isVisible then
+          if entityId = playerId then
+            return Some(DrawPlayer entityRect)
+          else
+            return Some(DrawEnemy entityRect)
         else
-          return Some(DrawEnemy rect)
+          return None
     })
     |> AMap.fold (fun acc _ cmd -> IndexList.add cmd acc) IndexList.empty
 
@@ -133,6 +163,7 @@ module Render =
           projections.UpdatedPositions
           world.LiveProjectiles
           playerId
+          cameraService
 
       and! projectileCmds =
         generateProjectileCommands

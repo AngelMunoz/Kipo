@@ -100,9 +100,6 @@ module Collision =
 
                   match Spatial.intersectsMTV entityPoly objPoly with
                   | ValueSome mtv ->
-                    Console.WriteLine(
-                      $"[CollisionSystem] Collision with {obj.Name} (ID: {obj.Id}). MTV: {mtv}"
-                    )
 
                     this.EventBus.Publish(
                       SystemCommunications.MapObjectCollision

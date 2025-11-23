@@ -23,6 +23,7 @@ open Pomo.Core.Domain.Core
 type MovementState =
   | Idle
   | MovingTo of targetPosition: Vector2
+  | MovingAlongPath of path: Vector2 list
 
 [<Struct>]
 type Selection =

@@ -136,7 +136,7 @@ type PomoGame() as this =
       playerId
     )
 
-  let movementService = Navigation.create(eventBus)
+  let movementService = Navigation.create(eventBus, mapStore, "Proto1", worldView)
   let inventoryService = Inventory.create(eventBus, itemStore, worldView)
   let equipmentService = Equipment.create worldView eventBus
 

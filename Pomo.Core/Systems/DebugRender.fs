@@ -445,6 +445,15 @@ module DebugRender =
 
     let mapStore = game.Services.GetService<MapStore>()
 
+    // Performance counters and timing
+    let mutable frameCount = 0
+    let mutable lastFPSTime = TimeSpan.Zero
+    let mutable fps = 0.0f
+
+    // Stats for culling performance
+    let mutable totalEntities = 0
+    let mutable visibleEntities = 0
+
     let spriteBatch = lazy (new SpriteBatch(game.GraphicsDevice))
     let mutable pixel: Texture2D voption = ValueNone
     let mutable hudFont = Unchecked.defaultof<_>
@@ -979,3 +988,27 @@ module DebugRender =
           | _ -> ()
 
         sb.End()
+
+      // Calculate FPS
+      frameCount <- frameCount + 1
+      if gameTime.TotalGameTime.TotalSeconds - lastFPSTime.TotalSeconds >= 1.0 then
+        fps <- float32 frameCount
+        frameCount <- 0
+        lastFPSTime <- gameTime.TotalGameTime
+
+      // Count total entities for culling stats
+      totalEntities <- AMap.count projections.UpdatedPositions |> AVal.force
+
+      // Render performance stats overlay at top-left of screen
+      let screenTransform = Matrix.Identity
+      sb.Begin(transformMatrix = screenTransform)
+
+      let statsText =
+        System.Text.StringBuilder()
+          .AppendLine($"FPS: %.1f{fps}")
+          .AppendLine($"Entities: {totalEntities}")
+          .AppendLine("Culling: 0% (TODO)")
+          .ToString()
+
+      sb.DrawString(hudFont, statsText, Vector2(10.0f, 10.0f), Color.White)
+      sb.End()

@@ -77,6 +77,23 @@ module TerrainRenderSystem =
                 |> IndexList.filter(fun l -> names |> HashSet.contains l.Name)
               | ValueNone -> map.Layers
 
+            // Calculate visible viewport bounds in world coordinates
+            let viewportWorldLeft =
+              camera.Position.X
+              - float32 camera.Viewport.Width / (2.0f * camera.Zoom)
+
+            let viewportWorldRight =
+              camera.Position.X
+              + float32 camera.Viewport.Width / (2.0f * camera.Zoom)
+
+            let viewportWorldTop =
+              camera.Position.Y
+              - float32 camera.Viewport.Height / (2.0f * camera.Zoom)
+
+            let viewportWorldBottom =
+              camera.Position.Y
+              + float32 camera.Viewport.Height / (2.0f * camera.Zoom)
+
             // Render order: RightDown is standard
             // For staggered iso, we iterate Y then X usually, or just iterate the array.
 
@@ -188,11 +205,25 @@ module TerrainRenderSystem =
                           let drawX = posX
                           let drawY = posY + tileH - float32 texture.Height
 
-                          spriteBatch.Draw(
-                            texture,
-                            Vector2(drawX, drawY),
-                            Color.White
-                          )
+                          // Calculate tile bounds for culling
+                          let tileLeft = drawX
+                          let tileRight = drawX + float32 texture.Width
+                          let tileTop = drawY
+                          let tileBottom = drawY + float32 texture.Height
+
+                          // Check if tile is within camera viewport bounds
+                          let isVisible =
+                            tileRight >= viewportWorldLeft
+                            && tileLeft <= viewportWorldRight
+                            && tileBottom >= viewportWorldTop
+                            && tileTop <= viewportWorldBottom
+
+                          if isVisible then
+                            spriteBatch.Draw(
+                              texture,
+                              Vector2(drawX, drawY),
+                              Color.White
+                            )
                       | ValueNone -> ()
 
             spriteBatch.End()

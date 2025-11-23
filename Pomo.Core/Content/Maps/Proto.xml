@@ -407,25 +407,25 @@
   </object>
  </objectgroup>
  <objectgroup id="8" name="Gameplay">
-  <object id="145" name="GateA" type="Spawn" x="17.25" y="896" width="30.5" height="30.5">
+  <object id="145" name="GateA" type="Spawn" x="43.25" y="884" width="30.5" height="30.5">
    <properties>
     <property name="PlayerSpawn" type="bool" value="true"/>
    </properties>
    <ellipse/>
   </object>
-  <object id="147" name="GateB" type="Spawn" x="16" y="1" width="30.5" height="30.5">
+  <object id="147" name="GateB" type="Spawn" x="36" y="5" width="30.5" height="30.5">
    <properties>
     <property name="PlayerSpawn" type="bool" value="true"/>
    </properties>
    <ellipse/>
   </object>
-  <object id="148" name="GateC" type="Spawn" x="946.25" y="16.75" width="30.5" height="30.5">
+  <object id="148" name="GateC" type="Spawn" x="930.25" y="9.25" width="30.5" height="30.5">
    <properties>
     <property name="PlayerSpawn" type="bool" value="true"/>
    </properties>
    <ellipse/>
   </object>
-  <object id="149" name="GateD" type="Spawn" x="945.5" y="912" width="30.5" height="30.5">
+  <object id="149" name="GateD" type="Spawn" x="926.5" y="894.5" width="30.5" height="30.5">
    <properties>
     <property name="PlayerSpawn" type="bool" value="true"/>
    </properties>

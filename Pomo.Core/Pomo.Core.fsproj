@@ -13,8 +13,10 @@
     <Compile Include="Domain/Item.fs" />
     <Compile Include="Domain/Map.fs" />
     <Compile Include="Domain/Spatial.fs" />
+    <Compile Include="Domain/Navigation.fs" />
     <Compile Include="Domain/AI.fs" />
     <Compile Include="Domain/Events.fs" />
+    <Compile Include="Algorithms/Pathfinding.fs" />
     <Compile Include="Domain/World.fs" />
     <Compile Include="EventBus.fs" />
     <Compile Include="Serialization.fs" />

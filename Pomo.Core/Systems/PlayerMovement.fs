@@ -175,6 +175,53 @@ module PlayerMovement =
               )
 
             lastVelocity <- finalVelocity
+        | Some(MovingAlongPath path) ->
+            match path with
+            | [] ->
+              // Path finished
+              this.EventBus.Publish(
+                Physics(VelocityChanged struct (playerId, Vector2.Zero))
+              )
+
+              this.EventBus.Publish(
+                Physics(MovementStateChanged struct (playerId, Idle))
+              )
+              
+              lastVelocity <- Vector2.Zero
+            | currentWaypoint :: remainingWaypoints ->
+               let distance = Vector2.Distance(position, currentWaypoint)
+               let threshold = Pomo.Core.Domain.Core.Constants.AI.WaypointReachedThreshold
+
+               if distance < threshold then
+                 // Waypoint reached, move to next
+                 this.EventBus.Publish(
+                   Physics(
+                     MovementStateChanged
+                       struct (playerId, MovingAlongPath remainingWaypoints)
+                   )
+                 )
+               else
+                 // Move towards current waypoint
+                 let direction = Vector2.Normalize(currentWaypoint - position)
+                 let adjustedVelocity = direction * float32 movementSpeed
+
+                 // Apply collision sliding
+                 let finalVelocity =
+                   if accumulatedMtv <> Vector2.Zero then
+                     let normal = Vector2.Normalize accumulatedMtv
+                     if Vector2.Dot(adjustedVelocity, normal) < 0.0f then
+                       adjustedVelocity - normal * Vector2.Dot(adjustedVelocity, normal)
+                     else
+                       adjustedVelocity
+                   else
+                     adjustedVelocity
+
+                 if finalVelocity <> lastVelocity then
+                   this.EventBus.Publish(
+                     Physics(VelocityChanged struct (playerId, finalVelocity))
+                   )
+
+                 lastVelocity <- finalVelocity
 
         | Some Idle ->
           let mutable targetVelocity = currentVelocity

@@ -76,11 +76,14 @@ module Core =
     module Collision =
       let GridCellSize = 64.0f
 
+    module Navigation =
+      let GridCellSize = 8.0f
+
     module Spawning =
       let DefaultDuration = TimeSpan.FromSeconds(1.0)
 
     module AI =
-      let WaypointReachedThreshold = 64.0f
+      let WaypointReachedThreshold = 8.0f
 
     module Debug =
       let StatYOffset = -20.0f

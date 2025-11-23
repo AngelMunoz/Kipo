@@ -8,6 +8,7 @@ open Pomo.Core.Domain.Units
 open Pomo.Core.Domain.World
 open Pomo.Core.Domain.Events
 open Pomo.Core.Systems.Systems
+open Pomo.Core.Domain.Core // For Constants.AI.WaypointReachedThreshold
 
 module UnitMovement =
 
@@ -24,6 +25,10 @@ module UnitMovement =
       System.Collections.Concurrent.ConcurrentQueue<
         SystemCommunications.CollisionEvents
        >()
+
+    // Local state for path following
+    let mutable currentPaths =
+      System.Collections.Generic.Dictionary<Guid<EntityId>, Vector2 list>()
 
     let movementStates =
       this.World.MovementStates |> AMap.filter(fun id _ -> id <> playerId)
@@ -86,6 +91,69 @@ module UnitMovement =
       // We iterate over all entities that have a movement state
       for entityId, state in movementStates do
         match state with
+        | MovingAlongPath path ->
+          currentPaths[entityId] <- path // Update local path state
+
+          match path with
+          | [] -> // Path finished
+            this.EventBus.Publish(
+              Physics(VelocityChanged struct (entityId, Vector2.Zero))
+            )
+
+            this.EventBus.Publish(
+              Physics(MovementStateChanged struct (entityId, Idle))
+            )
+
+            lastVelocities[entityId] <- Vector2.Zero
+            currentPaths.Remove(entityId) |> ignore
+          | currentWaypoint :: remainingWaypoints ->
+            match positions.TryFindV entityId with
+            | ValueSome currentPos ->
+              let speed =
+                match derivedStats.TryFindV entityId with
+                | ValueSome stats -> float32 stats.MS
+                | ValueNone -> 100.0f // Default speed if no stats
+
+              let distance = Vector2.Distance(currentPos, currentWaypoint)
+              let threshold = Constants.AI.WaypointReachedThreshold
+
+              if distance < threshold then
+                // Waypoint reached, move to next
+                this.EventBus.Publish(
+                  Physics(
+                    MovementStateChanged
+                      struct (entityId, MovingAlongPath remainingWaypoints)
+                  )
+                )
+              else
+                // Move towards current waypoint
+                let direction = Vector2.Normalize(currentWaypoint - currentPos)
+                let velocity = direction * speed
+
+                // Apply collision sliding
+                let finalVelocity =
+                  match frameCollisions.TryGetValue entityId with
+                  | true, mtv when mtv <> Vector2.Zero ->
+                    let normal = Vector2.Normalize(mtv)
+
+                    if Vector2.Dot(velocity, normal) < 0.0f then
+                      velocity - normal * Vector2.Dot(velocity, normal)
+                    else
+                      velocity
+                  | _ -> velocity
+
+                let lastVel =
+                  match lastVelocities.TryGetValue entityId with
+                  | true, v -> v
+                  | false, _ -> Vector2.Zero
+
+                if finalVelocity <> lastVel then
+                  this.EventBus.Publish(
+                    Physics(VelocityChanged struct (entityId, finalVelocity))
+                  )
+
+                  lastVelocities[entityId] <- finalVelocity
+            | ValueNone -> () // No position, can't move
         | MovingTo target ->
           match positions.TryFindV entityId with
           | ValueSome currentPos ->
@@ -108,6 +176,7 @@ module UnitMovement =
               )
 
               lastVelocities[entityId] <- Vector2.Zero
+              currentPaths.Remove(entityId) |> ignore // Clear any residual path
             else
               // Move towards target
               let direction = Vector2.Normalize(target - currentPos)
@@ -148,3 +217,5 @@ module UnitMovement =
             )
 
             lastVelocities[entityId] <- Vector2.Zero
+
+          currentPaths.Remove(entityId) |> ignore // Clear any residual path
