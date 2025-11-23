@@ -459,15 +459,15 @@ module Combat =
                   radius
                   maxTargets
               | Cone(angle, length, maxTargets) ->
+                let casterPos =
+                  positions
+                  |> HashMap.tryFindV casterId
+                  |> ValueOption.defaultValue center
+
                 let direction =
                   match target with
                   | SystemCommunications.TargetPosition pos ->
                     // For position targeting, direction is from caster to target position
-                    let casterPos =
-                      positions
-                      |> HashMap.tryFindV casterId
-                      |> ValueOption.defaultValue center
-
                     let offset = pos - casterPos
 
                     if offset = Vector2.Zero then
@@ -476,11 +476,6 @@ module Combat =
                       Vector2.Normalize(offset)
                   | SystemCommunications.TargetEntity targetId ->
                     // For entity targeting, direction is from caster to target entity
-                    let casterPos =
-                      positions
-                      |> HashMap.tryFindV casterId
-                      |> ValueOption.defaultValue center
-
                     let targetPos =
                       positions
                       |> HashMap.tryFindV targetId
@@ -498,35 +493,30 @@ module Combat =
                   mapDef
                   getNearbyEntities
                   casterId
-                  center
+                  casterPos
                   direction
                   angle
                   length
                   maxTargets
               | Line(width, length, maxTargets) ->
+                let casterPos =
+                  positions
+                  |> HashMap.tryFindV casterId
+                  |> ValueOption.defaultValue center
+
                 let endPoint =
                   match target with
                   | SystemCommunications.TargetPosition pos ->
                     // For position targeting, direction is from caster to target position
-                    let casterPos =
-                      positions
-                      |> HashMap.tryFindV casterId
-                      |> ValueOption.defaultValue center
-
                     let offset = pos - casterPos
 
                     if offset = Vector2.Zero then
-                      center + Vector2.UnitX * length // Default direction when target is same as caster
+                      casterPos + Vector2.UnitX * length // Default direction when target is same as caster
                     else
                       let direction = Vector2.Normalize(offset)
-                      center + direction * length
+                      casterPos + direction * length
                   | SystemCommunications.TargetEntity targetId ->
                     // For entity targeting, direction is from caster to target entity
-                    let casterPos =
-                      positions
-                      |> HashMap.tryFindV casterId
-                      |> ValueOption.defaultValue center
-
                     let targetPos =
                       positions
                       |> HashMap.tryFindV targetId
@@ -535,17 +525,17 @@ module Combat =
                     let offset = targetPos - casterPos
 
                     if offset = Vector2.Zero then
-                      center + Vector2.UnitX * length // Default direction when target is same as caster
+                      casterPos + Vector2.UnitX * length // Default direction when target is same as caster
                     else
                       let direction = Vector2.Normalize(offset)
-                      center + direction * length
-                  | _ -> center + Vector2.UnitX * length
+                      casterPos + direction * length
+                  | _ -> casterPos + Vector2.UnitX * length
 
                 AreaOfEffect.findTargetsInLine
                   mapDef
                   getNearbyEntities
                   casterId
-                  center
+                  casterPos
                   endPoint
                   width
                   maxTargets
