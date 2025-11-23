@@ -216,7 +216,24 @@ module EntitySpawnerLogic =
         currentState = AIState.Idle
         stateEnterTime = TimeSpan.Zero
         spawnPosition = pos
-        absoluteWaypoints = ValueNone
+        absoluteWaypoints =
+          if
+            archetype.behaviorType = BehaviorType.Patrol
+            || archetype.behaviorType = BehaviorType.Aggressive
+          then
+            // Generate a simple square patrol path relative to spawn
+            let offset = 100.0f
+
+            let waypoints = [|
+              pos // Start at spawn
+              pos + Vector2(offset, 0.0f)
+              pos + Vector2(offset, offset)
+              pos + Vector2(0.0f, offset)
+            |]
+
+            ValueSome waypoints
+          else
+            ValueNone
         waypointIndex = 0
         lastDecisionTime = TimeSpan.Zero
         currentTarget = ValueNone

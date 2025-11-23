@@ -251,8 +251,8 @@ type PomoGame() as this =
           // Check for AI Spawn
           elif not isPlayerSpawn && enemyCount < maxEnemies then
             let enemyId = Guid.NewGuid() |> UMX.tag
-            // Determine archetype (could come from property in future)
-            let archetypeId = %1
+            // Determine archetype (alternate between 1 and 2)
+            let archetypeId = if enemyCount % 2 = 0 then %1 else %2
 
             let intent: SystemCommunications.SpawnEntityIntent = {
               EntityId = enemyId
