@@ -760,161 +760,183 @@ module DebugRender =
 
       let mutable yOffsets = HashMap.empty<Guid<EntityId>, float32>
 
-      sb.Begin()
+      let cameraService = game.Services.GetService<Core.CameraService>()
+      let cameras = cameraService.GetAllCameras()
 
-      for command in commandsToExecute do
-        match command with
-        | DrawActiveEffect(effect, entityPos) ->
-          let yOffset =
-            yOffsets.TryFind effect.TargetEntity
-            |> Option.defaultValue Core.Constants.Debug.StatYOffset
+      for struct (playerId, camera) in cameras do
+        // Reset yOffsets for each camera to ensure text stacks correctly per view
+        yOffsets <- HashMap.empty
 
-          yOffsets <-
-            yOffsets
-            |> HashMap.add
-              effect.TargetEntity
-              (yOffset + Core.Constants.Debug.EffectYOffset)
+        let transform =
+          Matrix.CreateTranslation(-camera.Position.X, -camera.Position.Y, 0.0f)
+          * Matrix.CreateScale(camera.Zoom)
+          * Matrix.CreateTranslation(
+            float32 camera.Viewport.Width / 2.0f,
+            float32 camera.Viewport.Height / 2.0f,
+            0.0f
+          )
 
-          let struct (text, textPosition) =
-            drawActiveEffect(effect, entityPos, yOffset, totalGameTime)
+        game.GraphicsDevice.Viewport <- camera.Viewport
+        sb.Begin(transformMatrix = transform)
 
-          sb.DrawString(hudFont, text, textPosition, Color.Yellow)
+        for command in commandsToExecute do
+          match command with
+          | DrawActiveEffect(effect, entityPos) ->
+            let yOffset =
+              yOffsets.TryFind effect.TargetEntity
+              |> Option.defaultValue Core.Constants.Debug.StatYOffset
 
-        | DrawDerivedStats(ownerId, stats, resources, entityPos) ->
-          let yOffset =
-            yOffsets.TryFind ownerId
-            |> Option.defaultValue Core.Constants.Debug.StatYOffset
+            yOffsets <-
+              yOffsets
+              |> HashMap.add
+                effect.TargetEntity
+                (yOffset + Core.Constants.Debug.EffectYOffset)
 
-          let text = formatStats(stats, resources)
-          let textPosition = Vector2(entityPos.X, entityPos.Y + yOffset)
-          sb.DrawString(hudFont, text, textPosition, Color.Cyan)
+            let struct (text, textPosition) =
+              drawActiveEffect(effect, entityPos, yOffset, totalGameTime)
 
-        | DrawInventory(ownerId, inventory, entityPos) ->
-          let yOffset =
-            yOffsets.TryFind ownerId
-            |> Option.defaultValue Core.Constants.Debug.StatYOffset
+            sb.DrawString(hudFont, text, textPosition, Color.Yellow)
 
-          let strBuilder = System.Text.StringBuilder()
-          strBuilder.AppendLine("Inventory:") |> ignore
+          | DrawDerivedStats(ownerId, stats, resources, entityPos) ->
+            let yOffset =
+              yOffsets.TryFind ownerId
+              |> Option.defaultValue Core.Constants.Debug.StatYOffset
 
-          for item in inventory do
-            strBuilder.AppendLine $"- {item.Name}" |> ignore
+            let text = formatStats(stats, resources)
+            let textPosition = Vector2(entityPos.X, entityPos.Y + yOffset)
+            sb.DrawString(hudFont, text, textPosition, Color.Cyan)
 
-          let text = strBuilder.ToString()
+          | DrawInventory(ownerId, inventory, entityPos) ->
+            let yOffset =
+              yOffsets.TryFind ownerId
+              |> Option.defaultValue Core.Constants.Debug.StatYOffset
 
-          let textPosition =
-            Vector2(
-              entityPos.X,
-              entityPos.Y + yOffset + Core.Constants.Debug.InventoryYOffset
+            let strBuilder = System.Text.StringBuilder()
+            strBuilder.AppendLine("Inventory:") |> ignore
+
+            for item in inventory do
+              strBuilder.AppendLine($"- {item.Name}") |> ignore
+
+            sb.DrawString(
+              hudFont,
+              strBuilder.ToString(),
+              entityPos + Vector2(0.0f, yOffset),
+              Color.White
             )
 
-          sb.DrawString(hudFont, text, textPosition, Color.White)
+          | DrawEquipped(ownerId, equipped, entityPos) ->
+            let yOffset =
+              yOffsets.TryFind ownerId
+              |> Option.defaultValue Core.Constants.Debug.StatYOffset
 
-        | DrawEquipped(ownerId, equipped, entityPos) ->
-          let yOffset =
-            yOffsets.TryFind ownerId
-            |> Option.defaultValue Core.Constants.Debug.StatYOffset
+            let strBuilder = System.Text.StringBuilder()
+            strBuilder.AppendLine("Equipped:") |> ignore
 
-          let strBuilder = System.Text.StringBuilder()
-          strBuilder.AppendLine("Equipped:") |> ignore
+            for (slot, item) in equipped do
+              strBuilder.AppendLine($"- %A{slot}: {item.Name}") |> ignore
 
-          for slot, item in equipped do
-            strBuilder.AppendLine $"- {slot}: {item.Name}" |> ignore
+            sb.DrawString(
+              hudFont,
+              strBuilder.ToString(),
+              entityPos + Vector2(0.0f, yOffset + 100.0f),
+              Color.White
+            )
 
-          let text = strBuilder.ToString()
+          | DrawAIState(ownerId, state, entityPos) ->
+            let yOffset =
+              yOffsets.TryFind ownerId
+              |> Option.defaultValue Core.Constants.Debug.StatYOffset
 
-          let textPosition =
-            Vector2(entityPos.X, entityPos.Y + yOffset + 250.0f)
+            let text = $"AI: %A{state}"
 
-          sb.DrawString(hudFont, text, textPosition, Color.LightGreen)
+            let textPosition =
+              Vector2(entityPos.X, entityPos.Y + yOffset - 20.0f)
 
-        | DrawAIState(ownerId, state, entityPos) ->
-          let yOffset = yOffsets.TryFind ownerId |> Option.defaultValue -20.0f
-          let text = $"AI: %A{state}"
-          let textPosition = Vector2(entityPos.X, entityPos.Y + yOffset - 20.0f)
+            sb.DrawString(hudFont, text, textPosition, Color.Magenta)
 
-          yOffsets <- yOffsets |> HashMap.add ownerId (yOffset - 35.0f)
+          | DrawMapObject(points, position, width, height, rotation, color) ->
+            match pixel with
+            | ValueSome px ->
+              match points with
+              | ValueSome pts -> drawPolygon sb px pts position rotation color
+              | ValueNone ->
+                drawEllipse sb px position width height rotation color
+            | ValueNone -> ()
 
-          yOffsets <- yOffsets |> HashMap.add ownerId (yOffset - 35.0f)
+          | DrawEntityBounds position ->
+            match pixel with
+            | ValueSome px ->
+              let poly = Spatial.getEntityPolygon position
+              drawPolygon sb px poly Vector2.Zero 0.0f Color.Red
+            | ValueNone -> ()
 
-          sb.DrawString(hudFont, text, textPosition, Color.Red)
+          | DrawSpatialGrid grid ->
+            match pixel with
+            | ValueSome px ->
+              for (cell, entities) in grid |> HashMap.toSeq do
+                let cellSize = Core.Constants.Collision.GridCellSize
+                let x = float32 cell.X * cellSize
+                let y = float32 cell.Y * cellSize
 
-        | DrawMapObject(points, position, width, height, rotation, color) ->
-          match pixel with
-          | ValueSome px ->
-            match points with
-            | ValueSome pts -> drawPolygon sb px pts position rotation color
-            | ValueNone ->
-              drawEllipse sb px position width height rotation color
-              drawEllipse sb px position width height rotation color
-              drawEllipse sb px position width height rotation color
-          | ValueNone -> ()
+                let rect =
+                  Microsoft.Xna.Framework.Rectangle(
+                    int x,
+                    int y,
+                    int cellSize,
+                    int cellSize
+                  )
 
-        | DrawEntityBounds position ->
-          match pixel with
-          | ValueSome px ->
-            let poly = Spatial.getEntityPolygon position
-            drawPolygon sb px poly Vector2.Zero 0.0f Color.Red
-          | ValueNone -> ()
+                let color =
+                  if entities.Count > 0 then Color.Red else Color.Gray * 0.5f
 
-        | DrawSpatialGrid grid ->
-          match pixel with
-          | ValueSome px ->
-            for (cell, entities: IndexList<Guid<EntityId>>) in
-              grid |> HashMap.toSeq do
-              let cellSize = 64.0f
-              let x = float32 cell.X * cellSize
-              let y = float32 cell.Y * cellSize
+                drawLine sb px (Vector2(x, y)) (Vector2(x + cellSize, y)) color
 
-              let rect =
-                Microsoft.Xna.Framework.Rectangle(
-                  int x,
-                  int y,
-                  int cellSize,
-                  int cellSize
-                )
+                drawLine
+                  sb
+                  px
+                  (Vector2(x + cellSize, y))
+                  (Vector2(x + cellSize, y + cellSize))
+                  color
 
-              // Draw cell border
-              let color =
-                if entities.Count > 0 then Color.Red else Color.Gray * 0.5f
+                drawLine
+                  sb
+                  px
+                  (Vector2(x + cellSize, y + cellSize))
+                  (Vector2(x, y + cellSize))
+                  color
 
-              drawLine sb px (Vector2(x, y)) (Vector2(x + cellSize, y)) color
+                drawLine sb px (Vector2(x, y + cellSize)) (Vector2(x, y)) color
 
-              drawLine
-                sb
-                px
-                (Vector2(x + cellSize, y))
-                (Vector2(x + cellSize, y + cellSize))
-                color
+                if entities.Count > 0 then
+                  let text = $"{entities.Count}"
+                  let textPos = Vector2(x + 5.0f, y + 5.0f)
+                  sb.DrawString(hudFont, text, textPos, Color.White)
+            | ValueNone -> ()
 
-              drawLine
-                sb
-                px
-                (Vector2(x + cellSize, y + cellSize))
-                (Vector2(x, y + cellSize))
-                color
+          | DrawCone(origin, direction, angle, length, color) ->
+            match pixel with
+            | ValueSome px ->
+              drawCone sb px origin direction angle length (color * 0.3f)
+            | ValueNone -> ()
 
-              drawLine sb px (Vector2(x, y + cellSize)) (Vector2(x, y)) color
+          | DrawLineShape(start, end', width, color) ->
+            match pixel with
+            | ValueSome px ->
+              drawLineShape sb px start end' width (color * 0.3f)
+            | ValueNone -> ()
 
-              // Draw entity count
-              if entities.Count > 0 then
-                let text = $"{entities.Count}"
-                let textPos = Vector2(x + 5.0f, y + 5.0f)
-                sb.DrawString(hudFont, text, textPos, Color.White)
-          | ValueNone -> ()
-        | DrawCone(origin, direction, angle, length, color) -> ()
-        | DrawLineShape(start, end', width, color) -> ()
+        for struct (cmd, _) in transientCommands do
+          match cmd with
+          | DrawCone(origin, direction, angle, length, color) ->
+            match pixel with
+            | ValueSome px ->
+              drawCone sb px origin direction angle length (color * 0.5f)
+            | ValueNone -> ()
+          | DrawLineShape(start, end', width, color) ->
+            match pixel with
+            | ValueSome px ->
+              drawLineShape sb px start end' width (color * 0.5f)
+            | ValueNone -> ()
+          | _ -> ()
 
-      for struct (cmd, _) in transientCommands do
-        match cmd with
-        | DrawCone(origin, direction, angle, length, color) ->
-          match pixel with
-          | ValueSome px -> drawCone sb px origin direction angle length color
-          | ValueNone -> ()
-        | DrawLineShape(start, end', width, color) ->
-          match pixel with
-          | ValueSome px -> drawLineShape sb px start end' width color
-          | ValueNone -> ()
-        | _ -> ()
-
-      sb.End()
+        sb.End()

@@ -123,12 +123,16 @@ type PomoGame() as this =
   let effectApplicationService =
     Effects.EffectApplication.create(worldView, eventBus)
 
+  let cameraSystem =
+    CameraSystem.create(this, projections, Array.singleton playerId)
+
   let actionHandler =
     ActionHandler.create(
       worldView,
       eventBus,
       targetingService,
       projections,
+      cameraSystem,
       playerId
     )
 
@@ -141,6 +145,8 @@ type PomoGame() as this =
     base.IsMouseVisible <- true
     base.Content.RootDirectory <- "Content"
     base.Window.AllowUserResizing <- true
+    graphicsDeviceManager.PreferredBackBufferWidth <- 1280
+    graphicsDeviceManager.PreferredBackBufferHeight <- 720
 
     graphicsDeviceManager.SupportedOrientations <-
       DisplayOrientation.LandscapeLeft ||| DisplayOrientation.LandscapeRight
@@ -158,6 +164,7 @@ type PomoGame() as this =
     base.Services.AddService<World.World> worldView
 
     base.Services.AddService<TargetingService> targetingService
+    base.Services.AddService<Core.CameraService> cameraSystem
 
     base.Components.Add(new RawInputSystem(this, playerId))
     base.Components.Add(new InputMappingSystem(this, playerId))
@@ -184,7 +191,8 @@ type PomoGame() as this =
       new RenderOrchestratorSystem.RenderOrchestratorSystem(
         this,
         "Proto1",
-        playerId
+        playerId,
+        DrawOrder = Render.Layer.TerrainBase
       )
     )
 
@@ -224,6 +232,8 @@ type PomoGame() as this =
         | true, i -> Some i
         | _ -> None)
       |> Option.defaultValue 5
+
+
 
     // Find Object Groups
     for group in mapDef.ObjectGroups do

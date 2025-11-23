@@ -11,6 +11,7 @@ open Pomo.Core.Stores
 open Pomo.Core.Domain
 
 module RenderOrchestratorSystem =
+  open Pomo.Core.Projections
 
   let private findRenderGroup(layer: Map.MapLayer) : int =
     match layer.Properties |> HashMap.tryFindV "RenderGroup" with
@@ -22,23 +23,23 @@ module RenderOrchestratorSystem =
 
   type RenderOrchestratorSystem
     (game: Game, mapKey: string, playerId: Guid<EntityId>) =
-    inherit GameComponent(game)
+    inherit DrawableGameComponent(game)
 
-    // Store the components this orchestrator creates so they can be removed if needed
-    let createdComponents = ResizeArray() // Renamed 'component' to 'comp' related vars where needed
+    let mutable renderServices: Render.RenderService list = []
+    let mutable terrainServices: TerrainRenderSystem.TerrainRenderService list = []
+
+    let world = game.Services.GetService<World.World>()
+
+    let targetingService =
+      game.Services.GetService<Targeting.TargetingService>()
+
+    let projections = game.Services.GetService<ProjectionService>()
 
     override _.Initialize() =
       base.Initialize()
 
       let mapStore = game.Services.GetService<MapStore>()
       let map = mapStore.find mapKey
-
-      // Remove any previously created components to ensure a clean state,
-      // especially important if maps are dynamically reloaded.
-      for comp in createdComponents do // Renamed 'component' to 'comp'
-        game.Components.Remove(comp) |> ignore
-
-      createdComponents.Clear()
 
       // Group map layers by their RenderGroup property
       let layerGroups =
@@ -52,41 +53,46 @@ module RenderOrchestratorSystem =
             | ValueNone -> acc.Add(group, IndexList.single layer))
           HashMap.empty
 
-      // Create and add TerrainRenderSystem for each group of layers
-      for groupIndex, layers in layerGroups do
-        let layerNames = layers |> IndexList.map(fun l -> l.Name)
+      // Create TerrainRenderService for each group
+      terrainServices <-
+        layerGroups
+        |> HashMap.toArray
+        |> Array.sortBy fst
+        |> Array.map(fun (_, layers) ->
+          let layerNames = layers |> IndexList.map(fun l -> l.Name)
 
-        let terrainRenderer =
-          new TerrainRenderSystem.TerrainRenderSystem(
-            game,
-            mapKey,
-            layersToRender = layerNames,
-            // Scale groupIndex to get distinct DrawOrder values
-            DrawOrder = Render.Layer.TerrainBase + groupIndex * 20
-          )
+          TerrainRenderSystem.create(game, mapKey, ValueSome layerNames))
+        |> List.ofArray
 
-        game.Components.Add terrainRenderer
+      // Create RenderService
+      let cameraService = game.Services.GetService<Core.CameraService>()
 
-        createdComponents.Add(terrainRenderer :> IGameComponent)
-
-
-      // Create and add RenderSystem for entities, using convention for RenderGroup = 1
-      // Entities get DrawOrder 10 times their conventional RenderGroup (1)
-      let entityRenderer =
-        new Render.RenderSystem(
+      let renderService =
+        Render.create(
           game,
-          playerId,
-          DrawOrder = Render.Layer.Entities
+          world,
+          targetingService,
+          projections,
+          cameraService,
+          playerId
         )
 
-      game.Components.Add entityRenderer
-      createdComponents.Add(entityRenderer :> IGameComponent)
+      renderServices <- [ renderService ]
 
-    override _.Dispose(disposing) =
-      if disposing then
-        for comp in createdComponents do // Renamed 'component' to 'comp'
-          game.Components.Remove(comp) |> ignore
+    override _.Draw(gameTime) =
+      let graphicsDevice = game.GraphicsDevice
+      let originalViewport = graphicsDevice.Viewport
+      let cameraService = game.Services.GetService<Core.CameraService>()
 
-        createdComponents.Clear()
+      // Iterate through cameras and render
+      for (playerId, camera) in cameraService.GetAllCameras() do
+        // Render Terrain (Background)
+        for terrainService in terrainServices do
+          terrainService.Draw(camera)
 
-      base.Dispose(disposing)
+        // Render Entities
+        for renderService in renderServices do
+          renderService.Draw(camera)
+
+      // Restore viewport
+      graphicsDevice.Viewport <- originalViewport

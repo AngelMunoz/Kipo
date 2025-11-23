@@ -22,6 +22,7 @@ module ActionHandler =
   let private createHoveredEntityProjection
     (world: World)
     (positions: amap<Guid<EntityId>, Vector2>)
+    (cameraService: Core.CameraService)
     (playerId: Guid<EntityId>)
     =
     adaptive {
@@ -29,9 +30,12 @@ module ActionHandler =
         world.RawInputStates
         |> AMap.tryFind playerId
         |> AVal.map(
-          Option.map(fun state ->
+          Option.bind(fun state ->
             let ms = state.Mouse
-            Vector2(float32 ms.Position.X, float32 ms.Position.Y))
+            let rawPos = Vector2(float32 ms.Position.X, float32 ms.Position.Y)
+
+            cameraService.ScreenToWorld(rawPos, playerId)
+            |> ValueOption.toOption)
         )
 
       return!
@@ -50,8 +54,8 @@ module ActionHandler =
 
                   let entityBounds =
                     Microsoft.Xna.Framework.Rectangle(
-                      int entityPos.X,
-                      int entityPos.Y,
+                      int(entityPos.X - entitySize.X / 2.0f),
+                      int(entityPos.Y - entitySize.Y / 2.0f),
                       int entitySize.X,
                       int entitySize.Y
                     )
@@ -77,10 +81,15 @@ module ActionHandler =
       eventBus: EventBus,
       targetingService: TargetingService,
       projections: Projections.ProjectionService,
+      cameraService: Core.CameraService,
       entityId: Guid<EntityId>
     ) =
     let hoveredEntityAval =
-      createHoveredEntityProjection world projections.UpdatedPositions entityId
+      createHoveredEntityProjection
+        world
+        projections.UpdatedPositions
+        cameraService
+        entityId
 
     { new CoreEventListener with
         member _.StartListening() =
@@ -154,10 +163,15 @@ module ActionHandler =
                   |> Option.defaultWith(fun () -> Mouse.GetState())
 
                 let mousePosition =
-                  Vector2(
-                    float32 mouseState.Position.X,
-                    float32 mouseState.Position.Y
-                  )
+                  let rawMousePos =
+                    Vector2(
+                      float32 mouseState.Position.X,
+                      float32 mouseState.Position.Y
+                    )
+
+                  match cameraService.ScreenToWorld(rawMousePos, entityId) with
+                  | ValueSome worldPos -> worldPos
+                  | ValueNone -> rawMousePos // Fallback if no camera found (shouldn't happen for local player)
 
                 let targetingMode =
                   targetingService.TargetingMode |> AVal.force
