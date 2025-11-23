@@ -44,6 +44,51 @@ module Render =
 
 module Core =
   open FSharp.UMX
+  open System
+  open Microsoft.Xna.Framework
+  open Microsoft.Xna.Framework.Graphics
+  open Units
+
+  [<Struct>]
+  type Camera = {
+    Position: Vector2
+    Zoom: float32
+    Viewport: Viewport
+  }
+
+  type CameraService =
+    abstract member GetCamera: Guid<EntityId> -> Camera voption
+    abstract member GetAllCameras: unit -> struct (Guid<EntityId> * Camera)[]
+    abstract member ScreenToWorld: Vector2 * Guid<EntityId> -> Vector2 voption
+
+  module Constants =
+    module Entity =
+      let Size = Vector2(16.0f, 16.0f)
+      let CollisionRadius = 16.0f
+      let CollisionDistance = 32.0f
+
+    module Projectile =
+      let Size = Vector2(8.0f, 8.0f)
+
+    module UI =
+      let TargetingIndicatorSize = Vector2(20.0f, 20.0f)
+
+    module Collision =
+      let GridCellSize = 64.0f
+
+    module Spawning =
+      let DefaultDuration = TimeSpan.FromSeconds(1.0)
+
+    module AI =
+      let WaypointReachedThreshold = 64.0f
+
+    module Debug =
+      let StatYOffset = -20.0f
+      let EffectYOffset = -15.0f
+      let InventoryYOffset = 150.0f
+      let TransientCommandDuration = TimeSpan.FromSeconds(2.0)
+
+
 
   [<Struct>]
   type Element =

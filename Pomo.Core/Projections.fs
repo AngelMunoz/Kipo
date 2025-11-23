@@ -259,7 +259,9 @@ module Projections =
         updatedPositions
         |> AMap.toASet
         |> ASet.map(fun (key, pos) ->
-          let cell = Spatial.getGridCell 64.0f pos
+          let cell =
+            Spatial.getGridCell Core.Constants.Collision.GridCellSize pos
+
           struct (cell, key))
         |> ASet.fold
           (fun acc struct (cell, key) ->
@@ -283,7 +285,11 @@ module Projections =
       let! grid = grid |> AMap.toAVal
       let! positions = positions |> AMap.toAVal
 
-      let cells = Spatial.getCellsInRadius 64.0f center radius
+      let cells =
+        Spatial.getCellsInRadius
+          Core.Constants.Collision.GridCellSize
+          center
+          radius
 
       let potentialTargets =
         cells

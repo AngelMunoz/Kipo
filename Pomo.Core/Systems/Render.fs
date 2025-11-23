@@ -34,7 +34,7 @@ module Render =
       if isProjectile then
         return None
       else
-        let size = Vector2(32.0f, 32.0f)
+        let size = Core.Constants.Entity.Size
 
         let rect =
           Rectangle(
@@ -61,7 +61,7 @@ module Render =
 
       match posOpt with
       | Some pos ->
-        let projectileSize = Vector2(8.0f, 8.0f)
+        let projectileSize = Core.Constants.Projectile.Size
 
         let rect =
           Rectangle(
@@ -79,6 +79,7 @@ module Render =
   let private generateTargetingIndicatorCommands
     (world: World.World)
     (targetingService: TargetingService)
+    (cameraService: Core.CameraService)
     (playerId: Guid<EntityId>)
     =
     adaptive {
@@ -94,13 +95,18 @@ module Render =
         match mouseState with
         | None -> return IndexList.empty
         | Some mouseState ->
-          let indicatorPosition =
+          let rawPos =
             Vector2(
               float32 mouseState.Position.X,
               float32 mouseState.Position.Y
             )
 
-          let indicatorSize = Vector2(64.0f, 64.0f)
+          let indicatorPosition =
+            match cameraService.ScreenToWorld(rawPos, playerId) with
+            | ValueSome worldPos -> worldPos
+            | ValueNone -> rawPos
+
+          let indicatorSize = Core.Constants.UI.TargetingIndicatorSize
 
           let rect =
             Rectangle(
@@ -118,6 +124,7 @@ module Render =
     (world: World.World)
     (targetingService: TargetingService)
     (projections: Projections.ProjectionService)
+    (cameraService: Core.CameraService)
     (playerId: Guid<EntityId>)
     =
     adaptive {
@@ -133,42 +140,69 @@ module Render =
           projections.UpdatedPositions
 
       and! targetingCmds =
-        generateTargetingIndicatorCommands world targetingService playerId
+        generateTargetingIndicatorCommands
+          world
+          targetingService
+          cameraService
+          playerId
 
       return IndexList.concat [ entityCmds; projectileCmds; targetingCmds ]
     }
 
-  type RenderSystem(game: Game, playerId: Guid<EntityId>) =
-    inherit DrawableGameComponent(game)
 
-    let world: World.World = game.Services.GetService<World.World>()
-    let targetingService = game.Services.GetService<TargetingService>()
-    let projections = game.Services.GetService<Projections.ProjectionService>()
 
-    let spriteBatch = lazy (new SpriteBatch(game.GraphicsDevice))
+  type RenderService =
+    abstract Draw: Core.Camera -> unit
 
-    let mutable texture = Unchecked.defaultof<_>
+  let create
+    (
+      game: Game,
+      world: World.World,
+      targetingService: TargetingService,
+      projections: Projections.ProjectionService,
+      cameraService: Core.CameraService,
+      playerId: Guid<EntityId>
+    ) =
+    let spriteBatch = new SpriteBatch(game.GraphicsDevice)
+    let texture = new Texture2D(game.GraphicsDevice, 1, 1)
+    texture.SetData [| Color.White |]
 
     let drawCommands =
-      generateDrawCommands world targetingService projections playerId
+      generateDrawCommands
+        world
+        targetingService
+        projections
+        cameraService
+        playerId
 
-    override _.Initialize() : unit =
-      base.Initialize()
-      texture <- new Texture2D(game.GraphicsDevice, 1, 1)
-      texture.SetData [| Color.White |]
+    { new RenderService with
+        member _.Draw(camera: Core.Camera) =
+          let commandsToExecute = drawCommands |> AVal.force
 
-    override _.Draw(gameTime) =
-      let commandsToExecute = drawCommands |> AVal.force
-      let sb = spriteBatch.Value
+          let transform =
+            Matrix.CreateTranslation(
+              -camera.Position.X,
+              -camera.Position.Y,
+              0.0f
+            )
+            * Matrix.CreateScale(camera.Zoom)
+            * Matrix.CreateTranslation(
+              float32 camera.Viewport.Width / 2.0f,
+              float32 camera.Viewport.Height / 2.0f,
+              0.0f
+            )
 
-      sb.Begin()
+          game.GraphicsDevice.Viewport <- camera.Viewport
 
-      for command in commandsToExecute do
-        match command with
-        | DrawPlayer rect -> sb.Draw(texture, rect, Color.White)
-        | DrawEnemy rect -> sb.Draw(texture, rect, Color.Green)
-        | DrawProjectile rect -> sb.Draw(texture, rect, Color.Red)
-        | DrawTargetingIndicator rect ->
-          sb.Draw(texture, rect, Color.Blue * 0.5f)
+          spriteBatch.Begin(transformMatrix = transform)
 
-      sb.End()
+          for command in commandsToExecute do
+            match command with
+            | DrawPlayer rect -> spriteBatch.Draw(texture, rect, Color.White)
+            | DrawEnemy rect -> spriteBatch.Draw(texture, rect, Color.Green)
+            | DrawProjectile rect -> spriteBatch.Draw(texture, rect, Color.Red)
+            | DrawTargetingIndicator rect ->
+              spriteBatch.Draw(texture, rect, Color.Blue * 0.5f)
+
+          spriteBatch.End()
+    }

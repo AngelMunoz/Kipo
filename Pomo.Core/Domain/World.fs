@@ -54,6 +54,11 @@ module World =
     EntityInventories: cmap<Guid<EntityId>, HashSet<Guid<ItemInstanceId>>>
     EquippedItems: cmap<Guid<EntityId>, HashMap<Slot, Guid<ItemInstanceId>>>
     AIControllers: cmap<Guid<EntityId>, AI.AIController>
+    SpawningEntities:
+      cmap<
+        Guid<EntityId>,
+        struct (SystemCommunications.SpawnType * Vector2 * TimeSpan)
+       >
   }
 
   type World =
@@ -102,6 +107,12 @@ module World =
 
     abstract AIControllers: amap<Guid<EntityId>, AI.AIController>
 
+    abstract SpawningEntities:
+      amap<
+        Guid<EntityId>,
+        struct (SystemCommunications.SpawnType * Vector2 * TimeSpan)
+       >
+
 
   let create(rng: Random) =
     let mutableWorld: MutableWorld = {
@@ -132,6 +143,7 @@ module World =
       EntityInventories = cmap()
       EquippedItems = cmap()
       AIControllers = cmap()
+      SpawningEntities = cmap()
     }
 
     let worldView =
@@ -159,6 +171,7 @@ module World =
           member _.EntityInventories = mutableWorld.EntityInventories
           member _.EquippedItems = mutableWorld.EquippedItems
           member _.AIControllers = mutableWorld.AIControllers
+          member _.SpawningEntities = mutableWorld.SpawningEntities
       }
 
     struct (mutableWorld, worldView)

@@ -37,16 +37,18 @@
     <Compile Include="Systems/Navigation.fs" />
     <Compile Include="Systems/Movement.fs" />
     <Compile Include="Systems/UnitMovement.fs" />
-    <Compile Include="Systems/CollisionSystem.fs" />
+    <Compile Include="Systems/Collision.fs" />
     <Compile Include="Systems/MapLoader.fs" />
-    <Compile Include="Systems/TerrainRenderSystem.fs" />
+    <Compile Include="Systems/CameraSystem.fs" />
+    <Compile Include="Systems/TerrainRender.fs" />
     <Compile Include="Systems/Render.fs" />
-    <Compile Include="Systems/RenderOrchestratorSystem.fs" />
+    <Compile Include="Systems/RenderOrchestrator.fs" />
     <Compile Include="Systems/DebugRender.fs" />
     <Compile Include="Systems/State.fs" />
     <Compile Include="Systems/Inventory.fs" />
     <Compile Include="Systems/Equipment.fs" />
     <Compile Include="Systems/AISystem.fs" />
+    <Compile Include="Systems/EntitySpawner.fs" />
     <Compile Include="PomoGame.fs" />
   </ItemGroup>
   <ItemGroup>

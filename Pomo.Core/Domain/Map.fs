@@ -75,6 +75,7 @@ module Map =
     Gid: int voption // For tile objects
     Properties: HashMap<string, string>
     Points: IndexList<Vector2> voption // For polygons/polylines
+    IsEllipse: bool
   }
 
   [<Struct>]
@@ -114,4 +115,5 @@ module Map =
     Layers: IndexList<MapLayer>
     ObjectGroups: IndexList<ObjectGroup>
     BackgroundColor: Color voption
+    Properties: HashMap<string, string>
   }

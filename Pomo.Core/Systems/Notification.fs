@@ -6,6 +6,7 @@ open Microsoft.Xna.Framework
 open Microsoft.Xna.Framework.Graphics
 open Pomo.Core.EventBus
 open Pomo.Core.Domain.Events
+open Pomo.Core.Domain.Core
 
 
 module Notification =
@@ -76,13 +77,28 @@ module Notification =
 
     override _.Draw(gameTime) =
       let sb = spriteBatch.Value
-      sb.Begin()
+      let cameraService = game.Services.GetService<CameraService>()
+      let cameras = cameraService.GetAllCameras()
 
-      for notification in notifications do
-        let alpha = notification.Life / notification.MaxLife
-        let color = Color.White * alpha
-        let textSize = hudFont.MeasureString(notification.Text)
-        let textPosition = notification.Position - textSize / 2.0f
-        sb.DrawString(hudFont, notification.Text, textPosition, color)
+      for struct (playerId, camera) in cameras do
+        game.GraphicsDevice.Viewport <- camera.Viewport
 
-      sb.End()
+        let transform =
+          Matrix.CreateTranslation(-camera.Position.X, -camera.Position.Y, 0.0f)
+          * Matrix.CreateScale(camera.Zoom)
+          * Matrix.CreateTranslation(
+            float32 camera.Viewport.Width / 2.0f,
+            float32 camera.Viewport.Height / 2.0f,
+            0.0f
+          )
+
+        sb.Begin(transformMatrix = transform)
+
+        for notification in notifications do
+          let alpha = notification.Life / notification.MaxLife
+          let color = Color.White * alpha
+          let textSize = hudFont.MeasureString(notification.Text)
+          let textPosition = notification.Position - textSize / 2.0f
+          sb.DrawString(hudFont, notification.Text, textPosition, color)
+
+        sb.End()

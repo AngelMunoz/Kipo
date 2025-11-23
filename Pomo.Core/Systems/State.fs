@@ -28,11 +28,22 @@ module StateUpdate =
     let addEntity (world: MutableWorld) (entity: Entity.EntitySnapshot) =
       world.Positions[entity.Id] <- entity.Position
       world.Velocities[entity.Id] <- entity.Velocity
+      // Remove from spawning entities if it was spawning
+      world.SpawningEntities.Remove entity.Id |> ignore
 
     let inline removeEntity (world: MutableWorld) (entity: Guid<EntityId>) =
       world.Positions.Remove(entity) |> ignore
       world.Velocities.Remove(entity) |> ignore
       world.LiveProjectiles.Remove(entity) |> ignore
+      world.SpawningEntities.Remove(entity) |> ignore
+
+    let inline addSpawningEntity
+      (world: MutableWorld)
+      struct (entityId: Guid<EntityId>, spawnType: SystemCommunications.SpawnType, position: Vector2)
+      =
+       // Capture current time for animation
+       let startTime = world.Time.Value.TotalGameTime
+       world.SpawningEntities[entityId] <- struct(spawnType, position, startTime)
 
     let inline updatePosition
       (world: MutableWorld)
@@ -315,6 +326,8 @@ module StateUpdate =
             match event with
             | Created created -> Entity.addEntity mutableWorld created
             | Removed removed -> Entity.removeEntity mutableWorld removed
+            | Spawning spawning ->
+              Entity.addSpawningEntity mutableWorld spawning
           | Input event ->
             match event with
             | RawStateChanged rawIChanged ->

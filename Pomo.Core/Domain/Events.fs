@@ -31,6 +31,18 @@ type Selection =
 
 [<RequireQualifiedAccess>]
 module SystemCommunications =
+  [<RequireQualifiedAccess>]
+  type SpawnType =
+    | Player of playerIndex: int
+    | Enemy of archetypeId: int<AiArchetypeId>
+
+  [<Struct>]
+  type SpawnEntityIntent = {
+    EntityId: Guid<EntityId>
+    Type: SpawnType
+    Position: Vector2
+  }
+
   [<Struct>]
   type ShowNotification = { Message: string; Position: Vector2 }
 
@@ -152,6 +164,8 @@ module SystemCommunications =
 // --- State Change Events ---
 
 type EntityLifecycleEvents =
+  | Spawning of
+    spawning: struct (Guid<EntityId> * SystemCommunications.SpawnType * Vector2)
   | Created of created: EntitySnapshot
   | Removed of removed: Guid<EntityId>
 

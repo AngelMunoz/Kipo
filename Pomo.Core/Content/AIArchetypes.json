@@ -4,7 +4,7 @@
     "Name": "Basic Enemy",
     "BehaviorType": "Aggressive",
     "PerceptionConfig": {
-      "VisualRange": 150.0,
+      "VisualRange": [16.0, 10],
       "Fov": 360.0,
       "MemoryDuration": 5.0
     },
@@ -16,14 +16,20 @@
         "Response": "Engage"
       }
     ],
-    "DecisionInterval": 0.5
+    "DecisionInterval": 0.5,
+    "BaseStats": {
+      "Power": 2,
+      "Magic": 2,
+      "Sense": 2,
+      "Charm": 200
+    }
   },
   {
     "Id": 2,
     "Name": "Patrolling Guard",
     "BehaviorType": "Patrol",
     "PerceptionConfig": {
-      "VisualRange": 200.0,
+      "VisualRange": [16.0, 13],
       "Fov": 180.0,
       "MemoryDuration": 10.0
     },
@@ -41,6 +47,12 @@
         "Response": "Engage"
       }
     ],
-    "DecisionInterval": 1.0
+    "DecisionInterval": 2.5,
+    "BaseStats": {
+      "Power": 5,
+      "Magic": 2,
+      "Sense": 10,
+      "Charm": 100
+    }
   }
 ]

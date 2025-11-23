@@ -65,6 +65,7 @@ type AIArchetype = {
   perceptionConfig: PerceptionConfig
   cuePriorities: CuePriority[]
   decisionInterval: TimeSpan
+  baseStats: BaseStats
 }
 
 // --- Runtime State ---
@@ -193,7 +194,19 @@ module Serialization =
     let decoder: Decoder<PerceptionConfig> =
       fun json -> decode {
         let! visualRange =
-          Required.Property.get ("VisualRange", Required.float) json
+          Required.Property.array ("VisualRange", Required.float) json
+          |> Result.bind(fun arr ->
+            match arr with
+            | [| value; size |] -> float32(value * size) |> Ok
+            | [| value |] -> float32 value |> Ok
+            | _ ->
+              let joined = String.Join(", ", arr)
+
+              DecodeError.ofError(
+                json.Clone(),
+                $"VisualRange array must have either one or two float values: {joined}"
+              )
+              |> Error)
 
         and! fov = Required.Property.get ("Fov", Required.float) json
 
@@ -248,6 +261,11 @@ module Serialization =
         and! decisionIntervalSeconds =
           Required.Property.get ("DecisionInterval", Required.float) json
 
+        and! baseStats =
+          Required.Property.get
+            ("BaseStats", Serialization.BaseStats.decoder)
+            json
+
         return {
           id = UMX.tag id
           name = name
@@ -255,5 +273,6 @@ module Serialization =
           perceptionConfig = perceptionConfig
           cuePriorities = cuePriorities
           decisionInterval = TimeSpan.FromSeconds decisionIntervalSeconds
+          baseStats = baseStats
         }
       }
