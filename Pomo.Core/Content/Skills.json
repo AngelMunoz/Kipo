@@ -9,7 +9,7 @@
     "Cost": { "Type": "MP", "Amount": 10 },
     "Cooldown": 1.5,
     "Targeting": "TargetEntity",
-    "Range": [32.0],
+    "Range": [16.0, 2],
     "Area": "Point",
     "Delivery": { "Type": "Instant" },
     "Formula": "AP * 1.0",
@@ -26,7 +26,7 @@
     "Cost": { "Type": "MP", "Amount": 20 },
     "Cooldown": 3.0,
     "Targeting": "TargetEntity",
-    "Range": [32, 5],
+    "Range": [16, 10],
     "Area": "Point",
     "Delivery": {
       "Type": "Projectile",
@@ -51,7 +51,7 @@
     "Cost": { "Type": "MP", "Amount": 1 },
     "Cooldown": 0.5,
     "Targeting": "TargetEntity",
-    "Range": [32, 8],
+    "Range": [16, 16],
     "Area": "Point",
     "Delivery": {
       "Type": "Projectile",
@@ -158,7 +158,7 @@
     "Cost": { "Type": "MP", "Amount": 5 },
     "Cooldown": 10.0,
     "Targeting": "TargetEntity",
-    "Range": [32.0, 2],
+    "Range": [16.0, 4],
     "Area": "Point",
     "Delivery": { "Type": "Instant" },
     "Effects": [
@@ -182,10 +182,10 @@
     "Cost": { "Type": "MP", "Amount": 5 },
     "Cooldown": 5.0,
     "Targeting": "TargetPosition",
-    "Range": [32, 7],
+    "Range": [16, 14],
     "Area": {
       "Type": "Circle",
-      "Radius": 300.0,
+      "Radius": 304.0,
       "MaxTargets": 5
     },
     "Delivery": { "Type": "Instant" },
@@ -206,7 +206,7 @@
     "Cost": { "Type": "MP", "Amount": 5 },
     "Cooldown": 4.0,
     "Targeting": "TargetEntity",
-    "Range": [32, 6],
+    "Range": [16, 12],
     "Area": "Point",
     "Delivery": {
       "Type": "Projectile",
@@ -232,11 +232,11 @@
     "Cost": { "Type": "MP", "Amount": 10 },
     "Cooldown": 2.0,
     "Targeting": "TargetPosition",
-    "Range": [32, 6],
+    "Range": [16, 12],
     "Area": {
       "Type": "Cone",
       "Angle": 45.0,
-      "Length": 200.0,
+      "Length": 208.0,
       "MaxTargets": 10
     },
     "Delivery": { "Type": "Instant" },
@@ -257,11 +257,11 @@
     "Cost": { "Type": "MP", "Amount": 15 },
     "Cooldown": 3.0,
     "Targeting": "TargetPosition",
-    "Range": [32, 10],
+    "Range": [16, 20],
     "Area": {
       "Type": "Line",
-      "Width": 10.0,
-      "Length": 300.0,
+      "Width": 16.0,
+      "Length": 304.0,
       "MaxTargets": 10
     },
     "Delivery": { "Type": "Instant" },
@@ -279,11 +279,11 @@
     "Cost": { "Type": "MP", "Amount": 8 },
     "Cooldown": 2.0,
     "Targeting": "TargetEntity",
-    "Range": [32, 8],
+    "Range": [16, 16],
     "Area": {
       "Type": "Cone",
       "Angle": 60.0,
-      "Length": 150.0,
+      "Length": 160.0,
       "MaxTargets": 5
     },
     "Delivery": {
@@ -308,11 +308,11 @@
     "Cost": { "Type": "MP", "Amount": 12 },
     "Cooldown": 2.5,
     "Targeting": "TargetEntity",
-    "Range": [32, 8],
+    "Range": [16, 16],
     "Area": {
       "Type": "Line",
-      "Width": 20.0,
-      "Length": 200.0,
+      "Width": 16.0,
+      "Length": 208.0,
       "MaxTargets": 5
     },
     "Delivery": {
@@ -334,10 +334,10 @@
     "Cost": { "Type": "MP", "Amount": 10 },
     "Cooldown": 2.0,
     "Targeting": "TargetPosition",
-    "Range": [32, 10],
+    "Range": [16, 20],
     "Area": {
       "Type": "AdaptiveCone",
-      "EffectiveWidth": 200.0,
+      "EffectiveWidth": 208.0,
       "Length": 400.0,
       "MaxTargets": 5
     },
