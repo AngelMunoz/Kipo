@@ -28,6 +28,9 @@ module Navigation =
     let navGrid =
       Grid.generate mapDef Constants.Navigation.GridCellSize entitySize
 
+    // Define the threshold for free movement (16 units * 5 = 80 units)
+    let freeMovementThreshold = Constants.Entity.Size.X * 5.0f
+
     { new CoreEventListener with
         member _.StartListening() =
           eventBus.GetObservableFor<SystemCommunications.SetMovementTarget>()
@@ -39,14 +42,28 @@ module Navigation =
               world.Positions |> AMap.force |> HashMap.tryFindV entityId
             with
             | ValueSome currentPosition ->
-              match AStar.findPath navGrid currentPosition targetPosition with
-              | ValueSome path when not(List.isEmpty path) ->
+              let distance = Vector2.Distance(currentPosition, targetPosition)
+
+              if distance < freeMovementThreshold then
+                // Use direct movement for close targets (free movement)
                 eventBus.Publish(
                   StateChangeEvent.Physics(
                     PhysicsEvents.MovementStateChanged
-                      struct (entityId, MovingAlongPath path)
+                      struct (entityId, MovingTo targetPosition)
                   )
                 )
-              | _ -> () // No path found, do nothing (effectively canceling move)
+              else
+                // Use pathfinding for distant targets
+                match
+                  AStar.findPath navGrid currentPosition targetPosition
+                with
+                | ValueSome path when not(List.isEmpty path) ->
+                  eventBus.Publish(
+                    StateChangeEvent.Physics(
+                      PhysicsEvents.MovementStateChanged
+                        struct (entityId, MovingAlongPath path)
+                    )
+                  )
+                | _ -> () // No path found, do nothing (effectively canceling move)
             | ValueNone -> ())
     }
