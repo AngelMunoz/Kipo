@@ -136,7 +136,9 @@ type PomoGame() as this =
       playerId
     )
 
-  let movementService = Navigation.create(eventBus, mapStore, "Proto1", worldView)
+  let movementService =
+    Navigation.create(eventBus, mapStore, "Proto1", worldView)
+
   let inventoryService = Inventory.create(eventBus, itemStore, worldView)
   let equipmentService = Equipment.create worldView eventBus
 
@@ -171,7 +173,7 @@ type PomoGame() as this =
     base.Components.Add(new PlayerMovementSystem(this, playerId))
     base.Components.Add(new UnitMovementSystem(this, playerId))
     base.Components.Add(new AbilityActivationSystem(this, playerId))
-    base.Components.Add(new CombatSystem(this))
+    base.Components.Add(new CombatSystem(this, "Proto1"))
     base.Components.Add(new ResourceManagerSystem(this))
     base.Components.Add(new ProjectileSystem(this))
     base.Components.Add(new CollisionSystem(this, "Proto1"))

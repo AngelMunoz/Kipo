@@ -185,3 +185,143 @@ module Spatial =
       let projection = start + lineVec * tClamped
       let distSq = Vector2.DistanceSquared(point, projection)
       distSq <= width / 2.0f * (width / 2.0f)
+
+  module Isometric =
+    open Pomo.Core.Domain.Map
+
+    /// Converts from screen/world coordinates to isometric grid coordinates
+    let screenToGrid
+      (mapDef: MapDefinition)
+      (screenX: float32, screenY: float32)
+      =
+      let tileW = float32 mapDef.TileWidth
+      let tileH = float32 mapDef.TileHeight
+      let originX = float32 mapDef.Width * tileW / 2.0f
+
+      // Invert the isometric transformation:
+      // screenX = originX + (gridX - gridY) * tileW / 2
+      // screenY = (gridX + gridY) * tileH / 2
+      //
+      // Solving for gridX and gridY:
+      // From second equation: gridX + gridY = 2 * screenY / tileH
+      // From first equation: gridX - gridY = 2 * (screenX - originX) / tileW
+      //
+      // Adding: 2 * gridX = 2 * screenY / tileH + 2 * (screenX - originX) / tileW
+      // So: gridX = screenY / tileH + (screenX - originX) / tileW
+      //
+      // Subtracting: 2 * gridY = 2 * screenY / tileH - 2 * (screenX - originX) / tileW
+      // So: gridY = screenY / tileH - (screenX - originX) / tileW
+
+      let gridX = screenY / tileH + (screenX - originX) / tileW
+      let gridY = screenY / tileH - (screenX - originX) / tileW
+
+      Vector2(gridX, gridY)
+
+    /// Converts from isometric grid coordinates to screen/world coordinates
+    let gridToScreen (mapDef: MapDefinition) (gridX: float32, gridY: float32) =
+      let tileW = float32 mapDef.TileWidth
+      let tileH = float32 mapDef.TileHeight
+      let originX = float32 mapDef.Width * tileW / 2.0f
+
+      // screenX = originX + (gridX - gridY) * tileW / 2
+      // screenY = (gridX + gridY) * tileH / 2
+
+      let screenX = originX + (gridX - gridY) * tileW / 2.0f
+      let screenY = (gridX + gridY) * tileH / 2.0f
+
+      Vector2(screenX, screenY)
+
+    /// Checks if a point in screen coordinates is within an isometric line AOE
+    /// lineStart and lineEnd are in screen coordinates
+    /// Performs the check in isometric grid space to account for the projection
+    let isPointInIsometricLine
+      (mapDef: MapDefinition)
+      (lineStart: Vector2)
+      (lineEnd: Vector2)
+      (width: float32)
+      (point: Vector2)
+      =
+      // Convert all coordinates to isometric grid space
+      let startGrid = screenToGrid mapDef (lineStart.X, lineStart.Y)
+      let endGrid = screenToGrid mapDef (lineEnd.X, lineEnd.Y)
+      let pointGrid = screenToGrid mapDef (point.X, point.Y)
+
+      // Apply the same line algorithm but in isometric grid space
+      let lineVec = endGrid - startGrid
+      let lineLenSq = lineVec.LengthSquared()
+
+      if lineLenSq = 0.0f then
+        Vector2.DistanceSquared(startGrid, pointGrid)
+        <= width / 2.0f * (width / 2.0f)
+      else
+        let t = Vector2.Dot(pointGrid - startGrid, lineVec) / lineLenSq
+        let tClamped = System.Math.Clamp(t, 0.0f, 1.0f)
+        let projection = startGrid + lineVec * tClamped
+        let distSq = Vector2.DistanceSquared(pointGrid, projection)
+        distSq <= width / 2.0f * (width / 2.0f)
+
+    /// Checks if a point in screen coordinates is within an isometric cone AOE
+    /// origin, direction, and point are in screen coordinates
+    /// Performs the check in isometric grid space
+    let isPointInIsometricCone
+      (mapDef: MapDefinition)
+      (origin: Vector2)
+      (direction: Vector2)
+      (angleDegrees: float32)
+      (length: float32)
+      (point: Vector2)
+      =
+      // Convert coordinates to isometric grid space
+      let originGrid = screenToGrid mapDef (origin.X, origin.Y)
+      let pointGrid = screenToGrid mapDef (point.X, point.Y)
+
+      // The direction vector also needs to be converted to grid space
+      // To do this, we'll convert the destination point (origin + direction) to grid space,
+      // then calculate the difference
+      let originPlusDir = origin + direction
+
+      let originPlusDirGrid =
+        screenToGrid mapDef (originPlusDir.X, originPlusDir.Y)
+
+      let directionGrid = Vector2.Normalize(originPlusDirGrid - originGrid)
+
+      let distanceSquared = Vector2.DistanceSquared(originGrid, pointGrid)
+
+      if distanceSquared > length * length then
+        false
+      else
+        let offset = pointGrid - originGrid
+        // Handle the case where point is exactly at origin to avoid normalizing zero vector
+        if offset = Vector2.Zero then
+          true // Point at origin is always in the cone
+        else
+          let toPoint = Vector2.Normalize(offset)
+
+          let angleRadians =
+            Microsoft.Xna.Framework.MathHelper.ToRadians(angleDegrees / 2.0f)
+
+          let dot = Vector2.Dot(directionGrid, toPoint)
+          let cosAngle = System.MathF.Cos angleRadians
+          dot >= cosAngle
+
+    /// Checks if a point in screen coordinates is within an isometric circle AOE
+    let isPointInIsometricCircle
+      (mapDef: MapDefinition)
+      (center: Vector2)
+      (radius: float32)
+      (point: Vector2)
+      =
+      // Convert to grid space for comparison
+      let centerGrid = screenToGrid mapDef (center.X, center.Y)
+      let pointGrid = screenToGrid mapDef (point.X, point.Y)
+
+      // Apply anisotropic scaling to account for isometric distortion
+      // In isometric projection, distances along the X and Y axes are compressed
+      let dx = pointGrid.X - centerGrid.X
+      let dy = pointGrid.Y - centerGrid.Y
+
+      // The effective distance in isometric space needs to account for the projection
+      // Use a weighted distance that accounts for the isometric distortion
+      let effectiveDistance = sqrt((dx * dx) + (dy * dy))
+
+      effectiveDistance <= radius

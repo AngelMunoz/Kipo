@@ -21,6 +21,7 @@ module Combat =
 
   module private AreaOfEffect =
     let findTargetsInCircle
+      (mapDef: Map.MapDefinition)
       (getNearbyEntities:
         Vector2 -> float32 -> alist<struct (Guid<EntityId> * Vector2)>)
       (casterId: Guid<EntityId>)
@@ -30,9 +31,23 @@ module Combat =
       =
       let nearby = getNearbyEntities center radius |> AList.force
 
+      // Convert radius to grid units for the check
+      // Assuming radius is in pixels, and we want to check against grid distance
+      // We use TileWidth as the conversion factor, adjusted by sqrt(2) because
+      // 1 grid unit diagonal (width of tile) corresponds to TileWidth pixels.
+      // Grid diagonal length is sqrt(2). So TileWidth = sqrt(2) grid units.
+      // 1 pixel = sqrt(2) / TileWidth grid units.
+      let radiusGrid = radius * 1.41421356f / float32 mapDef.TileWidth
+
       let targets =
         nearby
-        |> IndexList.filter(fun struct (id, _) -> id <> casterId)
+        |> IndexList.filter(fun struct (id, pos) ->
+          id <> casterId
+          && Spatial.Isometric.isPointInIsometricCircle
+            mapDef
+            center
+            radiusGrid
+            pos)
         |> IndexList.sortBy(fun struct (_, pos) ->
           Vector2.DistanceSquared(center, pos))
         |> IndexList.map(fun struct (id, _) -> id)
@@ -43,6 +58,7 @@ module Combat =
         targets |> IndexList.take maxTargets
 
     let findTargetsInCone
+      (mapDef: Map.MapDefinition)
       (getNearbyEntities:
         Vector2 -> float32 -> alist<struct (Guid<EntityId> * Vector2)>)
       (casterId: Guid<EntityId>)
@@ -54,11 +70,25 @@ module Combat =
       =
       let nearby = getNearbyEntities origin length |> AList.force
 
+      // Convert length to grid units
+      // Assuming length is in pixels, and we want to check against grid distance
+      // We use TileWidth as the conversion factor, adjusted by sqrt(2) because
+      // 1 grid unit diagonal (width of tile) corresponds to TileWidth pixels.
+      // Grid diagonal length is sqrt(2). So TileWidth = sqrt(2) grid units.
+      // 1 pixel = sqrt(2) / TileWidth grid units.
+      let lengthGrid = length * 1.41421356f / float32 mapDef.TileWidth
+
       let targets =
         nearby
         |> IndexList.filter(fun struct (id, pos) ->
           id <> casterId
-          && Spatial.isPointInCone origin direction angle length pos)
+          && Spatial.Isometric.isPointInIsometricCone
+            mapDef
+            origin
+            direction
+            angle
+            lengthGrid
+            pos)
         |> IndexList.sortBy(fun struct (_, pos) ->
           Vector2.DistanceSquared(origin, pos))
         |> IndexList.map(fun struct (id, _) -> id)
@@ -69,6 +99,7 @@ module Combat =
         targets |> IndexList.take maxTargets
 
     let findTargetsInLine
+      (mapDef: Map.MapDefinition)
       (getNearbyEntities:
         Vector2 -> float32 -> alist<struct (Guid<EntityId> * Vector2)>)
       (casterId: Guid<EntityId>)
@@ -81,10 +112,24 @@ module Combat =
       let length = Vector2.Distance(start, endPoint)
       let nearby = getNearbyEntities start (length + width) |> AList.force
 
+      // Convert width to grid units
+      // Assuming width is in pixels, and we want to check against grid distance
+      // We use TileWidth as the conversion factor, adjusted by sqrt(2) because
+      // 1 grid unit diagonal (width of tile) corresponds to TileWidth pixels.
+      // Grid diagonal length is sqrt(2). So TileWidth = sqrt(2) grid units.
+      // 1 pixel = sqrt(2) / TileWidth grid units.
+      let widthGrid = width * 1.41421356f / float32 mapDef.TileWidth
+
       let targets =
         nearby
         |> IndexList.filter(fun struct (id, pos) ->
-          id <> casterId && Spatial.isPointInLine start endPoint width pos)
+          id <> casterId
+          && Spatial.Isometric.isPointInIsometricLine
+            mapDef
+            start
+            endPoint
+            widthGrid
+            pos)
         |> IndexList.sortBy(fun struct (_, pos) ->
           Vector2.DistanceSquared(start, pos))
         |> IndexList.map(fun struct (id, _) -> id)
@@ -287,6 +332,7 @@ module Combat =
     let handleAbilityIntent
       (world: World)
       (eventBus: EventBus)
+      (mapDef: Map.MapDefinition)
       (derivedStats: amap<Guid<EntityId>, Entity.DerivedStats>)
       (positions: amap<Guid<EntityId>, Vector2>)
       (skillStore: Stores.SkillStore)
@@ -406,6 +452,7 @@ module Combat =
               | Circle(radius, maxTargets) ->
 
                 AreaOfEffect.findTargetsInCircle
+                  mapDef
                   getNearbyEntities
                   casterId
                   center
@@ -422,8 +469,11 @@ module Combat =
                       |> ValueOption.defaultValue center
 
                     let offset = pos - casterPos
-                    if offset = Vector2.Zero then Vector2.UnitX // Default direction when target is same as caster
-                    else Vector2.Normalize(offset)
+
+                    if offset = Vector2.Zero then
+                      Vector2.UnitX // Default direction when target is same as caster
+                    else
+                      Vector2.Normalize(offset)
                   | SystemCommunications.TargetEntity targetId ->
                     // For entity targeting, direction is from caster to target entity
                     let casterPos =
@@ -437,11 +487,15 @@ module Combat =
                       |> ValueOption.defaultValue center
 
                     let offset = targetPos - casterPos
-                    if offset = Vector2.Zero then Vector2.UnitX // Default direction when target is same as caster
-                    else Vector2.Normalize(offset)
+
+                    if offset = Vector2.Zero then
+                      Vector2.UnitX // Default direction when target is same as caster
+                    else
+                      Vector2.Normalize(offset)
                   | _ -> Vector2.UnitX // Default direction if self-targeted?
 
                 AreaOfEffect.findTargetsInCone
+                  mapDef
                   getNearbyEntities
                   casterId
                   center
@@ -460,6 +514,7 @@ module Combat =
                       |> ValueOption.defaultValue center
 
                     let offset = pos - casterPos
+
                     if offset = Vector2.Zero then
                       center + Vector2.UnitX * length // Default direction when target is same as caster
                     else
@@ -478,6 +533,7 @@ module Combat =
                       |> ValueOption.defaultValue center
 
                     let offset = targetPos - casterPos
+
                     if offset = Vector2.Zero then
                       center + Vector2.UnitX * length // Default direction when target is same as caster
                     else
@@ -486,6 +542,7 @@ module Combat =
                   | _ -> center + Vector2.UnitX * length
 
                 AreaOfEffect.findTargetsInLine
+                  mapDef
                   getNearbyEntities
                   casterId
                   center
@@ -513,6 +570,7 @@ module Combat =
       (
         world: World,
         eventBus: EventBus,
+        mapDef: Map.MapDefinition,
         derivedStats: amap<Guid<EntityId>, Entity.DerivedStats>,
         positions: amap<Guid<EntityId>, Vector2>,
         skillStore: Stores.SkillStore,
@@ -537,6 +595,7 @@ module Combat =
             | Circle(radius, maxTargets) ->
 
               AreaOfEffect.findTargetsInCircle
+                mapDef
                 getNearbyEntities
                 impact.CasterId
                 center
@@ -552,6 +611,7 @@ module Combat =
               let direction = Vector2.Normalize(center - casterPos)
 
               AreaOfEffect.findTargetsInCone
+                mapDef
                 getNearbyEntities
                 impact.CasterId
                 center
@@ -570,6 +630,7 @@ module Combat =
               let endPoint = center + direction * length
 
               AreaOfEffect.findTargetsInLine
+                mapDef
                 getNearbyEntities
                 impact.CasterId
                 center
@@ -649,6 +710,7 @@ module Combat =
       (
         world: World,
         eventBus: EventBus,
+        mapDef: Map.MapDefinition,
         derivedStats: amap<Guid<EntityId>, Entity.DerivedStats>,
         positions: amap<Guid<EntityId>, Vector2>,
         skillStore: Stores.SkillStore,
@@ -660,6 +722,7 @@ module Combat =
       handleAbilityIntent
         world
         eventBus
+        mapDef
         derivedStats
         positions
         skillStore
@@ -669,7 +732,7 @@ module Combat =
         event.Target
 
 
-  type CombatSystem(game: Game) as this =
+  type CombatSystem(game: Game, mapKey: string) as this =
     inherit GameSystem(game)
 
     let eventBus = this.EventBus
@@ -682,12 +745,15 @@ module Combat =
       let derivedStats = this.Projections.DerivedStats
       let positions = this.Projections.UpdatedPositions
       let getNearbyEntities = this.Projections.GetNearbyEntities
+      let mapStore = this.Game.Services.GetService<Stores.MapStore>()
+      let mapDef = mapStore.find mapKey
 
       eventBus.GetObservableFor<SystemCommunications.AbilityIntent>()
       |> Observable.subscribe(
         Handlers.handleAbilityIntentEvent(
           this.World,
           eventBus,
+          mapDef,
           derivedStats,
           positions,
           skillStore,
@@ -701,6 +767,7 @@ module Combat =
         Handlers.handleProjectileImpact(
           this.World,
           eventBus,
+          mapDef,
           derivedStats,
           positions,
           skillStore,

@@ -962,36 +962,292 @@ module DebugRender =
             | ValueNone -> ()
 
           | DrawCone(origin, direction, angle, length, color) ->
-            match pixel with
-            | ValueSome px ->
+            match pixel, mapStore.tryFind mapKey with
+            | ValueSome px, ValueSome mapDef ->
+              // ISOMETRIC CONE VISUALIZATION
+              // 1. Convert to Grid Space
+              let originGrid =
+                Spatial.Isometric.screenToGrid mapDef (origin.X, origin.Y)
+
+              let originPlusDir = origin + direction
+
+              let originPlusDirGrid =
+                Spatial.Isometric.screenToGrid
+                  mapDef
+                  (originPlusDir.X, originPlusDir.Y)
+
+              let directionGrid =
+                Vector2.Normalize(originPlusDirGrid - originGrid)
+
+              // 2. Scale length to grid units
+              let lengthGrid = length * 1.41421356f / float32 mapDef.TileWidth
+
+              // 3. Calculate Cone Points in Grid Space
+              let halfAngleRad = MathHelper.ToRadians(angle / 2.0f)
+
+              let baseAngle =
+                float32(
+                  Math.Atan2(float directionGrid.Y, float directionGrid.X)
+                )
+
+              let leftAngle = baseAngle - halfAngleRad
+              let rightAngle = baseAngle + halfAngleRad
+
+              let leftPointGrid =
+                originGrid
+                + Vector2(
+                  lengthGrid * float32(Math.Cos(float leftAngle)),
+                  lengthGrid * float32(Math.Sin(float leftAngle))
+                )
+
+              let rightPointGrid =
+                originGrid
+                + Vector2(
+                  lengthGrid * float32(Math.Cos(float rightAngle)),
+                  lengthGrid * float32(Math.Sin(float rightAngle))
+                )
+
+              // 4. Convert Points back to Screen Space
+              let leftPointScreen =
+                Spatial.Isometric.gridToScreen
+                  mapDef
+                  (leftPointGrid.X, leftPointGrid.Y)
+
+              let rightPointScreen =
+                Spatial.Isometric.gridToScreen
+                  mapDef
+                  (rightPointGrid.X, rightPointGrid.Y)
+
+              drawLine sb px origin leftPointScreen (color * 0.3f)
+              drawLine sb px origin rightPointScreen (color * 0.3f)
+
+              // Draw Arc
+              let segments = 10
+              let angleStep = (rightAngle - leftAngle) / float32 segments
+
+              for i in 0 .. segments - 1 do
+                let a1 = leftAngle + float32 i * angleStep
+                let a2 = leftAngle + float32(i + 1) * angleStep
+
+                let p1Grid =
+                  originGrid
+                  + Vector2(
+                    lengthGrid * float32(Math.Cos(float a1)),
+                    lengthGrid * float32(Math.Sin(float a1))
+                  )
+
+                let p2Grid =
+                  originGrid
+                  + Vector2(
+                    lengthGrid * float32(Math.Cos(float a2)),
+                    lengthGrid * float32(Math.Sin(float a2))
+                  )
+
+                let p1Screen =
+                  Spatial.Isometric.gridToScreen mapDef (p1Grid.X, p1Grid.Y)
+
+                let p2Screen =
+                  Spatial.Isometric.gridToScreen mapDef (p2Grid.X, p2Grid.Y)
+
+                drawLine sb px p1Screen p2Screen (color * 0.3f)
+
+            | ValueSome px, ValueNone ->
               drawCone sb px origin direction angle length (color * 0.3f)
-            | ValueNone -> ()
+            | _ -> ()
 
           | DrawLineShape(start, end', width, color) ->
-            match pixel with
-            | ValueSome px ->
+            match pixel, mapStore.tryFind mapKey with
+            | ValueSome px, ValueSome mapDef ->
+              // ISOMETRIC LINE VISUALIZATION
+              let startGrid =
+                Spatial.Isometric.screenToGrid mapDef (start.X, start.Y)
+
+              let endGrid =
+                Spatial.Isometric.screenToGrid mapDef (end'.X, end'.Y)
+
+              let widthGrid = width * 1.41421356f / float32 mapDef.TileWidth
+
+              let edge = endGrid - startGrid
+              let length = edge.Length()
+
+              if length > 0.0f then
+                let direction = Vector2.Normalize edge
+
+                let perpendicular =
+                  Vector2(-direction.Y, direction.X) * (widthGrid / 2.0f)
+
+                let p1Grid = startGrid + perpendicular
+                let p2Grid = startGrid - perpendicular
+                let p3Grid = endGrid - perpendicular
+                let p4Grid = endGrid + perpendicular
+
+                let p1Screen =
+                  Spatial.Isometric.gridToScreen mapDef (p1Grid.X, p1Grid.Y)
+
+                let p2Screen =
+                  Spatial.Isometric.gridToScreen mapDef (p2Grid.X, p2Grid.Y)
+
+                let p3Screen =
+                  Spatial.Isometric.gridToScreen mapDef (p3Grid.X, p3Grid.Y)
+
+                let p4Screen =
+                  Spatial.Isometric.gridToScreen mapDef (p4Grid.X, p4Grid.Y)
+
+                drawLine sb px p1Screen p2Screen (color * 0.3f)
+                drawLine sb px p2Screen p3Screen (color * 0.3f)
+                drawLine sb px p3Screen p4Screen (color * 0.3f)
+                drawLine sb px p4Screen p1Screen (color * 0.3f)
+
+            | ValueSome px, ValueNone ->
               drawLineShape sb px start end' width (color * 0.3f)
-            | ValueNone -> ()
+            | _ -> ()
 
         for struct (cmd, _) in transientCommands do
           match cmd with
           | DrawCone(origin, direction, angle, length, color) ->
-            match pixel with
-            | ValueSome px ->
+            match pixel, mapStore.tryFind mapKey with
+            | ValueSome px, ValueSome mapDef ->
+              // ISOMETRIC CONE VISUALIZATION (Transient)
+              let originGrid =
+                Spatial.Isometric.screenToGrid mapDef (origin.X, origin.Y)
+
+              let originPlusDir = origin + direction
+
+              let originPlusDirGrid =
+                Spatial.Isometric.screenToGrid
+                  mapDef
+                  (originPlusDir.X, originPlusDir.Y)
+
+              let directionGrid =
+                Vector2.Normalize(originPlusDirGrid - originGrid)
+
+              let lengthGrid = length * 1.41421356f / float32 mapDef.TileWidth
+
+              let halfAngleRad = MathHelper.ToRadians(angle / 2.0f)
+
+              let baseAngle =
+                float32(
+                  Math.Atan2(float directionGrid.Y, float directionGrid.X)
+                )
+
+              let leftAngle = baseAngle - halfAngleRad
+              let rightAngle = baseAngle + halfAngleRad
+
+              let leftPointGrid =
+                originGrid
+                + Vector2(
+                  lengthGrid * float32(Math.Cos(float leftAngle)),
+                  lengthGrid * float32(Math.Sin(float leftAngle))
+                )
+
+              let rightPointGrid =
+                originGrid
+                + Vector2(
+                  lengthGrid * float32(Math.Cos(float rightAngle)),
+                  lengthGrid * float32(Math.Sin(float rightAngle))
+                )
+
+              let leftPointScreen =
+                Spatial.Isometric.gridToScreen
+                  mapDef
+                  (leftPointGrid.X, leftPointGrid.Y)
+
+              let rightPointScreen =
+                Spatial.Isometric.gridToScreen
+                  mapDef
+                  (rightPointGrid.X, rightPointGrid.Y)
+
+              drawLine sb px origin leftPointScreen (color * 0.5f)
+              drawLine sb px origin rightPointScreen (color * 0.5f)
+
+              let segments = 10
+              let angleStep = (rightAngle - leftAngle) / float32 segments
+
+              for i in 0 .. segments - 1 do
+                let a1 = leftAngle + float32 i * angleStep
+                let a2 = leftAngle + float32(i + 1) * angleStep
+
+                let p1Grid =
+                  originGrid
+                  + Vector2(
+                    lengthGrid * float32(Math.Cos(float a1)),
+                    lengthGrid * float32(Math.Sin(float a1))
+                  )
+
+                let p2Grid =
+                  originGrid
+                  + Vector2(
+                    lengthGrid * float32(Math.Cos(float a2)),
+                    lengthGrid * float32(Math.Sin(float a2))
+                  )
+
+                let p1Screen =
+                  Spatial.Isometric.gridToScreen mapDef (p1Grid.X, p1Grid.Y)
+
+                let p2Screen =
+                  Spatial.Isometric.gridToScreen mapDef (p2Grid.X, p2Grid.Y)
+
+                drawLine sb px p1Screen p2Screen (color * 0.5f)
+
+            | ValueSome px, ValueNone ->
               drawCone sb px origin direction angle length (color * 0.5f)
-            | ValueNone -> ()
+            | _ -> ()
+
           | DrawLineShape(start, end', width, color) ->
-            match pixel with
-            | ValueSome px ->
+            match pixel, mapStore.tryFind mapKey with
+            | ValueSome px, ValueSome mapDef ->
+              // ISOMETRIC LINE VISUALIZATION (Transient)
+              let startGrid =
+                Spatial.Isometric.screenToGrid mapDef (start.X, start.Y)
+
+              let endGrid =
+                Spatial.Isometric.screenToGrid mapDef (end'.X, end'.Y)
+
+              let widthGrid = width * 1.41421356f / float32 mapDef.TileWidth
+
+              let edge = endGrid - startGrid
+              let length = edge.Length()
+
+              if length > 0.0f then
+                let direction = Vector2.Normalize edge
+
+                let perpendicular =
+                  Vector2(-direction.Y, direction.X) * (widthGrid / 2.0f)
+
+                let p1Grid = startGrid + perpendicular
+                let p2Grid = startGrid - perpendicular
+                let p3Grid = endGrid - perpendicular
+                let p4Grid = endGrid + perpendicular
+
+                let p1Screen =
+                  Spatial.Isometric.gridToScreen mapDef (p1Grid.X, p1Grid.Y)
+
+                let p2Screen =
+                  Spatial.Isometric.gridToScreen mapDef (p2Grid.X, p2Grid.Y)
+
+                let p3Screen =
+                  Spatial.Isometric.gridToScreen mapDef (p3Grid.X, p3Grid.Y)
+
+                let p4Screen =
+                  Spatial.Isometric.gridToScreen mapDef (p4Grid.X, p4Grid.Y)
+
+                drawLine sb px p1Screen p2Screen (color * 0.5f)
+                drawLine sb px p2Screen p3Screen (color * 0.5f)
+                drawLine sb px p3Screen p4Screen (color * 0.5f)
+                drawLine sb px p4Screen p1Screen (color * 0.5f)
+
+            | ValueSome px, ValueNone ->
               drawLineShape sb px start end' width (color * 0.5f)
-            | ValueNone -> ()
-          | _ -> ()
+            | _ -> ()
 
         sb.End()
 
       // Calculate FPS
       frameCount <- frameCount + 1
-      if gameTime.TotalGameTime.TotalSeconds - lastFPSTime.TotalSeconds >= 1.0 then
+
+      if
+        gameTime.TotalGameTime.TotalSeconds - lastFPSTime.TotalSeconds >= 1.0
+      then
         fps <- float32 frameCount
         frameCount <- 0
         lastFPSTime <- gameTime.TotalGameTime
@@ -1004,7 +1260,8 @@ module DebugRender =
       sb.Begin(transformMatrix = screenTransform)
 
       let statsText =
-        System.Text.StringBuilder()
+        System.Text
+          .StringBuilder()
           .AppendLine($"FPS: %.1f{fps}")
           .AppendLine($"Entities: {totalEntities}")
           .AppendLine("Culling: 0% (TODO)")
