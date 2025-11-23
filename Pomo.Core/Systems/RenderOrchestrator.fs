@@ -28,6 +28,9 @@ module RenderOrchestratorSystem =
     let mutable renderServices: Render.RenderService list = []
     let mutable terrainServices: TerrainRenderSystem.TerrainRenderService list = []
 
+    let mutable foregroundTerrainServices
+      : TerrainRenderSystem.TerrainRenderService list = []
+
     let world = game.Services.GetService<World.World>()
 
     let targetingService =
@@ -53,16 +56,26 @@ module RenderOrchestratorSystem =
             | ValueNone -> acc.Add(group, IndexList.single layer))
           HashMap.empty
 
-      // Create TerrainRenderService for each group
-      terrainServices <-
-        layerGroups
-        |> HashMap.toArray
-        |> Array.sortBy fst
-        |> Array.map(fun (_, layers) ->
-          let layerNames = layers |> IndexList.map(fun l -> l.Name)
+      // Create TerrainRenderService for each group, split into background/foreground
+      let backgroundServices = ResizeArray()
+      let foregroundServices = ResizeArray()
 
-          TerrainRenderSystem.create(game, mapKey, ValueSome layerNames))
-        |> List.ofArray
+      layerGroups
+      |> HashMap.toArray
+      |> Array.sortBy fst
+      |> Array.iter(fun (group, layers) ->
+        let layerNames = layers |> IndexList.map(fun l -> l.Name)
+
+        let service =
+          TerrainRenderSystem.create(game, mapKey, ValueSome layerNames)
+
+        if group < 2 then
+          backgroundServices.Add(service)
+        else
+          foregroundServices.Add(service))
+
+      terrainServices <- backgroundServices |> List.ofSeq
+      foregroundTerrainServices <- foregroundServices |> List.ofSeq
 
       // Create RenderService
       let cameraService = game.Services.GetService<Core.CameraService>()
@@ -86,13 +99,17 @@ module RenderOrchestratorSystem =
 
       // Iterate through cameras and render
       for (playerId, camera) in cameraService.GetAllCameras() do
-        // Render Terrain (Background)
+        // Render Background Terrain (RenderGroup < 2)
         for terrainService in terrainServices do
           terrainService.Draw(camera)
 
         // Render Entities
         for renderService in renderServices do
           renderService.Draw(camera)
+
+        // Render Foreground Terrain (RenderGroup >= 2) - Decorations on top
+        for terrainService in foregroundTerrainServices do
+          terrainService.Draw(camera)
 
       // Restore viewport
       graphicsDevice.Viewport <- originalViewport

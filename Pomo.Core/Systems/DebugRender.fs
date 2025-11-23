@@ -49,6 +49,7 @@ module DebugRender =
       width: float32 *
       height: float32 *
       rotation: float32 *
+      isEllipse: bool *
       color: Color
     | DrawEntityBounds of position: Vector2
     | DrawSpatialGrid of grid: HashMap<GridCell, IndexList<Guid<EntityId>>>
@@ -203,6 +204,7 @@ module DebugRender =
               obj.Width,
               obj.Height,
               obj.Rotation,
+              obj.IsEllipse,
               color
             ))
         else
@@ -854,13 +856,50 @@ module DebugRender =
 
             sb.DrawString(hudFont, text, textPosition, Color.Magenta)
 
-          | DrawMapObject(points, position, width, height, rotation, color) ->
+          | DrawMapObject(points,
+                          position,
+                          width,
+                          height,
+                          rotation,
+                          isEllipse,
+                          color) ->
             match pixel with
             | ValueSome px ->
               match points with
               | ValueSome pts -> drawPolygon sb px pts position rotation color
               | ValueNone ->
-                drawEllipse sb px position width height rotation color
+                if isEllipse then
+                  drawEllipse sb px position width height rotation color
+                else
+                  let radians = MathHelper.ToRadians(rotation)
+                  let halfWidth = width / 2.0f
+                  let halfHeight = height / 2.0f
+                  let centerOffset = Vector2(halfWidth, halfHeight)
+
+                  let topLeftLocal = Vector2(-halfWidth, -halfHeight)
+                  let topRightLocal = Vector2(halfWidth, -halfHeight)
+                  let bottomRightLocal = Vector2(halfWidth, halfHeight)
+                  let bottomLeftLocal = Vector2(-halfWidth, halfHeight)
+
+                  let topLeftUnrotated = topLeftLocal + centerOffset
+                  let topRightUnrotated = topRightLocal + centerOffset
+                  let bottomRightUnrotated = bottomRightLocal + centerOffset
+                  let bottomLeftUnrotated = bottomLeftLocal + centerOffset
+
+                  let topLeftRotated = rotate topLeftUnrotated radians
+                  let topRightRotated = rotate topRightUnrotated radians
+                  let bottomRightRotated = rotate bottomRightUnrotated radians
+                  let bottomLeftRotated = rotate bottomLeftUnrotated radians
+
+                  let p1 = topLeftRotated + position
+                  let p2 = topRightRotated + position
+                  let p3 = bottomRightRotated + position
+                  let p4 = bottomLeftRotated + position
+
+                  drawLine sb px p1 p2 color
+                  drawLine sb px p2 p3 color
+                  drawLine sb px p3 p4 color
+                  drawLine sb px p4 p1 color
             | ValueNone -> ()
 
           | DrawEntityBounds position ->

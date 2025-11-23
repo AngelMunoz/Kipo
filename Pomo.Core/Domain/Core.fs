@@ -71,7 +71,7 @@ module Core =
       let Size = Vector2(8.0f, 8.0f)
 
     module UI =
-      let TargetingIndicatorSize = Vector2(64.0f, 64.0f)
+      let TargetingIndicatorSize = Vector2(20.0f, 20.0f)
 
     module Collision =
       let GridCellSize = 64.0f

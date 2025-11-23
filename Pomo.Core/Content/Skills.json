@@ -215,7 +215,7 @@
       "Kind": {
         "Type": "Chained",
         "JumpsLeft": 4,
-        "MaxRange": 1000.0
+        "MaxRange": 80.0
       }
     },
     "Formula": "MA * 0.8",

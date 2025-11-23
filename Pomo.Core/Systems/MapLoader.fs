@@ -221,6 +221,8 @@ module MapLoader =
       else
         ValueNone
 
+    let isEllipse = not(isNull(element.Element(xname "ellipse")))
+
     {
       Id = %id
       Name = name
@@ -233,6 +235,7 @@ module MapLoader =
       Gid = gid
       Properties = parseProperties element
       Points = points
+      IsEllipse = isEllipse
     }
 
   let private parseObjectGroup(element: XElement) : ObjectGroup =

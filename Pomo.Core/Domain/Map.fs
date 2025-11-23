@@ -75,6 +75,7 @@ module Map =
     Gid: int voption // For tile objects
     Properties: HashMap<string, string>
     Points: IndexList<Vector2> voption // For polygons/polylines
+    IsEllipse: bool
   }
 
   [<Struct>]

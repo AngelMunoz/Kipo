@@ -50,14 +50,14 @@ module ActionHandler =
                 if entityId = playerId then
                   None
                 else
-                  let entitySize = Core.Constants.Entity.Size
+                  let clickAreaSize = Core.Constants.UI.TargetingIndicatorSize
 
                   let entityBounds =
                     Microsoft.Xna.Framework.Rectangle(
-                      int(entityPos.X - entitySize.X / 2.0f),
-                      int(entityPos.Y - entitySize.Y / 2.0f),
-                      int entitySize.X,
-                      int entitySize.Y
+                      int(entityPos.X - clickAreaSize.X / 2.0f),
+                      int(entityPos.Y - clickAreaSize.Y / 2.0f),
+                      int clickAreaSize.X,
+                      int clickAreaSize.Y
                     )
 
                   if entityBounds.Contains mousePos then
