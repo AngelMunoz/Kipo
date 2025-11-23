@@ -250,22 +250,22 @@
   "10": {
     "Kind": "Active",
     "Id": 10,
-    "Name": "Railgun",
+    "Name": "ManaBeam",
     "Description": "Fires a piercing beam in a line.",
     "Intent": "Offensive",
-    "DamageSource": "Physical",
+    "DamageSource": "Magical",
     "Cost": { "Type": "MP", "Amount": 15 },
     "Cooldown": 3.0,
     "Targeting": "TargetPosition",
     "Range": [16, 20],
     "Area": {
       "Type": "Line",
-      "Width": 16.0,
+      "Width": 32.0,
       "Length": 304.0,
       "MaxTargets": 10
     },
     "Delivery": { "Type": "Instant" },
-    "Formula": "AP * 2.0",
+    "Formula": "MA * 2.0",
     "Origin": "Caster",
     "Effects": []
   },

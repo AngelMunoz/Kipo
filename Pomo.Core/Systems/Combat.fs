@@ -415,14 +415,30 @@ module Combat =
                 let direction =
                   match target with
                   | SystemCommunications.TargetPosition pos ->
-                    Vector2.Normalize(pos - center)
+                    // For position targeting, direction is from caster to target position
+                    let casterPos =
+                      positions
+                      |> HashMap.tryFindV casterId
+                      |> ValueOption.defaultValue center
+
+                    let offset = pos - casterPos
+                    if offset = Vector2.Zero then Vector2.UnitX // Default direction when target is same as caster
+                    else Vector2.Normalize(offset)
                   | SystemCommunications.TargetEntity targetId ->
+                    // For entity targeting, direction is from caster to target entity
+                    let casterPos =
+                      positions
+                      |> HashMap.tryFindV casterId
+                      |> ValueOption.defaultValue center
+
                     let targetPos =
                       positions
                       |> HashMap.tryFindV targetId
                       |> ValueOption.defaultValue center
 
-                    Vector2.Normalize(targetPos - center)
+                    let offset = targetPos - casterPos
+                    if offset = Vector2.Zero then Vector2.UnitX // Default direction when target is same as caster
+                    else Vector2.Normalize(offset)
                   | _ -> Vector2.UnitX // Default direction if self-targeted?
 
                 AreaOfEffect.findTargetsInCone
@@ -437,19 +453,36 @@ module Combat =
                 let endPoint =
                   match target with
                   | SystemCommunications.TargetPosition pos ->
-                    // If target is a position, that defines the direction.
-                    // But Line implies a specific length.
-                    // So we calculate the end point based on direction and length.
-                    let direction = Vector2.Normalize(pos - center)
-                    center + direction * length
+                    // For position targeting, direction is from caster to target position
+                    let casterPos =
+                      positions
+                      |> HashMap.tryFindV casterId
+                      |> ValueOption.defaultValue center
+
+                    let offset = pos - casterPos
+                    if offset = Vector2.Zero then
+                      center + Vector2.UnitX * length // Default direction when target is same as caster
+                    else
+                      let direction = Vector2.Normalize(offset)
+                      center + direction * length
                   | SystemCommunications.TargetEntity targetId ->
+                    // For entity targeting, direction is from caster to target entity
+                    let casterPos =
+                      positions
+                      |> HashMap.tryFindV casterId
+                      |> ValueOption.defaultValue center
+
                     let targetPos =
                       positions
                       |> HashMap.tryFindV targetId
                       |> ValueOption.defaultValue center
 
-                    let direction = Vector2.Normalize(targetPos - center)
-                    center + direction * length
+                    let offset = targetPos - casterPos
+                    if offset = Vector2.Zero then
+                      center + Vector2.UnitX * length // Default direction when target is same as caster
+                    else
+                      let direction = Vector2.Normalize(offset)
+                      center + direction * length
                   | _ -> center + Vector2.UnitX * length
 
                 AreaOfEffect.findTargetsInLine

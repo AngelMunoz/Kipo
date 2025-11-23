@@ -157,11 +157,16 @@ module Spatial =
     if distanceSquared > length * length then
       false
     else
-      let toPoint = Vector2.Normalize(point - origin)
-      let angleRadians = MathHelper.ToRadians(angleDegrees / 2.0f)
-      let dot = Vector2.Dot(direction, toPoint)
-      let cosAngle = MathF.Cos angleRadians
-      dot >= cosAngle
+      let offset = point - origin
+      // Handle the case where point is exactly at origin to avoid normalizing zero vector
+      if offset = Vector2.Zero then
+        true // Point at origin is always in the cone
+      else
+        let toPoint = Vector2.Normalize(offset)
+        let angleRadians = MathHelper.ToRadians(angleDegrees / 2.0f)
+        let dot = Vector2.Dot(direction, toPoint)
+        let cosAngle = MathF.Cos angleRadians
+        dot >= cosAngle
 
   let isPointInLine
     (start: Vector2)
