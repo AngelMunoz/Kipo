@@ -33,12 +33,25 @@ module Units =
 module Render =
   [<RequireQualifiedAccess>]
   module Layer =
+    [<Literal>]
     let TerrainBase = 0
+
+    [<Literal>]
     let Items = 100
+
+    [<Literal>]
     let Entities = 200
+
+    [<Literal>]
     let Projectiles = 250
+
+    [<Literal>]
     let VFX = 300
+
+    [<Literal>]
     let UI = 1000
+
+    [<Literal>]
     let Debug = 9999
 
 
@@ -64,8 +77,15 @@ module Core =
   module Constants =
     module Entity =
       let Size = Vector2(16.0f, 16.0f)
+
+      [<Literal>]
       let CollisionRadius = 16.0f
+
+      [<Literal>]
       let CollisionDistance = 32.0f
+
+      [<Literal>]
+      let SkillActivationRangeBuffer = 5.0f
 
     module Projectile =
       let Size = Vector2(8.0f, 8.0f)
@@ -74,22 +94,31 @@ module Core =
       let TargetingIndicatorSize = Vector2(20.0f, 20.0f)
 
     module Collision =
+      [<Literal>]
       let GridCellSize = 64.0f
 
     module Navigation =
+      [<Literal>]
       let GridCellSize = 8.0f
 
     module Spawning =
-      let DefaultDuration = TimeSpan.FromSeconds(1.0)
+      let DefaultDuration = TimeSpan.FromSeconds 1.0
 
     module AI =
+      [<Literal>]
       let WaypointReachedThreshold = 8.0f
 
     module Debug =
+      [<Literal>]
       let StatYOffset = -20.0f
+
+      [<Literal>]
       let EffectYOffset = -15.0f
+
+      [<Literal>]
       let InventoryYOffset = 150.0f
-      let TransientCommandDuration = TimeSpan.FromSeconds(2.0)
+
+      let TransientCommandDuration = TimeSpan.FromSeconds 2.0
 
 
 
@@ -143,7 +172,7 @@ module Core =
 
   type CoreEventListener =
 
-    abstract member StartListening: unit -> System.IDisposable
+    abstract member StartListening: unit -> IDisposable
 
 
   module Serialization =
