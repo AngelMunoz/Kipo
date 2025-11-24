@@ -159,48 +159,19 @@ module AbilityActivation =
         (ctx: AbilityActivationContext)
         (casterId: Guid<EntityId>)
         (skillId: int<SkillId>)
-        (casterPos: Vector2)
+        (casterPos: Vector2) // Not directly used here, but kept for context if needed for other intents later
         (targetPos: Vector2)
-        (effectiveWidth: float32)
-        (length: float32)
-        (maxTargets: int)
+        (_length: float32) // Not directly used here, as Combat.fs will handle it
+        (_maxTargets: int) // Not directly used here, as Combat.fs will handle it
         =
-        match ctx.SearchContext with
-        | Some searchCtx ->
-            let distance = Vector2.Distance(casterPos, targetPos)
-
-            let angleRad =
-                if distance > 0.001f then
-                    2.0f * float32(Math.Atan(float(effectiveWidth / (2.0f * distance))))
-                else
-                    MathHelper.Pi
-            
-            let angleDegrees = MathHelper.ToDegrees angleRad
-
-            let direction =
-                if distance > 0.001f then
-                    Vector2.Normalize(targetPos - casterPos)
-                else
-                    Vector2.UnitX
-
-            // Use Spatial.Search to find entities in the cone
-            let targets = 
-                Spatial.Search.findTargetsInCone 
-                    searchCtx 
-                    casterId 
-                    casterPos 
-                    direction 
-                    angleDegrees 
-                    length 
-                    maxTargets
-
-            for targetId in targets do
-                publishSingleIntent
-                    ctx.EventBus
-                    casterId
-                    skillId
-                    (SystemCommunications.TargetEntity targetId)
-        | None -> () // Cannot search without context
+        // AbilityActivation's role for AdaptiveCone is to confirm valid targeting
+        // and then pass the target information to Combat.fs for execution.
+        // Combat.fs will handle the dynamic aperture and target finding.
+        publishSingleIntent
+            ctx.EventBus
+            casterId
+            skillId
+            (SystemCommunications.TargetPosition targetPos)
 
       let publish
         (ctx: AbilityActivationContext)
@@ -215,14 +186,13 @@ module AbilityActivation =
         | Circle _
         | Cone _
         | Line _ -> publishSingleIntent ctx.EventBus casterId skill.Id target
-        | AdaptiveCone(effectiveWidth, length, count) ->
+        | AdaptiveCone(length, count) ->
           publishAdaptiveConeIntent
             ctx
             casterId
             skill.Id
             casterPos
-            center
-            effectiveWidth
+            center // Use 'center' as targetPos for the intent
             length
             count
         | MultiPoint(radius, count) ->

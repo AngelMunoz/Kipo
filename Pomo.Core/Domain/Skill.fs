@@ -166,7 +166,6 @@ module Skill =
     | Line of width: float32 * length: float32 * maxLineTargets: int
     | MultiPoint of radius: float32 * maxPointTargets: int
     | AdaptiveCone of
-      effectiveWidth: float32 *
       length: float32 *
       maxTargets: int
 
@@ -863,10 +862,7 @@ module Skill =
                 and! count = Required.Property.get ("Count", Required.int) json
                 return MultiPoint(float32 radius, count)
               | "adaptivecone" ->
-                let! effectiveWidth =
-                  Required.Property.get ("EffectiveWidth", Required.float) json
-
-                and! length =
+                let! length =
                   Required.Property.get ("Length", Required.float) json
 
                 and! maxTargets =
@@ -874,7 +870,6 @@ module Skill =
 
                 return
                   AdaptiveCone(
-                    float32 effectiveWidth,
                     float32 length,
                     maxTargets
                   )

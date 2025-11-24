@@ -288,27 +288,41 @@ module Combat =
           // Handle Multi-Target Projectiles (Fan of Knives, etc.)
           let targets =
             match activeSkill.Area with
-            | AdaptiveCone(effectiveWidth, length, maxTargets) ->
+            | AdaptiveCone(length, maxTargets) ->
                 let origin, direction, angle =
                     match target with
                     | SystemCommunications.TargetPosition pos ->
                         let casterPos =
                             positions
                             |> HashMap.tryFindV casterId
-                            |> ValueOption.defaultValue Vector2.Zero // Should find a better default or fail?
+                            |> ValueOption.defaultValue Vector2.Zero
                         
-                        let distance = Vector2.Distance(casterPos, pos)
-                        let dir = 
-                            if distance > 0.001f then Vector2.Normalize(pos - casterPos)
+                        let offset = pos - casterPos
+                        let dist = offset.Length()
+
+                        let dir =
+                            if dist > 0.001f then Vector2.Normalize(offset)
                             else Vector2.UnitX
                         
-                        let angleRad =
-                            if distance > 0.001f then
-                                2.0f * float32(Math.Atan(float(effectiveWidth / (2.0f * distance))))
-                            else
-                                MathHelper.Pi
+                        // Reference forward vector (e.g., along positive Y for isometric, or check caster facing)
+                        // Assuming Caster's forward is `Vector2.UnitY` for simplicity or use specific entity facing
+                        let referenceForward = Vector2.UnitY // Or caster's actual facing vector
+
+                        // Angle of target relative to reference forward (in degrees)
+                        let angleFromForwardRad = MathF.Acos(Vector2.Dot(referenceForward, dir))
+                        let angleFromForwardDeg = MathHelper.ToDegrees(angleFromForwardRad)
+
+                        // Map 0-90 degrees from forward to 30-180 degrees aperture
+                        // This assumes symmetrical spread. If not, needs left/right calc.
+                        // Aperture = 30 + (angleFromForwardDeg / 90.0) * 150.0
+                        let apertureAngle = 
+                            if angleFromForwardDeg <= 90.0f then
+                                30.0f + (angleFromForwardDeg / 90.0f) * 150.0f
+                            else // If target is behind (90-180 deg), mirror the angle or cap. 
+                                // For now, let's just cap at max if it goes beyond 90 (very wide spread)
+                                180.0f // Or 30.0f + ((180.0f - angleFromForwardDeg) / 90.0f) * 150.0f 
                         
-                        casterPos, dir, MathHelper.ToDegrees(angleRad)
+                        casterPos, dir, apertureAngle
                         
                     | SystemCommunications.TargetDirection pos ->
                          // Similar to TargetPosition but direction is explicit? 
@@ -318,18 +332,25 @@ module Combat =
                             |> HashMap.tryFindV casterId
                             |> ValueOption.defaultValue Vector2.Zero
                         
-                        let distance = Vector2.Distance(casterPos, pos)
-                        let dir = 
-                            if distance > 0.001f then Vector2.Normalize(pos - casterPos)
+                        let offset = pos - casterPos
+                        let dist = offset.Length()
+
+                        let dir =
+                            if dist > 0.001f then Vector2.Normalize(offset)
                             else Vector2.UnitX
                             
-                        let angleRad =
-                            if distance > 0.001f then
-                                2.0f * float32(Math.Atan(float(effectiveWidth / (2.0f * distance))))
-                            else
-                                MathHelper.Pi
+                        // Reference forward vector
+                        let referenceForward = Vector2.UnitY 
+                        let angleFromForwardRad = MathF.Acos(Vector2.Dot(referenceForward, dir))
+                        let angleFromForwardDeg = MathHelper.ToDegrees(angleFromForwardRad)
+
+                        let apertureAngle = 
+                            if angleFromForwardDeg <= 90.0f then
+                                30.0f + (angleFromForwardDeg / 90.0f) * 150.0f
+                            else 
+                                180.0f 
                                 
-                        casterPos, dir, MathHelper.ToDegrees(angleRad)
+                        casterPos, dir, apertureAngle
                         
                     | _ -> Vector2.Zero, Vector2.UnitX, 0.0f // Fallback/Invalid
 

@@ -337,7 +337,6 @@
     "Range": [16, 20],
     "Area": {
       "Type": "AdaptiveCone",
-      "EffectiveWidth": 208.0,
       "Length": 400.0,
       "MaxTargets": 5
     },

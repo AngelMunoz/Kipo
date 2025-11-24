@@ -616,36 +616,29 @@ module DebugRender =
               // Let's use DrawCone with 360 angle? No, DrawCone logic might fail.
               // Let's just skip Circle for now or add DrawCircle later.
               None
-            | AdaptiveCone(effectiveWidth, _, _) ->
-              let distance = Vector2.Distance(casterPos, targetPos)
-
-              let angle =
-                if distance > 0.001f then
-                  2.0f
-                  * float32(
-                    Math.Atan(float(effectiveWidth / (2.0f * distance)))
-                  )
-                else
-                  MathHelper.Pi
-
-              let angle = Math.Min(angle, MathHelper.Pi)
-
+            | AdaptiveCone(length, _) -> // length and maxTargets remain
               let direction =
-                if distance > 0.001f then
+                if Vector2.DistanceSquared(casterPos, targetPos) > 0.001f then
                   Vector2.Normalize(targetPos - casterPos)
                 else
                   Vector2.UnitX
 
-              // Use distance as length for visualization? Or skill length?
-              // Skill length is usually the max range.
-              // But for adaptive cone, the "cone" is conceptual.
-              // Let's use distance as length to show the cone reaching the target.
+              let referenceForward = Vector2.UnitY // Assuming caster's forward
+              let angleFromForwardRad = MathF.Acos(Vector2.Dot(referenceForward, direction))
+              let angleFromForwardDeg = MathHelper.ToDegrees(angleFromForwardRad)
+
+              let apertureAngle = 
+                  if angleFromForwardDeg <= 90.0f then
+                      30.0f + (angleFromForwardDeg / 90.0f) * 150.0f
+                  else 
+                      180.0f 
+              
               Some(
                 DrawCone(
                   casterPos,
                   direction,
-                  MathHelper.ToDegrees angle,
-                  distance,
+                  apertureAngle,
+                  length, // Use skill's full length
                   color
                 )
               )
