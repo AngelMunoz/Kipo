@@ -198,6 +198,7 @@ This system is the core of the stat calculation pipeline.
 **Goal:** Refactor the entire skill pipeline to support a wide variety of composable skill types, including complex targeting, delivery, and area of effect, as well as advanced projectile behaviors like chaining.
 
 - **Key Architectural Changes:**
+
   - **Decoupled Skill Definition:** A skill is now composed of `Targeting` (Self, Entity, Position), `Delivery` (Instant, Projectile), and `SkillArea` (Point, Circle, Cone, Line, MultiPoint).
   - **Flexible Targeting:** The `TargetingSystem` now handles different targeting modes and initiates movement-then-cast behavior for out-of-range targets via a `PendingSkillCast` state.
   - **Generalized Activation:** The `AbilityActivationSystem` correctly interprets the `PendingSkillCast` and publishes a generic `AbilityIntent` event. It also handles spawning multiple projectiles for `MultiPoint` area skills.
@@ -280,20 +281,20 @@ This system is the core of the stat calculation pipeline.
 - **`TileDefinition`**: Static data for a tile type, e.g., `Id`, `TerrainType` (`Walkable`, `Blocked`, `Water`), `MovementCost`.
 - **`MapTile`**: An instance of a tile on the map, holding a `TileDefinitionId` and its position.
 - **`MapDefinition`**: Static data for a whole map, loaded from a Tiled JSON file.
-    - Fields: `Name`, `Dimensions` (width/height in tiles), `TileSize`, a 2D array of `MapTile`s, and a list of `MapObject`s (for things like spawn points or triggers placed in Tiled).
+  - Fields: `Name`, `Dimensions` (width/height in tiles), `TileSize`, a 2D array of `MapTile`s, and a list of `MapObject`s (for things like spawn points or triggers placed in Tiled).
 - **`CollisionShape`**: A DU for entity collision, e.g., `Circle of float32` or `Box of Vector2`. This will be added to the `Entity` record.
 - **`SpatialGrid`**: A core data structure in the `World` state. It will be a simple grid-based spatial index to accelerate queries like "what entities are in this area?".
 
 ### 9.2 SCE: Systems, Components, Events
 
 - **Events:**
-    - `MapLoaded of MapDefinition`
-    - `CollisionDetected of EntityA: EntityId * EntityB: EntityId` (for entity-entity collisions)
+  - `MapLoaded of MapDefinition`
+  - `CollisionDetected of EntityA: EntityId * EntityB: EntityId` (for entity-entity collisions)
 - **Systems:**
-    - **`MapLoadingService`**: A service responsible for parsing Tiled JSON files into our `MapDefinition` format.
-    - **`TerrainRenderSystem`**: A `DrawableGameComponent` that renders the `MapDefinition` with an isometric projection.
-    - **`SpatialIndexingSystem`**: A system that runs each frame to update the `SpatialGrid` with the current positions of all entities.
-    - **`CollisionSystem`**: This system will use the `SpatialGrid` to get nearby entities and perform narrow-phase collision checks. It will be used by other systems (like `MovementSystem`) to validate actions.
+  - **`MapLoadingService`**: A service responsible for parsing Tiled JSON files into our `MapDefinition` format.
+  - **`TerrainRenderSystem`**: A `DrawableGameComponent` that renders the `MapDefinition` with an isometric projection.
+  - **`SpatialIndexingSystem`**: A system that runs each frame to update the `SpatialGrid` with the current positions of all entities.
+  - **`CollisionSystem`**: This system will use the `SpatialGrid` to get nearby entities and perform narrow-phase collision checks. It will be used by other systems (like `MovementSystem`) to validate actions.
 
 ### 9.3 Data-Driven Definitions
 
@@ -305,8 +306,8 @@ This system is the core of the stat calculation pipeline.
 - **`MovementSystem` Integration**: Will be updated to query the `CollisionSystem` to check if a proposed new position is valid.
 - **`CombatSystem` Integration**: Will use the `SpatialGrid` to efficiently find targets for Area of Effect abilities.
 - **New Projection (`Projections.getNearbyEntities`)**:
-    - **Signature**: `world -> EntityId -> float -> alist<EntityId>`
-    - **Purpose**: A crucial projection for AI. It will take an entity and a radius and use the `SpatialGrid` to efficiently return a reactive list of all entities within that radius.
+  - **Signature**: `world -> EntityId -> float -> alist<EntityId>`
+  - **Purpose**: A crucial projection for AI. It will take an entity and a radius and use the `SpatialGrid` to efficiently return a reactive list of all entities within that radius.
 
 ### 9.5 ✅ Verification Checklist
 
@@ -316,16 +317,38 @@ This system is the core of the stat calculation pipeline.
 - [x] Do `PlayerMovementSystem` and `UnitMovementSystem` react to wall collisions to prevent entities from moving into blocked spaces?
 - [x] Can the `SpatialGrid` be queried via a helper function (`Collision.getNearbyEntities`) to find entities in a specific area?
 - [x] Does a debug renderer correctly visualize collision shapes and the spatial grid, rendering on top of all game elements?
-- [ ] Is there a reactive `Projections.getNearbyEntities` that uses the spatial grid for efficient, declarative queries (e.g., for AI)?
-- [ ] Is the `CombatSystem`'s AoE logic refactored to use the `SpatialGrid` for efficient target acquisition instead of iterating all entities?
-- [ ] Is map loading fully dynamic, allowing systems like the `RenderOrchestrator` to react to map changes at runtime?
+- [x] Is there a reactive `Projections.getNearbyEntities` that uses the spatial grid for efficient, declarative queries (e.g., for AI)?
+- [x] Is the `CombatSystem`'s AoE logic refactored to use the `SpatialGrid` for efficient target acquisition instead of iterating all entities?
+- [x] Is map loading fully dynamic, allowing systems like the `RenderOrchestrator` to react to map changes at runtime?
 - [ ] (Optional Refactor) Has the duplicated collision response logic in `PlayerMovementSystem` and `UnitMovementSystem` been unified for better maintainability?
 
 ## 10. Phase 6: AI
 
 **Goal:** An enemy that moves and attacks the player, using the terrain and spatial index for intelligent behavior.
 
-- **SCE:** `AIControllerComponent`, `PerceptionSystem`, `AIBehaviorSystem`, `TargetChanged` event.
+### 10.1 Current State (Implemented)
+
+- **Core Architecture:** `AIController`, `AIArchetype`, `PerceptionSystem`, `AISystem` are implemented.
+- **Perception:** Visual cues and memory decay are working.
+- **Navigation:** Waypoint patrolling and "Move To" commands are implemented.
+- **Decision Making:** Basic priority-based decision logic exists (`Investigate`, `Engage`, `Flee`).
+
+### 10.2 Missing Pieces (Next Steps)
+
+- **Combat Integration:** The `Engage` response currently only moves to the target. It needs to:
+  - Check for available abilities in `SkillStore`.
+  - Check range and resource costs.
+  - Publish `AbilityIntent` events to cast spells.
+- **State Machine Refinement:** Ensure transitions between `Chasing` and `Attacking` are smooth.
+
+### 10.3 ✅ Verification Checklist
+
+- [x] Can an AI entity perceive the player and generate a `Visual` cue?
+- [x] Does the AI transition from `Patrol` to `Investigate` or `Engage` based on cues?
+- [x] Does the AI successfully navigate to a target position?
+- [ ] **Does the AI cast an ability (e.g., "Fireball") when in range of the player?**
+- [ ] Does the AI respect cooldowns and resources?
+- [x] Does the AI return to patrolling after the player is lost (memory expired)?
 
 ## 11. Phase 7 and Beyond
 
