@@ -696,35 +696,7 @@ module DebugRender =
 
               let endPoint = impactPos + direction * length
               Some(DrawLineShape(impactPos, endPoint, width, color))
-            | AdaptiveCone(effectiveWidth, _, _) ->
-              let distance = Vector2.Distance(casterPos, impactPos)
-
-              let angle =
-                if distance > 0.001f then
-                  2.0f
-                  * float32(
-                    Math.Atan(float(effectiveWidth / (2.0f * distance)))
-                  )
-                else
-                  MathHelper.Pi
-
-              let angle = Math.Min(angle, MathHelper.Pi)
-
-              let direction =
-                if distance > 0.001f then
-                  Vector2.Normalize(impactPos - casterPos)
-                else
-                  Vector2.UnitX
-
-              Some(
-                DrawCone(
-                  impactPos,
-                  direction,
-                  MathHelper.ToDegrees angle,
-                  distance,
-                  color
-                )
-              )
+            | AdaptiveCone _ -> None // Do not draw cone on impact for AdaptiveCone
             | _ -> None
 
           match command with

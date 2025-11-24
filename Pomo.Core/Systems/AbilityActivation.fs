@@ -20,6 +20,15 @@ open Pomo.Core.Systems.Systems
 module AbilityActivation =
   open Pomo.Core
   open System.Reactive.Disposables
+  open Pomo.Core.Domain.Spatial // Add this line
+
+  [<Struct>]
+  type AbilityActivationContext = {
+    EventBus: EventBus
+    SkillStore: SkillStore
+    Rng: Random
+    SearchContext: Spatial.Search.SearchContext option
+  }
 
   [<Struct>]
   type ValidationContext = {
@@ -124,8 +133,7 @@ module AbilityActivation =
         eventBus.Publish intent
 
       let private publishMultiPointIntent
-        (eventBus: EventBus)
-        (rng: Random)
+        (ctx: AbilityActivationContext)
         (casterId: Guid<EntityId>)
         (skillId: int<SkillId>)
         (center: Vector2)
@@ -133,8 +141,8 @@ module AbilityActivation =
         (count: int)
         =
         for _ in 1..count do
-          let angle = float(rng.NextDouble()) * 2.0 * Math.PI
-          let dist = float(rng.NextDouble()) * float radius
+          let angle = float(ctx.Rng.NextDouble()) * 2.0 * Math.PI
+          let dist = float(ctx.Rng.NextDouble()) * float radius
           let offsetX = cos angle * dist
           let offsetY = sin angle * dist
 
@@ -142,66 +150,60 @@ module AbilityActivation =
             center + Vector2(float32 offsetX, float32 offsetY)
 
           publishSingleIntent
-            eventBus
+            ctx.EventBus
             casterId
             skillId
             (SystemCommunications.TargetPosition pointTargetPos)
 
       let private publishAdaptiveConeIntent
-        (eventBus: EventBus)
+        (ctx: AbilityActivationContext)
         (casterId: Guid<EntityId>)
         (skillId: int<SkillId>)
         (casterPos: Vector2)
         (targetPos: Vector2)
         (effectiveWidth: float32)
         (length: float32)
-        (count: int)
+        (maxTargets: int)
         =
-        let distance = Vector2.Distance(casterPos, targetPos)
+        match ctx.SearchContext with
+        | Some searchCtx ->
+            let distance = Vector2.Distance(casterPos, targetPos)
 
-        let angle =
-          if distance > 0.001f then
-            2.0f * float32(Math.Atan(float(effectiveWidth / (2.0f * distance))))
-          else
-            MathHelper.Pi // 180 degrees if right on top
+            let angleRad =
+                if distance > 0.001f then
+                    2.0f * float32(Math.Atan(float(effectiveWidth / (2.0f * distance))))
+                else
+                    MathHelper.Pi
+            
+            let angleDegrees = MathHelper.ToDegrees angleRad
 
-        // Clamp angle to max 180 degrees to be safe
-        let angle = Math.Min(angle, MathHelper.Pi)
+            let direction =
+                if distance > 0.001f then
+                    Vector2.Normalize(targetPos - casterPos)
+                else
+                    Vector2.UnitX
 
-        let direction =
-          if distance > 0.001f then
-            Vector2.Normalize(targetPos - casterPos)
-          else
-            Vector2.UnitX
+            // Use Spatial.Search to find entities in the cone
+            let targets = 
+                Spatial.Search.findTargetsInCone 
+                    searchCtx 
+                    casterId 
+                    casterPos 
+                    direction 
+                    angleDegrees 
+                    length 
+                    maxTargets
 
-        let baseAngle =
-          float32(Math.Atan2(float direction.Y, float direction.X))
-
-        let halfAngleRad = angle / 2.0f
-        let startAngle = baseAngle - halfAngleRad
-
-        let angleStep = if count > 1 then angle / float32(count - 1) else 0.0f
-
-        for i in 0 .. count - 1 do
-          let currentAngle = startAngle + float32 i * angleStep
-
-          let offsetDirection =
-            Vector2(
-              float32(Math.Cos(float currentAngle)),
-              float32(Math.Sin(float currentAngle))
-            )
-
-          let endPoint = casterPos + offsetDirection * length
-
-          publishSingleIntent
-            eventBus
-            casterId
-            skillId
-            (SystemCommunications.TargetPosition endPoint)
+            for targetId in targets do
+                publishSingleIntent
+                    ctx.EventBus
+                    casterId
+                    skillId
+                    (SystemCommunications.TargetEntity targetId)
+        | None -> () // Cannot search without context
 
       let publish
-        (eventBus: EventBus)
-        (rng: Random)
+        (ctx: AbilityActivationContext)
         (casterId: Guid<EntityId>)
         (casterPos: Vector2)
         (skill: ActiveSkill)
@@ -212,10 +214,10 @@ module AbilityActivation =
         | Point
         | Circle _
         | Cone _
-        | Line _ -> publishSingleIntent eventBus casterId skill.Id target
+        | Line _ -> publishSingleIntent ctx.EventBus casterId skill.Id target
         | AdaptiveCone(effectiveWidth, length, count) ->
           publishAdaptiveConeIntent
-            eventBus
+            ctx
             casterId
             skill.Id
             casterPos
@@ -225,8 +227,7 @@ module AbilityActivation =
             count
         | MultiPoint(radius, count) ->
           publishMultiPointIntent
-            eventBus
-            rng
+            ctx
             casterId
             skill.Id
             center
@@ -252,10 +253,9 @@ module AbilityActivation =
       | _ -> ValueNone
 
     let private handlePendingCast
-      (eventBus: EventBus)
+      (ctx: AbilityActivationContext)
       (validationContext: ValidationContext)
       (positions: HashMap<Guid<EntityId>, Vector2>)
-      (rng: Random)
       (skill: ActiveSkill)
       (target: SystemCommunications.SkillTarget)
       =
@@ -276,7 +276,7 @@ module AbilityActivation =
             | OnCooldown -> "Skill is on cooldown"
             | _ -> "Cannot cast skill"
 
-          eventBus.Publish(
+          ctx.EventBus.Publish(
             {
               Message = message
               Position = casterPos
@@ -300,8 +300,7 @@ module AbilityActivation =
 
             if distance <= maxRange + SKILL_ACTIVATION_RANGE_BUFFER then
               IntentPublisher.publish
-                eventBus
-                rng
+                ctx
                 casterId
                 casterPos
                 skill
@@ -309,7 +308,7 @@ module AbilityActivation =
                 centerTargetPos
             else
               // This should have been handled by TargetingSystem, but as a fallback
-              eventBus.Publish(
+              ctx.EventBus.Publish(
                 {
                   Message = "Target is out of range"
                   Position = casterPos
@@ -319,8 +318,7 @@ module AbilityActivation =
 
     let handleMovementStateChanged
       (world: World)
-      (eventBus: EventBus)
-      (skillStore: SkillStore)
+      (ctx: AbilityActivationContext)
       (combatStatuses: HashMap<Guid<EntityId>, CombatStatus IndexList>)
       (positions: HashMap<Guid<EntityId>, Vector2>)
       struct (entityId, movementState)
@@ -328,7 +326,7 @@ module AbilityActivation =
       if movementState = Idle then
         let pendingCasts = world.PendingSkillCast |> AMap.force
 
-        match getPendingCastContext pendingCasts skillStore entityId with
+        match getPendingCastContext pendingCasts ctx.SkillStore entityId with
         | ValueSome(skill, target) ->
           let statuses =
             combatStatuses
@@ -345,7 +343,7 @@ module AbilityActivation =
             world.Time |> AVal.map _.TotalGameTime |> AVal.force
 
           let validationContext = {
-            SkillStore = skillStore
+            SkillStore = ctx.SkillStore
             Statuses = statuses
             Resources = resources
             Cooldowns = cooldowns
@@ -354,25 +352,46 @@ module AbilityActivation =
           }
 
           handlePendingCast
-            eventBus
+            ctx
             validationContext
             positions
-            world.Rng
             skill
             target
 
           // Always clear the pending cast after checking
-          eventBus.Publish(
+          ctx.EventBus.Publish(
             StateChangeEvent.Combat(PendingSkillCastCleared entityId)
           )
         | _ -> () // No pending cast or data missing
       else
         () // Not idle, do nothing
 
-  type AbilityActivationSystem(game: Game, playerId: Guid<EntityId>) as this =
+  type AbilityActivationSystem(game: Game, playerId: Guid<EntityId>, mapKey: string) as this =
     inherit GameSystem(game)
 
     let skillStore = this.Game.Services.GetService<SkillStore>()
+    let mapStore = this.Game.Services.GetService<Stores.MapStore>()
+    
+    let mapDef = 
+        try Some (mapStore.find mapKey) 
+        with _ -> None
+        
+    let getNearbyEntities = this.Projections.GetNearbyEntities
+
+    let activationContext = {
+        EventBus = this.EventBus
+        SkillStore = skillStore
+        Rng = this.World.Rng
+        SearchContext = 
+            match mapDef with
+            | Some map -> 
+                Some { 
+                    MapDef = map
+                    GetNearbyEntities = getNearbyEntities 
+                }
+            | None -> None
+    }
+
     let subscriptions = new CompositeDisposable()
 
     let actionStates =
@@ -419,8 +438,7 @@ module AbilityActivation =
       |> Observable.subscribe(fun e ->
         Handlers.handleMovementStateChanged
           this.World
-          this.EventBus
-          skillStore
+          activationContext
           (this.Projections.CombatStatuses |> AMap.force)
           (this.Projections.UpdatedPositions |> AMap.force)
           e)

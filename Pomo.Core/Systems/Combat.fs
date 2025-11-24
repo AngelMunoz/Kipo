@@ -19,126 +19,6 @@ open Pomo.Core.Systems.DamageCalculator
 module Combat =
   open System.Reactive.Disposables
 
-  module private AreaOfEffect =
-    let findTargetsInCircle
-      (mapDef: Map.MapDefinition)
-      (getNearbyEntities:
-        Vector2 -> float32 -> alist<struct (Guid<EntityId> * Vector2)>)
-      (casterId: Guid<EntityId>)
-      (center: Vector2)
-      (radius: float32)
-      (maxTargets: int)
-      =
-      let nearby = getNearbyEntities center radius |> AList.force
-
-      // Convert radius to grid units for the check
-      // Assuming radius is in pixels, and we want to check against grid distance
-      // We use TileWidth as the conversion factor, adjusted by sqrt(2) because
-      // 1 grid unit diagonal (width of tile) corresponds to TileWidth pixels.
-      // Grid diagonal length is sqrt(2). So TileWidth = sqrt(2) grid units.
-      // 1 pixel = sqrt(2) / TileWidth grid units.
-      let radiusGrid = radius * 1.41421356f / float32 mapDef.TileWidth
-
-      let targets =
-        nearby
-        |> IndexList.filter(fun struct (id, pos) ->
-          id <> casterId
-          && Spatial.Isometric.isPointInIsometricCircle
-            mapDef
-            center
-            radiusGrid
-            pos)
-        |> IndexList.sortBy(fun struct (_, pos) ->
-          Vector2.DistanceSquared(center, pos))
-        |> IndexList.map(fun struct (id, _) -> id)
-
-      if maxTargets >= IndexList.count targets then
-        targets
-      else
-        targets |> IndexList.take maxTargets
-
-    let findTargetsInCone
-      (mapDef: Map.MapDefinition)
-      (getNearbyEntities:
-        Vector2 -> float32 -> alist<struct (Guid<EntityId> * Vector2)>)
-      (casterId: Guid<EntityId>)
-      (origin: Vector2)
-      (direction: Vector2)
-      (angle: float32)
-      (length: float32)
-      (maxTargets: int)
-      =
-      let nearby = getNearbyEntities origin length |> AList.force
-
-      // Convert length to grid units
-      // Assuming length is in pixels, and we want to check against grid distance
-      // We use TileWidth as the conversion factor, adjusted by sqrt(2) because
-      // 1 grid unit diagonal (width of tile) corresponds to TileWidth pixels.
-      // Grid diagonal length is sqrt(2). So TileWidth = sqrt(2) grid units.
-      // 1 pixel = sqrt(2) / TileWidth grid units.
-      let lengthGrid = length * 1.41421356f / float32 mapDef.TileWidth
-
-      let targets =
-        nearby
-        |> IndexList.filter(fun struct (id, pos) ->
-          id <> casterId
-          && Spatial.Isometric.isPointInIsometricCone
-            mapDef
-            origin
-            direction
-            angle
-            lengthGrid
-            pos)
-        |> IndexList.sortBy(fun struct (_, pos) ->
-          Vector2.DistanceSquared(origin, pos))
-        |> IndexList.map(fun struct (id, _) -> id)
-
-      if maxTargets >= IndexList.count targets then
-        targets
-      else
-        targets |> IndexList.take maxTargets
-
-    let findTargetsInLine
-      (mapDef: Map.MapDefinition)
-      (getNearbyEntities:
-        Vector2 -> float32 -> alist<struct (Guid<EntityId> * Vector2)>)
-      (casterId: Guid<EntityId>)
-      (start: Vector2)
-      (endPoint: Vector2)
-      (width: float32)
-      (maxTargets: int)
-      =
-      // Radius for broad phase is half the length + half the width, roughly, or just length from start
-      let length = Vector2.Distance(start, endPoint)
-      let nearby = getNearbyEntities start (length + width) |> AList.force
-
-      // Convert width to grid units
-      // Assuming width is in pixels, and we want to check against grid distance
-      // We use TileWidth as the conversion factor, adjusted by sqrt(2) because
-      // 1 grid unit diagonal (width of tile) corresponds to TileWidth pixels.
-      // Grid diagonal length is sqrt(2). So TileWidth = sqrt(2) grid units.
-      // 1 pixel = sqrt(2) / TileWidth grid units.
-      let widthGrid = width * 1.41421356f / float32 mapDef.TileWidth
-
-      let targets =
-        nearby
-        |> IndexList.filter(fun struct (id, pos) ->
-          id <> casterId
-          && Spatial.Isometric.isPointInIsometricLine
-            mapDef
-            start
-            endPoint
-            widthGrid
-            pos)
-        |> IndexList.sortBy(fun struct (_, pos) ->
-          Vector2.DistanceSquared(start, pos))
-        |> IndexList.map(fun struct (id, _) -> id)
-
-      if maxTargets >= IndexList.count targets then
-        targets
-      else
-        targets |> IndexList.take maxTargets
-
   module private Handlers =
     let applySkillDamage
       (world: World)
@@ -332,12 +212,10 @@ module Combat =
     let handleAbilityIntent
       (world: World)
       (eventBus: EventBus)
-      (mapDef: Map.MapDefinition)
+      (searchCtx: Spatial.Search.SearchContext)
       (derivedStats: amap<Guid<EntityId>, Entity.DerivedStats>)
       (positions: amap<Guid<EntityId>, Vector2>)
       (skillStore: Stores.SkillStore)
-      (getNearbyEntities:
-        Vector2 -> float32 -> alist<struct (Guid<EntityId> * Vector2)>)
       (casterId: Guid<EntityId>)
       (skillId: int<SkillId>)
       (target: SystemCommunications.SkillTarget)
@@ -406,29 +284,105 @@ module Combat =
         // 3. Handle delivery
         match activeSkill.Delivery with
         | Delivery.Projectile projectileInfo ->
-          let targetEntity =
-            match target with
-            | SystemCommunications.TargetEntity te -> Some te
-            // If a projectile is targeted at a position, we can't create a homing projectile.
-            // This logic can be extended to support non-homing projectiles to a point.
-            | _ -> None
+          
+          // Handle Multi-Target Projectiles (Fan of Knives, etc.)
+          let targets =
+            match activeSkill.Area with
+            | AdaptiveCone(effectiveWidth, length, maxTargets) ->
+                let origin, direction, angle =
+                    match target with
+                    | SystemCommunications.TargetPosition pos ->
+                        let casterPos =
+                            positions
+                            |> HashMap.tryFindV casterId
+                            |> ValueOption.defaultValue Vector2.Zero // Should find a better default or fail?
+                        
+                        let distance = Vector2.Distance(casterPos, pos)
+                        let dir = 
+                            if distance > 0.001f then Vector2.Normalize(pos - casterPos)
+                            else Vector2.UnitX
+                        
+                        let angleRad =
+                            if distance > 0.001f then
+                                2.0f * float32(Math.Atan(float(effectiveWidth / (2.0f * distance))))
+                            else
+                                MathHelper.Pi
+                        
+                        casterPos, dir, MathHelper.ToDegrees(angleRad)
+                        
+                    | SystemCommunications.TargetDirection pos ->
+                         // Similar to TargetPosition but direction is explicit? 
+                         // Usually TargetDirection implies origin is caster.
+                        let casterPos =
+                            positions
+                            |> HashMap.tryFindV casterId
+                            |> ValueOption.defaultValue Vector2.Zero
+                        
+                        let distance = Vector2.Distance(casterPos, pos)
+                        let dir = 
+                            if distance > 0.001f then Vector2.Normalize(pos - casterPos)
+                            else Vector2.UnitX
+                            
+                        let angleRad =
+                            if distance > 0.001f then
+                                2.0f * float32(Math.Atan(float(effectiveWidth / (2.0f * distance))))
+                            else
+                                MathHelper.Pi
+                                
+                        casterPos, dir, MathHelper.ToDegrees(angleRad)
+                        
+                    | _ -> Vector2.Zero, Vector2.UnitX, 0.0f // Fallback/Invalid
 
-          match targetEntity with
-          | Some targetId ->
-            let projectileId = Guid.NewGuid() |> UMX.tag<EntityId>
+                if angle > 0.0f then
+                    Spatial.Search.findTargetsInCone
+                        searchCtx
+                        casterId
+                        origin
+                        direction
+                        angle
+                        length
+                        maxTargets
+                else
+                    IndexList.empty
+            | _ -> IndexList.empty
 
-            let liveProjectile: Projectile.LiveProjectile = {
-              Caster = casterId
-              Target = targetId
-              SkillId = skillId
-              Info = projectileInfo
-            }
+          // If we found area targets, fire projectiles at them
+          if not targets.IsEmpty then
+             for targetId in targets do
+                let projectileId = Guid.NewGuid() |> UMX.tag<EntityId>
+                let liveProjectile: Projectile.LiveProjectile = {
+                  Caster = casterId
+                  Target = targetId
+                  SkillId = skillId
+                  Info = projectileInfo
+                }
+                eventBus.Publish(
+                  StateChangeEvent.CreateProjectile
+                    struct (projectileId, liveProjectile, ValueNone)
+                )
+          else
+              // Fallback to single target logic (Standard Homing Projectile)
+              let targetEntity =
+                match target with
+                | SystemCommunications.TargetEntity te -> Some te
+                | _ -> None
 
-            eventBus.Publish(
-              StateChangeEvent.CreateProjectile
-                struct (projectileId, liveProjectile, ValueNone)
-            )
-          | None -> ()
+              match targetEntity with
+              | Some targetId ->
+                let projectileId = Guid.NewGuid() |> UMX.tag<EntityId>
+
+                let liveProjectile: Projectile.LiveProjectile = {
+                  Caster = casterId
+                  Target = targetId
+                  SkillId = skillId
+                  Info = projectileInfo
+                }
+
+                eventBus.Publish(
+                  StateChangeEvent.CreateProjectile
+                    struct (projectileId, liveProjectile, ValueNone)
+                )
+              | None -> ()
         | Delivery.Instant ->
 
           let targetCenter =
@@ -468,9 +422,8 @@ module Combat =
                     casterPos, r
                   | _ -> center, radius
 
-                AreaOfEffect.findTargetsInCircle
-                  mapDef
-                  getNearbyEntities
+                Spatial.Search.findTargetsInCircle
+                  searchCtx
                   casterId
                   origin
                   effectiveRadius
@@ -537,9 +490,8 @@ module Combat =
 
                   | _ -> center, Vector2.UnitX
 
-                AreaOfEffect.findTargetsInCone
-                  mapDef
-                  getNearbyEntities
+                Spatial.Search.findTargetsInCone
+                  searchCtx
                   casterId
                   origin
                   direction
@@ -610,9 +562,8 @@ module Combat =
 
                   | _ -> center, center + Vector2.UnitX * length
 
-                AreaOfEffect.findTargetsInLine
-                  mapDef
-                  getNearbyEntities
+                Spatial.Search.findTargetsInLine
+                  searchCtx
                   casterId
                   start
                   endPoint
@@ -639,12 +590,10 @@ module Combat =
       (
         world: World,
         eventBus: EventBus,
-        mapDef: Map.MapDefinition,
         derivedStats: amap<Guid<EntityId>, Entity.DerivedStats>,
         positions: amap<Guid<EntityId>, Vector2>,
         skillStore: Stores.SkillStore,
-        getNearbyEntities:
-          Vector2 -> float32 -> alist<struct (Guid<EntityId> * Vector2)>
+        searchCtx: Spatial.Search.SearchContext
       )
       (impact: SystemCommunications.ProjectileImpacted)
       =
@@ -663,9 +612,8 @@ module Combat =
             | Point -> IndexList.single impact.TargetId
             | Circle(radius, maxTargets) ->
 
-              AreaOfEffect.findTargetsInCircle
-                mapDef
-                getNearbyEntities
+              Spatial.Search.findTargetsInCircle
+                searchCtx
                 impact.CasterId
                 center
                 radius
@@ -679,9 +627,8 @@ module Combat =
 
               let direction = Vector2.Normalize(center - casterPos)
 
-              AreaOfEffect.findTargetsInCone
-                mapDef
-                getNearbyEntities
+              Spatial.Search.findTargetsInCone
+                searchCtx
                 impact.CasterId
                 center
                 direction
@@ -698,9 +645,8 @@ module Combat =
               let direction = Vector2.Normalize(center - casterPos)
               let endPoint = center + direction * length
 
-              AreaOfEffect.findTargetsInLine
-                mapDef
-                getNearbyEntities
+              Spatial.Search.findTargetsInLine
+                searchCtx
                 impact.CasterId
                 center
                 endPoint
@@ -779,23 +725,20 @@ module Combat =
       (
         world: World,
         eventBus: EventBus,
-        mapDef: Map.MapDefinition,
         derivedStats: amap<Guid<EntityId>, Entity.DerivedStats>,
         positions: amap<Guid<EntityId>, Vector2>,
         skillStore: Stores.SkillStore,
-        getNearbyEntities:
-          Vector2 -> float32 -> alist<struct (Guid<EntityId> * Vector2)>
+        searchCtx: Spatial.Search.SearchContext
       )
       (event: SystemCommunications.AbilityIntent)
       =
       handleAbilityIntent
         world
         eventBus
-        mapDef
+        searchCtx
         derivedStats
         positions
         skillStore
-        getNearbyEntities
         event.Caster
         event.SkillId
         event.Target
@@ -816,17 +759,21 @@ module Combat =
       let getNearbyEntities = this.Projections.GetNearbyEntities
       let mapStore = this.Game.Services.GetService<Stores.MapStore>()
       let mapDef = mapStore.find mapKey
+      
+      let searchCtx: Spatial.Search.SearchContext = {
+        MapDef = mapDef
+        GetNearbyEntities = getNearbyEntities
+      }
 
       eventBus.GetObservableFor<SystemCommunications.AbilityIntent>()
       |> Observable.subscribe(
         Handlers.handleAbilityIntentEvent(
           this.World,
           eventBus,
-          mapDef,
           derivedStats,
           positions,
           skillStore,
-          getNearbyEntities
+          searchCtx
         )
       )
       |> subscriptions.Add
@@ -836,11 +783,10 @@ module Combat =
         Handlers.handleProjectileImpact(
           this.World,
           eventBus,
-          mapDef,
           derivedStats,
           positions,
           skillStore,
-          getNearbyEntities
+          searchCtx
         )
       )
       |> subscriptions.Add

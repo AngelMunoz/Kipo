@@ -5,6 +5,7 @@ open Microsoft.Xna.Framework
 open FSharp.UMX
 open FSharp.Data.Adaptive
 open Pomo.Core.Domain.Units
+open Pomo.Core.Domain.Entity
 
 module Spatial =
 
@@ -325,3 +326,109 @@ module Spatial =
       let effectiveDistance = sqrt((dx * dx) + (dy * dy))
 
       effectiveDistance <= radius
+
+  module Search =
+    open Pomo.Core.Domain.Map
+
+    type SearchContext = {
+        MapDef: MapDefinition
+        GetNearbyEntities: Vector2 -> float32 -> alist<struct (Guid<EntityId> * Vector2)>
+    }
+
+    let findTargetsInCircle
+      (ctx: SearchContext)
+      (casterId: Guid<EntityId>)
+      (center: Vector2)
+      (radius: float32)
+      (maxTargets: int)
+      =
+      let nearby = ctx.GetNearbyEntities center radius |> AList.force
+
+      // Convert radius to grid units for the check
+      let radiusGrid = radius * 1.41421356f / float32 ctx.MapDef.TileWidth
+
+      let targets =
+        nearby
+        |> IndexList.filter(fun struct (id, pos) ->
+          id <> casterId
+          && Isometric.isPointInIsometricCircle
+            ctx.MapDef
+            center
+            radiusGrid
+            pos)
+        |> IndexList.sortBy(fun struct (_, pos) ->
+          Vector2.DistanceSquared(center, pos))
+        |> IndexList.map(fun struct (id, _) -> id)
+
+      if maxTargets >= IndexList.count targets then
+        targets
+      else
+        targets |> IndexList.take maxTargets
+
+    let findTargetsInCone
+      (ctx: SearchContext)
+      (casterId: Guid<EntityId>)
+      (origin: Vector2)
+      (direction: Vector2)
+      (angle: float32)
+      (length: float32)
+      (maxTargets: int)
+      =
+      let nearby = ctx.GetNearbyEntities origin length |> AList.force
+
+      // Convert length to grid units
+      let lengthGrid = length * 1.41421356f / float32 ctx.MapDef.TileWidth
+
+      let targets =
+        nearby
+        |> IndexList.filter(fun struct (id, pos) ->
+          id <> casterId
+          && Isometric.isPointInIsometricCone
+            ctx.MapDef
+            origin
+            direction
+            angle
+            lengthGrid
+            pos)
+        |> IndexList.sortBy(fun struct (_, pos) ->
+          Vector2.DistanceSquared(origin, pos))
+        |> IndexList.map(fun struct (id, _) -> id)
+
+      if maxTargets >= IndexList.count targets then
+        targets
+      else
+        targets |> IndexList.take maxTargets
+
+    let findTargetsInLine
+      (ctx: SearchContext)
+      (casterId: Guid<EntityId>)
+      (start: Vector2)
+      (endPoint: Vector2)
+      (width: float32)
+      (maxTargets: int)
+      =
+      // Radius for broad phase is half the length + half the width, roughly, or just length from start
+      let length = Vector2.Distance(start, endPoint)
+      let nearby = ctx.GetNearbyEntities start (length + width) |> AList.force
+
+      // Convert width to grid units
+      let widthGrid = width * 1.41421356f / float32 ctx.MapDef.TileWidth
+
+      let targets =
+        nearby
+        |> IndexList.filter(fun struct (id, pos) ->
+          id <> casterId
+          && Isometric.isPointInIsometricLine
+            ctx.MapDef
+            start
+            endPoint
+            widthGrid
+            pos)
+        |> IndexList.sortBy(fun struct (_, pos) ->
+          Vector2.DistanceSquared(start, pos))
+        |> IndexList.map(fun struct (id, _) -> id)
+
+      if maxTargets >= IndexList.count targets then
+        targets
+      else
+        targets |> IndexList.take maxTargets
