@@ -357,12 +357,16 @@ module Combat =
                 if angle > 0.0f then
                     Spatial.Search.findTargetsInCone
                         searchCtx
-                        casterId
-                        origin
-                        direction
-                        angle
-                        length
-                        maxTargets
+                        {
+                            CasterId = casterId
+                            Cone = {
+                                Origin = origin
+                                Direction = direction
+                                AngleDegrees = angle
+                                Length = length
+                            }
+                            MaxTargets = maxTargets
+                        }
                 else
                     IndexList.empty
             | _ -> IndexList.empty
@@ -445,10 +449,14 @@ module Combat =
 
                 Spatial.Search.findTargetsInCircle
                   searchCtx
-                  casterId
-                  origin
-                  effectiveRadius
-                  maxTargets
+                  {
+                      CasterId = casterId
+                      Circle = {
+                          Center = origin
+                          Radius = effectiveRadius
+                      }
+                      MaxTargets = maxTargets
+                  }
               | Cone(angle, length, maxTargets) ->
                 let origin, direction =
                   match target with
@@ -513,12 +521,16 @@ module Combat =
 
                 Spatial.Search.findTargetsInCone
                   searchCtx
-                  casterId
-                  origin
-                  direction
-                  angle
-                  length
-                  maxTargets
+                  {
+                      CasterId = casterId
+                      Cone = {
+                          Origin = origin
+                          Direction = direction
+                          AngleDegrees = angle
+                          Length = length
+                      }
+                      MaxTargets = maxTargets
+                  }
               | Line(width, length, maxTargets) ->
                 let start, endPoint =
                   match target with
@@ -585,11 +597,15 @@ module Combat =
 
                 Spatial.Search.findTargetsInLine
                   searchCtx
-                  casterId
-                  start
-                  endPoint
-                  width
-                  maxTargets
+                  {
+                      CasterId = casterId
+                      Line = {
+                          Start = start
+                          End = endPoint
+                          Width = width
+                      }
+                      MaxTargets = maxTargets
+                  }
               | MultiPoint _ ->
                 // This is for spawning multiple projectiles, which is handled in AbilityActivation.
                 // If an instant skill has this, it's probably a bug in the skill definition.
@@ -635,10 +651,14 @@ module Combat =
 
               Spatial.Search.findTargetsInCircle
                 searchCtx
-                impact.CasterId
-                center
-                radius
-                maxTargets
+                {
+                    CasterId = impact.CasterId
+                    Circle = {
+                        Center = center
+                        Radius = radius
+                    }
+                    MaxTargets = maxTargets
+                }
             | Cone(angle, length, maxTargets) ->
               // For projectile impact, direction is from caster to impact point
               let casterPos =
@@ -650,12 +670,16 @@ module Combat =
 
               Spatial.Search.findTargetsInCone
                 searchCtx
-                impact.CasterId
-                center
-                direction
-                angle
-                length
-                maxTargets
+                {
+                    CasterId = impact.CasterId
+                    Cone = {
+                        Origin = center
+                        Direction = direction
+                        AngleDegrees = angle
+                        Length = length
+                    }
+                    MaxTargets = maxTargets
+                }
             | Line(width, length, maxTargets) ->
               // For projectile impact, line is along the trajectory
               let casterPos =
@@ -668,11 +692,15 @@ module Combat =
 
               Spatial.Search.findTargetsInLine
                 searchCtx
-                impact.CasterId
-                center
-                endPoint
-                width
-                maxTargets
+                {
+                    CasterId = impact.CasterId
+                    Line = {
+                        Start = center
+                        End = endPoint
+                        Width = width
+                    }
+                    MaxTargets = maxTargets
+                }
             | MultiPoint _ ->
               // This shouldn't happen. MultiPoint is for firing multiple projectiles,
               // not for the area of a single projectile impact.
