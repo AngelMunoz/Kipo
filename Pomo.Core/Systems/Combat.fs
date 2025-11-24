@@ -19,60 +19,232 @@ open Pomo.Core.Systems.DamageCalculator
 module Combat =
   open System.Reactive.Disposables
 
-  module private Handlers =
+  type CombatContext = {
+    World: World
+    EventBus: EventBus
+    SearchContext: Spatial.Search.SearchContext
+    DerivedStats: HashMap<Guid<EntityId>, Entity.DerivedStats>
+    Positions: HashMap<Guid<EntityId>, Vector2>
+    SkillStore: Stores.SkillStore
+  }
+
+  module private Targeting =
+
+    let getPosition (ctx: CombatContext) (entityId: Guid<EntityId>) =
+      ctx.Positions
+      |> HashMap.tryFindV entityId
+      |> ValueOption.defaultValue Vector2.Zero
+
+    let resolveCircle
+      (ctx: CombatContext)
+      (casterId: Guid<EntityId>)
+      (center: Vector2)
+      (radius: float32)
+      (target: SystemCommunications.SkillTarget)
+      =
+      match target with
+      | SystemCommunications.TargetDirection pos ->
+        // Origin is caster. Radius is distance to cursor, clamped by skill radius.
+        let casterPos = getPosition ctx casterId
+        let dist = Vector2.Distance(casterPos, pos)
+        let r = Math.Min(dist, radius)
+        casterPos, r
+      | _ -> center, radius
+
+    let resolveCone
+      (ctx: CombatContext)
+      (casterId: Guid<EntityId>)
+      (center: Vector2)
+      (target: SystemCommunications.SkillTarget)
+      =
+      let casterPos = getPosition ctx casterId
+
+      match target with
+      | SystemCommunications.TargetDirection pos ->
+        // Origin is caster, direction is towards target position
+        let offset = pos - casterPos
+
+        let dir =
+          if offset = Vector2.Zero then
+            Vector2.UnitX
+          else
+            Vector2.Normalize(offset)
+
+        casterPos, dir
+      | SystemCommunications.TargetPosition pos ->
+        // Origin is the target position. Direction is from caster to position.
+        let offset = pos - casterPos
+
+        let dir =
+          if offset = Vector2.Zero then
+            Vector2.UnitX
+          else
+            Vector2.Normalize(offset)
+
+        pos, dir
+      | SystemCommunications.TargetEntity targetId ->
+        // Origin is target entity.
+        // Direction is from caster to target entity ("shatter")
+        let targetPos = getPosition ctx targetId
+        let offset = targetPos - casterPos
+
+        let dir =
+          if offset = Vector2.Zero then
+            Vector2.UnitX
+          else
+            Vector2.Normalize(offset)
+
+        targetPos, dir
+      | _ -> center, Vector2.UnitX
+
+    let resolveLine
+      (ctx: CombatContext)
+      (casterId: Guid<EntityId>)
+      (center: Vector2)
+      (length: float32)
+      (target: SystemCommunications.SkillTarget)
+      =
+      let casterPos = getPosition ctx casterId
+
+      match target with
+      | SystemCommunications.TargetDirection pos ->
+        // Start at caster, end at caster + direction * length
+        let offset = pos - casterPos
+
+        let dir =
+          if offset = Vector2.Zero then
+            Vector2.UnitX
+          else
+            Vector2.Normalize(offset)
+
+        casterPos, casterPos + dir * length
+      | SystemCommunications.TargetPosition pos ->
+        // Start at caster. End at position, clamped by length.
+        let offset = pos - casterPos
+        let dist = offset.Length()
+
+        let dir =
+          if dist > 0.0f then
+            Vector2.Normalize(offset)
+          else
+            Vector2.UnitX
+
+        let actualLength = Math.Min(dist, length)
+        casterPos, casterPos + dir * actualLength
+      | SystemCommunications.TargetEntity targetId ->
+        // Start at target entity.
+        // Direction from caster to target entity.
+        let targetPos = getPosition ctx targetId
+        let offset = targetPos - casterPos
+
+        let dir =
+          if offset = Vector2.Zero then
+            Vector2.UnitX
+          else
+            Vector2.Normalize(offset)
+
+        targetPos, targetPos + dir * length
+      | _ -> center, center + Vector2.UnitX * length
+
+    let calculateAdaptiveAperture(direction: Vector2) =
+      // Reference forward vector (e.g., along positive Y for isometric, or check caster facing)
+      // Assuming Caster's forward is `Vector2.UnitY` for simplicity or use specific entity facing
+      let referenceForward = Vector2.UnitY
+
+      // Angle of target relative to reference forward (in degrees)
+      let angleFromForwardRad =
+        MathF.Acos(Vector2.Dot(referenceForward, direction))
+
+      let angleFromForwardDeg = MathHelper.ToDegrees(angleFromForwardRad)
+
+      // Map 0-90 degrees from forward to 30-180 degrees aperture
+      // This assumes symmetrical spread. If not, needs left/right calc.
+      // Aperture = 30 + (angleFromForwardDeg / 90.0) * 150.0
+      if angleFromForwardDeg <= 90.0f then
+        30.0f + (angleFromForwardDeg / 90.0f) * 150.0f
+      else // If target is behind (90-180 deg), mirror the angle or cap.
+        // For now, let's just cap at max if it goes beyond 90 (very wide spread)
+        180.0f
+
+    let resolveAdaptiveCone
+      (ctx: CombatContext)
+      (casterId: Guid<EntityId>)
+      (target: SystemCommunications.SkillTarget)
+      =
+      let casterPos = getPosition ctx casterId
+
+      match target with
+      | SystemCommunications.TargetPosition pos ->
+        let offset = pos - casterPos
+        let dist = offset.Length()
+
+        let dir =
+          if dist > 0.001f then
+            Vector2.Normalize(offset)
+          else
+            Vector2.UnitX
+
+        let apertureAngle = calculateAdaptiveAperture dir
+        casterPos, dir, apertureAngle
+
+      | SystemCommunications.TargetDirection pos ->
+        // Similar to TargetPosition but direction is explicit?
+        // Usually TargetDirection implies origin is caster.
+        let offset = pos - casterPos
+        let dist = offset.Length()
+
+        let dir =
+          if dist > 0.001f then
+            Vector2.Normalize(offset)
+          else
+            Vector2.UnitX
+
+        let apertureAngle = calculateAdaptiveAperture dir
+        casterPos, dir, apertureAngle
+      | _ -> Vector2.Zero, Vector2.UnitX, 0.0f // Fallback/Invalid
+
+  module private Execution =
+
     let applySkillDamage
-      (world: World)
-      (derivedStats: HashMap<Guid<EntityId>, Entity.DerivedStats>)
+      (ctx: CombatContext)
       (casterId: Guid<EntityId>)
       (targetId: Guid<EntityId>)
       (skill: ActiveSkill)
       =
-
-      match derivedStats.TryFindV casterId, derivedStats.TryFindV targetId with
+      match
+        ctx.DerivedStats.TryFindV casterId, ctx.DerivedStats.TryFindV targetId
+      with
       | ValueSome attackerStats, ValueSome defenderStats ->
-        let result =
-          if casterId = targetId then
-            DamageCalculator.calculateRawDamageSelfTarget
-              world.Rng
-              attackerStats
-              defenderStats
-              skill
-          else
-            DamageCalculator.calculateFinalDamage
-              world.Rng
-              attackerStats
-              defenderStats
-              skill
-
-        result
+        if casterId = targetId then
+          DamageCalculator.calculateRawDamageSelfTarget
+            ctx.World.Rng
+            attackerStats
+            defenderStats
+            skill
+        else
+          DamageCalculator.calculateFinalDamage
+            ctx.World.Rng
+            attackerStats
+            defenderStats
+            skill
       | _ ->
-          // Caster or target stats not found
           {
             Amount = 0
             IsCritical = false
             IsEvaded = false
           }
 
-    let private applyInstantaneousSkillEffects
-      (world: World)
-      (eventBus: EventBus)
-      (derivedStats: HashMap<Guid<EntityId>, Entity.DerivedStats>)
-      (positions: HashMap<Guid<EntityId>, Vector2>)
+    let applyInstantaneousSkillEffects
+      (ctx: CombatContext)
       (casterId: Guid<EntityId>)
       (targetId: Guid<EntityId>)
       (activeSkill: ActiveSkill)
       =
-
-      let result =
-        applySkillDamage world derivedStats casterId targetId activeSkill
-
-      let targetPos =
-        positions
-        |> HashMap.tryFindV targetId
-        |> ValueOption.defaultValue Vector2.Zero
+      let result = applySkillDamage ctx casterId targetId activeSkill
+      let targetPos = Targeting.getPosition ctx targetId
 
       if result.IsEvaded then
-        eventBus.Publish(
+        ctx.EventBus.Publish(
           {
             Message = "Miss"
             Position = targetPos
@@ -80,7 +252,7 @@ module Combat =
           : SystemCommunications.ShowNotification
         )
       else
-        eventBus.Publish(
+        ctx.EventBus.Publish(
           {
             Target = targetId
             Amount = result.Amount
@@ -88,7 +260,7 @@ module Combat =
           : SystemCommunications.DamageDealt
         )
 
-        eventBus.Publish(
+        ctx.EventBus.Publish(
           {
             Message = $"-{result.Amount}"
             Position = targetPos
@@ -97,7 +269,7 @@ module Combat =
         )
 
         if result.IsCritical then
-          eventBus.Publish(
+          ctx.EventBus.Publish(
             {
               Message = "Crit!"
               Position = targetPos
@@ -106,24 +278,86 @@ module Combat =
           )
 
         for effect in activeSkill.Effects do
-          let intent =
-            {
-              SourceEntity = casterId
-              TargetEntity = targetId
-              Effect = effect
-            }
-            : SystemCommunications.EffectApplicationIntent
+          let intent: SystemCommunications.EffectApplicationIntent = {
+            SourceEntity = casterId
+            TargetEntity = targetId
+            Effect = effect
+          }
 
-          eventBus.Publish intent
+          ctx.EventBus.Publish intent
+
+    let applyResourceCost
+      (ctx: CombatContext)
+      (casterId: Guid<EntityId>)
+      (activeSkill: ActiveSkill)
+      =
+      match activeSkill.Cost with
+      | ValueSome cost ->
+        let resources = ctx.World.Resources |> AMap.force
+
+        let currentResources =
+          resources.TryFindV casterId
+          |> ValueOption.defaultValue {
+            HP = 0
+            MP = 0
+            Status = Entity.Status.Dead
+          }
+
+        let requiredAmount = cost.Amount |> ValueOption.defaultValue 0
+
+        let newResources =
+          match cost.ResourceType with
+          | Entity.ResourceType.HP -> {
+              currentResources with
+                  HP = currentResources.HP - requiredAmount
+            }
+          | Entity.ResourceType.MP ->
+              {
+                currentResources with
+                    MP = currentResources.MP - requiredAmount
+              }
+
+        ctx.EventBus.Publish(
+          StateChangeEvent.Combat(
+            CombatEvents.ResourcesChanged struct (casterId, newResources)
+          )
+        )
+      | ValueNone -> ()
+
+    let applyCooldown
+      (ctx: CombatContext)
+      (casterId: Guid<EntityId>)
+      (skillId: int<SkillId>)
+      (activeSkill: ActiveSkill)
+      =
+      match activeSkill.Cooldown with
+      | ValueSome cd ->
+        let totalGameTime =
+          ctx.World.Time |> AVal.map _.TotalGameTime |> AVal.force
+
+        let cooldowns = ctx.World.AbilityCooldowns |> AMap.force
+
+        let currentCooldowns =
+          cooldowns.TryFindV casterId |> ValueOption.defaultValue HashMap.empty
+
+        let readyTime = totalGameTime + cd
+        let newCooldowns = currentCooldowns.Add(skillId, readyTime)
+
+        ctx.EventBus.Publish(
+          StateChangeEvent.Combat(
+            CombatEvents.CooldownsChanged struct (casterId, newCooldowns)
+          )
+        )
+      | ValueNone -> ()
+
+
+  module private Handlers =
 
     let handleEffectResourceIntent
-      (derivedStats: amap<Guid<EntityId>, Entity.DerivedStats>)
-      (eventBus: EventBus)
+      (ctx: CombatContext)
       (intent: SystemCommunications.EffectResourceIntent)
       =
-      let derivedStats = derivedStats |> AMap.force
-
-      match derivedStats.TryFindV intent.SourceEntity with
+      match ctx.DerivedStats.TryFindV intent.SourceEntity with
       | ValueSome attackerStats ->
         let totalResourceChangeFromModifiers =
           intent.Effect.Modifiers
@@ -135,58 +369,51 @@ module Combat =
                   attackerStats
                   formula
 
-              {
-                Amount = changeAmount
-                ResourceType = resource
-                Target = intent.TargetEntity
-              }
-              : SystemCommunications.ResourceRestored
-              |> Some
+              Some(
+                {
+                  Amount = changeAmount
+                  ResourceType = resource
+                  Target = intent.TargetEntity
+                }
+                : SystemCommunications.ResourceRestored
+              )
             | _ -> None)
 
         for resourceChangeEvent in totalResourceChangeFromModifiers do
-          eventBus.Publish resourceChangeEvent
+          ctx.EventBus.Publish resourceChangeEvent
 
-        eventBus.Publish(
+        ctx.EventBus.Publish(
           EffectExpired struct (intent.TargetEntity, intent.ActiveEffectId)
         )
-      | _ -> () // Attacker stats not found
+      | _ -> ()
 
     let handleEffectDamageIntent
-      (derivedStats: amap<Guid<EntityId>, Entity.DerivedStats>)
-      (positions: amap<Guid<EntityId>, Vector2>)
-      (eventBus: EventBus)
+      (ctx: CombatContext)
       (intent: SystemCommunications.EffectDamageIntent)
       =
-      let positions = positions |> AMap.force
-      let derivedStats = derivedStats |> AMap.force
-
       match
-        derivedStats.TryFindV intent.SourceEntity,
-        derivedStats.TryFindV intent.TargetEntity
+        ctx.DerivedStats.TryFindV intent.SourceEntity,
+        ctx.DerivedStats.TryFindV intent.TargetEntity
       with
       | ValueSome attackerStats, ValueSome defenderStats ->
-
         let totalDamageFromModifiers =
           intent.Effect.Modifiers
           |> Array.choose(fun m ->
             match m with
             | AbilityDamageMod(mathExpr, element) ->
-              let dmg =
+              Some(
                 DamageCalculator.calculateEffectDamage
                   attackerStats
                   defenderStats
                   mathExpr
                   intent.Effect.DamageSource
                   element
-
-              Some dmg
+              )
             | _ -> None)
           |> Array.sum
 
-
         if totalDamageFromModifiers > 0 then
-          eventBus.Publish(
+          ctx.EventBus.Publish(
             {
               Target = intent.TargetEntity
               Amount = totalDamageFromModifiers
@@ -194,452 +421,201 @@ module Combat =
             : SystemCommunications.DamageDealt
           )
 
-          let targetPos =
-            positions
-            |> HashMap.tryFindV intent.TargetEntity
-            |> ValueOption.defaultValue Vector2.Zero
+          let targetPos = Targeting.getPosition ctx intent.TargetEntity
 
-          eventBus.Publish(
+          ctx.EventBus.Publish(
             {
               Message = $"-{totalDamageFromModifiers}"
               Position = targetPos
             }
             : SystemCommunications.ShowNotification
           )
-      | _ -> () // Attacker or defender stats not found
+      | _ -> ()
+
+    let handleProjectileDelivery
+      (ctx: CombatContext)
+      (casterId: Guid<EntityId>)
+      (skillId: int<SkillId>)
+      (target: SystemCommunications.SkillTarget)
+      (activeSkill: ActiveSkill)
+      (projectileInfo: Projectile.ProjectileInfo)
+      =
+
+      // Handle Multi-Target Projectiles (Fan of Knives, etc.)
+      let targets =
+        match activeSkill.Area with
+        | AdaptiveCone(length, maxTargets) ->
+          let origin, direction, angle =
+            Targeting.resolveAdaptiveCone ctx casterId target
+
+          if angle > 0.0f then
+            Spatial.Search.findTargetsInCone ctx.SearchContext {
+              CasterId = casterId
+              Cone = {
+                Origin = origin
+                Direction = direction
+                AngleDegrees = angle
+                Length = length
+              }
+              MaxTargets = maxTargets
+            }
+          else
+            IndexList.empty
+        | _ -> IndexList.empty
+
+      // If we found area targets, fire projectiles at them
+      if not targets.IsEmpty then
+        for targetId in targets do
+          let projectileId = Guid.NewGuid() |> UMX.tag<EntityId>
+
+          let liveProjectile: Projectile.LiveProjectile = {
+            Caster = casterId
+            Target = targetId
+            SkillId = skillId
+            Info = projectileInfo
+          }
+
+          ctx.EventBus.Publish(
+            StateChangeEvent.CreateProjectile
+              struct (projectileId, liveProjectile, ValueNone)
+          )
+      else
+        // Fallback to single target logic (Standard Homing Projectile)
+        let targetEntity =
+          match target with
+          | SystemCommunications.TargetEntity te -> Some te
+          | _ -> None
+
+        match targetEntity with
+        | Some targetId ->
+          let projectileId = Guid.NewGuid() |> UMX.tag<EntityId>
+
+          let liveProjectile: Projectile.LiveProjectile = {
+            Caster = casterId
+            Target = targetId
+            SkillId = skillId
+            Info = projectileInfo
+          }
+
+          ctx.EventBus.Publish(
+            StateChangeEvent.CreateProjectile
+              struct (projectileId, liveProjectile, ValueNone)
+          )
+        | None -> ()
+
+    let handleInstantDelivery
+      (ctx: CombatContext)
+      (casterId: Guid<EntityId>)
+      (target: SystemCommunications.SkillTarget)
+      (activeSkill: ActiveSkill)
+      =
+      let targetCenter =
+        match target with
+        | SystemCommunications.TargetEntity targetId ->
+          ctx.Positions.TryFindV targetId
+        | SystemCommunications.TargetPosition pos -> ValueSome pos
+        // Default the center to the caster
+        // allow the area to decide its own center based on the direction
+        | SystemCommunications.TargetDirection _
+        | SystemCommunications.TargetSelf -> ctx.Positions.TryFindV casterId
+
+      match targetCenter with
+      | ValueNone -> () // No center to apply AoE
+      | ValueSome center ->
+        let targets =
+          match activeSkill.Area with
+          | Point ->
+            match target with
+            | SystemCommunications.TargetSelf -> IndexList.single casterId
+            | SystemCommunications.TargetEntity targetId ->
+              IndexList.single targetId
+            | SystemCommunications.TargetPosition _ -> IndexList.empty // Can't target entities with a point on the ground
+            | SystemCommunications.TargetDirection _ -> IndexList.empty // Can't target entities with a direction
+          | Circle(radius, maxTargets) ->
+            let origin, effectiveRadius =
+              Targeting.resolveCircle ctx casterId center radius target
+
+            Spatial.Search.findTargetsInCircle ctx.SearchContext {
+              CasterId = casterId
+              Circle = {
+                Center = origin
+                Radius = effectiveRadius
+              }
+              MaxTargets = maxTargets
+            }
+          | Cone(angle, length, maxTargets) ->
+            let origin, direction =
+              Targeting.resolveCone ctx casterId center target
+
+            Spatial.Search.findTargetsInCone ctx.SearchContext {
+              CasterId = casterId
+              Cone = {
+                Origin = origin
+                Direction = direction
+                AngleDegrees = angle
+                Length = length
+              }
+              MaxTargets = maxTargets
+            }
+          | Line(width, length, maxTargets) ->
+            let start, endPoint =
+              Targeting.resolveLine ctx casterId center length target
+
+            Spatial.Search.findTargetsInLine ctx.SearchContext {
+              CasterId = casterId
+              Line = {
+                Start = start
+                End = endPoint
+                Width = width
+              }
+              MaxTargets = maxTargets
+            }
+          | MultiPoint _ ->
+            // This is for spawning multiple projectiles, which is handled in AbilityActivation.
+            // If an instant skill has this, it's probably a bug in the skill definition.
+            IndexList.empty
+          | AdaptiveCone _ -> IndexList.empty
+
+        for targetId in targets do
+          Execution.applyInstantaneousSkillEffects
+            ctx
+            casterId
+            targetId
+            activeSkill
 
 
     let handleAbilityIntent
-      (world: World)
-      (eventBus: EventBus)
-      (searchCtx: Spatial.Search.SearchContext)
-      (derivedStats: amap<Guid<EntityId>, Entity.DerivedStats>)
-      (positions: amap<Guid<EntityId>, Vector2>)
-      (skillStore: Stores.SkillStore)
+      (ctx: CombatContext)
       (casterId: Guid<EntityId>)
       (skillId: int<SkillId>)
       (target: SystemCommunications.SkillTarget)
       =
-      let positions = positions |> AMap.force
-      let derivedStats = derivedStats |> AMap.force
-
-      match skillStore.tryFind skillId with
+      match ctx.SkillStore.tryFind skillId with
       | ValueSome(Skill.Active activeSkill) ->
         // Apply cost and cooldown now that the ability is confirmed
-        let totalGameTime = world.Time |> AVal.map _.TotalGameTime |> AVal.force
+        Execution.applyResourceCost ctx casterId activeSkill
+        Execution.applyCooldown ctx casterId skillId activeSkill
 
-        let resources = world.Resources |> AMap.force
-        let cooldowns = world.AbilityCooldowns |> AMap.force
-
-
-        // 1. Apply resource cost
-        match activeSkill.Cost with
-        | ValueSome cost ->
-          let currentResources =
-            resources.TryFindV casterId
-            |> ValueOption.defaultValue {
-              HP = 0
-              MP = 0
-              Status = Entity.Status.Dead
-            }
-
-          let requiredAmount = cost.Amount |> ValueOption.defaultValue 0
-
-          let newResources =
-            match cost.ResourceType with
-            | Entity.ResourceType.HP -> {
-                currentResources with
-                    HP = currentResources.HP - requiredAmount
-              }
-            | Entity.ResourceType.MP ->
-                {
-                  currentResources with
-                      MP = currentResources.MP - requiredAmount
-                }
-
-          eventBus.Publish(
-            StateChangeEvent.Combat(
-              CombatEvents.ResourcesChanged struct (casterId, newResources)
-            )
-          )
-        | ValueNone -> ()
-
-        // 2. Apply cooldown
-        match activeSkill.Cooldown with
-        | ValueSome cd ->
-          let currentCooldowns =
-            cooldowns.TryFindV casterId
-            |> ValueOption.defaultValue HashMap.empty
-
-          let readyTime = totalGameTime + cd
-          let newCooldowns = currentCooldowns.Add(skillId, readyTime)
-
-          eventBus.Publish(
-            StateChangeEvent.Combat(
-              CombatEvents.CooldownsChanged struct (casterId, newCooldowns)
-            )
-          )
-        | ValueNone -> ()
-
-        // 3. Handle delivery
         match activeSkill.Delivery with
         | Delivery.Projectile projectileInfo ->
-          
-          // Handle Multi-Target Projectiles (Fan of Knives, etc.)
-          let targets =
-            match activeSkill.Area with
-            | AdaptiveCone(length, maxTargets) ->
-                let origin, direction, angle =
-                    match target with
-                    | SystemCommunications.TargetPosition pos ->
-                        let casterPos =
-                            positions
-                            |> HashMap.tryFindV casterId
-                            |> ValueOption.defaultValue Vector2.Zero
-                        
-                        let offset = pos - casterPos
-                        let dist = offset.Length()
-
-                        let dir =
-                            if dist > 0.001f then Vector2.Normalize(offset)
-                            else Vector2.UnitX
-                        
-                        // Reference forward vector (e.g., along positive Y for isometric, or check caster facing)
-                        // Assuming Caster's forward is `Vector2.UnitY` for simplicity or use specific entity facing
-                        let referenceForward = Vector2.UnitY // Or caster's actual facing vector
-
-                        // Angle of target relative to reference forward (in degrees)
-                        let angleFromForwardRad = MathF.Acos(Vector2.Dot(referenceForward, dir))
-                        let angleFromForwardDeg = MathHelper.ToDegrees(angleFromForwardRad)
-
-                        // Map 0-90 degrees from forward to 30-180 degrees aperture
-                        // This assumes symmetrical spread. If not, needs left/right calc.
-                        // Aperture = 30 + (angleFromForwardDeg / 90.0) * 150.0
-                        let apertureAngle = 
-                            if angleFromForwardDeg <= 90.0f then
-                                30.0f + (angleFromForwardDeg / 90.0f) * 150.0f
-                            else // If target is behind (90-180 deg), mirror the angle or cap. 
-                                // For now, let's just cap at max if it goes beyond 90 (very wide spread)
-                                180.0f // Or 30.0f + ((180.0f - angleFromForwardDeg) / 90.0f) * 150.0f 
-                        
-                        casterPos, dir, apertureAngle
-                        
-                    | SystemCommunications.TargetDirection pos ->
-                         // Similar to TargetPosition but direction is explicit? 
-                         // Usually TargetDirection implies origin is caster.
-                        let casterPos =
-                            positions
-                            |> HashMap.tryFindV casterId
-                            |> ValueOption.defaultValue Vector2.Zero
-                        
-                        let offset = pos - casterPos
-                        let dist = offset.Length()
-
-                        let dir =
-                            if dist > 0.001f then Vector2.Normalize(offset)
-                            else Vector2.UnitX
-                            
-                        // Reference forward vector
-                        let referenceForward = Vector2.UnitY 
-                        let angleFromForwardRad = MathF.Acos(Vector2.Dot(referenceForward, dir))
-                        let angleFromForwardDeg = MathHelper.ToDegrees(angleFromForwardRad)
-
-                        let apertureAngle = 
-                            if angleFromForwardDeg <= 90.0f then
-                                30.0f + (angleFromForwardDeg / 90.0f) * 150.0f
-                            else 
-                                180.0f 
-                                
-                        casterPos, dir, apertureAngle
-                        
-                    | _ -> Vector2.Zero, Vector2.UnitX, 0.0f // Fallback/Invalid
-
-                if angle > 0.0f then
-                    Spatial.Search.findTargetsInCone
-                        searchCtx
-                        {
-                            CasterId = casterId
-                            Cone = {
-                                Origin = origin
-                                Direction = direction
-                                AngleDegrees = angle
-                                Length = length
-                            }
-                            MaxTargets = maxTargets
-                        }
-                else
-                    IndexList.empty
-            | _ -> IndexList.empty
-
-          // If we found area targets, fire projectiles at them
-          if not targets.IsEmpty then
-             for targetId in targets do
-                let projectileId = Guid.NewGuid() |> UMX.tag<EntityId>
-                let liveProjectile: Projectile.LiveProjectile = {
-                  Caster = casterId
-                  Target = targetId
-                  SkillId = skillId
-                  Info = projectileInfo
-                }
-                eventBus.Publish(
-                  StateChangeEvent.CreateProjectile
-                    struct (projectileId, liveProjectile, ValueNone)
-                )
-          else
-              // Fallback to single target logic (Standard Homing Projectile)
-              let targetEntity =
-                match target with
-                | SystemCommunications.TargetEntity te -> Some te
-                | _ -> None
-
-              match targetEntity with
-              | Some targetId ->
-                let projectileId = Guid.NewGuid() |> UMX.tag<EntityId>
-
-                let liveProjectile: Projectile.LiveProjectile = {
-                  Caster = casterId
-                  Target = targetId
-                  SkillId = skillId
-                  Info = projectileInfo
-                }
-
-                eventBus.Publish(
-                  StateChangeEvent.CreateProjectile
-                    struct (projectileId, liveProjectile, ValueNone)
-                )
-              | None -> ()
+          handleProjectileDelivery
+            ctx
+            casterId
+            skillId
+            target
+            activeSkill
+            projectileInfo
         | Delivery.Instant ->
-
-          let targetCenter =
-            match target with
-            | SystemCommunications.TargetEntity targetId ->
-              positions.TryFindV targetId
-            | SystemCommunications.TargetPosition pos -> ValueSome pos
-            // Default the center to the caster
-            // allow the area to decide its own center based on the direction
-            | SystemCommunications.TargetDirection _
-            | SystemCommunications.TargetSelf -> positions.TryFindV casterId
-
-          match targetCenter with
-          | ValueNone -> () // No center to apply AoE
-          | ValueSome center ->
-            let targets =
-              match activeSkill.Area with
-              | Point ->
-                match target with
-                | SystemCommunications.TargetSelf -> IndexList.single casterId
-                | SystemCommunications.TargetEntity targetId ->
-                  IndexList.single targetId
-                | SystemCommunications.TargetPosition _ -> IndexList.empty // Can't target entities with a point on the ground
-                | SystemCommunications.TargetDirection _ -> IndexList.empty // Can't target entities with a direction
-              | Circle(radius, maxTargets) ->
-                let origin, effectiveRadius =
-                  match target with
-                  | SystemCommunications.TargetDirection pos ->
-                    // Origin is caster. Radius is distance to cursor, clamped by skill radius.
-                    let casterPos =
-                      positions
-                      |> HashMap.tryFindV casterId
-                      |> ValueOption.defaultValue center
-
-                    let dist = Vector2.Distance(casterPos, pos)
-                    let r = Math.Min(dist, radius)
-                    casterPos, r
-                  | _ -> center, radius
-
-                Spatial.Search.findTargetsInCircle
-                  searchCtx
-                  {
-                      CasterId = casterId
-                      Circle = {
-                          Center = origin
-                          Radius = effectiveRadius
-                      }
-                      MaxTargets = maxTargets
-                  }
-              | Cone(angle, length, maxTargets) ->
-                let origin, direction =
-                  match target with
-                  | SystemCommunications.TargetDirection pos ->
-                    // Origin is caster, direction is towards target position
-                    let casterPos =
-                      positions
-                      |> HashMap.tryFindV casterId
-                      |> ValueOption.defaultValue center
-
-                    let offset = pos - casterPos
-
-                    let dir =
-                      if offset = Vector2.Zero then
-                        Vector2.UnitX
-                      else
-                        Vector2.Normalize(offset)
-
-                    casterPos, dir
-
-                  | SystemCommunications.TargetPosition pos ->
-                    // Origin is the target position. Direction is from caster to position.
-                    let casterPos =
-                      positions
-                      |> HashMap.tryFindV casterId
-                      |> ValueOption.defaultValue center
-
-                    let offset = pos - casterPos
-
-                    let dir =
-                      if offset = Vector2.Zero then
-                        Vector2.UnitX
-                      else
-                        Vector2.Normalize(offset)
-
-                    pos, dir
-
-                  | SystemCommunications.TargetEntity targetId ->
-                    // Origin is target entity.
-                    // Direction is from caster to target entity ("shatter")
-                    let casterPos =
-                      positions
-                      |> HashMap.tryFindV casterId
-                      |> ValueOption.defaultValue center
-
-                    let targetPos =
-                      positions
-                      |> HashMap.tryFindV targetId
-                      |> ValueOption.defaultValue center
-
-                    let offset = targetPos - casterPos
-
-                    let dir =
-                      if offset = Vector2.Zero then
-                        Vector2.UnitX
-                      else
-                        Vector2.Normalize(offset)
-
-                    targetPos, dir
-
-                  | _ -> center, Vector2.UnitX
-
-                Spatial.Search.findTargetsInCone
-                  searchCtx
-                  {
-                      CasterId = casterId
-                      Cone = {
-                          Origin = origin
-                          Direction = direction
-                          AngleDegrees = angle
-                          Length = length
-                      }
-                      MaxTargets = maxTargets
-                  }
-              | Line(width, length, maxTargets) ->
-                let start, endPoint =
-                  match target with
-                  | SystemCommunications.TargetDirection pos ->
-                    // Start at caster, end at caster + direction * length
-                    let casterPos =
-                      positions
-                      |> HashMap.tryFindV casterId
-                      |> ValueOption.defaultValue center
-
-                    let offset = pos - casterPos
-
-                    let dir =
-                      if offset = Vector2.Zero then
-                        Vector2.UnitX
-                      else
-                        Vector2.Normalize(offset)
-
-                    casterPos, casterPos + dir * length
-
-                  | SystemCommunications.TargetPosition pos ->
-                    // Start at caster. End at position, clamped by length.
-                    let casterPos =
-                      positions
-                      |> HashMap.tryFindV casterId
-                      |> ValueOption.defaultValue center
-
-                    let offset = pos - casterPos
-                    let dist = offset.Length()
-
-                    let dir =
-                      if dist > 0.0f then
-                        Vector2.Normalize(offset)
-                      else
-                        Vector2.UnitX
-
-                    let actualLength = Math.Min(dist, length)
-                    casterPos, casterPos + dir * actualLength
-
-                  | SystemCommunications.TargetEntity targetId ->
-                    // Start at target entity.
-                    // Direction from caster to target entity.
-                    let casterPos =
-                      positions
-                      |> HashMap.tryFindV casterId
-                      |> ValueOption.defaultValue center
-
-                    let targetPos =
-                      positions
-                      |> HashMap.tryFindV targetId
-                      |> ValueOption.defaultValue center
-
-                    let offset = targetPos - casterPos
-
-                    let dir =
-                      if offset = Vector2.Zero then
-                        Vector2.UnitX
-                      else
-                        Vector2.Normalize(offset)
-
-                    targetPos, targetPos + dir * length
-
-                  | _ -> center, center + Vector2.UnitX * length
-
-                Spatial.Search.findTargetsInLine
-                  searchCtx
-                  {
-                      CasterId = casterId
-                      Line = {
-                          Start = start
-                          End = endPoint
-                          Width = width
-                      }
-                      MaxTargets = maxTargets
-                  }
-              | MultiPoint _ ->
-                // This is for spawning multiple projectiles, which is handled in AbilityActivation.
-                // If an instant skill has this, it's probably a bug in the skill definition.
-                IndexList.empty
-              | AdaptiveCone _ -> IndexList.empty
-
-            for targetId in targets do
-              applyInstantaneousSkillEffects
-                world
-                eventBus
-                derivedStats
-                positions
-                casterId
-                targetId
-                activeSkill
+          handleInstantDelivery ctx casterId target activeSkill
       | _ -> ()
 
     let handleProjectileImpact
-      (
-        world: World,
-        eventBus: EventBus,
-        derivedStats: amap<Guid<EntityId>, Entity.DerivedStats>,
-        positions: amap<Guid<EntityId>, Vector2>,
-        skillStore: Stores.SkillStore,
-        searchCtx: Spatial.Search.SearchContext
-      )
+      (ctx: CombatContext)
       (impact: SystemCommunications.ProjectileImpacted)
       =
-      let positions = positions |> AMap.force
-      let derivedStats = derivedStats |> AMap.force
-
-      match skillStore.tryFind impact.SkillId with
+      match ctx.SkillStore.tryFind impact.SkillId with
       | ValueSome(Active skill) ->
-        let impactPosition = positions.TryFindV impact.TargetId
+        let impactPosition = ctx.Positions.TryFindV impact.TargetId
 
         match impactPosition with
         | ValueNone -> () // Impacted entity has no position, should not happen
@@ -648,76 +624,59 @@ module Combat =
             match skill.Area with
             | Point -> IndexList.single impact.TargetId
             | Circle(radius, maxTargets) ->
-
-              Spatial.Search.findTargetsInCircle
-                searchCtx
-                {
-                    CasterId = impact.CasterId
-                    Circle = {
-                        Center = center
-                        Radius = radius
-                    }
-                    MaxTargets = maxTargets
-                }
+              Spatial.Search.findTargetsInCircle ctx.SearchContext {
+                CasterId = impact.CasterId
+                Circle = { Center = center; Radius = radius }
+                MaxTargets = maxTargets
+              }
             | Cone(angle, length, maxTargets) ->
               // For projectile impact, direction is from caster to impact point
-              let casterPos =
-                positions
-                |> HashMap.tryFindV impact.CasterId
-                |> ValueOption.defaultValue center
-
+              let casterPos = Targeting.getPosition ctx impact.CasterId
               let direction = Vector2.Normalize(center - casterPos)
 
-              Spatial.Search.findTargetsInCone
-                searchCtx
-                {
-                    CasterId = impact.CasterId
-                    Cone = {
-                        Origin = center
-                        Direction = direction
-                        AngleDegrees = angle
-                        Length = length
-                    }
-                    MaxTargets = maxTargets
+              Spatial.Search.findTargetsInCone ctx.SearchContext {
+                CasterId = impact.CasterId
+                Cone = {
+                  Origin = center
+                  Direction = direction
+                  AngleDegrees = angle
+                  Length = length
                 }
+                MaxTargets = maxTargets
+              }
             | Line(width, length, maxTargets) ->
               // For projectile impact, line is along the trajectory
-              let casterPos =
-                positions
-                |> HashMap.tryFindV impact.CasterId
-                |> ValueOption.defaultValue center
-
+              let casterPos = Targeting.getPosition ctx impact.CasterId
               let direction = Vector2.Normalize(center - casterPos)
               let endPoint = center + direction * length
 
-              Spatial.Search.findTargetsInLine
-                searchCtx
-                {
-                    CasterId = impact.CasterId
-                    Line = {
-                        Start = center
-                        End = endPoint
-                        Width = width
-                    }
-                    MaxTargets = maxTargets
+              Spatial.Search.findTargetsInLine ctx.SearchContext {
+                CasterId = impact.CasterId
+                Line = {
+                  Start = center
+                  End = endPoint
+                  Width = width
                 }
+                MaxTargets = maxTargets
+              }
             | MultiPoint _ ->
               // This shouldn't happen. MultiPoint is for firing multiple projectiles,
               // not for the area of a single projectile impact.
               IndexList.single impact.TargetId
-            | AdaptiveCone _ -> IndexList.single impact.TargetId
+            | AdaptiveCone _ ->
+              // This shouldn't happen. AdaptiveCone is gets calculated from selected targets/positions
+              // then generates projectiles for each target/position. impacts should just deal damage to the
+              // target/position. not creating new cones/projectiles.
+              IndexList.single impact.TargetId
 
           for targetId in targets do
             let result =
-              applySkillDamage world derivedStats impact.CasterId targetId skill
+              Execution.applySkillDamage ctx impact.CasterId targetId skill
 
-            let targetPos =
-              positions
-              |> HashMap.tryFindV targetId
-              |> ValueOption.defaultValue Vector2.Zero
+            let targetPos = Targeting.getPosition ctx targetId
 
             if result.IsEvaded then
-              eventBus.Publish(
+              ctx.EventBus.Publish(
                 {
                   Message = "Miss"
                   Position = targetPos
@@ -725,7 +684,7 @@ module Combat =
                 : SystemCommunications.ShowNotification
               )
             else
-              eventBus.Publish(
+              ctx.EventBus.Publish(
                 {
                   Target = targetId
                   Amount = result.Amount
@@ -742,7 +701,7 @@ module Combat =
 
               let finalMessage = baseMessage + debugText
 
-              eventBus.Publish(
+              ctx.EventBus.Publish(
                 {
                   Message = finalMessage
                   Position = targetPos
@@ -751,7 +710,7 @@ module Combat =
               )
 
               if result.IsCritical then
-                eventBus.Publish(
+                ctx.EventBus.Publish(
                   {
                     Message = "Crit!"
                     Position = targetPos
@@ -760,7 +719,7 @@ module Combat =
                 )
 
               for effect in skill.Effects do
-                eventBus.Publish(
+                ctx.EventBus.Publish(
                   {
                     SourceEntity = impact.CasterId
                     TargetEntity = targetId
@@ -770,35 +729,12 @@ module Combat =
                 )
       | _ -> () // Skill not found
 
-    let inline handleAbilityIntentEvent
-      (
-        world: World,
-        eventBus: EventBus,
-        derivedStats: amap<Guid<EntityId>, Entity.DerivedStats>,
-        positions: amap<Guid<EntityId>, Vector2>,
-        skillStore: Stores.SkillStore,
-        searchCtx: Spatial.Search.SearchContext
-      )
-      (event: SystemCommunications.AbilityIntent)
-      =
-      handleAbilityIntent
-        world
-        eventBus
-        searchCtx
-        derivedStats
-        positions
-        skillStore
-        event.Caster
-        event.SkillId
-        event.Target
-
 
   type CombatSystem(game: Game, mapKey: string) as this =
     inherit GameSystem(game)
 
     let eventBus = this.EventBus
     let skillStore = this.Game.Services.GetService<Stores.SkillStore>()
-
     let subscriptions = new CompositeDisposable()
 
     override this.Initialize() =
@@ -808,48 +744,45 @@ module Combat =
       let getNearbyEntities = this.Projections.GetNearbyEntities
       let mapStore = this.Game.Services.GetService<Stores.MapStore>()
       let mapDef = mapStore.find mapKey
-      
+
       let searchCtx: Spatial.Search.SearchContext = {
         MapDef = mapDef
         GetNearbyEntities = getNearbyEntities
       }
 
+      // make it inline to be sure the AMap forcing
+      // is done in the subscription callbacks
+      let inline createCtx() = {
+        World = this.World
+        EventBus = eventBus
+        SearchContext = searchCtx
+        DerivedStats = derivedStats |> AMap.force
+        Positions = positions |> AMap.force
+        SkillStore = skillStore
+      }
+
       eventBus.GetObservableFor<SystemCommunications.AbilityIntent>()
-      |> Observable.subscribe(
-        Handlers.handleAbilityIntentEvent(
-          this.World,
-          eventBus,
-          derivedStats,
-          positions,
-          skillStore,
-          searchCtx
-        )
-      )
+      |> Observable.subscribe(fun event ->
+        Handlers.handleAbilityIntent
+          (createCtx())
+          event.Caster
+          event.SkillId
+          event.Target)
       |> subscriptions.Add
 
       eventBus.GetObservableFor<SystemCommunications.ProjectileImpacted>()
-      |> Observable.subscribe(
-        Handlers.handleProjectileImpact(
-          this.World,
-          eventBus,
-          derivedStats,
-          positions,
-          skillStore,
-          searchCtx
-        )
-      )
+      |> Observable.subscribe(fun event ->
+        Handlers.handleProjectileImpact (createCtx()) event)
       |> subscriptions.Add
 
       eventBus.GetObservableFor<SystemCommunications.EffectDamageIntent>()
-      |> Observable.subscribe(
-        Handlers.handleEffectDamageIntent derivedStats positions eventBus
-      )
+      |> Observable.subscribe(fun event ->
+        Handlers.handleEffectDamageIntent (createCtx()) event)
       |> subscriptions.Add
 
       eventBus.GetObservableFor<SystemCommunications.EffectResourceIntent>()
-      |> Observable.subscribe(
-        Handlers.handleEffectResourceIntent derivedStats eventBus
-      )
+      |> Observable.subscribe(fun event ->
+        Handlers.handleEffectResourceIntent (createCtx()) event)
       |> subscriptions.Add
 
     override _.Dispose disposing =
@@ -859,5 +792,4 @@ module Combat =
       base.Dispose disposing
 
     override _.Kind = Combat
-
     override _.Update gameTime = base.Update gameTime
