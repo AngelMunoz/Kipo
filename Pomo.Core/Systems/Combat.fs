@@ -433,10 +433,13 @@ module Combat =
 
           let targetCenter =
             match target with
-            | SystemCommunications.TargetSelf -> positions.TryFindV casterId
             | SystemCommunications.TargetEntity targetId ->
               positions.TryFindV targetId
             | SystemCommunications.TargetPosition pos -> ValueSome pos
+            // Default the center to the caster
+            // allow the area to decide its own center based on the direction
+            | SystemCommunications.TargetDirection _
+            | SystemCommunications.TargetSelf -> positions.TryFindV casterId
 
           match targetCenter with
           | ValueNone -> () // No center to apply AoE
@@ -449,33 +452,74 @@ module Combat =
                 | SystemCommunications.TargetEntity targetId ->
                   IndexList.single targetId
                 | SystemCommunications.TargetPosition _ -> IndexList.empty // Can't target entities with a point on the ground
+                | SystemCommunications.TargetDirection _ -> IndexList.empty // Can't target entities with a direction
               | Circle(radius, maxTargets) ->
+                let origin, effectiveRadius =
+                  match target with
+                  | SystemCommunications.TargetDirection pos ->
+                    // Origin is caster. Radius is distance to cursor, clamped by skill radius.
+                    let casterPos =
+                      positions
+                      |> HashMap.tryFindV casterId
+                      |> ValueOption.defaultValue center
+
+                    let dist = Vector2.Distance(casterPos, pos)
+                    let r = Math.Min(dist, radius)
+                    casterPos, r
+                  | _ -> center, radius
 
                 AreaOfEffect.findTargetsInCircle
                   mapDef
                   getNearbyEntities
                   casterId
-                  center
-                  radius
+                  origin
+                  effectiveRadius
                   maxTargets
               | Cone(angle, length, maxTargets) ->
-                let casterPos =
-                  positions
-                  |> HashMap.tryFindV casterId
-                  |> ValueOption.defaultValue center
-
-                let direction =
+                let origin, direction =
                   match target with
-                  | SystemCommunications.TargetPosition pos ->
-                    // For position targeting, direction is from caster to target position
+                  | SystemCommunications.TargetDirection pos ->
+                    // Origin is caster, direction is towards target position
+                    let casterPos =
+                      positions
+                      |> HashMap.tryFindV casterId
+                      |> ValueOption.defaultValue center
+
                     let offset = pos - casterPos
 
-                    if offset = Vector2.Zero then
-                      Vector2.UnitX // Default direction when target is same as caster
-                    else
-                      Vector2.Normalize(offset)
+                    let dir =
+                      if offset = Vector2.Zero then
+                        Vector2.UnitX
+                      else
+                        Vector2.Normalize(offset)
+
+                    casterPos, dir
+
+                  | SystemCommunications.TargetPosition pos ->
+                    // Origin is the target position. Direction is from caster to position.
+                    let casterPos =
+                      positions
+                      |> HashMap.tryFindV casterId
+                      |> ValueOption.defaultValue center
+
+                    let offset = pos - casterPos
+
+                    let dir =
+                      if offset = Vector2.Zero then
+                        Vector2.UnitX
+                      else
+                        Vector2.Normalize(offset)
+
+                    pos, dir
+
                   | SystemCommunications.TargetEntity targetId ->
-                    // For entity targeting, direction is from caster to target entity
+                    // Origin is target entity.
+                    // Direction is from caster to target entity ("shatter")
+                    let casterPos =
+                      positions
+                      |> HashMap.tryFindV casterId
+                      |> ValueOption.defaultValue center
+
                     let targetPos =
                       positions
                       |> HashMap.tryFindV targetId
@@ -483,40 +527,72 @@ module Combat =
 
                     let offset = targetPos - casterPos
 
-                    if offset = Vector2.Zero then
-                      Vector2.UnitX // Default direction when target is same as caster
-                    else
-                      Vector2.Normalize(offset)
-                  | _ -> Vector2.UnitX // Default direction if self-targeted?
+                    let dir =
+                      if offset = Vector2.Zero then
+                        Vector2.UnitX
+                      else
+                        Vector2.Normalize(offset)
+
+                    targetPos, dir
+
+                  | _ -> center, Vector2.UnitX
 
                 AreaOfEffect.findTargetsInCone
                   mapDef
                   getNearbyEntities
                   casterId
-                  casterPos
+                  origin
                   direction
                   angle
                   length
                   maxTargets
               | Line(width, length, maxTargets) ->
-                let casterPos =
-                  positions
-                  |> HashMap.tryFindV casterId
-                  |> ValueOption.defaultValue center
-
-                let endPoint =
+                let start, endPoint =
                   match target with
-                  | SystemCommunications.TargetPosition pos ->
-                    // For position targeting, direction is from caster to target position
+                  | SystemCommunications.TargetDirection pos ->
+                    // Start at caster, end at caster + direction * length
+                    let casterPos =
+                      positions
+                      |> HashMap.tryFindV casterId
+                      |> ValueOption.defaultValue center
+
                     let offset = pos - casterPos
 
-                    if offset = Vector2.Zero then
-                      casterPos + Vector2.UnitX * length // Default direction when target is same as caster
-                    else
-                      let direction = Vector2.Normalize(offset)
-                      casterPos + direction * length
+                    let dir =
+                      if offset = Vector2.Zero then
+                        Vector2.UnitX
+                      else
+                        Vector2.Normalize(offset)
+
+                    casterPos, casterPos + dir * length
+
+                  | SystemCommunications.TargetPosition pos ->
+                    // Start at caster. End at position, clamped by length.
+                    let casterPos =
+                      positions
+                      |> HashMap.tryFindV casterId
+                      |> ValueOption.defaultValue center
+
+                    let offset = pos - casterPos
+                    let dist = offset.Length()
+
+                    let dir =
+                      if dist > 0.0f then
+                        Vector2.Normalize(offset)
+                      else
+                        Vector2.UnitX
+
+                    let actualLength = Math.Min(dist, length)
+                    casterPos, casterPos + dir * actualLength
+
                   | SystemCommunications.TargetEntity targetId ->
-                    // For entity targeting, direction is from caster to target entity
+                    // Start at target entity.
+                    // Direction from caster to target entity.
+                    let casterPos =
+                      positions
+                      |> HashMap.tryFindV casterId
+                      |> ValueOption.defaultValue center
+
                     let targetPos =
                       positions
                       |> HashMap.tryFindV targetId
@@ -524,18 +600,21 @@ module Combat =
 
                     let offset = targetPos - casterPos
 
-                    if offset = Vector2.Zero then
-                      casterPos + Vector2.UnitX * length // Default direction when target is same as caster
-                    else
-                      let direction = Vector2.Normalize(offset)
-                      casterPos + direction * length
-                  | _ -> casterPos + Vector2.UnitX * length
+                    let dir =
+                      if offset = Vector2.Zero then
+                        Vector2.UnitX
+                      else
+                        Vector2.Normalize(offset)
+
+                    targetPos, targetPos + dir * length
+
+                  | _ -> center, center + Vector2.UnitX * length
 
                 AreaOfEffect.findTargetsInLine
                   mapDef
                   getNearbyEntities
                   casterId
-                  casterPos
+                  start
                   endPoint
                   width
                   maxTargets

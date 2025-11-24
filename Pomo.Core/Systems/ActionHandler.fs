@@ -233,6 +233,16 @@ module ActionHandler =
                     }
                     : SystemCommunications.TargetSelected
                   )
+                | ValueSome TargetDirection ->
+                  let selection = SelectedPosition mousePosition
+
+                  eventBus.Publish(
+                    {
+                      Selector = entityId
+                      Selection = selection
+                    }
+                    : SystemCommunications.TargetSelected
+                  )
               | ValueSome _
               | ValueNone -> ())
     }

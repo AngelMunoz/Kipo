@@ -231,7 +231,7 @@
     "DamageSource": "Magical",
     "Cost": { "Type": "MP", "Amount": 10 },
     "Cooldown": 2.0,
-    "Targeting": "TargetPosition",
+    "Targeting": "TargetDirection",
     "Range": [16, 12],
     "Area": {
       "Type": "Cone",
@@ -256,7 +256,7 @@
     "DamageSource": "Magical",
     "Cost": { "Type": "MP", "Amount": 15 },
     "Cooldown": 3.0,
-    "Targeting": "TargetPosition",
+    "Targeting": "TargetDirection",
     "Range": [16, 20],
     "Area": {
       "Type": "Line",

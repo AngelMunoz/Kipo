@@ -58,6 +58,7 @@ module SystemCommunications =
     | TargetSelf
     | TargetEntity of entity: Guid<EntityId>
     | TargetPosition of position: Vector2
+    | TargetDirection of position: Vector2
 
   [<Struct>]
   type AbilityIntent = {

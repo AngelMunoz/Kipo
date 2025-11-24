@@ -156,6 +156,7 @@ module Skill =
     | Self
     | TargetEntity
     | TargetPosition
+    | TargetDirection
 
   [<Struct>]
   type SkillArea =
@@ -789,6 +790,7 @@ module Skill =
           | "self" -> return Self
           | "targetentity" -> return TargetEntity
           | "targetposition" -> return TargetPosition
+          | "targetdirection" -> return TargetDirection
           | _ ->
             return!
               DecodeError.ofError(

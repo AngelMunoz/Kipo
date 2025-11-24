@@ -580,6 +580,7 @@ module DebugRender =
           let targetPos =
             match intent.Target with
             | SystemCommunications.TargetPosition pos -> pos
+            | SystemCommunications.TargetDirection pos -> pos
             | SystemCommunications.TargetEntity id ->
               projections.UpdatedPositions
               |> AMap.tryFind id

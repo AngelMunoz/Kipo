@@ -138,6 +138,29 @@ module Targeting =
             : SystemCommunications.AbilityIntent
           )
 
+    let handleTargetDirection
+      (eventBus: EventBus)
+      (positions: HashMap<Guid<EntityId>, Vector2>)
+      (skill: ActiveSkill)
+      (casterId: Guid<EntityId>)
+      (targetPos: Vector2)
+      =
+
+      match positions.TryFindV casterId with
+      | ValueNone -> () // Caster position not found, do nothing.
+      | ValueSome casterPos ->
+        // For TargetDirection, we don't check range for movement,
+        // as the skill originates from the caster.
+        // We just fire the intent immediately.
+        eventBus.Publish(
+          {
+            Caster = casterId
+            SkillId = skill.Id
+            Target = SystemCommunications.TargetDirection targetPos
+          }
+          : SystemCommunications.AbilityIntent
+        )
+
     let handleTargetPosition
       (eventBus: EventBus)
       (positions: HashMap<Guid<EntityId>, Vector2>)
@@ -218,6 +241,13 @@ module Targeting =
               targetId
           | TargetPosition, SelectedPosition targetPos ->
             TargetingHandlers.handleTargetPosition
+              eventBus
+              positions
+              activeSkill
+              casterId
+              targetPos
+          | TargetDirection, SelectedPosition targetPos ->
+            TargetingHandlers.handleTargetDirection
               eventBus
               positions
               activeSkill
