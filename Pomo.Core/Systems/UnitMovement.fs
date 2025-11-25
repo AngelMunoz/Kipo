@@ -9,6 +9,8 @@ open Pomo.Core.Domain.World
 open Pomo.Core.Domain.Events
 open Pomo.Core.Systems.Systems
 open Pomo.Core.Domain.Core // For Constants.AI.WaypointReachedThreshold
+open Pomo.Core.Algorithms
+open Pomo.Core.Systems
 
 module UnitMovement =
 
@@ -90,82 +92,70 @@ module UnitMovement =
 
       // We iterate over all entities that have a movement state
       for entityId, state in movementStates do
-        match state with
-        | MovingAlongPath path ->
-          currentPaths[entityId] <- path // Update local path state
+        match positions.TryFindV entityId with
+        | ValueSome currentPos ->
+          let speed =
+            match derivedStats.TryFindV entityId with
+            | ValueSome stats -> float32 stats.MS
+            | ValueNone -> 100.0f // Default speed if no stats
 
-          match path with
-          | [] -> // Path finished
-            this.EventBus.Publish(
-              Physics(VelocityChanged struct (entityId, Vector2.Zero))
-            )
+          match state with
+          | MovingAlongPath path ->
+            currentPaths[entityId] <- path // Update local path state
 
-            this.EventBus.Publish(
-              Physics(MovementStateChanged struct (entityId, Idle))
-            )
+            match
+              MovementLogic.handleMovingAlongPath
+                currentPos
+                path
+                speed
+                (match frameCollisions.TryGetValue entityId with
+                 | true, mtv -> mtv
+                 | false, _ -> Vector2.Zero)
+            with
+            | MovementLogic.Arrived ->
+              // Path finished
+              this.EventBus.Publish(
+                Physics(VelocityChanged struct (entityId, Vector2.Zero))
+              )
 
-            lastVelocities[entityId] <- Vector2.Zero
-            currentPaths.Remove(entityId) |> ignore
-          | currentWaypoint :: remainingWaypoints ->
-            match positions.TryFindV entityId with
-            | ValueSome currentPos ->
-              let speed =
-                match derivedStats.TryFindV entityId with
-                | ValueSome stats -> float32 stats.MS
-                | ValueNone -> 100.0f // Default speed if no stats
+              this.EventBus.Publish(
+                Physics(MovementStateChanged struct (entityId, Idle))
+              )
 
-              let distance = Vector2.Distance(currentPos, currentWaypoint)
-              let threshold = Constants.AI.WaypointReachedThreshold
-
-              if distance < threshold then
-                // Waypoint reached, move to next
-                this.EventBus.Publish(
-                  Physics(
-                    MovementStateChanged
-                      struct (entityId, MovingAlongPath remainingWaypoints)
-                  )
+              lastVelocities[entityId] <- Vector2.Zero
+              currentPaths.Remove(entityId) |> ignore
+            | MovementLogic.WaypointReached remainingWaypoints ->
+              // Waypoint reached, move to next
+              this.EventBus.Publish(
+                Physics(
+                  MovementStateChanged
+                    struct (entityId, MovingAlongPath remainingWaypoints)
                 )
-              else
-                // Move towards current waypoint
-                let direction = Vector2.Normalize(currentWaypoint - currentPos)
-                let velocity = direction * speed
+              )
+            | MovementLogic.Moving finalVelocity ->
+              let lastVel =
+                match lastVelocities.TryGetValue entityId with
+                | true, v -> v
+                | false, _ -> Vector2.Zero
 
-                // Apply collision sliding
-                let finalVelocity =
-                  match frameCollisions.TryGetValue entityId with
-                  | true, mtv when mtv <> Vector2.Zero ->
-                    let normal = Vector2.Normalize(mtv)
+              if finalVelocity <> lastVel then
+                this.EventBus.Publish(
+                  Physics(VelocityChanged struct (entityId, finalVelocity))
+                )
 
-                    if Vector2.Dot(velocity, normal) < 0.0f then
-                      velocity - normal * Vector2.Dot(velocity, normal)
-                    else
-                      velocity
-                  | _ -> velocity
+              lastVelocities[entityId] <- finalVelocity
 
-                let lastVel =
-                  match lastVelocities.TryGetValue entityId with
-                  | true, v -> v
-                  | false, _ -> Vector2.Zero
-
-                if finalVelocity <> lastVel then
-                  this.EventBus.Publish(
-                    Physics(VelocityChanged struct (entityId, finalVelocity))
-                  )
-
-                  lastVelocities[entityId] <- finalVelocity
-            | ValueNone -> () // No position, can't move
-        | MovingTo target ->
-          match positions.TryFindV entityId with
-          | ValueSome currentPos ->
-            let speed =
-              match derivedStats.TryFindV entityId with
-              | ValueSome stats -> float32 stats.MS
-              | ValueNone -> 100.0f // Default speed if no stats
-
-            let distance = Vector2.Distance(currentPos, target)
-            let threshold = 2.0f
-
-            if distance < threshold then
+          | MovingTo target ->
+            match
+              MovementLogic.handleMovingTo
+                currentPos
+                target
+                speed
+                (match frameCollisions.TryGetValue entityId with
+                 | true, mtv -> mtv
+                 | false, _ -> Vector2.Zero)
+            with
+            | MovementLogic.Arrived ->
               // Arrived
               this.EventBus.Publish(
                 Physics(VelocityChanged struct (entityId, Vector2.Zero))
@@ -177,23 +167,7 @@ module UnitMovement =
 
               lastVelocities[entityId] <- Vector2.Zero
               currentPaths.Remove(entityId) |> ignore // Clear any residual path
-            else
-              // Move towards target
-              let direction = Vector2.Normalize(target - currentPos)
-              let velocity = direction * speed
-
-              // Apply collision sliding
-              let finalVelocity =
-                match frameCollisions.TryGetValue entityId with
-                | true, mtv when mtv <> Vector2.Zero ->
-                  let normal = Vector2.Normalize(mtv)
-
-                  if Vector2.Dot(velocity, normal) < 0.0f then
-                    velocity - normal * Vector2.Dot(velocity, normal)
-                  else
-                    velocity
-                | _ -> velocity
-
+            | MovementLogic.Moving finalVelocity ->
               let lastVel =
                 match lastVelocities.TryGetValue entityId with
                 | true, v -> v
@@ -204,14 +178,22 @@ module UnitMovement =
                   Physics(VelocityChanged struct (entityId, finalVelocity))
                 )
 
-                lastVelocities[entityId] <- finalVelocity
-          | _ -> () // No position, can't move
-        | Idle ->
-          // Ensure velocity is zero if idle (and we were previously moving)
-          if
-            lastVelocities.ContainsKey entityId
-            && lastVelocities[entityId] <> Vector2.Zero
-          then
+              lastVelocities[entityId] <- finalVelocity
+            | _ -> () // Should not happen for MovingTo
+          | Idle ->
+            // Ensure velocity is zero if idle (and we were previously moving)
+            if
+              lastVelocities.ContainsKey entityId
+              && lastVelocities[entityId] <> Vector2.Zero
+            then
+              this.EventBus.Publish(
+                Physics(VelocityChanged struct (entityId, Vector2.Zero))
+              )
+
+              lastVelocities[entityId] <- Vector2.Zero
+
+            currentPaths.Remove(entityId) |> ignore // Clear any residual path
+
             this.EventBus.Publish(
               Physics(VelocityChanged struct (entityId, Vector2.Zero))
             )
@@ -219,3 +201,4 @@ module UnitMovement =
             lastVelocities[entityId] <- Vector2.Zero
 
           currentPaths.Remove(entityId) |> ignore // Clear any residual path
+        | ValueNone -> ()

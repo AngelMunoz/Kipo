@@ -17,6 +17,8 @@
     <Compile Include="Domain/AI.fs" />
     <Compile Include="Domain/Events.fs" />
     <Compile Include="Algorithms/Pathfinding.fs" />
+    <Compile Include="Algorithms/Physics.fs" />
+    <Compile Include="Systems/MovementLogic.fs" />
     <Compile Include="Domain/World.fs" />
     <Compile Include="EventBus.fs" />
     <Compile Include="Serialization.fs" />

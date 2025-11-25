@@ -9,7 +9,10 @@ open Pomo.Core.Domain.Units
 open Pomo.Core.Domain.World
 open Pomo.Core.Domain.Events
 open Pomo.Core.Domain.Action
+open Pomo.Core.Domain.Action
 open Pomo.Core.Systems.Systems
+open Pomo.Core.Algorithms
+open Pomo.Core.Systems
 
 module PlayerMovement =
 
@@ -138,10 +141,14 @@ module PlayerMovement =
 
         match movementState with
         | Some(MovingTo destination) ->
-          let distance = Vector2.Distance(position, destination)
-          let threshold = 2.0f // Close enough
-
-          if distance < threshold then
+          match
+            MovementLogic.handleMovingTo
+              position
+              destination
+              (float32 movementSpeed)
+              accumulatedMtv
+          with
+          | MovementLogic.Arrived ->
             // We've arrived. Stop moving and return to Idle state.
             this.EventBus.Publish(
               Physics(VelocityChanged struct (playerId, Vector2.Zero))
@@ -150,91 +157,56 @@ module PlayerMovement =
             this.EventBus.Publish(
               Physics(MovementStateChanged struct (playerId, Idle))
             )
-          else
-            // Still moving towards the destination.
-            let direction = Vector2.Normalize(destination - position)
-            let adjustedVelocity = direction * float32 movementSpeed
-
-            // Apply collision sliding
-            let finalVelocity =
-              if accumulatedMtv <> Vector2.Zero then
-                let normal = Vector2.Normalize accumulatedMtv
-                // If moving against the normal (into the wall)
-                if Vector2.Dot(adjustedVelocity, normal) < 0.0f then
-                  // Project velocity onto the tangent (slide)
-                  adjustedVelocity
-                  - normal * Vector2.Dot(adjustedVelocity, normal)
-                else
-                  adjustedVelocity
-              else
-                adjustedVelocity
-
+          | MovementLogic.Moving finalVelocity ->
             if finalVelocity <> lastVelocity then
               this.EventBus.Publish(
                 Physics(VelocityChanged struct (playerId, finalVelocity))
               )
 
             lastVelocity <- finalVelocity
+          | _ -> () // Should not happen for MovingTo
+
         | Some(MovingAlongPath path) ->
-            match path with
-            | [] ->
-              // Path finished
+          match
+            MovementLogic.handleMovingAlongPath
+              position
+              path
+              (float32 movementSpeed)
+              accumulatedMtv
+          with
+          | MovementLogic.Arrived ->
+            // Path finished
+            this.EventBus.Publish(
+              Physics(VelocityChanged struct (playerId, Vector2.Zero))
+            )
+
+            this.EventBus.Publish(
+              Physics(MovementStateChanged struct (playerId, Idle))
+            )
+
+            lastVelocity <- Vector2.Zero
+          | MovementLogic.WaypointReached remainingWaypoints ->
+            // Waypoint reached, move to next
+            this.EventBus.Publish(
+              Physics(
+                MovementStateChanged
+                  struct (playerId, MovingAlongPath remainingWaypoints)
+              )
+            )
+          | MovementLogic.Moving finalVelocity ->
+            if finalVelocity <> lastVelocity then
               this.EventBus.Publish(
-                Physics(VelocityChanged struct (playerId, Vector2.Zero))
+                Physics(VelocityChanged struct (playerId, finalVelocity))
               )
 
-              this.EventBus.Publish(
-                Physics(MovementStateChanged struct (playerId, Idle))
-              )
-              
-              lastVelocity <- Vector2.Zero
-            | currentWaypoint :: remainingWaypoints ->
-               let distance = Vector2.Distance(position, currentWaypoint)
-               let threshold = Pomo.Core.Domain.Core.Constants.AI.WaypointReachedThreshold
-
-               if distance < threshold then
-                 // Waypoint reached, move to next
-                 this.EventBus.Publish(
-                   Physics(
-                     MovementStateChanged
-                       struct (playerId, MovingAlongPath remainingWaypoints)
-                   )
-                 )
-               else
-                 // Move towards current waypoint
-                 let direction = Vector2.Normalize(currentWaypoint - position)
-                 let adjustedVelocity = direction * float32 movementSpeed
-
-                 // Apply collision sliding
-                 let finalVelocity =
-                   if accumulatedMtv <> Vector2.Zero then
-                     let normal = Vector2.Normalize accumulatedMtv
-                     if Vector2.Dot(adjustedVelocity, normal) < 0.0f then
-                       adjustedVelocity - normal * Vector2.Dot(adjustedVelocity, normal)
-                     else
-                       adjustedVelocity
-                   else
-                     adjustedVelocity
-
-                 if finalVelocity <> lastVelocity then
-                   this.EventBus.Publish(
-                     Physics(VelocityChanged struct (playerId, finalVelocity))
-                   )
-
-                 lastVelocity <- finalVelocity
+            lastVelocity <- finalVelocity
 
         | Some Idle ->
           let mutable targetVelocity = currentVelocity
 
           // Apply collision sliding to Input velocity
-          if
-            accumulatedMtv <> Vector2.Zero && targetVelocity <> Vector2.Zero
-          then
-            let normal = Vector2.Normalize(accumulatedMtv)
-
-            if Vector2.Dot(targetVelocity, normal) < 0.0f then
-              targetVelocity <-
-                targetVelocity - normal * Vector2.Dot(targetVelocity, normal)
+          let targetVelocity =
+            Physics.applyCollisionSliding targetVelocity accumulatedMtv
 
           if targetVelocity <> lastVelocity then
             this.EventBus.Publish(
