@@ -43,7 +43,7 @@ module Collision =
       | ValueNone -> IndexList.empty)
 
 
-  type CollisionSystem(game: Game, mapKey: string) as this =
+  type CollisionSystem(game: Game, mapKey: string) =
     inherit GameSystem(game)
 
     let mapStore = game.Services.GetService<MapStore>()
@@ -61,13 +61,14 @@ module Collision =
         |> HashMap.ofSeq
       | ValueNone -> HashMap.empty
 
-    let spatialGrid = this.Projections.SpatialGrid
+
 
     override val Kind = SystemKind.Collision with get
 
     override this.Update _ =
-      let grid = spatialGrid |> AMap.force
-      let positions = this.Projections.UpdatedPositions |> AMap.force
+      let snapshot = this.Projections.ComputeMovementSnapshot()
+      let grid = snapshot.SpatialGrid
+      let positions = snapshot.Positions
       let liveEntities = this.Projections.LiveEntities |> ASet.force
       let getNearbyTo = getNearbyEntities grid
 
