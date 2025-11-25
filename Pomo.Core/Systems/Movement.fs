@@ -19,7 +19,7 @@ module Movement =
     override val Kind = Movement with get
 
     override this.Update _ =
-      let movements = this.Projections.UpdatedPositions |> AMap.force
+      let movements = this.Projections.ComputeMovementSnapshot().Positions
 
       for id, newPosition in movements do
         this.EventBus.Publish(Physics(PositionChanged struct (id, newPosition)))

@@ -193,6 +193,7 @@ module AbilityActivation =
   }
 
   module private Handlers =
+    open Pomo.Core.Projections
 
     let private getPendingCastContext
       (pendingCasts:
@@ -281,7 +282,7 @@ module AbilityActivation =
       World: World
       AbilityActivationContext: AbilityActivationContext
       CombatStatuses: HashMap<Guid<EntityId>, CombatStatus IndexList>
-      Positions: HashMap<Guid<EntityId>, Vector2>
+      Snapshot: unit -> MovementSnapshot
     }
 
     let handleMovementStateChanged
@@ -327,7 +328,7 @@ module AbilityActivation =
 
           handlePendingCast changeCtx.AbilityActivationContext {
             ValidationContext = validationContext
-            Positions = changeCtx.Positions
+            Positions = changeCtx.Snapshot().Positions
             Skill = skill
             Target = target
           }
@@ -352,7 +353,12 @@ module AbilityActivation =
       SearchContext =
         ValueSome {
           GetNearbyEntities =
-            fun v2 ce -> this.Projections.GetNearbyEntities v2 ce |> AList.force
+            fun v2 ce ->
+              this.Projections.GetNearbyEntitiesSnapshot(
+                this.Projections.ComputeMovementSnapshot(),
+                v2,
+                ce
+              )
         }
     }
 
@@ -386,10 +392,7 @@ module AbilityActivation =
 
     let playerCooldowns = this.World.AbilityCooldowns |> AMap.tryFind playerId
 
-    let playerPosition =
-      this.Projections.UpdatedPositions
-      |> AMap.tryFind playerId
-      |> AVal.map(Option.defaultValue Vector2.Zero)
+
 
     override this.Initialize() =
       base.Initialize()
@@ -405,7 +408,7 @@ module AbilityActivation =
             World = this.World
             AbilityActivationContext = activationContext
             CombatStatuses = this.Projections.CombatStatuses |> AMap.force
-            Positions = this.Projections.UpdatedPositions |> AMap.force
+            Snapshot = this.Projections.ComputeMovementSnapshot
           }
           e)
       |> subscriptions.Add
@@ -423,9 +426,13 @@ module AbilityActivation =
       let statuses = playerCombatStatuses |> AVal.force
       let resources = playerResources |> AVal.force
       let cooldowns = playerCooldowns |> AVal.force
+      let snapshot = this.Projections.ComputeMovementSnapshot()
 
       let publishNotification(msg: string) =
-        let casterPos = playerPosition |> AVal.force
+        let casterPos =
+          snapshot.Positions
+          |> HashMap.tryFind playerId
+          |> Option.defaultValue Vector2.Zero
 
         this.EventBus.Publish(
           { Message = msg; Position = casterPos }
