@@ -348,7 +348,7 @@ module Spatial =
 
     type SearchContext = {
       GetNearbyEntities:
-        Vector2 -> float32 -> alist<struct (Guid<EntityId> * Vector2)>
+        Vector2 -> float32 -> IndexList<struct (Guid<EntityId> * Vector2)>
     }
 
     [<Struct>]
@@ -378,7 +378,6 @@ module Spatial =
       =
       let nearby =
         ctx.GetNearbyEntities request.Circle.Center request.Circle.Radius
-        |> AList.force
 
       let targets =
         nearby
@@ -394,9 +393,7 @@ module Spatial =
         targets |> IndexList.take request.MaxTargets
 
     let findTargetsInCone (ctx: SearchContext) (request: ConeSearchRequest) =
-      let nearby =
-        ctx.GetNearbyEntities request.Cone.Origin request.Cone.Length
-        |> AList.force
+      let nearby = ctx.GetNearbyEntities request.Cone.Origin request.Cone.Length
 
       let targets =
         nearby
@@ -417,7 +414,6 @@ module Spatial =
 
       let nearby =
         ctx.GetNearbyEntities request.Line.Start (length + request.Line.Width)
-        |> AList.force
 
       let targets =
         nearby
