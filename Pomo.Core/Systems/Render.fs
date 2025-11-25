@@ -15,6 +15,7 @@ open Pomo.Core.Systems.Targeting
 module Render =
   open Pomo.Core
   open Pomo.Core.Domain.Projectile
+  open Microsoft.Xna.Framework.Input
 
   type DrawCommand =
     | DrawPlayer of rect: Rectangle
@@ -23,17 +24,22 @@ module Render =
     | DrawTargetingIndicator of rect: Rectangle
 
   let private generateEntityCommands
-    (positions: amap<Guid<EntityId>, Vector2>)
-    (projectiles: amap<Guid<EntityId>, LiveProjectile>)
+    (snapshot: Projections.MovementSnapshot)
+    (projectiles: HashMap<Guid<EntityId>, LiveProjectile>)
+    (liveEntities: HashSet<Guid<EntityId>>)
     (playerId: Guid<EntityId>)
     (cameraService: Core.CameraService)
     =
-    positions
-    |> AMap.chooseA(fun entityId pos -> adaptive {
-      let! isProjectile = AMap.keys projectiles |> ASet.contains entityId
+    let positions = snapshot.Positions
+    let projectileKeys = projectiles |> HashMap.keys
 
-      if isProjectile then
-        return None
+    positions
+    |> HashMap.toArrayV
+    |> Array.choose(fun struct (entityId, pos) ->
+      if projectileKeys.Contains entityId then
+        None
+      elif not(liveEntities.Contains entityId) then
+        None
       else
         let size = Core.Constants.Entity.Size
 
@@ -65,32 +71,37 @@ module Render =
                   - float32 camera.Viewport.Height / (2.0f * camera.Zoom)
                   - cullingPadding
                 ),
-                int(float32 camera.Viewport.Width / camera.Zoom + 2.0f * cullingPadding),
-                int(float32 camera.Viewport.Height / camera.Zoom + 2.0f * cullingPadding)
+                int(
+                  float32 camera.Viewport.Width / camera.Zoom
+                  + 2.0f * cullingPadding
+                ),
+                int(
+                  float32 camera.Viewport.Height / camera.Zoom
+                  + 2.0f * cullingPadding
+                )
               )
 
             paddedViewportRect.Intersects entityRect)
 
         if isVisible then
           if entityId = playerId then
-            return Some(DrawPlayer entityRect)
+            Some(DrawPlayer entityRect)
           else
-            return Some(DrawEnemy entityRect)
+            Some(DrawEnemy entityRect)
         else
-          return None
-    })
-    |> AMap.fold (fun acc _ cmd -> IndexList.add cmd acc) IndexList.empty
+          None)
 
   let private generateProjectileCommands
-    (projectiles: amap<Guid<EntityId>, LiveProjectile>)
-    (positions: amap<Guid<EntityId>, Vector2>)
+    (projectiles: HashMap<Guid<EntityId>, LiveProjectile>)
+    (snapshot: Projections.MovementSnapshot)
     =
-    projectiles
-    |> AMap.chooseA(fun projectileId _ -> adaptive {
-      let! posOpt = AMap.tryFind projectileId positions
+    let positions = snapshot.Positions
 
-      match posOpt with
-      | Some pos ->
+    projectiles
+    |> HashMap.keys
+    |> HashSet.chooseV(fun projectileId ->
+      match positions |> HashMap.tryFindV projectileId with
+      | ValueSome pos ->
         let projectileSize = Core.Constants.Projectile.Size
 
         let rect =
@@ -101,86 +112,76 @@ module Render =
             int projectileSize.Y
           )
 
-        return Some(DrawProjectile rect)
-      | None -> return None
-    })
-    |> AMap.fold (fun acc _ cmd -> IndexList.add cmd acc) IndexList.empty
+        ValueSome(DrawProjectile rect)
+      | ValueNone -> ValueNone)
 
   let private generateTargetingIndicatorCommands
-    (world: World.World)
-    (targetingService: TargetingService)
+    (targetingMode: Skill.Targeting voption)
+    (mouseState: MouseState voption)
     (cameraService: Core.CameraService)
     (playerId: Guid<EntityId>)
     =
-    adaptive {
-      let! targetingMode = targetingService.TargetingMode
+    match targetingMode with
+    | ValueSome _ ->
+      match mouseState with
+      | ValueNone -> IndexList.empty
+      | ValueSome mouseState ->
+        let rawPos =
+          Vector2(float32 mouseState.Position.X, float32 mouseState.Position.Y)
 
-      let! mouseState =
-        world.RawInputStates
-        |> AMap.tryFind playerId
-        |> AVal.map(Option.map _.Mouse)
+        let indicatorPosition =
+          match cameraService.ScreenToWorld(rawPos, playerId) with
+          | ValueSome worldPos -> worldPos
+          | ValueNone -> rawPos
 
-      match targetingMode with
-      | ValueSome _ ->
-        match mouseState with
-        | None -> return IndexList.empty
-        | Some mouseState ->
-          let rawPos =
-            Vector2(
-              float32 mouseState.Position.X,
-              float32 mouseState.Position.Y
-            )
+        let indicatorSize = Core.Constants.UI.TargetingIndicatorSize
 
-          let indicatorPosition =
-            match cameraService.ScreenToWorld(rawPos, playerId) with
-            | ValueSome worldPos -> worldPos
-            | ValueNone -> rawPos
+        let rect =
+          Rectangle(
+            int(indicatorPosition.X - indicatorSize.X / 2.0f),
+            int(indicatorPosition.Y - indicatorSize.Y / 2.0f),
+            int indicatorSize.X,
+            int indicatorSize.Y
+          )
 
-          let indicatorSize = Core.Constants.UI.TargetingIndicatorSize
+        IndexList.single(DrawTargetingIndicator rect)
+    | ValueNone -> IndexList.empty
 
-          let rect =
-            Rectangle(
-              int(indicatorPosition.X - indicatorSize.X / 2.0f),
-              int(indicatorPosition.Y - indicatorSize.Y / 2.0f),
-              int indicatorSize.X,
-              int indicatorSize.Y
-            )
+  [<Struct>]
+  type DrawCommandContext = {
+    LiveProjectiles: HashMap<Guid<EntityId>, LiveProjectile>
+    LiveEntities: HashSet<Guid<EntityId>>
+    CameraService: Core.CameraService
+    PlayerId: Guid<EntityId>
+    Snapshot: Projections.MovementSnapshot
+    TargetingMode: Skill.Targeting voption
+    MouseState: MouseState voption
+  }
 
-          return IndexList.single(DrawTargetingIndicator rect)
-      | ValueNone -> return IndexList.empty
+  let generateDrawCommands(context: DrawCommandContext) =
+    let entityCmds =
+      generateEntityCommands
+        context.Snapshot
+        context.LiveProjectiles
+        context.LiveEntities
+        context.PlayerId
+        context.CameraService
+
+    let projectileCmds =
+      generateProjectileCommands context.LiveProjectiles context.Snapshot
+
+    let targetingCmds =
+      generateTargetingIndicatorCommands
+        context.TargetingMode
+        context.MouseState
+        context.CameraService
+        context.PlayerId
+
+    seq {
+      yield! entityCmds
+      yield! projectileCmds
+      yield! targetingCmds
     }
-
-  let generateDrawCommands
-    (world: World.World)
-    (targetingService: TargetingService)
-    (projections: Projections.ProjectionService)
-    (cameraService: Core.CameraService)
-    (playerId: Guid<EntityId>)
-    =
-    adaptive {
-      let! entityCmds =
-        generateEntityCommands
-          projections.UpdatedPositions
-          world.LiveProjectiles
-          playerId
-          cameraService
-
-      and! projectileCmds =
-        generateProjectileCommands
-          world.LiveProjectiles
-          projections.UpdatedPositions
-
-      and! targetingCmds =
-        generateTargetingIndicatorCommands
-          world
-          targetingService
-          cameraService
-          playerId
-
-      return IndexList.concat [ entityCmds; projectileCmds; targetingCmds ]
-    }
-
-
 
   type RenderService =
     abstract Draw: Core.Camera -> unit
@@ -198,17 +199,28 @@ module Render =
     let texture = new Texture2D(game.GraphicsDevice, 1, 1)
     texture.SetData [| Color.White |]
 
-    let drawCommands =
-      generateDrawCommands
-        world
-        targetingService
-        projections
-        cameraService
-        playerId
-
     { new RenderService with
         member _.Draw(camera: Core.Camera) =
-          let commandsToExecute = drawCommands |> AVal.force
+          let snapshot = projections.ComputeMovementSnapshot()
+
+          let mouseState =
+            world.RawInputStates |> AMap.map' _.Mouse |> AMap.force
+
+          let targetingMode = targetingService.TargetingMode |> AVal.force
+          let mouseState = HashMap.tryFindV playerId mouseState
+          let liveProjectiles = world.LiveProjectiles |> AMap.force
+          let liveEntities = projections.LiveEntities |> ASet.force
+
+          let drawCommands =
+            generateDrawCommands {
+              LiveProjectiles = liveProjectiles
+              LiveEntities = liveEntities
+              CameraService = cameraService
+              PlayerId = playerId
+              Snapshot = snapshot
+              TargetingMode = targetingMode
+              MouseState = mouseState
+            }
 
           let transform =
             Matrix.CreateTranslation(
@@ -216,7 +228,7 @@ module Render =
               -camera.Position.Y,
               0.0f
             )
-            * Matrix.CreateScale(camera.Zoom)
+            * Matrix.CreateScale camera.Zoom
             * Matrix.CreateTranslation(
               float32 camera.Viewport.Width / 2.0f,
               float32 camera.Viewport.Height / 2.0f,
@@ -227,7 +239,7 @@ module Render =
 
           spriteBatch.Begin(transformMatrix = transform)
 
-          for command in commandsToExecute do
+          for command in drawCommands do
             match command with
             | DrawPlayer rect -> spriteBatch.Draw(texture, rect, Color.White)
             | DrawEnemy rect -> spriteBatch.Draw(texture, rect, Color.Green)

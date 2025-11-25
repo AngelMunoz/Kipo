@@ -308,6 +308,12 @@ module Projections =
     }
     |> AList.ofAVal
 
+  [<Struct>]
+  type MovementSnapshot = {
+    Positions: HashMap<Guid<EntityId>, Vector2>
+    SpatialGrid: HashMap<GridCell, IndexList<Guid<EntityId>>>
+  }
+
   type ProjectionService =
     abstract UpdatedPositions: amap<Guid<EntityId>, Vector2>
     abstract LiveEntities: aset<Guid<EntityId>>
@@ -324,8 +330,59 @@ module Projections =
     abstract GetNearbyEntities:
       Vector2 -> float32 -> alist<struct (Guid<EntityId> * Vector2)>
 
+    /// Forces the current world state and computes the physics/grid for this frame.
+    abstract ComputeMovementSnapshot: unit -> MovementSnapshot
+
+    /// Helper to query a snapshot (pure function, no longer adaptive)
+    abstract GetNearbyEntitiesSnapshot:
+      MovementSnapshot * Vector2 * float32 ->
+        IndexList<struct (Guid<EntityId> * Vector2)>
+
+
+  let private calculateMovementSnapshot
+    (time: TimeSpan)
+    (velocities: HashMap<Guid<EntityId>, Vector2>)
+    (positions: HashMap<Guid<EntityId>, Vector2>)
+    =
+    let dt = float32 time.TotalSeconds
+    let mutable newPositions = HashMap.empty
+    let mutable newGrid = HashMap.empty
+
+    for (id, startPos) in positions do
+      // Calculate Position
+      let currentPos =
+        match velocities |> HashMap.tryFindV id with
+        | ValueSome v -> startPos + (v * dt)
+        | ValueNone -> startPos
+
+      newPositions <- newPositions |> HashMap.add id currentPos
+
+      // Calculate Grid
+      let cell =
+        Spatial.getGridCell Core.Constants.Collision.GridCellSize currentPos
+
+      // Add to Grid
+      let cellContent =
+        match newGrid |> HashMap.tryFindV cell with
+        | ValueSome list -> list
+        | ValueNone -> IndexList.empty
+
+      newGrid <- newGrid |> HashMap.add cell (cellContent |> IndexList.add id)
+
+    {
+      Positions = newPositions
+      SpatialGrid = newGrid
+    }
 
   let create(itemStore: ItemStore, world: World) =
+    let movementSnapshotNode = adaptive {
+      let! time = world.Time |> AVal.map _.Delta
+      let! velocities = world.Velocities |> AMap.toAVal
+      let! positions = world.Positions |> AMap.toAVal
+
+      return calculateMovementSnapshot time velocities positions
+    }
+
     { new ProjectionService with
         member _.UpdatedPositions = updatedPositions world
         member _.LiveEntities = liveEntities world
@@ -338,4 +395,27 @@ module Projections =
 
         member this.GetNearbyEntities center radius =
           getNearbyEntities this.SpatialGrid this.UpdatedPositions center radius
+
+        member _.ComputeMovementSnapshot() = movementSnapshotNode |> AVal.force
+
+        member _.GetNearbyEntitiesSnapshot(snapshot, center, radius) =
+          let cells =
+            Spatial.getCellsInRadius
+              Core.Constants.Collision.GridCellSize
+              center
+              radius
+
+          let potentialTargets =
+            cells
+            |> IndexList.collect(fun cell ->
+              match snapshot.SpatialGrid |> HashMap.tryFindV cell with
+              | ValueSome list -> list
+              | ValueNone -> IndexList.empty)
+
+          potentialTargets
+          |> IndexList.choose(fun entityId ->
+            match snapshot.Positions |> HashMap.tryFindV entityId with
+            | ValueSome pos when Vector2.Distance(pos, center) <= radius ->
+              Some struct (entityId, pos)
+            | _ -> None)
     }
