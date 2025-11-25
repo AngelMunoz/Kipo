@@ -14,6 +14,9 @@ open Pomo.Core.Domain.World
 open Pomo.Core.Stores
 open Pomo.Core.EventBus
 
+open Pomo.Core.Domain.Spatial
+open Systems
+
 module Perception =
   let inline distance (p1: Vector2) (p2: Vector2) = Vector2.Distance(p1, p2)
 
@@ -32,53 +35,40 @@ module Perception =
     (controllerPos: Vector2)
     (controllerFactions: Faction HashSet)
     (config: PerceptionConfig)
-    (positions: amap<Guid<EntityId>, Vector2>)
-    (factions: amap<Guid<EntityId>, Faction HashSet>)
+    (positions: HashMap<Guid<EntityId>, Vector2>)
+    (factions: HashMap<Guid<EntityId>, Faction HashSet>)
     (currentTick: TimeSpan)
+    (nearbyEntities: IndexList<Guid<EntityId>>)
     =
-    adaptive {
-      let cues =
-        positions
-        |> AMap.chooseA(fun entityId pos -> adaptive {
-          let! factions = factions |> AMap.tryFind entityId
+    nearbyEntities
+    |> IndexList.choose(fun entityId ->
+      match positions |> HashMap.tryFindV entityId with
+      | ValueSome pos ->
+        match factions |> HashMap.tryFindV entityId with
+        | ValueSome targetFactions ->
+          let dist = distance controllerPos pos
 
-          match factions with
-          | Some targetFactions ->
-            let dist = distance controllerPos pos
+          if
+            dist <= config.visualRange
+            && isHostileFaction controllerFactions targetFactions
+          then
+            let strength =
+              if dist < config.visualRange * 0.3f then Overwhelming
+              elif dist < config.visualRange * 0.6f then Strong
+              elif dist < config.visualRange * 0.8f then Moderate
+              else Weak
 
-            if
-              dist <= config.visualRange
-              && isHostileFaction controllerFactions targetFactions
-            then
-              let strength =
-                if dist < config.visualRange * 0.3f then Overwhelming
-                elif dist < config.visualRange * 0.6f then Strong
-                elif dist < config.visualRange * 0.8f then Moderate
-                else Weak
-
-              return
-                Some {
-                  cueType = Visual
-                  strength = strength
-                  sourceEntityId = ValueSome entityId
-                  position = pos
-                  timestamp = currentTick
-                }
-            else
-              return None
-          | _ -> return None
-        })
-
-      let! gatheredCues =
-        cues
-        |> AMap.fold
-          (fun (acc: ResizeArray<_>) _ cue ->
-            acc.Add cue
-            acc)
-          (ResizeArray())
-
-      return gatheredCues.ToArray()
-    }
+            Some {
+              cueType = Visual
+              strength = strength
+              sourceEntityId = ValueSome entityId
+              position = pos
+              timestamp = currentTick
+            }
+          else
+            None
+        | _ -> None
+      | ValueNone -> None)
 
   let decayMemories
     (memories: HashMap<Guid<EntityId>, MemoryEntry>)
@@ -92,75 +82,87 @@ module Perception =
   let gatherCues
     (controller: AIController)
     (archetype: AIArchetype)
-    (world: World)
+    (positions: HashMap<Guid<EntityId>, Vector2>)
+    (factions: HashMap<Guid<EntityId>, Faction HashSet>)
+    (spatialGrid: HashMap<GridCell, IndexList<Guid<EntityId>>>)
     (controllerEntityPos: Vector2)
     (controllerEntityFactions: Faction HashSet)
-    (currentTick: TimeSpan aval)
+    (currentTick: TimeSpan)
     =
-    adaptive {
-      let! currentTick = currentTick
+    let cells =
+      Spatial.getCellsInRadius
+        Constants.Collision.GridCellSize
+        controllerEntityPos
+        archetype.perceptionConfig.visualRange
 
-      let! visualCues =
-        gatherVisualCues
-          controllerEntityPos
-          controllerEntityFactions
-          archetype.perceptionConfig
-          world.Positions
-          world.Factions
-          currentTick
+    let nearbyEntities =
+      cells
+      |> IndexList.collect(fun cell ->
+        match spatialGrid |> HashMap.tryFindV cell with
+        | ValueSome list -> list
+        | ValueNone -> IndexList.empty)
 
-      let decayedMemories =
-        decayMemories
-          controller.memories
-          currentTick
-          archetype.perceptionConfig.memoryDuration
+    let visualCues =
+      gatherVisualCues
+        controllerEntityPos
+        controllerEntityFactions
+        archetype.perceptionConfig
+        positions
+        factions
+        currentTick
+        nearbyEntities
 
-      let updatedMemories =
-        visualCues
-        |> Array.fold
-          (fun (mem: HashMap<Guid<EntityId>, MemoryEntry>) (cue: PerceptionCue) ->
-            match cue.sourceEntityId with
-            | ValueSome entityId ->
-              let confidence =
-                match cue.strength with
-                | Weak -> 0.25f
-                | Moderate -> 0.5f
-                | Strong -> 0.75f
-                | Overwhelming -> 1.0f
+    let decayedMemories =
+      decayMemories
+        controller.memories
+        currentTick
+        archetype.perceptionConfig.memoryDuration
 
-              let entry = {
-                entityId = entityId
-                lastSeenTick = currentTick
-                lastKnownPosition = cue.position
-                confidence = confidence
-              }
+    let updatedMemories =
+      visualCues
+      |> IndexList.fold
+        (fun (mem: HashMap<Guid<EntityId>, MemoryEntry>) (cue: PerceptionCue) ->
+          match cue.sourceEntityId with
+          | ValueSome entityId ->
+            let confidence =
+              match cue.strength with
+              | Weak -> 0.25f
+              | Moderate -> 0.5f
+              | Strong -> 0.75f
+              | Overwhelming -> 1.0f
 
-              mem.Add(entityId, entry)
-            | ValueNone -> mem)
-          decayedMemories
+            let entry = {
+              entityId = entityId
+              lastSeenTick = currentTick
+              lastKnownPosition = cue.position
+              confidence = confidence
+            }
 
-      let memoryCues =
-        updatedMemories
-        |> HashMap.toArray
-        |> Array.map(fun (entityId, memoryEntry) ->
-          let strength =
-            if memoryEntry.confidence >= 1.0f then Overwhelming
-            elif memoryEntry.confidence >= 0.75f then Strong
-            elif memoryEntry.confidence >= 0.5f then Moderate
-            else Weak
+            mem.Add(entityId, entry)
+          | ValueNone -> mem)
+        decayedMemories
 
-          {
-            cueType = Memory
-            strength = strength
-            sourceEntityId = ValueSome entityId
-            position = memoryEntry.lastKnownPosition
-            timestamp = memoryEntry.lastSeenTick
-          })
+    let memoryCues =
+      updatedMemories
+      |> HashMap.map(fun entityId memoryEntry ->
+        let strength =
+          if memoryEntry.confidence >= 1.0f then Overwhelming
+          elif memoryEntry.confidence >= 0.75f then Strong
+          elif memoryEntry.confidence >= 0.5f then Moderate
+          else Weak
 
-      let allCues = Array.concat [ visualCues; memoryCues ]
+        {
+          cueType = Memory
+          strength = strength
+          sourceEntityId = ValueSome entityId
+          position = memoryEntry.lastKnownPosition
+          timestamp = memoryEntry.lastSeenTick
+        })
+      |> HashMap.toValueArray
 
-      return struct (allCues, updatedMemories)
-    }
+    let allCues = Array.concat [ visualCues.AsArray; memoryCues ]
+
+    struct (allCues, updatedMemories)
 
 module Decision =
 
@@ -231,7 +233,7 @@ module AISystemLogic =
       let targetWaypoint = waypoints[currentIdx]
 
       let dist = Vector2.Distance(currentPos, targetWaypoint)
-      let hasReached = dist < Core.Constants.AI.WaypointReachedThreshold // Threshold
+      let hasReached = dist < Constants.AI.WaypointReachedThreshold // Threshold
 
       if hasReached then
         let nextIdx = (controller.waypointIndex + 1) % waypoints.Length
@@ -376,75 +378,73 @@ module AISystemLogic =
   let processAndGenerateCommands
     (controller: AIController)
     (archetype: AIArchetype)
-    (world: World)
+    (positions: HashMap<Guid<EntityId>, Vector2>)
+    (factions: HashMap<Guid<EntityId>, Faction HashSet>)
+    (spatialGrid: HashMap<GridCell, IndexList<Guid<EntityId>>>)
     (skillStore: SkillStore)
-    (currentTickAval: TimeSpan aval)
+    (currentTick: TimeSpan)
     =
-    adaptive {
-      let positions = world.Positions
-      let factions = world.Factions
-      let! currentTick = currentTickAval
+    let controlledPosition =
+      positions |> HashMap.tryFindV controller.controlledEntityId
 
-      let! controlledPosition =
-        positions |> AMap.tryFind controller.controlledEntityId
+    let controlledFactions =
+      factions |> HashMap.tryFindV controller.controlledEntityId
 
-      let! controlledFactions =
-        factions |> AMap.tryFind controller.controlledEntityId
+    match controlledPosition, controlledFactions with
+    | ValueSome pos, ValueSome facs ->
+      let struct (cues, updatedMemories) =
+        Perception.gatherCues
+          controller
+          archetype
+          positions
+          factions
+          spatialGrid
+          pos
+          facs
+          currentTick
 
-      match controlledPosition, controlledFactions with
-      | Some pos, Some facs ->
-        let! struct (cues, updatedMemories) =
-          Perception.gatherCues
-            controller
-            archetype
-            world
-            pos
-            facs
-            currentTickAval
+      let timeSinceLastDecision = currentTick - controller.lastDecisionTime
 
-        let timeSinceLastDecision = currentTick - controller.lastDecisionTime
+      let struct (command, shouldUpdateTime, newWaypointIndex, newState) =
+        if timeSinceLastDecision >= archetype.decisionInterval then
+          let bestCue = Decision.selectBestCue cues archetype.cuePriorities
 
-        let struct (command, shouldUpdateTime, newWaypointIndex, newState) =
-          if timeSinceLastDecision >= archetype.decisionInterval then
-            let bestCue = Decision.selectBestCue cues archetype.cuePriorities
+          match bestCue with
+          | Some struct (cue, priority) ->
+            handleBestCue cue priority controller skillStore
+          | None -> handleNoCue controller archetype pos
+        else
+          struct (ValueNone,
+                  false,
+                  controller.waypointIndex,
+                  controller.currentState)
 
-            match bestCue with
-            | Some struct (cue, priority) ->
-              handleBestCue cue priority controller skillStore
-            | None -> handleNoCue controller archetype pos
-          else
-            struct (ValueNone,
-                    false,
-                    controller.waypointIndex,
-                    controller.currentState)
+      let updatedController = {
+        controller with
+            memories = updatedMemories
+            waypointIndex = newWaypointIndex
+            currentState = newState
+            lastDecisionTime =
+              if shouldUpdateTime then
+                currentTick
+              else
+                controller.lastDecisionTime
+      }
 
-        let updatedController = {
-          controller with
-              memories = updatedMemories
-              waypointIndex = newWaypointIndex
-              currentState = newState
-              lastDecisionTime =
-                if shouldUpdateTime then
-                  currentTick
-                else
-                  controller.lastDecisionTime
-        }
+      struct (updatedController, command)
 
-        return struct (updatedController, command)
-
-      | _ -> return struct (controller, ValueNone)
-    }
+    | _ -> struct (controller, ValueNone)
 
 
 type AISystem
   (
     game: Game,
-    world: World.World,
+    world: World,
     eventBus: EventBus,
     skillStore: SkillStore,
     archetypeStore: AIArchetypeStore
-  ) =
-  inherit GameComponent(game)
+  ) as this =
+  inherit GameSystem(game)
 
   let fallbackArchetype = {
     id = %0
@@ -465,33 +465,39 @@ type AISystem
     }
   }
 
-  let adaptiveLogic =
-    world.AIControllers
-    |> AMap.mapA(fun _ controller ->
+  override val Kind = SystemKind.AI with get
+
+  override _.Update _ =
+    // Snapshot all necessary data
+    let positions = world.Positions |> AMap.force
+    let factions = world.Factions |> AMap.force
+    let spatialGrid = this.Projections.SpatialGrid |> AMap.force
+    let controllers = world.AIControllers |> AMap.force
+    let currentTick = (world.Time |> AVal.force).TotalGameTime
+
+    for controllerId, controller in controllers do
+
       let archetype =
         archetypeStore.tryFind controller.archetypeId
         |> ValueOption.defaultValue fallbackArchetype
 
-      AISystemLogic.processAndGenerateCommands
-        controller
-        archetype
-        world
-        skillStore
-        (world.Time |> AVal.map(fun t -> t.TotalGameTime)))
+      let struct (updatedController, command) =
+        AISystemLogic.processAndGenerateCommands
+          controller
+          archetype
+          positions
+          factions
+          spatialGrid
+          skillStore
+          currentTick
 
-  override this.Update(gameTime) =
-    let results = adaptiveLogic |> AMap.force
-
-    for id, struct (updatedController, command) in results do
       match command with
-      | ValueSome cmd ->
-        // cmd is inferred as SystemCommunications.SetMovementTarget
-        eventBus.Publish cmd
+      | ValueSome cmd -> eventBus.Publish cmd
       | ValueNone -> ()
 
-      // Only publish if state changed or significant update occurred
-      // Optimization: Check for equality before publishing
-      let currentControllers = world.AIControllers |> AMap.force
-
-      if updatedController <> currentControllers[id] then
-        eventBus.Publish(AI(ControllerUpdated struct (id, updatedController)))
+      if updatedController <> controller then
+        eventBus.Publish(
+          StateChangeEvent.AI(
+            ControllerUpdated struct (controllerId, updatedController)
+          )
+        )

@@ -17,6 +17,7 @@ module Systems =
     | Effects
     | ResourceManager
     | Collision
+    | AI
 
   type GameSystem(game: Game) =
     inherit GameComponent(game)
