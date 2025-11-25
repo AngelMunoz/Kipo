@@ -66,116 +66,104 @@ module DebugRender =
       color: Color
     | DrawCircle of center: Vector2 * radius: float32 * color: Color
 
-  let private generateActiveEffectCommands
-    (world: World.World)
-    (positions: amap<Guid<EntityId>, Vector2>)
-    =
-    positions
-    |> AMap.chooseA(fun entityId pos -> adaptive {
-      let! effectsOpt = AMap.tryFind entityId world.ActiveEffects
+  [<Struct>]
+  type DebugEntityContext = {
+    Positions: HashMap<Guid<EntityId>, Vector2>
+    ActiveEffects: HashMap<Guid<EntityId>, IndexList<ActiveEffect>>
+    Resources: HashMap<Guid<EntityId>, Entity.Resource>
+    DerivedStats: HashMap<Guid<EntityId>, DerivedStats>
+    Inventories: HashMap<Guid<EntityId>, HashSet<Item.ItemDefinition>>
+    EquippedItems:
+      HashMap<Guid<EntityId>, HashMap<Item.Slot, Item.ItemDefinition>>
+    AIControllers: HashMap<Guid<EntityId>, AIController>
+    LiveEntities: HashSet<Guid<EntityId>>
+  }
 
-      return
-        effectsOpt
-        |> Option.map(fun effects ->
-          effects
-          |> IndexList.map(fun effect -> DrawActiveEffect(effect, pos)))
-    })
-    |> AMap.fold
-      (fun acc _ cmds -> IndexList.concat [ acc; cmds ])
+  [<Struct>]
+  type DebugRenderContext = {
+    Entities: DebugEntityContext
+    SpatialGrid: HashMap<GridCell, IndexList<Guid<EntityId>>>
+    Map: MapDefinition voption
+    ShowStats: bool
+    ShowInventory: bool
+  }
+
+  let private generateActiveEffectCommands(ctx: DebugEntityContext) =
+    ctx.Positions
+    |> HashMap.fold
+      (fun acc entityId pos ->
+        match ctx.ActiveEffects.TryFindV entityId with
+        | ValueSome effects ->
+          let cmds =
+            effects
+            |> IndexList.map(fun effect -> DrawActiveEffect(effect, pos))
+
+          IndexList.concat [ acc; cmds ]
+        | ValueNone -> acc)
       IndexList.empty
 
   let private generateDerivedStatsCommands
-    (world: World.World)
-    (positions: amap<Guid<EntityId>, Vector2>)
-    (derivedStats: amap<Guid<EntityId>, DerivedStats>)
-    (showStats: bool aval)
+    (ctx: DebugEntityContext)
+    (showStats: bool)
     =
-    positions
-    |> AMap.chooseA(fun entityId pos -> adaptive {
-      let! show = showStats
-
-      if not show then
-        return None
-      else
-        let! statsOpt = derivedStats |> AMap.tryFind entityId
-
-        let! resourcesOpt = world.Resources |> AMap.tryFind entityId
-
-        return
-          statsOpt
-          |> Option.map(fun stats ->
-            IndexList.single(
-              DrawDerivedStats(entityId, stats, resourcesOpt, pos)
-            ))
-    })
-    |> AMap.fold
-      (fun acc _ cmds -> IndexList.concat [ acc; cmds ])
+    if not showStats then
       IndexList.empty
+    else
+      ctx.Positions
+      |> HashMap.fold
+        (fun acc entityId pos ->
+          match ctx.DerivedStats.TryFindV entityId with
+          | ValueSome stats ->
+            let resourcesOpt = ctx.Resources.TryFind entityId
+
+            IndexList.add
+              (DrawDerivedStats(entityId, stats, resourcesOpt, pos))
+              acc
+          | ValueNone -> acc)
+        IndexList.empty
 
   let private generateInventoryCommands
-    (positions: amap<Guid<EntityId>, Vector2>)
-    (inventory: amap<Guid<EntityId>, HashSet<Item.ItemDefinition>>)
-    (showInventory: bool aval)
+    (ctx: DebugEntityContext)
+    (showInventory: bool)
     =
-    positions
-    |> AMap.chooseA(fun entityId pos -> adaptive {
-      let! show = showInventory
-
-      if not show then
-        return None
-      else
-        let! inventoryOpt = inventory |> AMap.tryFind entityId
-
-        return
-          inventoryOpt
-          |> Option.map(fun inventory ->
-            IndexList.single(DrawInventory(entityId, inventory, pos)))
-    })
-    |> AMap.fold
-      (fun acc _ cmds -> IndexList.concat [ acc; cmds ])
+    if not showInventory then
       IndexList.empty
+    else
+      ctx.Positions
+      |> HashMap.fold
+        (fun acc entityId pos ->
+          match ctx.Inventories.TryFindV entityId with
+          | ValueSome inv ->
+            IndexList.add (DrawInventory(entityId, inv, pos)) acc
+          | ValueNone -> acc)
+        IndexList.empty
 
   let private generateEquippedCommands
-    (positions: amap<Guid<EntityId>, Vector2>)
-    (equippedItems:
-      amap<Guid<EntityId>, HashMap<Item.Slot, Item.ItemDefinition>>)
-    (showInventory: bool aval)
+    (ctx: DebugEntityContext)
+    (showInventory: bool)
     =
-    positions
-    |> AMap.chooseA(fun entityId pos -> adaptive {
-      let! show = showInventory
-
-      if not show then
-        return None
-      else
-        let! equippedOpt = equippedItems |> AMap.tryFind entityId
-
-        return
-          equippedOpt
-          |> Option.map(fun equipped ->
-            IndexList.single(DrawEquipped(entityId, equipped, pos)))
-    })
-    |> AMap.fold
-      (fun acc _ cmds -> IndexList.concat [ acc; cmds ])
+    if not showInventory then
       IndexList.empty
+    else
+      ctx.Positions
+      |> HashMap.fold
+        (fun acc entityId pos ->
+          match ctx.EquippedItems.TryFindV entityId with
+          | ValueSome equipped ->
+            IndexList.add (DrawEquipped(entityId, equipped, pos)) acc
+          | ValueNone -> acc)
+        IndexList.empty
 
-  let private generateAIStateCommands
-    (positions: amap<Guid<EntityId>, Vector2>)
-    (aiControllers: amap<Guid<EntityId>, AIController>)
-    =
-    positions
-    |> AMap.chooseA(fun entityId pos -> adaptive {
-      let! controllerOpt = aiControllers |> AMap.tryFind entityId
-
-      return
-        controllerOpt
-        |> Option.map(fun controller ->
-          IndexList.single(
-            DrawAIState(entityId, controller.currentState, pos)
-          ))
-    })
-    |> AMap.fold
-      (fun acc _ cmds -> IndexList.concat [ acc; cmds ])
+  let private generateAIStateCommands(ctx: DebugEntityContext) =
+    ctx.Positions
+    |> HashMap.fold
+      (fun acc entityId pos ->
+        match ctx.AIControllers.TryFindV entityId with
+        | ValueSome controller ->
+          IndexList.add
+            (DrawAIState(entityId, controller.currentState, pos))
+            acc
+        | ValueNone -> acc)
       IndexList.empty
 
   let private generateMapObjectCommands(map: MapDefinition voption) =
@@ -212,61 +200,46 @@ module DebugRender =
           IndexList.empty)
     | ValueNone -> IndexList.empty
 
-  let private generateEntityBoundsCommands
-    (positions: amap<Guid<EntityId>, Vector2>)
-    =
-    positions
-    |> AMap.chooseA(fun _ pos -> adaptive {
-      return Some(IndexList.single(DrawEntityBounds pos))
-    })
-    |> AMap.fold
-      (fun acc _ cmds -> IndexList.concat [ acc; cmds ])
+  let private generateEntityBoundsCommands(ctx: DebugEntityContext) =
+    ctx.Positions
+    |> HashMap.fold
+      (fun acc entityId pos ->
+        if ctx.LiveEntities.Contains entityId then
+          IndexList.add (DrawEntityBounds pos) acc
+        else
+          acc)
       IndexList.empty
 
-  let private generateDebugCommands
-    (
-      world: World.World,
-      positions: amap<Guid<EntityId>, Vector2>,
-      derivedStats: amap<Guid<EntityId>, DerivedStats>,
-      inventory: amap<Guid<EntityId>, HashSet<Item.ItemDefinition>>,
-      equippedItems:
-        amap<Guid<EntityId>, HashMap<Item.Slot, Item.ItemDefinition>>,
-      map: MapDefinition voption,
-      spatialGrid: amap<GridCell, IndexList<Guid<EntityId>>>
-    )
-    (showStats: bool aval)
-    (showInventory: bool aval)
-    =
-    adaptive {
-      let! effectCmds = generateActiveEffectCommands world positions
+  let private generateDebugCommands(ctx: DebugRenderContext) =
+    let effectCmds = generateActiveEffectCommands ctx.Entities
 
-      and! statsCmds =
-        generateDerivedStatsCommands world positions derivedStats showStats
+    let statsCmds = generateDerivedStatsCommands ctx.Entities ctx.ShowStats
 
-      and! inventoryCmds =
-        generateInventoryCommands positions inventory showInventory
+    let inventoryCmds = generateInventoryCommands ctx.Entities ctx.ShowInventory
 
-      and! equippedCmds =
-        generateEquippedCommands positions equippedItems showInventory
+    let equippedCmds = generateEquippedCommands ctx.Entities ctx.ShowInventory
 
-      and! aiStateCmds = generateAIStateCommands positions world.AIControllers
+    let aiStateCmds = generateAIStateCommands ctx.Entities
 
-      and! entityBoundsCmds = generateEntityBoundsCommands positions
+    let entityBoundsCmds = generateEntityBoundsCommands ctx.Entities
 
-      let! spatialGrid = spatialGrid |> AMap.toAVal
+    let filteredGrid =
+      ctx.SpatialGrid
+      |> HashMap.map(fun _ entities ->
+        entities
+        |> IndexList.filter(fun e -> ctx.Entities.LiveEntities.Contains e))
+      |> HashMap.filter(fun _ entities -> entities.Count > 0)
 
-      return
-        IndexList.concat [
-          effectCmds
-          statsCmds
-          inventoryCmds
-          equippedCmds
-          aiStateCmds
-          entityBoundsCmds
-          generateMapObjectCommands map
-          IndexList.single(DrawSpatialGrid spatialGrid)
-        ]
-    }
+    IndexList.concat [
+      effectCmds
+      statsCmds
+      inventoryCmds
+      equippedCmds
+      aiStateCmds
+      entityBoundsCmds
+      generateMapObjectCommands ctx.Map
+      IndexList.single(DrawSpatialGrid filteredGrid)
+    ]
 
   let private drawLine
     (sb: SpriteBatch)
@@ -485,17 +458,7 @@ module DebugRender =
     let skillStore = game.Services.GetService<SkillStore>()
     let subscriptions = new System.Reactive.Disposables.CompositeDisposable()
 
-    let debugCommands =
-      generateDebugCommands
-        (world,
-         projections.UpdatedPositions,
-         projections.DerivedStats,
-         projections.Inventories,
-         projections.EquipedItems,
-         mapStore.tryFind mapKey,
-         projections.SpatialGrid)
-        showStats
-        showInventory
+
 
     let getRemainingDuration (totalGameTime: TimeSpan) (effect: ActiveEffect) =
       match effect.SourceEffect.Duration with
@@ -591,10 +554,11 @@ module DebugRender =
       |> FSharp.Control.Reactive.Observable.subscribe(fun intent ->
         match skillStore.tryFind intent.SkillId with
         | ValueSome(Active skill) ->
+          let positions = projections.ComputeMovementSnapshot().Positions
+
           let casterPos =
-            projections.UpdatedPositions
-            |> AMap.tryFind intent.Caster
-            |> AVal.force
+            positions
+            |> HashMap.tryFind intent.Caster
             |> Option.defaultValue Vector2.Zero
 
           let targetPos =
@@ -602,10 +566,7 @@ module DebugRender =
             | SystemCommunications.TargetPosition pos -> pos
             | SystemCommunications.TargetDirection pos -> pos
             | SystemCommunications.TargetEntity id ->
-              projections.UpdatedPositions
-              |> AMap.tryFind id
-              |> AVal.force
-              |> Option.defaultValue casterPos
+              positions |> HashMap.tryFind id |> Option.defaultValue casterPos
             | _ -> casterPos
 
           let color = Color.Orange
@@ -674,16 +635,16 @@ module DebugRender =
       |> FSharp.Control.Reactive.Observable.subscribe(fun impact ->
         match skillStore.tryFind impact.SkillId with
         | ValueSome(Active skill) ->
+          let positions = projections.ComputeMovementSnapshot().Positions
+
           let casterPos =
-            projections.UpdatedPositions
-            |> AMap.tryFind impact.CasterId
-            |> AVal.force
+            positions
+            |> HashMap.tryFind impact.CasterId
             |> Option.defaultValue Vector2.Zero
 
           let impactPos =
-            projections.UpdatedPositions
-            |> AMap.tryFind impact.TargetId
-            |> AVal.force
+            positions
+            |> HashMap.tryFind impact.TargetId
             |> Option.defaultValue Vector2.Zero
 
           let color = Color.Red
@@ -739,7 +700,35 @@ module DebugRender =
       base.Draw gameTime
 
       let sb = spriteBatch.Value
-      let commandsToExecute = AVal.force debugCommands
+      let snapshot = projections.ComputeMovementSnapshot()
+
+      let liveEntities = projections.LiveEntities |> ASet.force
+
+      let positions =
+        snapshot.Positions
+        |> HashMap.filter(fun id _ -> liveEntities.Contains id)
+
+      let entityContext = {
+        Positions = positions
+        ActiveEffects = world.ActiveEffects |> AMap.force
+        Resources = world.Resources |> AMap.force
+        DerivedStats = projections.DerivedStats |> AMap.force
+        Inventories = projections.Inventories |> AMap.force
+        EquippedItems = projections.EquipedItems |> AMap.force
+        AIControllers = world.AIControllers |> AMap.force
+        LiveEntities = liveEntities
+      }
+
+      let renderContext = {
+        Entities = entityContext
+        SpatialGrid = snapshot.SpatialGrid
+        Map = mapStore.tryFind mapKey
+        ShowStats = showStats.Value
+        ShowInventory = showInventory.Value
+      }
+
+      let commandsToExecute = generateDebugCommands renderContext
+
       let totalGameTime = world.Time |> AVal.map _.TotalGameTime |> AVal.force
 
       // Prune expired transient commands
@@ -749,7 +738,7 @@ module DebugRender =
         let newDuration = duration - gameTime.ElapsedGameTime
 
         if newDuration > TimeSpan.Zero then
-          activeTransient.Add(struct (cmd, newDuration))
+          activeTransient.Add struct (cmd, newDuration)
 
       transientCommands.Clear()
       transientCommands.AddRange activeTransient
@@ -759,13 +748,13 @@ module DebugRender =
       let cameraService = game.Services.GetService<Core.CameraService>()
       let cameras = cameraService.GetAllCameras()
 
-      for struct (playerId, camera) in cameras do
+      for struct (_, camera) in cameras do
         // Reset yOffsets for each camera to ensure text stacks correctly per view
         yOffsets <- HashMap.empty
 
         let transform =
           Matrix.CreateTranslation(-camera.Position.X, -camera.Position.Y, 0.0f)
-          * Matrix.CreateScale(camera.Zoom)
+          * Matrix.CreateScale camera.Zoom
           * Matrix.CreateTranslation(
             float32 camera.Viewport.Width / 2.0f,
             float32 camera.Viewport.Height / 2.0f,
@@ -992,7 +981,7 @@ module DebugRender =
         lastFPSTime <- gameTime.TotalGameTime
 
       // Count total entities for culling stats
-      totalEntities <- AMap.count projections.UpdatedPositions |> AVal.force
+      totalEntities <- snapshot.Positions.Count
 
       // Render performance stats overlay at top-left of screen
       let screenTransform = Matrix.Identity
