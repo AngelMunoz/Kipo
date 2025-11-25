@@ -344,7 +344,6 @@ module AbilityActivation =
     inherit GameSystem(game)
 
     let skillStore = this.Game.Services.GetService<SkillStore>()
-    let getNearbyEntities = this.Projections.GetNearbyEntities
 
     let activationContext = {
       EventBus = this.EventBus
@@ -352,7 +351,8 @@ module AbilityActivation =
       Rng = this.World.Rng
       SearchContext =
         ValueSome {
-          GetNearbyEntities = getNearbyEntities
+          GetNearbyEntities =
+            fun v2 ce -> this.Projections.GetNearbyEntities v2 ce |> AList.force
         }
     }
 

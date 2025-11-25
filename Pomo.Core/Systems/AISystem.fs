@@ -469,9 +469,10 @@ type AISystem
 
   override _.Update _ =
     // Snapshot all necessary data
-    let positions = world.Positions |> AMap.force
+    let snapshot = this.Projections.ComputeMovementSnapshot()
+    let positions = snapshot.Positions
     let factions = world.Factions |> AMap.force
-    let spatialGrid = this.Projections.SpatialGrid |> AMap.force
+    let spatialGrid = snapshot.SpatialGrid
     let controllers = world.AIControllers |> AMap.force
     let currentTick = (world.Time |> AVal.force).TotalGameTime
 

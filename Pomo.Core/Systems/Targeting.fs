@@ -76,7 +76,6 @@ module Targeting =
     skillBeingTargeted: Skill voption aval
     currentAction:
       struct (cval<Guid<EntityId> voption> * cval<GameAction voption>)
-    positions: amap<Guid<EntityId>, Vector2>
   }
 
   module private TargetingHandlers =
@@ -210,18 +209,17 @@ module Targeting =
 
   let handleTargetSelected
     (args: HandleSelectedTargetArgs)
+    (getPositions: unit -> Projections.MovementSnapshot)
     (currentSelection: struct (Guid<EntityId> * Selection))
     =
     let {
           eventBus = eventBus
           skillBeingTargeted = skillBeingTargeted
           currentAction = _entityId, _action
-          positions = positions
         } =
       args
 
-    let positions = positions |> AMap.force
-
+    let positions = getPositions().Positions
     let struct (selector, selection) = currentSelection
 
     match _entityId.Value with
@@ -270,7 +268,6 @@ module Targeting =
 
   let create
     (
-      world: World,
       eventBus: EventBus,
       skillStore: SkillStore,
       projections: Projections.ProjectionService
@@ -291,12 +288,13 @@ module Targeting =
       )
 
     let handleSelected =
-      handleTargetSelected {
-        eventBus = eventBus
-        skillBeingTargeted = skillBeingTargeted
-        currentAction = struct (_entityId, _action)
-        positions = projections.UpdatedPositions
-      }
+      handleTargetSelected
+        {
+          eventBus = eventBus
+          skillBeingTargeted = skillBeingTargeted
+          currentAction = struct (_entityId, _action)
+        }
+        projections.ComputeMovementSnapshot
 
 
 

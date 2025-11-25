@@ -117,8 +117,7 @@ type PomoGame() as this =
 
   let projections = Projections.create(itemStore, worldView)
 
-  let targetingService =
-    Targeting.create(worldView, eventBus, skillStore, projections)
+  let targetingService = Targeting.create(eventBus, skillStore, projections)
 
   let effectApplicationService =
     Effects.EffectApplication.create(worldView, eventBus)
