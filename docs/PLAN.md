@@ -320,7 +320,7 @@ This system is the core of the stat calculation pipeline.
 - [x] Is there a reactive `Projections.getNearbyEntities` that uses the spatial grid for efficient, declarative queries (e.g., for AI)?
 - [x] Is the `CombatSystem`'s AoE logic refactored to use the `SpatialGrid` for efficient target acquisition instead of iterating all entities?
 - [x] Is map loading fully dynamic, allowing systems like the `RenderOrchestrator` to react to map changes at runtime?
-- [ ] (Optional Refactor) Has the duplicated collision response logic in `PlayerMovementSystem` and `UnitMovementSystem` been unified for better maintainability?
+- [x] (Optional Refactor) Has the duplicated collision response logic in `PlayerMovementSystem` and `UnitMovementSystem` been unified for better maintainability?
 
 ## 10. Phase 6: AI
 

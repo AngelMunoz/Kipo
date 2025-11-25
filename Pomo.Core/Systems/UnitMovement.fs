@@ -74,9 +74,8 @@ module UnitMovement =
           // Apply MTV to current position
           match allPositions |> HashMap.tryFindV eId with
           | ValueSome currentPos ->
-            let newPos = currentPos + mtv
-
-            this.EventBus.Publish(Physics(PositionChanged struct (eId, newPos)))
+            let mtv =
+              MovementLogic.resolveCollision eId currentPos mtv this.EventBus
 
             match frameCollisions.TryGetValue eId with
             | true, existing -> frameCollisions[eId] <- existing + mtv
@@ -113,37 +112,26 @@ module UnitMovement =
                  | false, _ -> Vector2.Zero)
             with
             | MovementLogic.Arrived ->
-              // Path finished
-              this.EventBus.Publish(
-                Physics(VelocityChanged struct (entityId, Vector2.Zero))
-              )
-
-              this.EventBus.Publish(
-                Physics(MovementStateChanged struct (entityId, Idle))
-              )
-
+              MovementLogic.notifyArrived entityId this.EventBus
               lastVelocities[entityId] <- Vector2.Zero
               currentPaths.Remove(entityId) |> ignore
             | MovementLogic.WaypointReached remainingWaypoints ->
-              // Waypoint reached, move to next
-              this.EventBus.Publish(
-                Physics(
-                  MovementStateChanged
-                    struct (entityId, MovingAlongPath remainingWaypoints)
-                )
-              )
+              MovementLogic.notifyWaypointReached
+                entityId
+                remainingWaypoints
+                this.EventBus
             | MovementLogic.Moving finalVelocity ->
               let lastVel =
                 match lastVelocities.TryGetValue entityId with
                 | true, v -> v
                 | false, _ -> Vector2.Zero
 
-              if finalVelocity <> lastVel then
-                this.EventBus.Publish(
-                  Physics(VelocityChanged struct (entityId, finalVelocity))
-                )
-
-              lastVelocities[entityId] <- finalVelocity
+              lastVelocities[entityId] <-
+                MovementLogic.notifyVelocityChange
+                  entityId
+                  finalVelocity
+                  lastVel
+                  this.EventBus
 
           | MovingTo target ->
             match
@@ -156,15 +144,7 @@ module UnitMovement =
                  | false, _ -> Vector2.Zero)
             with
             | MovementLogic.Arrived ->
-              // Arrived
-              this.EventBus.Publish(
-                Physics(VelocityChanged struct (entityId, Vector2.Zero))
-              )
-
-              this.EventBus.Publish(
-                Physics(MovementStateChanged struct (entityId, Idle))
-              )
-
+              MovementLogic.notifyArrived entityId this.EventBus
               lastVelocities[entityId] <- Vector2.Zero
               currentPaths.Remove(entityId) |> ignore // Clear any residual path
             | MovementLogic.Moving finalVelocity ->
@@ -173,12 +153,12 @@ module UnitMovement =
                 | true, v -> v
                 | false, _ -> Vector2.Zero
 
-              if finalVelocity <> lastVel then
-                this.EventBus.Publish(
-                  Physics(VelocityChanged struct (entityId, finalVelocity))
-                )
-
-              lastVelocities[entityId] <- finalVelocity
+              lastVelocities[entityId] <-
+                MovementLogic.notifyVelocityChange
+                  entityId
+                  finalVelocity
+                  lastVel
+                  this.EventBus
             | _ -> () // Should not happen for MovingTo
           | Idle ->
             // Ensure velocity is zero if idle (and we were previously moving)
@@ -186,19 +166,12 @@ module UnitMovement =
               lastVelocities.ContainsKey entityId
               && lastVelocities[entityId] <> Vector2.Zero
             then
-              this.EventBus.Publish(
-                Physics(VelocityChanged struct (entityId, Vector2.Zero))
-              )
-
-              lastVelocities[entityId] <- Vector2.Zero
+              lastVelocities[entityId] <-
+                MovementLogic.notifyVelocityChange
+                  entityId
+                  Vector2.Zero
+                  lastVelocities[entityId]
+                  this.EventBus
 
             currentPaths.Remove(entityId) |> ignore // Clear any residual path
-
-            this.EventBus.Publish(
-              Physics(VelocityChanged struct (entityId, Vector2.Zero))
-            )
-
-            lastVelocities[entityId] <- Vector2.Zero
-
-          currentPaths.Remove(entityId) |> ignore // Clear any residual path
         | ValueNone -> ()

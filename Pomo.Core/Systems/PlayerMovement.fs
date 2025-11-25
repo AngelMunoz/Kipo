@@ -107,15 +107,11 @@ module PlayerMovement =
         | SystemCommunications.CollisionEvents.MapObjectCollision(eId, _, mtv) when
           eId = playerId
           ->
-          // Apply MTV to current position
           let currentPos = position |> AVal.force
-          let newPos = currentPos + mtv
 
-          this.EventBus.Publish(
-            Physics(PositionChanged struct (playerId, newPos))
-          )
-
-          accumulatedMtv <- accumulatedMtv + mtv
+          accumulatedMtv <-
+            accumulatedMtv
+            + MovementLogic.resolveCollision eId currentPos mtv this.EventBus
         | _ -> ()
 
       let currentVelocity = velocity |> AVal.force
@@ -127,11 +123,12 @@ module PlayerMovement =
       if isStunned || isRooted then
         // If stunned or rooted, ensure velocity is zero.
         if lastVelocity <> Vector2.Zero then
-          this.EventBus.Publish(
-            Physics(VelocityChanged struct (playerId, Vector2.Zero))
-          )
-
-          lastVelocity <- Vector2.Zero
+          lastVelocity <-
+            MovementLogic.notifyVelocityChange
+              playerId
+              Vector2.Zero
+              lastVelocity
+              this.EventBus
       else
         let movementState = movementState |> AVal.force
 
@@ -149,21 +146,14 @@ module PlayerMovement =
               accumulatedMtv
           with
           | MovementLogic.Arrived ->
-            // We've arrived. Stop moving and return to Idle state.
-            this.EventBus.Publish(
-              Physics(VelocityChanged struct (playerId, Vector2.Zero))
-            )
-
-            this.EventBus.Publish(
-              Physics(MovementStateChanged struct (playerId, Idle))
-            )
+            MovementLogic.notifyArrived playerId this.EventBus
           | MovementLogic.Moving finalVelocity ->
-            if finalVelocity <> lastVelocity then
-              this.EventBus.Publish(
-                Physics(VelocityChanged struct (playerId, finalVelocity))
-              )
-
-            lastVelocity <- finalVelocity
+            lastVelocity <-
+              MovementLogic.notifyVelocityChange
+                playerId
+                finalVelocity
+                lastVelocity
+                this.EventBus
           | _ -> () // Should not happen for MovingTo
 
         | Some(MovingAlongPath path) ->
@@ -175,31 +165,20 @@ module PlayerMovement =
               accumulatedMtv
           with
           | MovementLogic.Arrived ->
-            // Path finished
-            this.EventBus.Publish(
-              Physics(VelocityChanged struct (playerId, Vector2.Zero))
-            )
-
-            this.EventBus.Publish(
-              Physics(MovementStateChanged struct (playerId, Idle))
-            )
-
+            MovementLogic.notifyArrived playerId this.EventBus
             lastVelocity <- Vector2.Zero
           | MovementLogic.WaypointReached remainingWaypoints ->
-            // Waypoint reached, move to next
-            this.EventBus.Publish(
-              Physics(
-                MovementStateChanged
-                  struct (playerId, MovingAlongPath remainingWaypoints)
-              )
-            )
+            MovementLogic.notifyWaypointReached
+              playerId
+              remainingWaypoints
+              this.EventBus
           | MovementLogic.Moving finalVelocity ->
-            if finalVelocity <> lastVelocity then
-              this.EventBus.Publish(
-                Physics(VelocityChanged struct (playerId, finalVelocity))
-              )
-
-            lastVelocity <- finalVelocity
+            lastVelocity <-
+              MovementLogic.notifyVelocityChange
+                playerId
+                finalVelocity
+                lastVelocity
+                this.EventBus
 
         | Some Idle ->
           let mutable targetVelocity = currentVelocity
@@ -208,10 +187,10 @@ module PlayerMovement =
           let targetVelocity =
             Physics.applyCollisionSliding targetVelocity accumulatedMtv
 
-          if targetVelocity <> lastVelocity then
-            this.EventBus.Publish(
-              Physics(VelocityChanged struct (playerId, targetVelocity))
-            )
-
-            lastVelocity <- targetVelocity
+          lastVelocity <-
+            MovementLogic.notifyVelocityChange
+              playerId
+              targetVelocity
+              lastVelocity
+              this.EventBus
         | None -> ()

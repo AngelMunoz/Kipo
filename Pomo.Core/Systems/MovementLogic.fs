@@ -1,9 +1,11 @@
 namespace Pomo.Core.Systems
 
 open Microsoft.Xna.Framework
+open FSharp.UMX
 open Pomo.Core.Domain.Events
 open Pomo.Core.Domain.Units
 open Pomo.Core.Algorithms
+open Pomo.Core.EventBus
 
 module MovementLogic =
 
@@ -14,6 +16,42 @@ module MovementLogic =
     | Moving of velocity: Vector2
     | WaypointReached of remainingPath: Vector2 list
 
+  let resolveCollision
+    (entityId: Guid<EntityId>)
+    (currentPos: Vector2)
+    (mtv: Vector2)
+    (eventBus: EventBus)
+    =
+    let newPos = currentPos + mtv
+    eventBus.Publish(Physics(PositionChanged struct (entityId, newPos)))
+    mtv
+
+  let notifyArrived (entityId: Guid<EntityId>) (eventBus: EventBus) =
+    eventBus.Publish(Physics(VelocityChanged struct (entityId, Vector2.Zero)))
+    eventBus.Publish(Physics(MovementStateChanged struct (entityId, Idle)))
+
+  let notifyWaypointReached
+    (entityId: Guid<EntityId>)
+    (remainingPath: Vector2 list)
+    (eventBus: EventBus)
+    =
+    eventBus.Publish(
+      Physics(
+        MovementStateChanged struct (entityId, MovingAlongPath remainingPath)
+      )
+    )
+
+  let notifyVelocityChange
+    (entityId: Guid<EntityId>)
+    (newVelocity: Vector2)
+    (lastVelocity: Vector2)
+    (eventBus: EventBus)
+    =
+    if newVelocity <> lastVelocity then
+      eventBus.Publish(Physics(VelocityChanged struct (entityId, newVelocity)))
+
+    newVelocity
+
   let handleMovingTo
     (currentPos: Vector2)
     (target: Vector2)
@@ -21,9 +59,8 @@ module MovementLogic =
     (accumulatedMtv: Vector2)
     =
     let distance = Vector2.Distance(currentPos, target)
-    let threshold = 2.0f // Close enough
 
-    if distance < threshold then
+    if distance < Physics.ArrivalThreshold then
       Arrived
     else
       // Still moving towards the destination.

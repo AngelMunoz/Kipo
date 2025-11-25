@@ -15,3 +15,5 @@ module Physics =
         velocity
     else
       velocity
+
+  let ArrivalThreshold = 2.0f
