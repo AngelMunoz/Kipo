@@ -88,12 +88,12 @@ module Spatial =
       let projB = project axis polyB
       overlap projA projB)
 
-  let intersectsMTV
+  let intersectsMTVWithAxes
     (polyA: IndexList<Vector2>)
+    (axesA: IndexList<Vector2>)
     (polyB: IndexList<Vector2>)
+    (axesB: IndexList<Vector2>)
     : Vector2 voption =
-    let axesA = getAxes polyA
-    let axesB = getAxes polyB
     let allAxes = IndexList.append axesA axesB
 
     let mutable minOverlap = Single.MaxValue
@@ -130,6 +130,14 @@ module Spatial =
         mtvAxis <- -mtvAxis
 
       ValueSome(mtvAxis * minOverlap)
+
+  let intersectsMTV
+    (polyA: IndexList<Vector2>)
+    (polyB: IndexList<Vector2>)
+    : Vector2 voption =
+    let axesA = getAxes polyA
+    let axesB = getAxes polyB
+    intersectsMTVWithAxes polyA axesA polyB axesB
 
   let getEntityPolygon(pos: Vector2) =
     let halfSize = Core.Constants.Entity.Size.X / 2.0f // Assuming square

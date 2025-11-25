@@ -18,25 +18,24 @@ module Collision =
   open Pomo.Core.Domain
 
   // Helper to get entities in nearby cells
+  let private neighborOffsets = [|
+    struct (-1, -1)
+    0, -1
+    1, -1
+    -1, 0
+    0, 0
+    1, 0
+    -1, 1
+    0, 1
+    1, 1
+  |]
+
   let getNearbyEntities
     (grid: HashMap<GridCell, IndexList<Guid<EntityId>>>)
     (cell: GridCell)
     =
-    let neighborOffsets: IndexList<struct (int * int)> =
-      IndexList.ofList [
-        -1, -1
-        0, -1
-        1, -1
-        -1, 0
-        0, 0
-        1, 0
-        -1, 1
-        0, 1
-        1, 1
-      ]
-
     neighborOffsets
-    |> IndexList.collect(fun struct (dx, dy) ->
+    |> Seq.collect(fun struct (dx, dy) ->
       let neighborCell = { X = cell.X + dx; Y = cell.Y + dy }
 
       match grid |> HashMap.tryFindV neighborCell with
@@ -49,6 +48,18 @@ module Collision =
 
     let mapStore = game.Services.GetService<MapStore>()
     let map = mapStore.tryFind mapKey
+
+    let mapObjectCache =
+      match map with
+      | ValueSome m ->
+        m.ObjectGroups
+        |> IndexList.collect(fun g -> g.Objects)
+        |> IndexList.map(fun obj ->
+          let poly = Spatial.getMapObjectPolygon obj
+          let axes = Spatial.getAxes poly
+          obj.Id, struct (poly, axes))
+        |> HashMap.ofSeq
+      | ValueNone -> HashMap.empty
 
     let spatialGrid = this.Projections.SpatialGrid
 
@@ -87,6 +98,9 @@ module Collision =
         for entityId in liveEntities do
           match positions |> HashMap.tryFindV entityId with
           | ValueSome pos ->
+            let entityPoly = getEntityPolygon pos
+            let entityAxes = getAxes entityPoly
+
             for group in mapDef.ObjectGroups do
               for obj in group.Objects do
                 let isCollidable =
@@ -95,16 +109,22 @@ module Collision =
                   | _ -> false
 
                 if isCollidable then
-                  let entityPoly = getEntityPolygon pos
-                  let objPoly = getMapObjectPolygon obj
+                  match mapObjectCache.TryFindV obj.Id with
+                  | ValueSome struct (objPoly, objAxes) ->
+                    match
+                      Spatial.intersectsMTVWithAxes
+                        entityPoly
+                        entityAxes
+                        objPoly
+                        objAxes
+                    with
+                    | ValueSome mtv ->
 
-                  match Spatial.intersectsMTV entityPoly objPoly with
-                  | ValueSome mtv ->
-
-                    this.EventBus.Publish(
-                      SystemCommunications.MapObjectCollision
-                        struct (entityId, obj, mtv)
-                    )
+                      this.EventBus.Publish(
+                        SystemCommunications.MapObjectCollision
+                          struct (entityId, obj, mtv)
+                      )
+                    | ValueNone -> ()
                   | ValueNone -> ()
           | ValueNone -> ()
       | ValueNone -> ()
