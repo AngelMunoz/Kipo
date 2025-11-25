@@ -730,7 +730,7 @@ module Combat =
       | _ -> () // Skill not found
 
 
-  type CombatSystem(game: Game, mapKey: string) as this =
+  type CombatSystem(game: Game) as this =
     inherit GameSystem(game)
 
     let eventBus = this.EventBus
@@ -742,11 +742,8 @@ module Combat =
       let derivedStats = this.Projections.DerivedStats
       let positions = this.Projections.UpdatedPositions
       let getNearbyEntities = this.Projections.GetNearbyEntities
-      let mapStore = this.Game.Services.GetService<Stores.MapStore>()
-      let mapDef = mapStore.find mapKey
 
       let searchCtx: Spatial.Search.SearchContext = {
-        MapDef = mapDef
         GetNearbyEntities = getNearbyEntities
       }
 

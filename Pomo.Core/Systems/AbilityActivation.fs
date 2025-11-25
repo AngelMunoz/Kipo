@@ -340,15 +340,10 @@ module AbilityActivation =
       else
         () // Not idle, do nothing
 
-  type AbilityActivationSystem
-    (game: Game, playerId: Guid<EntityId>, mapKey: string) as this =
+  type AbilityActivationSystem(game: Game, playerId: Guid<EntityId>) as this =
     inherit GameSystem(game)
 
     let skillStore = this.Game.Services.GetService<SkillStore>()
-    let mapStore = this.Game.Services.GetService<MapStore>()
-
-    let mapDef = mapStore.tryFind mapKey
-
     let getNearbyEntities = this.Projections.GetNearbyEntities
 
     let activationContext = {
@@ -356,11 +351,9 @@ module AbilityActivation =
       SkillStore = skillStore
       Rng = this.World.Rng
       SearchContext =
-        mapDef
-        |> ValueOption.map(fun mapDef -> {
-          MapDef = mapDef
+        ValueSome {
           GetNearbyEntities = getNearbyEntities
-        })
+        }
     }
 
     let subscriptions = new CompositeDisposable()

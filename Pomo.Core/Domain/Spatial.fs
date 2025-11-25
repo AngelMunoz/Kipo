@@ -14,24 +14,25 @@ module Spatial =
 
   [<Struct>]
   type Cone = {
-      Origin: Vector2
-      Direction: Vector2
-      AngleDegrees: float32
-      Length: float32
+    Origin: Vector2
+    Direction: Vector2
+    AngleDegrees: float32
+    Length: float32
   }
 
   [<Struct>]
   type LineSegment = {
-      Start: Vector2
-      End: Vector2
-      Width: float32
+    Start: Vector2
+    End: Vector2
+    Width: float32
   }
 
   [<Struct>]
-  type Circle = {
-      Center: Vector2
-      Radius: float32
-  }
+  type Circle = { Center: Vector2; Radius: float32 }
+
+  let isPointInCircle (circle: Circle) (point: Vector2) =
+    Vector2.DistanceSquared(circle.Center, point)
+    <= circle.Radius * circle.Radius
 
   let getGridCell (cellSize: float32) (position: Vector2) : GridCell = {
     X = int(position.X / cellSize)
@@ -167,10 +168,7 @@ module Spatial =
 
       corners |> IndexList.map(fun p -> rotate p radians + pos)
 
-  let isPointInCone
-    (cone: Cone)
-    (point: Vector2)
-    =
+  let isPointInCone (cone: Cone) (point: Vector2) =
     let distanceSquared = Vector2.DistanceSquared(cone.Origin, point)
 
     if distanceSquared > cone.Length * cone.Length then
@@ -187,15 +185,13 @@ module Spatial =
         let cosAngle = MathF.Cos angleRadians
         dot >= cosAngle
 
-  let isPointInLine
-    (line: LineSegment)
-    (point: Vector2)
-    =
+  let isPointInLine (line: LineSegment) (point: Vector2) =
     let lineVec = line.End - line.Start
     let lineLenSq = lineVec.LengthSquared()
 
     if lineLenSq = 0.0f then
-      Vector2.DistanceSquared(line.Start, point) <= line.Width / 2.0f * (line.Width / 2.0f)
+      Vector2.DistanceSquared(line.Start, point)
+      <= line.Width / 2.0f * (line.Width / 2.0f)
     else
       let t = Vector2.Dot(point - line.Start, lineVec) / lineLenSq
       let tClamped = Math.Clamp(t, 0.0f, 1.0f)
@@ -310,7 +306,9 @@ module Spatial =
           let toPoint = Vector2.Normalize(offset)
 
           let angleRadians =
-            Microsoft.Xna.Framework.MathHelper.ToRadians(cone.AngleDegrees / 2.0f)
+            Microsoft.Xna.Framework.MathHelper.ToRadians(
+              cone.AngleDegrees / 2.0f
+            )
 
           let dot = Vector2.Dot(directionGrid, toPoint)
           let cosAngle = System.MathF.Cos angleRadians
@@ -341,48 +339,43 @@ module Spatial =
     open Pomo.Core.Domain.Map
 
     type SearchContext = {
-        MapDef: MapDefinition
-        GetNearbyEntities: Vector2 -> float32 -> alist<struct (Guid<EntityId> * Vector2)>
+      GetNearbyEntities:
+        Vector2 -> float32 -> alist<struct (Guid<EntityId> * Vector2)>
     }
 
     [<Struct>]
     type CircleSearchRequest = {
-        CasterId: Guid<EntityId>
-        Circle: Circle
-        MaxTargets: int
+      CasterId: Guid<EntityId>
+      Circle: Circle
+      MaxTargets: int
     }
 
     [<Struct>]
     type ConeSearchRequest = {
-        CasterId: Guid<EntityId>
-        Cone: Cone
-        MaxTargets: int
+      CasterId: Guid<EntityId>
+      Cone: Cone
+      MaxTargets: int
     }
 
     [<Struct>]
     type LineSearchRequest = {
-        CasterId: Guid<EntityId>
-        Line: LineSegment
-        MaxTargets: int
+      CasterId: Guid<EntityId>
+      Line: LineSegment
+      MaxTargets: int
     }
 
     let findTargetsInCircle
       (ctx: SearchContext)
       (request: CircleSearchRequest)
       =
-      let nearby = ctx.GetNearbyEntities request.Circle.Center request.Circle.Radius |> AList.force
-
-      // Convert radius to grid units for the check
-      let radiusGrid = request.Circle.Radius * 1.41421356f / float32 ctx.MapDef.TileWidth
+      let nearby =
+        ctx.GetNearbyEntities request.Circle.Center request.Circle.Radius
+        |> AList.force
 
       let targets =
         nearby
         |> IndexList.filter(fun struct (id, pos) ->
-          id <> request.CasterId
-          && Isometric.isPointInIsometricCircle
-            ctx.MapDef
-            { Center = request.Circle.Center; Radius = radiusGrid }
-            pos)
+          id <> request.CasterId && isPointInCircle request.Circle pos)
         |> IndexList.sortBy(fun struct (_, pos) ->
           Vector2.DistanceSquared(request.Circle.Center, pos))
         |> IndexList.map(fun struct (id, _) -> id)
@@ -392,23 +385,15 @@ module Spatial =
       else
         targets |> IndexList.take request.MaxTargets
 
-    let findTargetsInCone
-      (ctx: SearchContext)
-      (request: ConeSearchRequest)
-      =
-      let nearby = ctx.GetNearbyEntities request.Cone.Origin request.Cone.Length |> AList.force
-
-      // Convert length to grid units
-      let lengthGrid = request.Cone.Length * 1.41421356f / float32 ctx.MapDef.TileWidth
+    let findTargetsInCone (ctx: SearchContext) (request: ConeSearchRequest) =
+      let nearby =
+        ctx.GetNearbyEntities request.Cone.Origin request.Cone.Length
+        |> AList.force
 
       let targets =
         nearby
         |> IndexList.filter(fun struct (id, pos) ->
-          id <> request.CasterId
-          && Isometric.isPointInIsometricCone
-            ctx.MapDef
-            { request.Cone with Length = lengthGrid }
-            pos)
+          id <> request.CasterId && isPointInCone request.Cone pos)
         |> IndexList.sortBy(fun struct (_, pos) ->
           Vector2.DistanceSquared(request.Cone.Origin, pos))
         |> IndexList.map(fun struct (id, _) -> id)
@@ -418,25 +403,18 @@ module Spatial =
       else
         targets |> IndexList.take request.MaxTargets
 
-    let findTargetsInLine
-      (ctx: SearchContext)
-      (request: LineSearchRequest)
-      =
+    let findTargetsInLine (ctx: SearchContext) (request: LineSearchRequest) =
       // Radius for broad phase is half the length + half the width, roughly, or just length from start
       let length = Vector2.Distance(request.Line.Start, request.Line.End)
-      let nearby = ctx.GetNearbyEntities request.Line.Start (length + request.Line.Width) |> AList.force
 
-      // Convert width to grid units
-      let widthGrid = request.Line.Width * 1.41421356f / float32 ctx.MapDef.TileWidth
+      let nearby =
+        ctx.GetNearbyEntities request.Line.Start (length + request.Line.Width)
+        |> AList.force
 
       let targets =
         nearby
         |> IndexList.filter(fun struct (id, pos) ->
-          id <> request.CasterId
-          && Isometric.isPointInIsometricLine
-            ctx.MapDef
-            { request.Line with Width = widthGrid }
-            pos)
+          id <> request.CasterId && isPointInLine request.Line pos)
         |> IndexList.sortBy(fun struct (_, pos) ->
           Vector2.DistanceSquared(request.Line.Start, pos))
         |> IndexList.map(fun struct (id, _) -> id)
