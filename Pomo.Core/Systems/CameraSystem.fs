@@ -54,9 +54,8 @@ module CameraSystem =
                 Microsoft.Xna.Framework.Graphics.Viewport(0, 0, width, height)
 
             let position =
-              projections.UpdatedPositions
-              |> AMap.tryFind playerId
-              |> AVal.force
+              projections.ComputeMovementSnapshot().Positions
+              |> HashMap.tryFind playerId
               |> Option.defaultValue Vector2.Zero
 
             ValueSome {
