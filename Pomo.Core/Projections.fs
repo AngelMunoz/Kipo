@@ -306,13 +306,6 @@ module Projections =
     }
 
   let create(itemStore: ItemStore, world: World) =
-    let movementSnapshotNode = adaptive {
-      let! time = world.Time |> AVal.map _.Delta
-      let! velocities = world.Velocities |> AMap.toAVal
-      let! positions = world.Positions |> AMap.toAVal
-
-      return calculateMovementSnapshot time velocities positions
-    }
 
     { new ProjectionService with
         member _.LiveEntities = liveEntities world
@@ -322,7 +315,11 @@ module Projections =
         member _.Inventories = inventoryDefs(world, itemStore)
         member _.ActionSets = activeActionSets world
 
-        member _.ComputeMovementSnapshot() = movementSnapshotNode |> AVal.force
+        member _.ComputeMovementSnapshot() =
+          let time = world.Time |> AVal.map _.Delta |> AVal.force
+          let velocities = world.Velocities |> AMap.force
+          let positions = world.Positions |> AMap.force
+          calculateMovementSnapshot time velocities positions
 
         member _.GetNearbyEntitiesSnapshot(snapshot, center, radius) =
           let cells =

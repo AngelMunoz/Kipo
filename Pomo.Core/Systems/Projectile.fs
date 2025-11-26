@@ -67,10 +67,10 @@ module Projectile =
           RemainingJumps = remainingJumps
         }
 
-        do addComms impact
+        addComms impact
 
         // Always remove the current projectile after impact
-        do addState <| EntityLifecycle(Removed projectileId)
+        addState <| EntityLifecycle(Removed projectileId)
 
         // Handle chaining
         match projectile.Info.Variations with
@@ -113,7 +113,7 @@ module Projectile =
         let direction = Vector2.Normalize(targetPos - projPos)
         let velocity = direction * projectile.Info.Speed
 
-        do addState <| Physics(VelocityChanged struct (projectileId, velocity))
+        addState <| Physics(VelocityChanged struct (projectileId, velocity))
 
         struct (commEvents |> IndexList.ofSeq, stateEvents |> IndexList.ofSeq)
 
