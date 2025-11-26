@@ -41,11 +41,12 @@ module Environment =
     abstract GraphicsDevice: GraphicsDevice
     abstract Content: ContentManager
 
+  [<AutoOpen>]
   module Patterns =
-    let (|Core|)(env: #CoreServices) = env :> CoreServices
-    let (|Stores|)(env: #StoreServices) = env :> StoreServices
-    let (|Gameplay|)(env: #GameplayServices) = env :> GameplayServices
-    let (|MonoGame|)(env: #MonoGameServices) = env :> MonoGameServices
+    let inline (|Core|)(env: #CoreServices) = env :> CoreServices
+    let inline (|Stores|)(env: #StoreServices) = env :> StoreServices
+    let inline (|Gameplay|)(env: #GameplayServices) = env :> GameplayServices
+    let inline (|MonoGame|)(env: #MonoGameServices) = env :> MonoGameServices
 
   type PomoSystem =
     abstract member Update: GameTime -> unit
