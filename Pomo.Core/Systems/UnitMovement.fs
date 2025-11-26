@@ -35,8 +35,7 @@ module UnitMovement =
     let movementStates =
       this.World.MovementStates |> AMap.filter(fun id _ -> id <> playerId)
 
-    let positions =
-      this.World.Positions |> AMap.filter(fun id _ -> id <> playerId)
+
 
     let derivedStats =
       this.Projections.DerivedStats |> AMap.filter(fun id _ -> id <> playerId)
@@ -58,6 +57,8 @@ module UnitMovement =
       base.Dispose(disposing)
 
     override this.Update(gameTime) =
+      let snapshot = this.Projections.ComputeMovementSnapshot()
+
       // Process collisions
       let mutable collisionEvent =
         Unchecked.defaultof<SystemCommunications.CollisionEvents>
@@ -70,7 +71,7 @@ module UnitMovement =
         | SystemCommunications.CollisionEvents.MapObjectCollision(eId, _, mtv) when
           eId <> playerId
           ->
-          let allPositions = this.World.Positions |> AMap.force
+          let allPositions = snapshot.Positions
           // Apply MTV to current position
           match allPositions |> HashMap.tryFindV eId with
           | ValueSome currentPos ->
@@ -85,7 +86,8 @@ module UnitMovement =
 
       let movementStates = movementStates |> AMap.force
 
-      let positions = positions |> AMap.force
+      let positions =
+        snapshot.Positions |> HashMap.filter(fun id _ -> id <> playerId)
 
       let derivedStats = derivedStats |> AMap.force
 

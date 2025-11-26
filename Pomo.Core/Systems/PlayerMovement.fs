@@ -22,29 +22,27 @@ module PlayerMovement =
       (playerId: Guid<EntityId>)
       (speed: float32)
       =
-      let actionStates =
-        world.GameActionStates
-        |> AMap.tryFind playerId
-        |> AVal.map(Option.defaultValue HashMap.empty)
-        |> AMap.ofAVal
+      world.GameActionStates
+      |> AMap.tryFind playerId
+      |> AVal.map(Option.defaultValue HashMap.empty)
+      |> AVal.map(
+        HashMap.fold
+          (fun acc action _ ->
+            let mutable move = Vector2.Zero
 
-      actionStates
-      |> AMap.fold
-        (fun acc action _ ->
-          let mutable move = Vector2.Zero
+            match action with
+            | MoveUp -> move <- move - Vector2.UnitY
+            | MoveDown -> move <- move + Vector2.UnitY
+            | MoveLeft -> move <- move - Vector2.UnitX
+            | MoveRight -> move <- move + Vector2.UnitX
+            | _ -> ()
 
-          match action with
-          | MoveUp -> move <- move - Vector2.UnitY
-          | MoveDown -> move <- move + Vector2.UnitY
-          | MoveLeft -> move <- move - Vector2.UnitX
-          | MoveRight -> move <- move + Vector2.UnitX
-          | _ -> ()
-
-          if move.LengthSquared() > 0.0f then
-            acc + Vector2.Normalize(move) * speed
-          else
-            Vector2.Zero)
-        Vector2.Zero
+            if move.LengthSquared() > 0.0f then
+              acc + Vector2.Normalize move * speed
+            else
+              Vector2.Zero)
+          Vector2.Zero
+      )
 
   type PlayerMovementSystem(game: Game, playerId: Guid<EntityId>) as this =
     inherit GameSystem(game)
@@ -59,10 +57,6 @@ module PlayerMovement =
       |> AMap.tryFind playerId
       |> AVal.map(Option.defaultValue IndexList.empty)
 
-    let position =
-      this.Projections.UpdatedPositions
-      |> AMap.tryFind playerId
-      |> AVal.map(Option.defaultValue Vector2.Zero)
 
     let movementSpeed =
       this.Projections.DerivedStats
@@ -96,6 +90,8 @@ module PlayerMovement =
       base.Dispose(disposing)
 
     override this.Update _ =
+      let snapshot = this.Projections.ComputeMovementSnapshot()
+
       // Process collisions
       let mutable accumulatedMtv = Vector2.Zero
 
@@ -107,7 +103,10 @@ module PlayerMovement =
         | SystemCommunications.CollisionEvents.MapObjectCollision(eId, _, mtv) when
           eId = playerId
           ->
-          let currentPos = position |> AVal.force
+          let currentPos =
+            snapshot.Positions
+            |> HashMap.tryFind playerId
+            |> Option.defaultValue Vector2.Zero
 
           accumulatedMtv <-
             accumulatedMtv
@@ -132,7 +131,10 @@ module PlayerMovement =
       else
         let movementState = movementState |> AVal.force
 
-        let position = position |> AVal.force
+        let position =
+          snapshot.Positions
+          |> HashMap.tryFind playerId
+          |> Option.defaultValue Vector2.Zero
 
         let movementSpeed = movementSpeed |> AVal.force
 
