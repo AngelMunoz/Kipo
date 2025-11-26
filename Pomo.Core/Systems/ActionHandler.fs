@@ -19,53 +19,48 @@ module ActionHandler =
   open Microsoft.Xna.Framework.Input
   open Pomo.Core.Domain.Core
 
-  let private createHoveredEntityProjection
+  let private findHoveredEntity
     (world: World)
-    (positions: amap<Guid<EntityId>, Vector2>)
+    (positions: HashMap<Guid<EntityId>, Vector2>)
     (cameraService: Core.CameraService)
     (playerId: Guid<EntityId>)
     =
-    adaptive {
-      let! mousePositionAval =
-        world.RawInputStates
-        |> AMap.tryFind playerId
-        |> AVal.map(
-          Option.bind(fun state ->
-            let ms = state.Mouse
-            let rawPos = Vector2(float32 ms.Position.X, float32 ms.Position.Y)
+    let mousePositionOpt =
+      world.RawInputStates
+      |> AMap.tryFind playerId
+      |> AVal.force
+      |> Option.bind(fun state ->
+        let ms = state.Mouse
+        let rawPos = Vector2(float32 ms.Position.X, float32 ms.Position.Y)
 
-            cameraService.ScreenToWorld(rawPos, playerId)
-            |> ValueOption.toOption)
-        )
+        cameraService.ScreenToWorld(rawPos, playerId) |> ValueOption.toOption)
 
-      return!
-        positions
-        |> AMap.fold
-          (fun (acc: _ option) entityId entityPos ->
-            if acc.IsSome then
-              acc
+    positions
+    |> HashMap.fold
+      (fun (acc: _ option) entityId entityPos ->
+        if acc.IsSome then
+          acc
+        else
+          mousePositionOpt
+          |> Option.bind(fun mousePos ->
+            if entityId = playerId then
+              None
             else
-              mousePositionAval
-              |> Option.bind(fun mousePos ->
-                if entityId = playerId then
-                  None
-                else
-                  let clickAreaSize = Core.Constants.UI.TargetingIndicatorSize
+              let clickAreaSize = Constants.UI.TargetingIndicatorSize
 
-                  let entityBounds =
-                    Microsoft.Xna.Framework.Rectangle(
-                      int(entityPos.X - clickAreaSize.X / 2.0f),
-                      int(entityPos.Y - clickAreaSize.Y / 2.0f),
-                      int clickAreaSize.X,
-                      int clickAreaSize.Y
-                    )
+              let entityBounds =
+                Microsoft.Xna.Framework.Rectangle(
+                  int(entityPos.X - clickAreaSize.X / 2.0f),
+                  int(entityPos.Y - clickAreaSize.Y / 2.0f),
+                  int clickAreaSize.X,
+                  int clickAreaSize.Y
+                )
 
-                  if entityBounds.Contains mousePos then
-                    Some entityId
-                  else
-                    None))
-          None
-    }
+              if entityBounds.Contains mousePos then
+                Some entityId
+              else
+                None))
+      None
 
   let private handleActionSetChange
     (actionSetChangeState: ValueOption<struct (InputActionState * int)>)
@@ -81,15 +76,10 @@ module ActionHandler =
       eventBus: EventBus,
       targetingService: TargetingService,
       projections: Projections.ProjectionService,
-      cameraService: Core.CameraService,
+      cameraService: CameraService,
       entityId: Guid<EntityId>
     ) =
-    let hoveredEntityAval =
-      createHoveredEntityProjection
-        world
-        projections.UpdatedPositions
-        cameraService
-        entityId
+
 
     { new CoreEventListener with
         member _.StartListening() =
@@ -177,7 +167,12 @@ module ActionHandler =
                   targetingService.TargetingMode |> AVal.force
 
                 // Get the entity under the cursor AT THIS MOMENT by forcing the projection.
-                let clickedEntity = hoveredEntityAval |> AVal.force
+                let clickedEntity =
+                  findHoveredEntity
+                    world
+                    (projections.ComputeMovementSnapshot().Positions)
+                    cameraService
+                    entityId
 
                 match targetingMode with
                 | ValueNone ->
