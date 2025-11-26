@@ -26,17 +26,7 @@ module Projections =
       | false, _ -> ValueNone
 
 
-  let private updatedPositions(world: World) =
-    (world.Velocities, world.Positions)
-    ||> AMap.choose2V(fun _ velocity position ->
-      match velocity, position with
-      | ValueSome vel, ValueSome pos -> ValueSome struct (vel, pos)
-      | _ -> ValueNone)
-    |> AMap.mapA(fun _ struct (velocity, position) -> adaptive {
-      let! time = world.Time |> AVal.map _.Delta
-      let displacement = velocity * float32 time.TotalSeconds
-      return position + displacement
-    })
+
 
   let private liveEntities(world: World) =
     world.Resources
@@ -253,60 +243,7 @@ module Projections =
 
       set |> ValueOption.bind(fun set -> sets |> HashMap.tryFindV set))
 
-  let private spatialGrid(updatedPositions: amap<Guid<EntityId>, Vector2>) =
-    adaptive {
-      let! updatedPositions =
-        updatedPositions
-        |> AMap.toASet
-        |> ASet.map(fun (key, pos) ->
-          let cell =
-            Spatial.getGridCell Core.Constants.Collision.GridCellSize pos
 
-          struct (cell, key))
-        |> ASet.fold
-          (fun acc struct (cell, key) ->
-            match acc |> HashMap.tryFindV cell with
-            | ValueSome list ->
-              acc |> HashMap.add cell (IndexList.add key list)
-            | ValueNone -> acc |> HashMap.add cell (IndexList.ofList [ key ]))
-          HashMap.empty
-
-      return updatedPositions
-    }
-    |> AMap.ofAVal
-
-  let getNearbyEntities
-    (grid: amap<GridCell, IndexList<Guid<EntityId>>>)
-    (positions: amap<Guid<EntityId>, Vector2>)
-    (center: Vector2)
-    (radius: float32)
-    =
-    adaptive {
-      let! grid = grid |> AMap.toAVal
-      let! positions = positions |> AMap.toAVal
-
-      let cells =
-        Spatial.getCellsInRadius
-          Core.Constants.Collision.GridCellSize
-          center
-          radius
-
-      let potentialTargets =
-        cells
-        |> IndexList.collect(fun cell ->
-          match grid |> HashMap.tryFindV cell with
-          | ValueSome list -> list
-          | ValueNone -> IndexList.empty)
-
-      return
-        potentialTargets
-        |> IndexList.choose(fun entityId ->
-          match positions |> HashMap.tryFindV entityId with
-          | ValueSome pos when Vector2.Distance(pos, center) <= radius ->
-            Some struct (entityId, pos)
-          | _ -> None)
-    }
-    |> AList.ofAVal
 
   [<Struct>]
   type MovementSnapshot = {
@@ -315,7 +252,6 @@ module Projections =
   }
 
   type ProjectionService =
-    abstract UpdatedPositions: amap<Guid<EntityId>, Vector2>
     abstract LiveEntities: aset<Guid<EntityId>>
     abstract CombatStatuses: amap<Guid<EntityId>, IndexList<CombatStatus>>
     abstract DerivedStats: amap<Guid<EntityId>, Entity.DerivedStats>
@@ -324,11 +260,6 @@ module Projections =
 
     abstract ActionSets:
       amap<Guid<EntityId>, HashMap<Action.GameAction, SlotProcessing>>
-
-    abstract SpatialGrid: amap<GridCell, IndexList<Guid<EntityId>>>
-
-    abstract GetNearbyEntities:
-      Vector2 -> float32 -> alist<struct (Guid<EntityId> * Vector2)>
 
     /// Forces the current world state and computes the physics/grid for this frame.
     abstract ComputeMovementSnapshot: unit -> MovementSnapshot
@@ -384,24 +315,19 @@ module Projections =
     }
 
     { new ProjectionService with
-        member _.UpdatedPositions = updatedPositions world
         member _.LiveEntities = liveEntities world
         member _.CombatStatuses = calculateCombatStatuses world
         member _.DerivedStats = calculateDerivedStats itemStore world
         member _.EquipedItems = equippedItemDefs(world, itemStore)
         member _.Inventories = inventoryDefs(world, itemStore)
         member _.ActionSets = activeActionSets world
-        member _.SpatialGrid = spatialGrid(updatedPositions world)
-
-        member this.GetNearbyEntities center radius =
-          getNearbyEntities this.SpatialGrid this.UpdatedPositions center radius
 
         member _.ComputeMovementSnapshot() = movementSnapshotNode |> AVal.force
 
         member _.GetNearbyEntitiesSnapshot(snapshot, center, radius) =
           let cells =
             Spatial.getCellsInRadius
-              Core.Constants.Collision.GridCellSize
+              Constants.Collision.GridCellSize
               center
               radius
 
