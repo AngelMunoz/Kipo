@@ -33,17 +33,39 @@
         "PrototypeTilesCollisions.tsx": {
             "scaleInDock": 1
         },
-        "X:/Kipo/Pomo.Core/Content/Maps/Proto.xml": {
-            "scale": 2,
-            "selectedLayer": 4,
+        "X:/Kipo/Pomo.Core/Content/Maps/Lobby.xml": {
+            "expandedObjectLayers": [
+                3,
+                4
+            ],
+            "scale": 5.5,
+            "selectedLayer": 2,
             "viewCenter": {
-                "x": 170.5,
-                "y": 1031.75
+                "x": 15.63636363636364,
+                "y": 167.54545454545456
+            }
+        },
+        "X:/Kipo/Pomo.Core/Content/Maps/Lobby.xml#ProtoTileset": {
+            "dynamicWrapping": true,
+            "scaleInDock": 1,
+            "scaleInEditor": 1
+        },
+        "X:/Kipo/Pomo.Core/Content/Maps/Proto.xml": {
+            "expandedObjectLayers": [
+                8,
+                5
+            ],
+            "scale": 2,
+            "selectedLayer": 2,
+            "viewCenter": {
+                "x": 531.5,
+                "y": 151.75
             }
         },
         "X:/Kipo/Pomo.Core/Content/Maps/Proto.xml#ProtoTileset": {
             "dynamicWrapping": false,
-            "scaleInDock": 1
+            "scaleInDock": 1,
+            "scaleInEditor": 1
         },
         "X:/home/amunoz/repos/Kipo/Pomo.Core/Content/Maps/Proto.xml": {
             "scale": 0.75,
@@ -59,22 +81,22 @@
             "scaleInEditor": 1
         }
     },
-    "last.imagePath": "/home/amunoz/repos/Kipo/Pomo.Core/Content/Tiles/64x64",
+    "last.imagePath": "X:/Kipo/Pomo.Core/Content/Tiles/64x64",
     "last.worldFilePath": "/home/amunoz/repos/Kipo/MapDesign",
     "loadedWorlds": [
         "/home/amunoz/repos/Kipo/MapDesign/Pomo.world"
     ],
-    "map.height": 15,
+    "map.height": 10,
     "map.lastUsedFormat": "tmx",
     "map.orientation": "3",
-    "map.renderOrder": "2",
+    "map.renderOrder": "0",
     "map.tileWidth": 64,
-    "map.width": 15,
+    "map.width": 10,
     "openFiles": [
         "X:/Kipo/Pomo.Core/Content/Maps/Proto.xml"
     ],
     "project": "PomoMaps.tiled-project",
-    "property.type": "bool",
+    "property.type": "int",
     "recentFiles": [
         "X:/Kipo/Pomo.Core/Content/Maps/Proto.xml",
         "X:/home/amunoz/repos/Kipo/Pomo.Core/Content/Maps/Proto.xml",
