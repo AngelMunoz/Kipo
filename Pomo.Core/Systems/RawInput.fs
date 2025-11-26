@@ -13,11 +13,16 @@ module RawInput =
   open Microsoft.Xna.Framework
 
 
-  type RawInputSystem(game: Game, entityId: Guid<EntityId>) as this =
+  open Pomo.Core.Environment
+  open Pomo.Core.Environment.Patterns
+
+  type RawInputSystem
+    (game: Game, env: PomoEnvironment, entityId: Guid<EntityId>) =
     inherit GameSystem(game)
 
+    let (Core core) = env.CoreServices
 
-    let prevInputState = this.World.RawInputStates |> AMap.tryFind entityId
+    let prevInputState = core.World.RawInputStates |> AMap.tryFind entityId
 
     override val Kind = RawInput with get
 
@@ -52,7 +57,7 @@ module RawInput =
         PrevTouch = prevInputState.Touch
       }
 
-      this.EventBus.Publish(
+      core.EventBus.Publish(
         StateChangeEvent.Input(
           InputEvents.RawStateChanged struct (entityId, newRawInputState)
         )

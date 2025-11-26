@@ -23,9 +23,18 @@ module RenderOrchestratorSystem =
       | false, _ -> 0
     | ValueNone -> 0
 
+  open Pomo.Core.Environment
+  open Pomo.Core.Environment.Patterns
+
   type RenderOrchestratorSystem
-    (game: Game, mapKey: string, playerId: Guid<EntityId>) =
+    (game: Game, env: PomoEnvironment, mapKey: string, playerId: Guid<EntityId>)
+    =
     inherit DrawableGameComponent(game)
+
+    let (Core core) = env.CoreServices
+    let (Stores stores) = env.StoreServices
+    let (Gameplay gameplay) = env.GameplayServices
+    let (MonoGame monoGame) = env.MonoGameServices
 
     let mutable renderServices: Render.RenderService list = []
     let mutable terrainServices: TerrainRenderSystem.TerrainRenderService list = []
@@ -33,16 +42,16 @@ module RenderOrchestratorSystem =
     let mutable foregroundTerrainServices
       : TerrainRenderSystem.TerrainRenderService list = []
 
-    let world = game.Services.GetService<World.World>()
+    let world = core.World
 
-    let targetingService = game.Services.GetService<TargetingService>()
+    let targetingService = gameplay.TargetingService
 
-    let projections = game.Services.GetService<ProjectionService>()
+    let projections = gameplay.Projections
 
     override _.Initialize() =
       base.Initialize()
 
-      let mapStore = game.Services.GetService<MapStore>()
+      let mapStore = stores.MapStore
       let map = mapStore.find mapKey
 
       // Group map layers by their RenderGroup property
@@ -68,7 +77,7 @@ module RenderOrchestratorSystem =
         let layerNames = layers |> IndexList.map(fun l -> l.Name)
 
         let service =
-          TerrainRenderSystem.create(game, mapKey, ValueSome layerNames)
+          TerrainRenderSystem.create(game, env, mapKey, ValueSome layerNames)
 
         if group < 2 then
           backgroundServices.Add(service)
@@ -79,7 +88,7 @@ module RenderOrchestratorSystem =
       foregroundTerrainServices <- foregroundServices |> List.ofSeq
 
       // Create RenderService
-      let cameraService = game.Services.GetService<CameraService>()
+      let cameraService = gameplay.CameraService
 
       let renderService =
         Render.create(
@@ -96,7 +105,7 @@ module RenderOrchestratorSystem =
     override _.Draw(gameTime) =
       let graphicsDevice = game.GraphicsDevice
       let originalViewport = graphicsDevice.Viewport
-      let cameraService = game.Services.GetService<CameraService>()
+      let cameraService = gameplay.CameraService
 
       // Iterate through cameras and render
       for (playerId, camera) in cameraService.GetAllCameras() do

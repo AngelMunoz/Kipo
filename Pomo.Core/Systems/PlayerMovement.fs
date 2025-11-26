@@ -44,26 +44,33 @@ module PlayerMovement =
           Vector2.Zero
       )
 
-  type PlayerMovementSystem(game: Game, playerId: Guid<EntityId>) as this =
+  open Pomo.Core.Environment
+  open Pomo.Core.Environment.Patterns
+
+  type PlayerMovementSystem
+    (game: Game, env: PomoEnvironment, playerId: Guid<EntityId>) =
     inherit GameSystem(game)
+
+    let (Core core) = env.CoreServices
+    let (Gameplay gameplay) = env.GameplayServices
 
     let speed = 100.0f
 
     // Use the projection
-    let velocity = Projections.PlayerVelocity this.World playerId speed
+    let velocity = Projections.PlayerVelocity core.World playerId speed
 
     let playerCombatStatuses =
-      this.Projections.CombatStatuses
+      gameplay.Projections.CombatStatuses
       |> AMap.tryFind playerId
       |> AVal.map(Option.defaultValue IndexList.empty)
 
 
     let movementSpeed =
-      this.Projections.DerivedStats
+      gameplay.Projections.DerivedStats
       |> AMap.tryFind playerId
       |> AVal.map(Option.map _.MS >> Option.defaultValue 100)
 
-    let movementState = this.World.MovementStates |> AMap.tryFind playerId
+    let movementState = core.World.MovementStates |> AMap.tryFind playerId
 
     // This is a simple, non-adaptive way to track the last published value.
     // A mutable variable scoped to the system is acceptable for this kind of internal bookkeeping.
@@ -80,7 +87,7 @@ module PlayerMovement =
       base.Initialize()
 
       sub <-
-        this.EventBus.GetObservableFor<SystemCommunications.CollisionEvents>()
+        core.EventBus.GetObservableFor<SystemCommunications.CollisionEvents>()
         |> Observable.subscribe(fun e -> collisionEvents.Enqueue(e))
 
     override _.Dispose(disposing) =
@@ -90,7 +97,7 @@ module PlayerMovement =
       base.Dispose(disposing)
 
     override this.Update _ =
-      let snapshot = this.Projections.ComputeMovementSnapshot()
+      let snapshot = gameplay.Projections.ComputeMovementSnapshot()
 
       // Process collisions
       let mutable accumulatedMtv = Vector2.Zero
@@ -110,7 +117,7 @@ module PlayerMovement =
 
           accumulatedMtv <-
             accumulatedMtv
-            + MovementLogic.resolveCollision eId currentPos mtv this.EventBus
+            + MovementLogic.resolveCollision eId currentPos mtv core.EventBus
         | _ -> ()
 
       let currentVelocity = velocity |> AVal.force
@@ -127,7 +134,7 @@ module PlayerMovement =
               playerId
               Vector2.Zero
               lastVelocity
-              this.EventBus
+              core.EventBus
       else
         let movementState = movementState |> AVal.force
 
@@ -148,14 +155,14 @@ module PlayerMovement =
               accumulatedMtv
           with
           | MovementLogic.Arrived ->
-            MovementLogic.notifyArrived playerId this.EventBus
+            MovementLogic.notifyArrived playerId core.EventBus
           | MovementLogic.Moving finalVelocity ->
             lastVelocity <-
               MovementLogic.notifyVelocityChange
                 playerId
                 finalVelocity
                 lastVelocity
-                this.EventBus
+                core.EventBus
           | _ -> () // Should not happen for MovingTo
 
         | Some(MovingAlongPath path) ->
@@ -167,20 +174,20 @@ module PlayerMovement =
               accumulatedMtv
           with
           | MovementLogic.Arrived ->
-            MovementLogic.notifyArrived playerId this.EventBus
+            MovementLogic.notifyArrived playerId core.EventBus
             lastVelocity <- Vector2.Zero
           | MovementLogic.WaypointReached remainingWaypoints ->
             MovementLogic.notifyWaypointReached
               playerId
               remainingWaypoints
-              this.EventBus
+              core.EventBus
           | MovementLogic.Moving finalVelocity ->
             lastVelocity <-
               MovementLogic.notifyVelocityChange
                 playerId
                 finalVelocity
                 lastVelocity
-                this.EventBus
+                core.EventBus
 
         | Some Idle ->
           let mutable targetVelocity = currentVelocity
@@ -194,5 +201,5 @@ module PlayerMovement =
               playerId
               targetVelocity
               lastVelocity
-              this.EventBus
+              core.EventBus
         | None -> ()

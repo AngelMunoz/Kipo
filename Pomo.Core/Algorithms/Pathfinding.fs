@@ -352,22 +352,18 @@ module Pathfinding =
       (endNode: NavNode)
       (closedSet: Dictionary<GridCell, NavNode>)
       : Vector2 list =
-      let mutable path = []
-      let mutable curr = ValueSome endNode
-
-      while curr.IsValueSome do
-        let node = curr.Value
+      let rec buildPath node acc =
         let worldPos = Grid.gridToWorld grid.CellSize node.Position
-        path <- worldPos :: path
+        let newAcc = worldPos :: acc
 
         match node.Parent with
         | ValueSome p ->
           match closedSet.TryGetValue p with
-          | true, parentNode -> curr <- ValueSome parentNode
-          | false, _ -> curr <- ValueNone
-        | ValueNone -> curr <- ValueNone
+          | true, parentNode -> buildPath parentNode newAcc
+          | false, _ -> newAcc
+        | ValueNone -> newAcc
 
-      path
+      buildPath endNode []
 
     let private hasLineOfSight
       (grid: NavGrid)

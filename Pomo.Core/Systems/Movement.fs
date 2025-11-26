@@ -13,13 +13,19 @@ open Pomo.Core.Systems.Systems
 
 module Movement =
 
-  type MovementSystem(game: Game) =
+  open Pomo.Core.Environment
+  open Pomo.Core.Environment.Patterns
+
+  type MovementSystem(game: Game, env: PomoEnvironment) =
     inherit GameSystem(game)
+
+    let (Gameplay gameplay) = env.GameplayServices
+    let (Core core) = env.CoreServices
 
     override val Kind = Movement with get
 
     override this.Update _ =
-      let movements = this.Projections.ComputeMovementSnapshot().Positions
+      let movements = gameplay.Projections.ComputeMovementSnapshot().Positions
 
       for id, newPosition in movements do
-        this.EventBus.Publish(Physics(PositionChanged struct (id, newPosition)))
+        core.EventBus.Publish(Physics(PositionChanged struct (id, newPosition)))

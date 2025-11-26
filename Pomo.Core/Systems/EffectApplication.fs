@@ -367,21 +367,26 @@ module Effects =
     |> AMap.map(fun _ effectList ->
       effectList |> IndexList.collect Helpers.generateInstantEvents)
 
-  type EffectProcessingSystem(game: Game) as this =
+  open Pomo.Core.Environment
+  open Pomo.Core.Environment.Patterns
+
+  type EffectProcessingSystem(game: Game, env: PomoEnvironment) =
     inherit GameSystem(game)
 
+    let (Core core) = env.CoreServices
+
     let timedEvents =
-      this.World.ActiveEffects
+      core.World.ActiveEffects
       |> timedEffects
-      |> calculateTimedEvents this.World
+      |> calculateTimedEvents core.World
 
     let loopEvents =
-      this.World.ActiveEffects |> loopEffects |> calculateLoopEvents this.World
+      core.World.ActiveEffects |> loopEffects |> calculateLoopEvents core.World
 
     let permanentLoopEvents =
-      this.World.ActiveEffects
+      core.World.ActiveEffects
       |> permanentLoopEffects
-      |> calculatePermanentLoopEvents this.World
+      |> calculatePermanentLoopEvents core.World
 
     let allEvents =
       let inline resolve _ a b = IndexList.append a b
@@ -400,8 +405,8 @@ module Effects =
         for evts in events do
           for evt in evts do
             match evt with
-            | State stateEvent -> this.EventBus.Publish stateEvent
-            | EffectTick(DamageIntent dmg) -> this.EventBus.Publish dmg
-            | EffectTick(ResourceIntent res) -> this.EventBus.Publish res
+            | State stateEvent -> core.EventBus.Publish stateEvent
+            | EffectTick(DamageIntent dmg) -> core.EventBus.Publish dmg
+            | EffectTick(ResourceIntent res) -> core.EventBus.Publish res
 
       publishEvents(allEvents |> AMap.toASetValues |> ASet.force)

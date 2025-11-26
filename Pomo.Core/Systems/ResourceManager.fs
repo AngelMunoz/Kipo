@@ -157,27 +157,34 @@ module ResourceManager =
                 )
           | ValueNone -> ()
 
-  type ResourceManagerSystem(game: Game) as this =
+  open Pomo.Core.Environment
+  open Pomo.Core.Environment.Patterns
+
+  type ResourceManagerSystem(game: Game, env: PomoEnvironment) =
     inherit GameSystem(game)
+
+    let (Core core) = env.CoreServices
+    let (Gameplay gameplay) = env.GameplayServices
+
     let subscriptions = new CompositeDisposable()
-    let allStats = this.Projections.DerivedStats
+    let allStats = gameplay.Projections.DerivedStats
     let regenAccumulators = Dictionary<Guid<EntityId>, struct (float * float)>()
 
     override this.Initialize() =
       base.Initialize()
 
-      this.EventBus.GetObservableFor<SystemCommunications.DamageDealt>()
+      core.EventBus.GetObservableFor<SystemCommunications.DamageDealt>()
       |> Observable.subscribe(
-        Handlers.handleDamageDealt this.World this.EventBus
+        Handlers.handleDamageDealt core.World core.EventBus
       )
       |> subscriptions.Add
 
-      this.EventBus.GetObservableFor<SystemCommunications.ResourceRestored>()
+      core.EventBus.GetObservableFor<SystemCommunications.ResourceRestored>()
       |> Observable.subscribe(
         handleResourceRestored
-          this.World
-          this.EventBus
-          this.Projections.DerivedStats
+          core.World
+          core.EventBus
+          gameplay.Projections.DerivedStats
       )
       |> subscriptions.Add
 
@@ -191,12 +198,12 @@ module ResourceManager =
 
     override this.Update gameTime =
       base.Update gameTime
-      let allResources = this.World.Resources |> AMap.force
-      let allInCombat = this.World.InCombatUntil |> AMap.force
+      let allResources = core.World.Resources |> AMap.force
+      let allInCombat = core.World.InCombatUntil |> AMap.force
       let allStats = allStats |> AMap.force
 
       let struct (totalGameTime, deltaTime) =
-        this.World.Time
+        core.World.Time
         |> AVal.map(fun t -> struct (t.TotalGameTime, t.Delta))
         |> AVal.force
 
@@ -206,5 +213,5 @@ module ResourceManager =
         allStats
         totalGameTime
         deltaTime
-        this.EventBus
+        core.EventBus
         regenAccumulators

@@ -12,10 +12,20 @@ open Pomo.Core.Stores
 
 module TerrainRenderSystem =
 
+  open Pomo.Core.Environment
+  open Pomo.Core.Environment.Patterns
+
   type TerrainRenderService =
     abstract Draw: Camera -> unit
 
-  let create(game: Game, mapKey: string, layersToRender: string seq voption) =
+  let create
+    (
+      game: Game,
+      env: PomoEnvironment,
+      mapKey: string,
+      layersToRender: string seq voption
+    ) =
+    let (Stores stores) = env.StoreServices
     let layersToRender = layersToRender |> ValueOption.map HashSet.ofSeq
 
     let mutable mapDefinition: MapDefinition voption = ValueNone
@@ -23,7 +33,7 @@ module TerrainRenderSystem =
     let spriteBatch = new SpriteBatch(game.GraphicsDevice)
     let tileTextures = Collections.Generic.Dictionary<int, Texture2D>()
 
-    let mapStore = game.Services.GetService<MapStore>()
+    let mapStore = stores.MapStore
     mapDefinition <- ValueSome(mapStore.find mapKey)
 
     match mapDefinition with
@@ -57,7 +67,7 @@ module TerrainRenderSystem =
                 -camera.Position.Y,
                 0.0f
               )
-              * Matrix.CreateScale(camera.Zoom)
+              * Matrix.CreateScale(camera.Zoom, camera.Zoom, 1.0f)
               * Matrix.CreateTranslation(
                 float32 camera.Viewport.Width / 2.0f,
                 float32 camera.Viewport.Height / 2.0f,

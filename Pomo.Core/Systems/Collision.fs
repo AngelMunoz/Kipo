@@ -43,10 +43,17 @@ module Collision =
       | ValueNone -> IndexList.empty)
 
 
-  type CollisionSystem(game: Game, mapKey: string) =
+  open Pomo.Core.Environment
+  open Pomo.Core.Environment.Patterns
+
+  type CollisionSystem(game: Game, env: PomoEnvironment, mapKey: string) =
     inherit GameSystem(game)
 
-    let mapStore = game.Services.GetService<MapStore>()
+    let (Core core) = env.CoreServices
+    let (Stores stores) = env.StoreServices
+    let (Gameplay gameplay) = env.GameplayServices
+
+    let mapStore = stores.MapStore
     let map = mapStore.tryFind mapKey
 
     let mapObjectCache =
@@ -66,10 +73,10 @@ module Collision =
     override val Kind = SystemKind.Collision with get
 
     override this.Update _ =
-      let snapshot = this.Projections.ComputeMovementSnapshot()
+      let snapshot = gameplay.Projections.ComputeMovementSnapshot()
       let grid = snapshot.SpatialGrid
       let positions = snapshot.Positions
-      let liveEntities = this.Projections.LiveEntities |> ASet.force
+      let liveEntities = gameplay.Projections.LiveEntities |> ASet.force
       let getNearbyTo = getNearbyEntities grid
 
       // Check for collisions
@@ -86,7 +93,7 @@ module Collision =
                 let distance = Vector2.Distance(pos, otherPos)
                 // Simple radius check
                 if distance < Core.Constants.Entity.CollisionDistance then
-                  this.EventBus.Publish(
+                  core.EventBus.Publish(
                     SystemCommunications.EntityCollision
                       struct (entityId, otherId)
                   )
@@ -121,7 +128,7 @@ module Collision =
                     with
                     | ValueSome mtv ->
 
-                      this.EventBus.Publish(
+                      core.EventBus.Publish(
                         SystemCommunications.MapObjectCollision
                           struct (entityId, obj, mtv)
                       )

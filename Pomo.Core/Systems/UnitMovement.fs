@@ -14,8 +14,15 @@ open Pomo.Core.Systems
 
 module UnitMovement =
 
-  type UnitMovementSystem(game: Game, playerId: Guid<EntityId>) as this =
+  open Pomo.Core.Environment
+  open Pomo.Core.Environment.Patterns
+
+  type UnitMovementSystem
+    (game: Game, env: PomoEnvironment, playerId: Guid<EntityId>) =
     inherit GameSystem(game)
+
+    let (Core core) = env.CoreServices
+    let (Gameplay gameplay) = env.GameplayServices
 
     // Mutable state to track last known velocities to avoid spamming events
     let lastVelocities =
@@ -33,12 +40,13 @@ module UnitMovement =
       System.Collections.Generic.Dictionary<Guid<EntityId>, Vector2 list>()
 
     let movementStates =
-      this.World.MovementStates |> AMap.filter(fun id _ -> id <> playerId)
+      core.World.MovementStates |> AMap.filter(fun id _ -> id <> playerId)
 
 
 
     let derivedStats =
-      this.Projections.DerivedStats |> AMap.filter(fun id _ -> id <> playerId)
+      gameplay.Projections.DerivedStats
+      |> AMap.filter(fun id _ -> id <> playerId)
 
     override val Kind = Movement with get
 
@@ -46,7 +54,7 @@ module UnitMovement =
       base.Initialize()
 
       sub <-
-        this.EventBus.GetObservableFor<SystemCommunications.CollisionEvents>()
+        core.EventBus.GetObservableFor<SystemCommunications.CollisionEvents>()
         |> Observable.subscribe(fun e -> collisionEvents.Enqueue(e))
 
 
@@ -57,7 +65,7 @@ module UnitMovement =
       base.Dispose(disposing)
 
     override this.Update(gameTime) =
-      let snapshot = this.Projections.ComputeMovementSnapshot()
+      let snapshot = gameplay.Projections.ComputeMovementSnapshot()
 
       // Process collisions
       let mutable collisionEvent =
@@ -76,7 +84,7 @@ module UnitMovement =
           match allPositions |> HashMap.tryFindV eId with
           | ValueSome currentPos ->
             let mtv =
-              MovementLogic.resolveCollision eId currentPos mtv this.EventBus
+              MovementLogic.resolveCollision eId currentPos mtv core.EventBus
 
             match frameCollisions.TryGetValue eId with
             | true, existing -> frameCollisions[eId] <- existing + mtv
@@ -114,14 +122,14 @@ module UnitMovement =
                  | false, _ -> Vector2.Zero)
             with
             | MovementLogic.Arrived ->
-              MovementLogic.notifyArrived entityId this.EventBus
+              MovementLogic.notifyArrived entityId core.EventBus
               lastVelocities[entityId] <- Vector2.Zero
               currentPaths.Remove(entityId) |> ignore
             | MovementLogic.WaypointReached remainingWaypoints ->
               MovementLogic.notifyWaypointReached
                 entityId
                 remainingWaypoints
-                this.EventBus
+                core.EventBus
             | MovementLogic.Moving finalVelocity ->
               let lastVel =
                 match lastVelocities.TryGetValue entityId with
@@ -133,7 +141,7 @@ module UnitMovement =
                   entityId
                   finalVelocity
                   lastVel
-                  this.EventBus
+                  core.EventBus
 
           | MovingTo target ->
             match
@@ -146,7 +154,7 @@ module UnitMovement =
                  | false, _ -> Vector2.Zero)
             with
             | MovementLogic.Arrived ->
-              MovementLogic.notifyArrived entityId this.EventBus
+              MovementLogic.notifyArrived entityId core.EventBus
               lastVelocities[entityId] <- Vector2.Zero
               currentPaths.Remove(entityId) |> ignore // Clear any residual path
             | MovementLogic.Moving finalVelocity ->
@@ -160,7 +168,7 @@ module UnitMovement =
                   entityId
                   finalVelocity
                   lastVel
-                  this.EventBus
+                  core.EventBus
             | _ -> () // Should not happen for MovingTo
           | Idle ->
             // Ensure velocity is zero if idle (and we were previously moving)
@@ -173,7 +181,7 @@ module UnitMovement =
                   entityId
                   Vector2.Zero
                   lastVelocities[entityId]
-                  this.EventBus
+                  core.EventBus
 
             currentPaths.Remove(entityId) |> ignore // Clear any residual path
         | ValueNone -> ()

@@ -750,24 +750,35 @@ module Combat =
       | _ -> () // Skill not found
 
 
-  type CombatSystem(game: Game) as this =
+  open Pomo.Core.Environment
+  open Pomo.Core.Environment.Patterns
+
+  type CombatSystem(game: Game, env: PomoEnvironment) =
     inherit GameSystem(game)
 
-    let eventBus = this.EventBus
-    let skillStore = this.Game.Services.GetService<Stores.SkillStore>()
+    let (Core core) = env.CoreServices
+    let (Stores stores) = env.StoreServices
+    let (Gameplay gameplay) = env.GameplayServices
+
+    let eventBus = core.EventBus
+    let skillStore = stores.SkillStore
     let subscriptions = new CompositeDisposable()
 
     override this.Initialize() =
       base.Initialize()
-      let derivedStats = this.Projections.DerivedStats
+      let derivedStats = gameplay.Projections.DerivedStats
 
       // make it inline to be sure the AMap forcing
       // is done in the subscription callbacks
       let inline createCtx() =
-        let snapshot = this.Projections.ComputeMovementSnapshot()
+        let snapshot = gameplay.Projections.ComputeMovementSnapshot()
 
         let getNearbyEntities center radius =
-          this.Projections.GetNearbyEntitiesSnapshot(snapshot, center, radius)
+          gameplay.Projections.GetNearbyEntitiesSnapshot(
+            snapshot,
+            center,
+            radius
+          )
 
         let searchCtx: Spatial.Search.SearchContext = {
           GetNearbyEntities = getNearbyEntities
@@ -775,14 +786,14 @@ module Combat =
 
         let entityContext = {
           Positions = snapshot.Positions
-          Cooldowns = this.World.AbilityCooldowns |> AMap.force
-          Resources = this.World.Resources |> AMap.force
+          Cooldowns = core.World.AbilityCooldowns |> AMap.force
+          Resources = core.World.Resources |> AMap.force
           DerivedStats = derivedStats |> AMap.force
         }
 
         {
-          Rng = this.World.Rng
-          Time = this.World.Time |> AVal.force
+          Rng = core.World.Rng
+          Time = core.World.Time |> AVal.force
           EventBus = eventBus
           SearchContext = searchCtx
           EntityContext = entityContext

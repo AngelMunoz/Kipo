@@ -103,46 +103,12 @@ type PomoGame() as this =
 
   let playerId = %Guid.NewGuid()
 
-  let eventBus = new EventBus()
+  let struct (pomoEnv, mutableWorld) = CompositionRoot.create(this, playerId)
 
-  // 1. Create both the mutable source of truth and the public read-only view.
-  let struct (mutableWorld, worldView) = World.create Random.Shared
-  let skillStore = Stores.Skill.create(JsonFileLoader.readSkills deserializer)
-  let itemStore = Stores.Item.create(JsonFileLoader.readItems deserializer)
-
-  let aiArchetypeStore =
-    Stores.AIArchetype.create(JsonFileLoader.readAIArchetypes deserializer)
-
-  let mapStore =
-    Stores.Map.create MapLoader.loadMap [ "Content/Maps/Proto.xml" ]
-
-
-  let projections = Projections.create(itemStore, worldView)
-
-  let targetingService = Targeting.create(eventBus, skillStore, projections)
-
-  let effectApplicationService =
-    Effects.EffectApplication.create(worldView, eventBus)
-
-  let cameraSystem =
-    CameraSystem.create(this, projections, Array.singleton playerId)
-
-  let actionHandler =
-    ActionHandler.create(
-      worldView,
-      eventBus,
-      targetingService,
-      projections,
-      cameraSystem,
-      playerId
-    )
-
-  let movementService =
-    Navigation.create(eventBus, mapStore, "Proto1", worldView)
-
-  let inventoryService = Inventory.create(eventBus, itemStore, worldView)
-  let equipmentService = Equipment.create worldView eventBus
-
+  let (Core core) = pomoEnv.CoreServices
+  let (Stores stores) = pomoEnv.StoreServices
+  let (Gameplay gameplay) = pomoEnv.GameplayServices
+  let (Listeners listeners) = pomoEnv.ListenerServices
 
   do
     base.IsMouseVisible <- true
@@ -156,43 +122,29 @@ type PomoGame() as this =
 
     base.Services.AddService<GraphicsDeviceManager> graphicsDeviceManager
 
-    base.Services.AddService<Projections.ProjectionService> projections
-
-    base.Services.AddService<SkillStore> skillStore
-    base.Services.AddService<ItemStore> itemStore
-    base.Services.AddService<AIArchetypeStore> aiArchetypeStore
-    base.Services.AddService<MapStore> mapStore
-    base.Services.AddService<EventBus> eventBus
-
-    base.Services.AddService<World.World> worldView
-
-    base.Services.AddService<TargetingService> targetingService
-    base.Services.AddService<CameraService> cameraSystem
-
-    base.Components.Add(new RawInputSystem(this, playerId))
-    base.Components.Add(new InputMappingSystem(this, playerId))
-    base.Components.Add(new PlayerMovementSystem(this, playerId))
-    base.Components.Add(new UnitMovementSystem(this, playerId))
-    base.Components.Add(new AbilityActivationSystem(this, playerId))
-    base.Components.Add(new CombatSystem(this))
-    base.Components.Add(new ResourceManagerSystem(this))
-    base.Components.Add(new ProjectileSystem(this))
-    base.Components.Add(new CollisionSystem(this, "Proto1"))
-    base.Components.Add(new MovementSystem(this))
+    base.Components.Add(new RawInputSystem(this, pomoEnv, playerId))
+    base.Components.Add(new InputMappingSystem(this, pomoEnv, playerId))
+    base.Components.Add(new PlayerMovementSystem(this, pomoEnv, playerId))
+    base.Components.Add(new UnitMovementSystem(this, pomoEnv, playerId))
+    base.Components.Add(new AbilityActivationSystem(this, pomoEnv, playerId))
+    base.Components.Add(new CombatSystem(this, pomoEnv))
+    base.Components.Add(new ResourceManagerSystem(this, pomoEnv))
+    base.Components.Add(new ProjectileSystem(this, pomoEnv))
+    base.Components.Add(new CollisionSystem(this, pomoEnv, "Proto1"))
+    base.Components.Add(new MovementSystem(this, pomoEnv))
 
     base.Components.Add(
-      new NotificationSystem(this, eventBus, DrawOrder = Render.Layer.UI)
+      new NotificationSystem(this, pomoEnv, DrawOrder = Render.Layer.UI)
     )
 
-    base.Components.Add(new EffectProcessingSystem(this))
+    base.Components.Add(new EffectProcessingSystem(this, pomoEnv))
 
-    base.Components.Add(
-      new EntitySpawnerSystem(this, aiArchetypeStore, itemStore)
-    )
+    base.Components.Add(new EntitySpawnerSystem(this, pomoEnv))
 
     base.Components.Add(
       new RenderOrchestratorSystem.RenderOrchestratorSystem(
         this,
+        pomoEnv,
         "Proto1",
         playerId,
         DrawOrder = Render.Layer.TerrainBase
@@ -202,17 +154,16 @@ type PomoGame() as this =
     base.Components.Add(
       new DebugRenderSystem(
         this,
+        pomoEnv,
         playerId,
         "Proto1",
         DrawOrder = Render.Layer.Debug
       )
     )
 
-    base.Components.Add(
-      new AISystem(this, worldView, eventBus, skillStore, aiArchetypeStore)
-    )
+    base.Components.Add(new AISystem(this, pomoEnv))
 
-    base.Components.Add(new StateUpdateSystem(this, mutableWorld))
+    base.Components.Add(new StateUpdateSystem(this, pomoEnv, mutableWorld))
 
 
   override _.Initialize() =
@@ -222,7 +173,7 @@ type PomoGame() as this =
 
     // --- Map Based Spawning ---
     let mapKey = "Proto1"
-    let mapDef = mapStore.find mapKey
+    let mapDef = stores.MapStore.find mapKey
 
     let mutable playerSpawned = false
     let mutable enemyCount = 0
@@ -258,7 +209,7 @@ type PomoGame() as this =
               Position = Vector2(obj.X, obj.Y)
             }
 
-            eventBus.Publish intent
+            core.EventBus.Publish intent
             playerSpawned <- true
 
           // Check for AI Spawn
@@ -273,18 +224,18 @@ type PomoGame() as this =
               Position = Vector2(obj.X, obj.Y)
             }
 
-            eventBus.Publish intent
+            core.EventBus.Publish intent
             enemyCount <- enemyCount + 1
 
         | _ -> ()
 
     // Start listening to action events
-    actionHandler.StartListening() |> subs.Add
-    movementService.StartListening() |> subs.Add
-    targetingService.StartListening() |> subs.Add
-    effectApplicationService.StartListening() |> subs.Add
-    inventoryService.StartListening() |> subs.Add
-    equipmentService.StartListening() |> subs.Add
+    listeners.ActionHandler.StartListening() |> subs.Add
+    listeners.NavigationService.StartListening() |> subs.Add
+    gameplay.TargetingService.StartListening() |> subs.Add
+    listeners.EffectApplication.StartListening() |> subs.Add
+    listeners.InventoryService.StartListening() |> subs.Add
+    listeners.EquipmentService.StartListening() |> subs.Add
 
 
   override _.Dispose(disposing: bool) =

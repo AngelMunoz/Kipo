@@ -240,73 +240,70 @@ module EntitySpawnerLogic =
         memories = HashMap.empty
       }
 
-      eventBus.Publish(
-        StateChangeEvent.AI(
-          AIStateChange.ControllerUpdated struct (entityId, controller)
-        )
-      )
+      eventBus.Publish()
 
-type EntitySpawnerSystem
-  (game: Game, aiArchetypeStore: AIArchetypeStore, itemStore: ItemStore) as this
-  =
-  inherit GameSystem(game)
+  open Pomo.Core.Environment
+  open Pomo.Core.Environment.Patterns
 
-  let pendingSpawns = List<EntitySpawnerLogic.PendingSpawn>()
-  let spawnDuration = Core.Constants.Spawning.DefaultDuration // Animation duration
+  type EntitySpawnerSystem(game: Game, env: PomoEnvironment) =
+    inherit GameSystem(game)
 
-  let subscriptions = new System.Reactive.Disposables.CompositeDisposable()
+    let (Core core) = env.CoreServices
+    let (Stores stores) = env.StoreServices
 
-  override this.Initialize() =
-    base.Initialize()
+    let pendingSpawns = List<PendingSpawn>()
+    let spawnDuration = Core.Constants.Spawning.DefaultDuration // Animation duration
 
-    this.EventBus
-      .GetObservableFor<SystemCommunications.SpawnEntityIntent>()
-      .Subscribe(fun intent ->
-        let totalGameTime =
-          this.World.Time |> AVal.map _.TotalGameTime |> AVal.force
+    let subscriptions = new System.Reactive.Disposables.CompositeDisposable()
 
-        let pending: EntitySpawnerLogic.PendingSpawn = {
-          EntityId = intent.EntityId
-          Type = intent.Type
-          Position = intent.Position
-          SpawnStartTime = totalGameTime
-          Duration = spawnDuration
-        }
+    override this.Initialize() =
+      base.Initialize()
 
-        pendingSpawns.Add(pending)
+      core.EventBus
+        .GetObservableFor<SystemCommunications.SpawnEntityIntent>()
+        .Subscribe(fun intent ->
+          let totalGameTime =
+            core.World.Time |> AVal.map _.TotalGameTime |> AVal.force
 
-        // Notify that spawning has started (visuals can pick this up)
-        this.EventBus.Publish(
-          EntityLifecycle(
-            Spawning struct (intent.EntityId, intent.Type, intent.Position)
+          let pending: PendingSpawn = {
+            EntityId = intent.EntityId
+            Type = intent.Type
+            Position = intent.Position
+            SpawnStartTime = totalGameTime
+            Duration = spawnDuration
+          }
+
+          pendingSpawns.Add(pending)
+
+          // Notify that spawning has started (visuals can pick this up)
+          core.EventBus.Publish(
+            EntityLifecycle(
+              Spawning struct (intent.EntityId, intent.Type, intent.Position)
+            )
           )
+
         )
+      |> subscriptions.Add
 
-      )
-    |> subscriptions.Add
+    override _.Dispose(disposing) =
+      if disposing then
+        subscriptions.Dispose()
 
-  override _.Dispose(disposing) =
-    if disposing then
-      subscriptions.Dispose()
+      base.Dispose(disposing)
 
-    base.Dispose(disposing)
+    override _.Update(gameTime) =
+      let totalGameTime =
+        core.World.Time |> AVal.map _.TotalGameTime |> AVal.force
 
-  override _.Update(gameTime) =
-    let totalGameTime =
-      this.World.Time |> AVal.map _.TotalGameTime |> AVal.force
+      if pendingSpawns.Count > 0 then
+        let currentTime = totalGameTime
+        let toRemove = List<PendingSpawn>()
 
-    if pendingSpawns.Count > 0 then
-      let currentTime = totalGameTime
-      let toRemove = List<EntitySpawnerLogic.PendingSpawn>()
+        for pending in pendingSpawns do
+          if currentTime >= pending.SpawnStartTime + pending.Duration then
+            finalizeSpawn pending core.EventBus stores.AIArchetypeStore
 
-      for pending in pendingSpawns do
-        if currentTime >= pending.SpawnStartTime + pending.Duration then
-          EntitySpawnerLogic.finalizeSpawn
-            pending
-            this.EventBus
-            aiArchetypeStore
+            toRemove.Add(pending)
 
-          toRemove.Add(pending)
-
-      for item in toRemove do
-        pendingSpawns.Remove(item) |> ignore
+        for item in toRemove do
+          pendingSpawns.Remove(item) |> ignore

@@ -52,12 +52,18 @@ module InputMapping =
     let wasDown = isMouseButtonDown prev btn
     not isDown && wasDown
 
-  type InputMappingSystem(game: Game, entityId: Guid<EntityId>) as this =
+  open Pomo.Core.Environment
+  open Pomo.Core.Environment.Patterns
+
+  type InputMappingSystem
+    (game: Game, env: PomoEnvironment, entityId: Guid<EntityId>) =
     inherit GameSystem(game)
 
-    let rawInputState = this.World.RawInputStates |> AMap.tryFind entityId
-    let inputMap = this.World.InputMaps |> AMap.tryFind entityId
-    let prevActionStates = this.World.GameActionStates |> AMap.tryFind entityId
+    let (Core core) = env.CoreServices
+
+    let rawInputState = core.World.RawInputStates |> AMap.tryFind entityId
+    let inputMap = core.World.InputMaps |> AMap.tryFind entityId
+    let prevActionStates = core.World.GameActionStates |> AMap.tryFind entityId
 
     let actionStates = adaptive {
       let! rawState = rawInputState
@@ -113,7 +119,7 @@ module InputMapping =
     override this.Update gameTime =
       match actionStates |> AVal.force with
       | Some states ->
-        this.EventBus.Publish(
+        core.EventBus.Publish(
           StateChangeEvent.Input(
             InputEvents.GameActionStatesChanged struct (entityId, states)
           )

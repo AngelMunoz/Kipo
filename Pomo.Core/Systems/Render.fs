@@ -230,7 +230,7 @@ module Render =
               -camera.Position.Y,
               0.0f
             )
-            * Matrix.CreateScale camera.Zoom
+            * Matrix.CreateScale(camera.Zoom, camera.Zoom, 1.0f)
             * Matrix.CreateTranslation(
               float32 camera.Viewport.Width / 2.0f,
               float32 camera.Viewport.Height / 2.0f,

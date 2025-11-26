@@ -123,29 +123,35 @@ module Projectile =
       struct (IndexList.empty,
               IndexList.single(EntityLifecycle(Removed projectileId)))
 
-type ProjectileSystem(game: Game) =
-  inherit GameSystem(game)
+  open Pomo.Core.Environment
+  open Pomo.Core.Environment.Patterns
 
-  override this.Update _ =
-    let snapshot = this.Projections.ComputeMovementSnapshot()
-    let liveEntities = this.Projections.LiveEntities |> ASet.force
-    let liveProjectiles = this.World.LiveProjectiles |> AMap.force
+  type ProjectileSystem(game: Game, env: PomoEnvironment) =
+    inherit GameSystem(game)
 
-    let sysEvents, stateEvents =
-      liveProjectiles
-      |> HashMap.fold
-        (fun (sysAcc, stateAcc) projectileId projectile ->
-          let struct (sysEvents, stateEvents) =
-            Projectile.processProjectile
-              this.World.Rng
-              snapshot.Positions
-              liveEntities
-              projectileId
-              projectile
+    let (Core core) = env.CoreServices
+    let (Gameplay gameplay) = env.GameplayServices
 
-          IndexList.append sysEvents sysAcc,
-          IndexList.append stateEvents stateAcc)
-        (IndexList.empty, IndexList.empty)
+    override this.Update _ =
+      let snapshot = gameplay.Projections.ComputeMovementSnapshot()
+      let liveEntities = gameplay.Projections.LiveEntities |> ASet.force
+      let liveProjectiles = core.World.LiveProjectiles |> AMap.force
 
-    sysEvents |> IndexList.iter this.EventBus.Publish
-    stateEvents |> IndexList.iter this.EventBus.Publish
+      let sysEvents, stateEvents =
+        liveProjectiles
+        |> HashMap.fold
+          (fun (sysAcc, stateAcc) projectileId projectile ->
+            let struct (sysEvents, stateEvents) =
+              processProjectile
+                core.World.Rng
+                snapshot.Positions
+                liveEntities
+                projectileId
+                projectile
+
+            IndexList.append sysEvents sysAcc,
+            IndexList.append stateEvents stateAcc)
+          (IndexList.empty, IndexList.empty)
+
+      sysEvents |> IndexList.iter core.EventBus.Publish
+      stateEvents |> IndexList.iter core.EventBus.Publish

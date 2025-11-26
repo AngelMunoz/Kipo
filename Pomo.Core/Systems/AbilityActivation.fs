@@ -341,21 +341,29 @@ module AbilityActivation =
       else
         () // Not idle, do nothing
 
-  type AbilityActivationSystem(game: Game, playerId: Guid<EntityId>) as this =
+  open Pomo.Core.Environment
+  open Pomo.Core.Environment.Patterns
+
+  type AbilityActivationSystem
+    (game: Game, env: PomoEnvironment, playerId: Guid<EntityId>) =
     inherit GameSystem(game)
 
-    let skillStore = this.Game.Services.GetService<SkillStore>()
+    let (Core core) = env.CoreServices
+    let (Stores stores) = env.StoreServices
+    let (Gameplay gameplay) = env.GameplayServices
+
+    let skillStore = stores.SkillStore
 
     let activationContext = {
-      EventBus = this.EventBus
+      EventBus = core.EventBus
       SkillStore = skillStore
-      Rng = this.World.Rng
+      Rng = core.World.Rng
       SearchContext =
         ValueSome {
           GetNearbyEntities =
             fun v2 ce ->
-              this.Projections.GetNearbyEntitiesSnapshot(
-                this.Projections.ComputeMovementSnapshot(),
+              gameplay.Projections.GetNearbyEntitiesSnapshot(
+                gameplay.Projections.ComputeMovementSnapshot(),
                 v2,
                 ce
               )
@@ -365,7 +373,7 @@ module AbilityActivation =
     let subscriptions = new CompositeDisposable()
 
     let actionStates =
-      this.World.GameActionStates
+      core.World.GameActionStates
       |> AMap.tryFind playerId
       |> AVal.map(Option.defaultValue HashMap.empty)
       |> AMap.ofAVal
@@ -379,25 +387,25 @@ module AbilityActivation =
       |> AMap.toASetValues
 
     let quickSlots =
-      this.Projections.ActionSets
+      gameplay.Projections.ActionSets
       |> AMap.tryFind playerId
       |> AVal.map(Option.defaultValue HashMap.empty)
 
     let playerCombatStatuses =
-      this.Projections.CombatStatuses
+      gameplay.Projections.CombatStatuses
       |> AMap.tryFind playerId
       |> AVal.map(Option.defaultValue IndexList.empty)
 
-    let playerResources = this.World.Resources |> AMap.tryFind playerId
+    let playerResources = core.World.Resources |> AMap.tryFind playerId
 
-    let playerCooldowns = this.World.AbilityCooldowns |> AMap.tryFind playerId
+    let playerCooldowns = core.World.AbilityCooldowns |> AMap.tryFind playerId
 
 
 
     override this.Initialize() =
       base.Initialize()
 
-      this.EventBus.GetObservableFor<StateChangeEvent>()
+      core.EventBus.GetObservableFor<StateChangeEvent>()
       |> Observable.choose(fun e ->
         match e with
         | Physics(MovementStateChanged data) -> Some data
@@ -405,10 +413,10 @@ module AbilityActivation =
       |> Observable.subscribe(fun e ->
         Handlers.handleMovementStateChanged
           {
-            World = this.World
+            World = core.World
             AbilityActivationContext = activationContext
-            CombatStatuses = this.Projections.CombatStatuses |> AMap.force
-            Snapshot = this.Projections.ComputeMovementSnapshot
+            CombatStatuses = gameplay.Projections.CombatStatuses |> AMap.force
+            Snapshot = gameplay.Projections.ComputeMovementSnapshot
           }
           e)
       |> subscriptions.Add
@@ -426,7 +434,7 @@ module AbilityActivation =
       let statuses = playerCombatStatuses |> AVal.force
       let resources = playerResources |> AVal.force
       let cooldowns = playerCooldowns |> AVal.force
-      let snapshot = this.Projections.ComputeMovementSnapshot()
+      let snapshot = gameplay.Projections.ComputeMovementSnapshot()
 
       let publishNotification(msg: string) =
         let casterPos =
@@ -434,7 +442,7 @@ module AbilityActivation =
           |> HashMap.tryFind playerId
           |> Option.defaultValue Vector2.Zero
 
-        this.EventBus.Publish(
+        core.EventBus.Publish(
           { Message = msg; Position = casterPos }
           : SystemCommunications.ShowNotification
         )
@@ -467,13 +475,13 @@ module AbilityActivation =
               match skillStore.tryFind skillId with
               | ValueSome(Active skill) ->
                 if skill.Intent = Offensive then
-                  this.EventBus.Publish(
+                  core.EventBus.Publish(
                     StateChangeEvent.Combat(InCombatTimerRefreshed playerId)
                   )
 
                 match skill.Targeting with
                 | Self ->
-                  this.EventBus.Publish(
+                  core.EventBus.Publish(
                     {
                       Caster = playerId
                       SkillId = skill.Id
@@ -483,7 +491,7 @@ module AbilityActivation =
                   )
                 | _ ->
 
-                  this.EventBus.Publish(
+                  core.EventBus.Publish(
                     { Slot = action; CasterId = playerId }
                     : SystemCommunications.SlotActivated
                   )
@@ -500,12 +508,12 @@ module AbilityActivation =
 
               publishNotification notificationMsg
           | ValueSome(Item itemInstanceId) ->
-            match this.World.ItemInstances.TryGetValue itemInstanceId with
+            match core.World.ItemInstances.TryGetValue itemInstanceId with
             | true, itemInstance ->
               match itemInstance.UsesLeft with
               | ValueSome 0 -> publishNotification "Item has no uses left!"
               | ValueSome _ ->
-                this.EventBus.Publish(
+                core.EventBus.Publish(
                   {
                     EntityId = playerId
                     ItemInstanceId = itemInstanceId

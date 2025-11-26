@@ -35,7 +35,13 @@ module Environment =
     abstract Projections: ProjectionService
     abstract TargetingService: TargetingService
     abstract CameraService: CameraService
+
+  type ListenerServices =
     abstract EffectApplication: CoreEventListener
+    abstract ActionHandler: CoreEventListener
+    abstract NavigationService: CoreEventListener
+    abstract InventoryService: CoreEventListener
+    abstract EquipmentService: CoreEventListener
 
   type MonoGameServices =
     abstract GraphicsDevice: GraphicsDevice
@@ -46,6 +52,7 @@ module Environment =
     let inline (|Core|)(env: #CoreServices) = env :> CoreServices
     let inline (|Stores|)(env: #StoreServices) = env :> StoreServices
     let inline (|Gameplay|)(env: #GameplayServices) = env :> GameplayServices
+    let inline (|Listeners|)(env: #ListenerServices) = env :> ListenerServices
     let inline (|MonoGame|)(env: #MonoGameServices) = env :> MonoGameServices
 
   type PomoSystem =
@@ -59,4 +66,5 @@ module Environment =
     abstract member CoreServices: CoreServices
     abstract member StoreServices: StoreServices
     abstract member GameplayServices: GameplayServices
+    abstract member ListenerServices: ListenerServices
     abstract member MonoGameServices: MonoGameServices

@@ -12,6 +12,9 @@ open Pomo.Core.Domain.Camera
 
 module Notification =
 
+  open Pomo.Core.Environment
+  open Pomo.Core.Environment.Patterns
+
   type OnScreenNotification = {
     Text: string
     Position: Vector2
@@ -20,11 +23,15 @@ module Notification =
     MaxLife: float32
   }
 
-  type NotificationSystem(game: Game, eventBus: EventBus) =
+  type NotificationSystem(game: Game, env: PomoEnvironment) =
     inherit DrawableGameComponent(game)
 
+    let (Core core) = env.CoreServices
+    let (Gameplay gameplay) = env.GameplayServices
+    let (MonoGame monoGame) = env.MonoGameServices
+
     let mutable notifications = List<OnScreenNotification>()
-    let spriteBatch = lazy new SpriteBatch(game.GraphicsDevice)
+    let spriteBatch = lazy new SpriteBatch(monoGame.GraphicsDevice)
     let mutable hudFont: SpriteFont = null
 
     let handleEvent(event: SystemCommunications.ShowNotification) =
@@ -51,12 +58,12 @@ module Notification =
       base.Initialize()
 
       sub <-
-        eventBus.GetObservableFor<SystemCommunications.ShowNotification>()
+        core.EventBus.GetObservableFor<SystemCommunications.ShowNotification>()
         |> Observable.subscribe(handleEvent)
 
     override _.LoadContent() =
       base.LoadContent()
-      hudFont <- game.Content.Load<SpriteFont>("Fonts/Hud")
+      hudFont <- monoGame.Content.Load<SpriteFont>("Fonts/Hud")
 
     override _.Update(gameTime) =
       let dt = float32 gameTime.ElapsedGameTime.TotalSeconds
@@ -78,7 +85,7 @@ module Notification =
 
     override _.Draw(gameTime) =
       let sb = spriteBatch.Value
-      let cameraService = game.Services.GetService<CameraService>()
+      let cameraService = gameplay.CameraService
       let cameras = cameraService.GetAllCameras()
 
       for struct (playerId, camera) in cameras do

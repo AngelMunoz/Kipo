@@ -436,15 +436,18 @@ module AISystemLogic =
     | _ -> struct (controller, ValueNone)
 
 
-type AISystem
-  (
-    game: Game,
-    world: World,
-    eventBus: EventBus,
-    skillStore: SkillStore,
-    archetypeStore: AIArchetypeStore
-  ) as this =
+open Pomo.Core.Environment
+open Pomo.Core.Environment.Patterns
+
+type AISystem(game: Game, env: PomoEnvironment) =
   inherit GameSystem(game)
+
+  let (Core core) = env.CoreServices
+  let (Stores stores) = env.StoreServices
+  let (Gameplay gameplay) = env.GameplayServices
+
+  let archetypeStore = stores.AIArchetypeStore
+  let skillStore = stores.SkillStore
 
   let fallbackArchetype = {
     id = %0
@@ -469,12 +472,12 @@ type AISystem
 
   override _.Update _ =
     // Snapshot all necessary data
-    let snapshot = this.Projections.ComputeMovementSnapshot()
+    let snapshot = gameplay.Projections.ComputeMovementSnapshot()
     let positions = snapshot.Positions
-    let factions = world.Factions |> AMap.force
+    let factions = core.World.Factions |> AMap.force
     let spatialGrid = snapshot.SpatialGrid
-    let controllers = world.AIControllers |> AMap.force
-    let currentTick = (world.Time |> AVal.force).TotalGameTime
+    let controllers = core.World.AIControllers |> AMap.force
+    let currentTick = (core.World.Time |> AVal.force).TotalGameTime
 
     for controllerId, controller in controllers do
 
@@ -493,11 +496,11 @@ type AISystem
           currentTick
 
       match command with
-      | ValueSome cmd -> eventBus.Publish cmd
+      | ValueSome cmd -> core.EventBus.Publish cmd
       | ValueNone -> ()
 
       if updatedController <> controller then
-        eventBus.Publish(
+        core.EventBus.Publish(
           StateChangeEvent.AI(
             ControllerUpdated struct (controllerId, updatedController)
           )

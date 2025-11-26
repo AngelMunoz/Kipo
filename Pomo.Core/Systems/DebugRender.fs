@@ -428,16 +428,25 @@ module DebugRender =
 
       drawLine sb pixel p1 p2 color
 
-  type DebugRenderSystem(game: Game, playerId: Guid<EntityId>, mapKey: string) =
+  open Pomo.Core.Environment
+  open Pomo.Core.Environment.Patterns
+
+  type DebugRenderSystem
+    (game: Game, env: PomoEnvironment, playerId: Guid<EntityId>, mapKey: string)
+    =
     inherit DrawableGameComponent(game)
 
-    let world: World.World = game.Services.GetService<World.World>()
-    let itemStore: ItemStore = game.Services.GetService<ItemStore>()
+    let (Core core) = env.CoreServices
+    let (Stores stores) = env.StoreServices
+    let (Gameplay gameplay) = env.GameplayServices
+    let (MonoGame monoGame) = env.MonoGameServices
 
-    let projections: Projections.ProjectionService =
-      game.Services.GetService<Projections.ProjectionService>()
+    let world = core.World
+    let itemStore = stores.ItemStore
 
-    let mapStore = game.Services.GetService<MapStore>()
+    let projections = gameplay.Projections
+
+    let mapStore = stores.MapStore
 
     // Performance counters and timing
     let mutable frameCount = 0
@@ -456,7 +465,7 @@ module DebugRender =
     let showInventory = cval false
 
     let transientCommands = ResizeArray<struct (DebugDrawCommand * TimeSpan)>()
-    let skillStore = game.Services.GetService<SkillStore>()
+    let skillStore = stores.SkillStore
     let subscriptions = new System.Reactive.Disposables.CompositeDisposable()
 
 
@@ -549,7 +558,7 @@ module DebugRender =
       p.SetData([| Color.White |])
       pixel <- ValueSome p
 
-      let eventBus = game.Services.GetService<EventBus>()
+      let eventBus = core.EventBus
 
       eventBus.GetObservableFor<SystemCommunications.AbilityIntent>()
       |> FSharp.Control.Reactive.Observable.subscribe(fun intent ->
@@ -746,7 +755,7 @@ module DebugRender =
 
       let mutable yOffsets = HashMap.empty<Guid<EntityId>, float32>
 
-      let cameraService = game.Services.GetService<CameraService>()
+      let cameraService = gameplay.CameraService
       let cameras = cameraService.GetAllCameras()
 
       for struct (_, camera) in cameras do

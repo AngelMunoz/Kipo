@@ -338,10 +338,15 @@ module StateUpdate =
       if world.Positions.ContainsKey entityId then
         world.AIControllers[entityId] <- controller
 
-  type StateUpdateSystem(game: Game, mutableWorld: World.MutableWorld) =
+  open Pomo.Core.Environment
+  open Pomo.Core.Environment.Patterns
+
+  type StateUpdateSystem
+    (game: Game, env: PomoEnvironment, mutableWorld: World.MutableWorld) =
     inherit GameComponent(game)
 
-    let eventBus = game.Services.GetService<EventBus>()
+    let (Core core) = env.CoreServices
+    let eventBus = core.EventBus
     let events = ConcurrentQueue<StateChangeEvent>()
     let mutable sub: IDisposable = null
 

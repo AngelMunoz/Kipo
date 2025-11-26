@@ -22,46 +22,6 @@ open Pomo.Core.Environment
 
 module CompositionRoot =
 
-
-
-  type AppEnv
-    (
-      eventBus: EventBus,
-      world: Pomo.Core.Domain.World.World,
-      random: Random,
-      skillStore: SkillStore,
-      itemStore: ItemStore,
-      mapStore: MapStore,
-      aiArchetypeStore: AIArchetypeStore,
-      projections: ProjectionService,
-      targetingService: TargetingService,
-      cameraService: CameraService,
-      effectApplication: Pomo.Core.Domain.Core.CoreEventListener,
-      graphicsDevice: GraphicsDevice,
-      content: ContentManager
-    ) =
-
-    interface CoreServices with
-      member _.EventBus = eventBus
-      member _.World = world
-      member _.Random = random
-
-    interface StoreServices with
-      member _.SkillStore = skillStore
-      member _.ItemStore = itemStore
-      member _.MapStore = mapStore
-      member _.AIArchetypeStore = aiArchetypeStore
-
-    interface GameplayServices with
-      member _.Projections = projections
-      member _.TargetingService = targetingService
-      member _.CameraService = cameraService
-      member _.EffectApplication = effectApplication
-
-    interface MonoGameServices with
-      member _.GraphicsDevice = graphicsDevice
-      member _.Content = content
-
   let create(game: Game, playerId: Guid<EntityId>) =
     let eventBus = new EventBus()
     let random = Random.Shared
@@ -85,6 +45,23 @@ module CompositionRoot =
 
     let effectApplication = EffectApplication.create(worldView, eventBus)
 
+    let actionHandler =
+      ActionHandler.create(
+        worldView,
+        eventBus,
+        targetingService,
+        projections,
+        cameraService,
+        playerId
+      )
+
+    let navigationService =
+      Navigation.create(eventBus, mapStore, "Proto1", worldView)
+
+    let inventoryService = Inventory.create(eventBus, itemStore, worldView)
+
+    let equipmentService = Equipment.create worldView eventBus
+
     let pomoEnv =
       { new PomoEnvironment with
           member _.CoreServices: CoreServices =
@@ -99,7 +76,15 @@ module CompositionRoot =
                 member _.Projections = projections
                 member _.TargetingService = targetingService
                 member _.CameraService = cameraService
+            }
+
+          member _.ListenerServices: ListenerServices =
+            { new ListenerServices with
                 member _.EffectApplication = effectApplication
+                member _.ActionHandler = actionHandler
+                member _.NavigationService = navigationService
+                member _.InventoryService = inventoryService
+                member _.EquipmentService = equipmentService
             }
 
           member _.MonoGameServices: MonoGameServices =
@@ -116,5 +101,7 @@ module CompositionRoot =
                 member _.AIArchetypeStore = aiArchetypeStore
             }
       }
+
+
 
     struct (pomoEnv, mutableWorld)

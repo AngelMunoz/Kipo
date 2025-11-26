@@ -72,6 +72,8 @@ module ActionHandler =
     | ValueSome(Pressed, value) -> publishChange value
     | _ -> ()
 
+  open Pomo.Core.Environment.Patterns
+
   let create
     (
       world: World,
