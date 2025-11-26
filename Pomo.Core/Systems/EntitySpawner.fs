@@ -240,7 +240,9 @@ module EntitySpawnerLogic =
         memories = HashMap.empty
       }
 
-      eventBus.Publish()
+      eventBus.Publish(
+        StateChangeEvent.AI(ControllerUpdated struct (entityId, controller))
+      )
 
   open Pomo.Core.Environment
   open Pomo.Core.Environment.Patterns

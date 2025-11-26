@@ -188,15 +188,16 @@ module Render =
   type RenderService =
     abstract Draw: Camera -> unit
 
-  let create
-    (
-      game: Game,
-      world: World.World,
-      targetingService: TargetingService,
-      projections: Projections.ProjectionService,
-      cameraService: CameraService,
-      playerId: Guid<EntityId>
-    ) =
+  open Pomo.Core.Environment.Patterns
+
+  let create(game: Game, env: PomoEnvironment, playerId: Guid<EntityId>) =
+    let (Core core) = env.CoreServices
+    let (Gameplay gameplay) = env.GameplayServices
+
+    let world = core.World
+    let targetingService = gameplay.TargetingService
+    let projections = gameplay.Projections
+    let cameraService = gameplay.CameraService
     let spriteBatch = new SpriteBatch(game.GraphicsDevice)
     let texture = new Texture2D(game.GraphicsDevice, 1, 1)
     texture.SetData [| Color.White |]
