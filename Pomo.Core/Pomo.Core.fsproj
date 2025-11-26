@@ -6,6 +6,7 @@
   <ItemGroup>
     <Compile Include="Localization/LocalizationManager.fs" />
     <Compile Include="Domain/Core.fs" />
+    <Compile Include="Domain/Camera.fs" />
     <Compile Include="Domain/Input.fs" />
     <Compile Include="Domain/Entity.fs" />
     <Compile Include="Domain/Projectile.fs" />
@@ -23,6 +24,7 @@
     <Compile Include="Projections.fs" />
     <Compile Include="Algorithms/Physics.fs" />
     <Compile Include="Algorithms/Pathfinding.fs" />
+    <Compile Include="Environment.fs" />
     <Compile Include="Systems/World.fs" />
     <Compile Include="Systems/FormulaEvaluator.fs" />
     <Compile Include="Systems/DamageCalculator.fs" />
@@ -53,6 +55,7 @@
     <Compile Include="Systems/Equipment.fs" />
     <Compile Include="Systems/AISystem.fs" />
     <Compile Include="Systems/EntitySpawner.fs" />
+    <Compile Include="CompositionRoot.fs" />
     <Compile Include="PomoGame.fs" />
   </ItemGroup>
   <ItemGroup>

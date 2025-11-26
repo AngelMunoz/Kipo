@@ -9,9 +9,11 @@ open Pomo.Core.Domain.Units
 open Pomo.Core.Domain.Map
 open Pomo.Core.Stores
 open Pomo.Core.Domain
+open Pomo.Core.Domain.Camera
 
 module RenderOrchestratorSystem =
   open Pomo.Core.Projections
+  open Pomo.Core.Environment
 
   let private findRenderGroup(layer: Map.MapLayer) : int =
     match layer.Properties |> HashMap.tryFindV "RenderGroup" with
@@ -33,8 +35,7 @@ module RenderOrchestratorSystem =
 
     let world = game.Services.GetService<World.World>()
 
-    let targetingService =
-      game.Services.GetService<Targeting.TargetingService>()
+    let targetingService = game.Services.GetService<TargetingService>()
 
     let projections = game.Services.GetService<ProjectionService>()
 
@@ -78,7 +79,7 @@ module RenderOrchestratorSystem =
       foregroundTerrainServices <- foregroundServices |> List.ofSeq
 
       // Create RenderService
-      let cameraService = game.Services.GetService<Core.CameraService>()
+      let cameraService = game.Services.GetService<CameraService>()
 
       let renderService =
         Render.create(
@@ -95,7 +96,7 @@ module RenderOrchestratorSystem =
     override _.Draw(gameTime) =
       let graphicsDevice = game.GraphicsDevice
       let originalViewport = graphicsDevice.Viewport
-      let cameraService = game.Services.GetService<Core.CameraService>()
+      let cameraService = game.Services.GetService<CameraService>()
 
       // Iterate through cameras and render
       for (playerId, camera) in cameraService.GetAllCameras() do

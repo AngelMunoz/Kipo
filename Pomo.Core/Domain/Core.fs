@@ -62,17 +62,7 @@ module Core =
   open Microsoft.Xna.Framework.Graphics
   open Units
 
-  [<Struct>]
-  type Camera = {
-    Position: Vector2
-    Zoom: float32
-    Viewport: Viewport
-  }
 
-  type CameraService =
-    abstract member GetCamera: Guid<EntityId> -> Camera voption
-    abstract member GetAllCameras: unit -> struct (Guid<EntityId> * Camera)[]
-    abstract member ScreenToWorld: Vector2 * Guid<EntityId> -> Vector2 voption
 
   module Constants =
     module Entity =

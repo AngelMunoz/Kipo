@@ -7,6 +7,7 @@ open Microsoft.Xna.Framework.Graphics
 open Pomo.Core.EventBus
 open Pomo.Core.Domain.Events
 open Pomo.Core.Domain.Core
+open Pomo.Core.Domain.Camera
 
 
 module Notification =

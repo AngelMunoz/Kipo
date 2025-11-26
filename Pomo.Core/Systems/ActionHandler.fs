@@ -18,11 +18,13 @@ open Pomo.Core.Systems.Targeting
 module ActionHandler =
   open Microsoft.Xna.Framework.Input
   open Pomo.Core.Domain.Core
+  open Pomo.Core.Domain.Camera
+  open Pomo.Core.Environment
 
   let private findHoveredEntity
     (world: World)
     (positions: HashMap<Guid<EntityId>, Vector2>)
-    (cameraService: Core.CameraService)
+    (cameraService: CameraService)
     (playerId: Guid<EntityId>)
     =
     let mousePositionOpt =

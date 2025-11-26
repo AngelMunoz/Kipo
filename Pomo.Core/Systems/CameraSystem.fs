@@ -7,6 +7,7 @@ open FSharp.UMX
 open FSharp.Data.Adaptive
 open Pomo.Core.Domain.Core
 open Pomo.Core.Domain.Units
+open Pomo.Core.Domain.Camera
 open Pomo.Core.Projections
 
 

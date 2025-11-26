@@ -61,6 +61,8 @@ open Pomo.Core.Localization
 open Pomo.Core
 open Pomo.Core.EventBus
 open Pomo.Core.Domain
+open Pomo.Core.Environment
+open Pomo.Core.Domain.Camera
 open Pomo.Core.Domain.Action
 open Pomo.Core.Domain.Events
 open Pomo.Core.Domain.Map
@@ -165,7 +167,7 @@ type PomoGame() as this =
     base.Services.AddService<World.World> worldView
 
     base.Services.AddService<TargetingService> targetingService
-    base.Services.AddService<Core.CameraService> cameraSystem
+    base.Services.AddService<CameraService> cameraSystem
 
     base.Components.Add(new RawInputSystem(this, playerId))
     base.Components.Add(new InputMappingSystem(this, playerId))

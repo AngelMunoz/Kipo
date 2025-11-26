@@ -6,6 +6,7 @@ open Microsoft.Xna.Framework.Graphics
 open FSharp.Data.Adaptive
 open Pomo.Core.Domain.Map
 open Pomo.Core.Domain.Core
+open Pomo.Core.Domain.Camera
 
 open Pomo.Core.Stores
 

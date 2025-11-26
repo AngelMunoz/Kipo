@@ -9,6 +9,7 @@ open FSharp.Data.Adaptive
 
 open Pomo.Core.Domain
 open Pomo.Core.Domain.Units
+open Pomo.Core.Domain.Camera
 open Pomo.Core.Systems.Targeting
 
 
@@ -16,6 +17,7 @@ module Render =
   open Pomo.Core
   open Pomo.Core.Domain.Projectile
   open Microsoft.Xna.Framework.Input
+  open Pomo.Core.Environment
 
   type DrawCommand =
     | DrawPlayer of rect: Rectangle
@@ -28,7 +30,7 @@ module Render =
     (projectiles: HashMap<Guid<EntityId>, LiveProjectile>)
     (liveEntities: HashSet<Guid<EntityId>>)
     (playerId: Guid<EntityId>)
-    (cameraService: Core.CameraService)
+    (cameraService: CameraService)
     =
     let positions = snapshot.Positions
     let projectileKeys = projectiles |> HashMap.keys
@@ -118,7 +120,7 @@ module Render =
   let private generateTargetingIndicatorCommands
     (targetingMode: Skill.Targeting voption)
     (mouseState: MouseState voption)
-    (cameraService: Core.CameraService)
+    (cameraService: CameraService)
     (playerId: Guid<EntityId>)
     =
     match targetingMode with
@@ -151,7 +153,7 @@ module Render =
   type DrawCommandContext = {
     LiveProjectiles: HashMap<Guid<EntityId>, LiveProjectile>
     LiveEntities: HashSet<Guid<EntityId>>
-    CameraService: Core.CameraService
+    CameraService: CameraService
     PlayerId: Guid<EntityId>
     Snapshot: Projections.MovementSnapshot
     TargetingMode: Skill.Targeting voption
@@ -184,7 +186,7 @@ module Render =
     }
 
   type RenderService =
-    abstract Draw: Core.Camera -> unit
+    abstract Draw: Camera -> unit
 
   let create
     (
@@ -192,7 +194,7 @@ module Render =
       world: World.World,
       targetingService: TargetingService,
       projections: Projections.ProjectionService,
-      cameraService: Core.CameraService,
+      cameraService: CameraService,
       playerId: Guid<EntityId>
     ) =
     let spriteBatch = new SpriteBatch(game.GraphicsDevice)
@@ -200,7 +202,7 @@ module Render =
     texture.SetData [| Color.White |]
 
     { new RenderService with
-        member _.Draw(camera: Core.Camera) =
+        member _.Draw(camera: Camera) =
           let snapshot = projections.ComputeMovementSnapshot()
 
           let mouseState =

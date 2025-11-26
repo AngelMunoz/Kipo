@@ -1,0 +1,61 @@
+namespace Pomo.Core
+
+open System
+open Microsoft.Xna.Framework
+open Microsoft.Xna.Framework.Graphics
+open Microsoft.Xna.Framework.Content
+open FSharp.Data.Adaptive
+
+open Pomo.Core.EventBus
+open Pomo.Core.Domain.World
+open Pomo.Core.Domain.Camera
+open Pomo.Core.Stores
+open Pomo.Core.Projections
+open Pomo.Core.Domain.Skill
+open Pomo.Core.Domain.Core
+
+module Environment =
+
+  type TargetingService =
+    inherit CoreEventListener
+    abstract member TargetingMode: Targeting voption aval with get
+
+  type CoreServices =
+    abstract EventBus: EventBus
+    abstract World: World
+    abstract Random: Random
+
+  type StoreServices =
+    abstract SkillStore: SkillStore
+    abstract ItemStore: ItemStore
+    abstract MapStore: MapStore
+    abstract AIArchetypeStore: AIArchetypeStore
+
+  type GameplayServices =
+    abstract Projections: ProjectionService
+    abstract TargetingService: TargetingService
+    abstract CameraService: CameraService
+    abstract EffectApplication: CoreEventListener
+
+  type MonoGameServices =
+    abstract GraphicsDevice: GraphicsDevice
+    abstract Content: ContentManager
+
+  module Patterns =
+    let (|Core|)(env: #CoreServices) = env :> CoreServices
+    let (|Stores|)(env: #StoreServices) = env :> StoreServices
+    let (|Gameplay|)(env: #GameplayServices) = env :> GameplayServices
+    let (|MonoGame|)(env: #MonoGameServices) = env :> MonoGameServices
+
+  type PomoSystem =
+    abstract member Update: GameTime -> unit
+    abstract member Draw: GameTime -> unit
+    abstract member Enabled: bool with get, set
+    abstract member UpdateOrder: int with get, set
+    abstract member DrawOrder: int with get, set
+
+  type PomoEnvironment =
+    abstract member CoreServices: CoreServices
+    abstract member StoreServices: StoreServices
+    abstract member GameplayServices: GameplayServices
+    abstract member MonoGameServices: MonoGameServices

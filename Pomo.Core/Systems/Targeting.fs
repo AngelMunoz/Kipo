@@ -19,12 +19,9 @@ module Targeting =
   open Pomo.Core.Stores
   open Pomo.Core.Domain.Action
   open Pomo.Core.Domain.Core
+  open Pomo.Core.Environment
 
   let private SKILL_ACTIVATION_RANGE_BUFFER = 5.0f
-
-  type TargetingService =
-    inherit CoreEventListener
-    abstract member TargetingMode: Targeting voption aval with get
 
   let skillByEntityAndAction
     (entityId: _ aval)

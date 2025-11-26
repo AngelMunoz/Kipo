@@ -20,6 +20,7 @@ open Pomo.Core.Stores
 open Pomo.Core.EventBus
 open Pomo.Core.Systems
 open Pomo.Core.Domain.Events
+open Pomo.Core.Domain.Camera
 
 module DebugRender =
   open Pomo.Core
@@ -745,7 +746,7 @@ module DebugRender =
 
       let mutable yOffsets = HashMap.empty<Guid<EntityId>, float32>
 
-      let cameraService = game.Services.GetService<Core.CameraService>()
+      let cameraService = game.Services.GetService<CameraService>()
       let cameras = cameraService.GetAllCameras()
 
       for struct (_, camera) in cameras do
