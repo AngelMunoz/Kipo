@@ -1,6 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <map version="1.10" tiledversion="1.11.2" class="Map" orientation="staggered" renderorder="right-down" width="30" height="30" tilewidth="64" tileheight="32" infinite="0" staggeraxis="x" staggerindex="odd" nextlayerid="11" nextobjectid="178">
  <properties>
+  <property name="BattleMode" value="PVE"/>
   <property name="MapKey" value="Proto1"/>
   <property name="MaxEnemyEntities" type="int" value="20"/>
  </properties>

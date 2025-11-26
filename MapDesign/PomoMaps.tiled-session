@@ -38,11 +38,11 @@
                 3,
                 4
             ],
-            "scale": 5.5,
-            "selectedLayer": 2,
+            "scale": 3,
+            "selectedLayer": 3,
             "viewCenter": {
-                "x": 15.63636363636364,
-                "y": 167.54545454545456
+                "x": 159,
+                "y": 148.16666666666663
             }
         },
         "X:/Kipo/Pomo.Core/Content/Maps/Lobby.xml#ProtoTileset": {
@@ -53,7 +53,8 @@
         "X:/Kipo/Pomo.Core/Content/Maps/Proto.xml": {
             "expandedObjectLayers": [
                 8,
-                5
+                5,
+                7
             ],
             "scale": 2,
             "selectedLayer": 2,
@@ -96,7 +97,7 @@
         "X:/Kipo/Pomo.Core/Content/Maps/Proto.xml"
     ],
     "project": "PomoMaps.tiled-project",
-    "property.type": "int",
+    "property.type": "string",
     "recentFiles": [
         "X:/Kipo/Pomo.Core/Content/Maps/Proto.xml",
         "X:/home/amunoz/repos/Kipo/Pomo.Core/Content/Maps/Proto.xml",
