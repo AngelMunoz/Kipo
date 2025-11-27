@@ -130,7 +130,7 @@ type PomoGame() as this =
     base.Components.Add(new CombatSystem(this, pomoEnv))
     base.Components.Add(new ResourceManagerSystem(this, pomoEnv))
     base.Components.Add(new ProjectileSystem(this, pomoEnv))
-    base.Components.Add(new CollisionSystem(this, pomoEnv, "Proto1"))
+    base.Components.Add(new CollisionSystem(this, pomoEnv, "Lobby"))
     base.Components.Add(new MovementSystem(this, pomoEnv))
 
     base.Components.Add(
@@ -145,7 +145,7 @@ type PomoGame() as this =
       new RenderOrchestratorSystem.RenderOrchestratorSystem(
         this,
         pomoEnv,
-        "Proto1",
+        "Lobby",
         playerId,
         DrawOrder = Render.Layer.TerrainBase
       )
@@ -156,12 +156,14 @@ type PomoGame() as this =
         this,
         pomoEnv,
         playerId,
-        "Proto1",
+        "Lobby",
         DrawOrder = Render.Layer.Debug
       )
     )
 
     base.Components.Add(new AISystem(this, pomoEnv))
+
+    base.Components.Add(new UISystem(this, pomoEnv, playerId, DrawOrder = 1000)) // Ensure UI is on top
 
     base.Components.Add(new StateUpdateSystem(this, pomoEnv, mutableWorld))
 
@@ -172,7 +174,7 @@ type PomoGame() as this =
     LocalizationManager.DefaultCultureCode |> LocalizationManager.SetCulture
 
     // --- Map Based Spawning ---
-    let mapKey = "Proto1"
+    let mapKey = "Lobby"
     let mapDef = stores.MapStore.find mapKey
 
     let mutable playerSpawned = false
@@ -190,44 +192,44 @@ type PomoGame() as this =
 
 
     // Find Object Groups
-    for group in mapDef.ObjectGroups do
-      for obj in group.Objects do
-        match obj.Type with
-        | ValueSome MapObjectType.Spawn ->
-          // Check for Player Spawn
-          let isPlayerSpawn =
-            obj.Properties
-            |> HashMap.tryFind "PlayerSpawn"
-            |> Option.map(fun v -> v.ToLower() = "true")
-            |> Option.defaultValue false
+    // for group in mapDef.ObjectGroups do
+    //   for obj in group.Objects do
+    //     match obj.Type with
+    //     | ValueSome MapObjectType.Spawn ->
+    //       // Check for Player Spawn
+    //       let isPlayerSpawn =
+    //         obj.Properties
+    //         |> HashMap.tryFind "PlayerSpawn"
+    //         |> Option.map(fun v -> v.ToLower() = "true")
+    //         |> Option.defaultValue false
 
-          if isPlayerSpawn && not playerSpawned then
-            // Spawn Player 1 here
-            let intent: SystemCommunications.SpawnEntityIntent = {
-              EntityId = playerId
-              Type = SystemCommunications.SpawnType.Player 0
-              Position = Vector2(obj.X, obj.Y)
-            }
+    //       if isPlayerSpawn && not playerSpawned then
+    //         // Spawn Player 1 here
+    //         let intent: SystemCommunications.SpawnEntityIntent = {
+    //           EntityId = playerId
+    //           Type = SystemCommunications.SpawnType.Player 0
+    //           Position = Vector2(obj.X, obj.Y)
+    //         }
 
-            core.EventBus.Publish intent
-            playerSpawned <- true
+    //         core.EventBus.Publish intent
+    //         playerSpawned <- true
 
-          // Check for AI Spawn
-          elif not isPlayerSpawn && enemyCount < maxEnemies then
-            let enemyId = Guid.NewGuid() |> UMX.tag
-            // Determine archetype (alternate between 1 and 2)
-            let archetypeId = if enemyCount % 2 = 0 then %1 else %2
+    //       // Check for AI Spawn
+    //       elif not isPlayerSpawn && enemyCount < maxEnemies then
+    //         let enemyId = Guid.NewGuid() |> UMX.tag
+    //         // Determine archetype (alternate between 1 and 2)
+    //         let archetypeId = if enemyCount % 2 = 0 then %1 else %2
 
-            let intent: SystemCommunications.SpawnEntityIntent = {
-              EntityId = enemyId
-              Type = SystemCommunications.SpawnType.Enemy archetypeId
-              Position = Vector2(obj.X, obj.Y)
-            }
+    //         let intent: SystemCommunications.SpawnEntityIntent = {
+    //           EntityId = enemyId
+    //           Type = SystemCommunications.SpawnType.Enemy archetypeId
+    //           Position = Vector2(obj.X, obj.Y)
+    //         }
 
-            core.EventBus.Publish intent
-            enemyCount <- enemyCount + 1
+    //         core.EventBus.Publish intent
+    //         enemyCount <- enemyCount + 1
 
-        | _ -> ()
+    //     | _ -> ()
 
     // Start listening to action events
     listeners.ActionHandler.StartListening() |> subs.Add

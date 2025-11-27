@@ -32,23 +32,42 @@ module RawInput =
       let currentGamePad = GamePad.GetState(PlayerIndex.One) // Assuming Player One
       let currentTouch = TouchPanel.GetState()
 
+      let isMouseOverUI = core.UIService.IsMouseOverUI |> AVal.force
+
+      // If mouse is over UI, we suppress mouse button clicks for the game world
+      let effectiveMouse =
+        if isMouseOverUI then
+          // Keep position, but release buttons
+          MouseState(
+            currentMouse.X,
+            currentMouse.Y,
+            currentMouse.ScrollWheelValue,
+            ButtonState.Released,
+            ButtonState.Released,
+            ButtonState.Released,
+            ButtonState.Released,
+            ButtonState.Released
+          )
+        else
+          currentMouse
+
       let prevInputState =
         prevInputState
         |> AVal.force
         |> Option.defaultValue {
           Keyboard = currentKeyboard
-          Mouse = currentMouse
+          Mouse = effectiveMouse
           GamePad = currentGamePad
           Touch = currentTouch
           PrevKeyboard = currentKeyboard
-          PrevMouse = currentMouse
+          PrevMouse = effectiveMouse
           PrevGamePad = currentGamePad
           PrevTouch = currentTouch
         }
 
       let newRawInputState = {
         Keyboard = currentKeyboard
-        Mouse = currentMouse
+        Mouse = effectiveMouse
         GamePad = currentGamePad
         Touch = currentTouch
         PrevKeyboard = prevInputState.Keyboard

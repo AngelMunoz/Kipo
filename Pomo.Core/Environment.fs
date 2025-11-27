@@ -14,7 +14,12 @@ open Pomo.Core.Projections
 open Pomo.Core.Domain.Skill
 open Pomo.Core.Domain.Core
 
+
 module Environment =
+
+  type IUIService =
+    abstract member IsMouseOverUI: bool aval
+    abstract member SetMouseOverUI: bool -> unit
 
   type TargetingService =
     inherit CoreEventListener
@@ -24,6 +29,7 @@ module Environment =
     abstract EventBus: EventBus
     abstract World: World
     abstract Random: Random
+    abstract UIService: IUIService
 
   type StoreServices =
     abstract SkillStore: SkillStore

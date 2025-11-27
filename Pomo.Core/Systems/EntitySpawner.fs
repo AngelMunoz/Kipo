@@ -267,12 +267,17 @@ module EntitySpawnerLogic =
           let totalGameTime =
             core.World.Time |> AVal.map _.TotalGameTime |> AVal.force
 
+          let duration =
+            match intent.Type with
+            | SystemCommunications.SpawnType.Player _ -> TimeSpan.Zero
+            | _ -> spawnDuration
+
           let pending: PendingSpawn = {
             EntityId = intent.EntityId
             Type = intent.Type
             Position = intent.Position
             SpawnStartTime = totalGameTime
-            Duration = spawnDuration
+            Duration = duration
           }
 
           pendingSpawns.Add(pending)

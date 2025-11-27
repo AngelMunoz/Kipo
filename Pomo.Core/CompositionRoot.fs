@@ -34,7 +34,11 @@ module CompositionRoot =
     let aiArchetypeStore =
       AIArchetype.create(JsonFileLoader.readAIArchetypes deserializer)
 
-    let mapStore = Map.create MapLoader.loadMap [ "Content/Maps/Proto.xml" ]
+    let mapStore =
+      Map.create MapLoader.loadMap [
+        "Content/Maps/Proto.xml"
+        "Content/Maps/Lobby.xml"
+      ]
 
     let projections = Projections.create(itemStore, worldView)
 
@@ -56,11 +60,13 @@ module CompositionRoot =
       )
 
     let navigationService =
-      Navigation.create(eventBus, mapStore, "Proto1", worldView)
+      Navigation.create(eventBus, mapStore, "Lobby", worldView)
 
     let inventoryService = Inventory.create(eventBus, itemStore, worldView)
 
     let equipmentService = Equipment.create worldView eventBus
+
+    let uiService = UIService.create()
 
     let pomoEnv =
       { new PomoEnvironment with
@@ -69,6 +75,7 @@ module CompositionRoot =
                 member _.EventBus = eventBus
                 member _.World = worldView
                 member _.Random = random
+                member _.UIService = uiService
             }
 
           member _.GameplayServices: GameplayServices =

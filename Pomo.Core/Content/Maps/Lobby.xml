@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<map version="1.10" tiledversion="1.11.2" orientation="staggered" renderorder="right-down" width="10" height="10" tilewidth="64" tileheight="32" infinite="0" staggeraxis="x" staggerindex="odd" nextlayerid="5" nextobjectid="9">
+<map version="1.10" tiledversion="1.11.2" orientation="staggered" renderorder="right-down" width="10" height="10" tilewidth="64" tileheight="32" infinite="0" staggeraxis="x" staggerindex="odd" nextlayerid="5" nextobjectid="10">
  <properties>
   <property name="BattleMode" value="Peaceful"/>
   <property name="MapKey" value="Lobby"/>
@@ -241,7 +241,10 @@
  </layer>
  <objectgroup id="3" name="Collisions">
   <object id="1" type="Wall" x="32" y="64">
-   <polygon points="0,0 32,16 64,0 96,-16 128,-32 160,-16 192,0 224,16 256,0 224,-16 192,-32 160,-48 128,-64 96,-48 64,-32 32,-16"/>
+   <polygon points="0,0 32,16 160,-48 128,-64"/>
+  </object>
+  <object id="9" type="Wall" x="201" y="50">
+   <polygon points="-41,-50 -73,-34 55,30 87,14"/>
   </object>
   <object id="5" type="Wall" x="-0.727273" y="-0.181818" width="32.7273" height="335.455"/>
   <object id="6" type="Wall" x="-0.545455" y="302.909" width="352.182" height="32.1818"/>

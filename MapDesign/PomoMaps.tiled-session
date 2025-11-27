@@ -3,10 +3,10 @@
         "height": 4300,
         "width": 2
     },
-    "activeFile": "X:/Kipo/Pomo.Core/Content/Maps/Proto.xml",
+    "activeFile": "X:/Kipo/Pomo.Core/Content/Maps/Lobby.xml",
     "expandedProjectPaths": [
-        "X:/home/amunoz/repos/Kipo/Pomo.Core/Content/Maps",
         "X:/Kipo/Pomo.Core/Content/Maps",
+        "X:/home/amunoz/repos/Kipo/Pomo.Core/Content/Maps",
         "."
     ],
     "fileStates": {
@@ -35,14 +35,14 @@
         },
         "X:/Kipo/Pomo.Core/Content/Maps/Lobby.xml": {
             "expandedObjectLayers": [
-                3,
-                4
+                4,
+                3
             ],
-            "scale": 3,
+            "scale": 11,
             "selectedLayer": 3,
             "viewCenter": {
-                "x": 159,
-                "y": 148.16666666666663
+                "x": 300.54545454545456,
+                "y": 183.77272727272725
             }
         },
         "X:/Kipo/Pomo.Core/Content/Maps/Lobby.xml#ProtoTileset": {
@@ -52,15 +52,15 @@
         },
         "X:/Kipo/Pomo.Core/Content/Maps/Proto.xml": {
             "expandedObjectLayers": [
+                7,
                 8,
-                5,
-                7
+                5
             ],
             "scale": 2,
             "selectedLayer": 2,
             "viewCenter": {
-                "x": 531.5,
-                "y": 151.75
+                "x": 517.5,
+                "y": 153.25
             }
         },
         "X:/Kipo/Pomo.Core/Content/Maps/Proto.xml#ProtoTileset": {
@@ -94,12 +94,14 @@
     "map.tileWidth": 64,
     "map.width": 10,
     "openFiles": [
-        "X:/Kipo/Pomo.Core/Content/Maps/Proto.xml"
+        "X:/Kipo/Pomo.Core/Content/Maps/Proto.xml",
+        "X:/Kipo/Pomo.Core/Content/Maps/Lobby.xml"
     ],
     "project": "PomoMaps.tiled-project",
     "property.type": "string",
     "recentFiles": [
         "X:/Kipo/Pomo.Core/Content/Maps/Proto.xml",
+        "X:/Kipo/Pomo.Core/Content/Maps/Lobby.xml",
         "X:/home/amunoz/repos/Kipo/Pomo.Core/Content/Maps/Proto.xml",
         "Proto.xml"
     ],
