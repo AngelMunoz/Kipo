@@ -8,6 +8,7 @@ open FSharp.UMX
 open Pomo.Core.Localization
 open Pomo.Core.Scenes
 open Pomo.Core.Domain.Units
+open Myra
 
 type PomoGame() as this =
   inherit Game()
@@ -34,7 +35,7 @@ type PomoGame() as this =
     base.Services.AddService<GraphicsDeviceManager> graphicsDeviceManager
 
   override _.Initialize() =
-    base.Initialize()
+    MyraEnvironment.Game <- this
 
     LocalizationManager.DefaultCultureCode |> LocalizationManager.SetCulture
 
@@ -46,11 +47,17 @@ type PomoGame() as this =
     let manager = new SceneManager(this)
     sceneManager <- ValueSome manager
 
-    // 3. Start Scene Coordinator (which handles initial scene loading and transitions)
-    let coordinatorSub =
-      CompositionRoot.SceneCoordinator.start this scope manager playerId
+    base.Initialize()
 
-    coordinatorDisposable <- ValueSome coordinatorSub
+  override _.LoadContent() =
+    match globalScope, sceneManager with
+    | ValueSome scope, ValueSome manager ->
+      // 3. Start Scene Coordinator (which handles initial scene loading and transitions)
+      let coordinatorSub =
+        CompositionRoot.SceneCoordinator.start this scope manager playerId
+
+      coordinatorDisposable <- ValueSome coordinatorSub
+    | _ -> () // Should not happen if Initialize ran correctly
 
   override _.Dispose(disposing: bool) =
     if disposing then

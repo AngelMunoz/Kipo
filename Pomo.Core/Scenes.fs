@@ -95,21 +95,27 @@ type Scene() =
 /// </summary>
 type SceneManager(game: Game) =
   let mutable currentScene: Scene voption = ValueNone
+  let mutable nextScene: Scene voption = ValueNone
 
   /// <summary>
-  /// Unloads the current scene (disposing it) and loads the new one.
+  /// Queues a scene transition to happen at the start of the next Update cycle.
   /// </summary>
   member this.LoadScene(scene: Scene) =
-    // Dispose of the old scene if one exists
-    currentScene |> ValueOption.iter(fun s -> s.Dispose())
-
-    currentScene <- ValueSome scene
-    scene.Initialize()
+    nextScene <- ValueSome scene
 
   /// <summary>
-  /// Updates the currently active scene.
+  /// Updates the currently active scene and handles transitions.
   /// </summary>
   member this.Update(gameTime: GameTime) =
+    // Handle Transition
+    match nextScene with
+    | ValueSome newScene ->
+        currentScene |> ValueOption.iter(fun s -> s.Dispose())
+        currentScene <- ValueSome newScene
+        newScene.Initialize()
+        nextScene <- ValueNone
+    | ValueNone -> ()
+
     currentScene |> ValueOption.iter(fun s -> s.Update(gameTime))
 
   /// <summary>
@@ -124,3 +130,4 @@ type SceneManager(game: Game) =
   interface IDisposable with
     member this.Dispose() =
       currentScene |> ValueOption.iter(fun s -> s.Dispose())
+      nextScene |> ValueOption.iter(fun s -> s.Dispose())

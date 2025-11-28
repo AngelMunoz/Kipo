@@ -57,6 +57,7 @@ type GlobalScope = {
   UIService: IUIService // UIService is effectively global (toast notifications etc)
 }
 
+[<Struct>]
 type SceneType =
   | MainMenu
   | Gameplay of selectedMap: string
@@ -285,56 +286,70 @@ module CompositionRoot =
             match System.Int32.TryParse v with
             | true, i -> Some i
             | _ -> None)
-          |> Option.defaultValue 5
+          |> Option.defaultValue 0
 
-        for group in mapDef.ObjectGroups do
-          for obj in group.Objects do
-            match obj.Type with
-            | ValueSome MapObjectType.Spawn ->
-              let isPlayerSpawn =
-                obj.Properties
-                |> HashMap.tryFindV "PlayerSpawn"
-                |> ValueOption.map(fun v -> v.ToLower() = "true")
-                |> ValueOption.defaultValue false
+        let spawnCandidates =
+          mapDef.ObjectGroups
+          |> IndexList.collect(fun group ->
+            group.Objects
+            |> IndexList.choose(fun obj ->
+              match obj.Type with
+              | ValueSome MapObjectType.Spawn ->
+                let isPlayerSpawn =
+                  obj.Properties
+                  |> HashMap.tryFindV "PlayerSpawn"
+                  |> ValueOption.map(fun v -> v.ToLower() = "true")
+                  |> ValueOption.defaultValue false
 
-              let pos =
-                match obj.Points with
-                | ValueSome points when not points.IsEmpty ->
-                  let offset = getRandomPointInPolygon points scope.Random
-                  Vector2(obj.X + offset.X, obj.Y + offset.Y)
-                | _ -> Vector2(obj.X, obj.Y)
+                let pos =
+                  match obj.Points with
+                  | ValueSome points when not points.IsEmpty ->
+                    let offset = getRandomPointInPolygon points scope.Random
+                    Vector2(obj.X + offset.X, obj.Y + offset.Y)
+                  | _ -> Vector2(obj.X, obj.Y)
 
-              if isPlayerSpawn && not playerSpawned then
-                let intent: SystemCommunications.SpawnEntityIntent = {
-                  EntityId = spawnPlayerId
-                  Type = SystemCommunications.SpawnType.Player 0
-                  Position = pos
-                }
+                Some(isPlayerSpawn, pos)
+              | _ -> None))
 
-                eventBus.Publish intent
-                playerSpawned <- true
-              elif not isPlayerSpawn && enemyCount < maxEnemies then
-                let enemyId = Guid.NewGuid() |> UMX.tag
-                let archetypeId = if enemyCount % 2 = 0 then %1 else %2
+        // Prioritize explicit player spawn, otherwise take the first spawn found
+        let playerSpawnPos =
+          spawnCandidates
+          |> IndexList.tryFind(fun _ (isPlayer, _) -> isPlayer)
+          |> Option.orElse(
+            spawnCandidates
+            |> IndexList.tryAt 0
+            |> Option.map(fun (isPlayer, pos) -> (isPlayer, pos))
+          )
+          |> Option.map snd // Get just the position
+          |> Option.defaultValue Vector2.Zero // Fallback to 0,0 if no spawn points defined
 
-                let intent: SystemCommunications.SpawnEntityIntent = {
-                  EntityId = enemyId
-                  Type = SystemCommunications.SpawnType.Enemy archetypeId
-                  Position = pos
-                }
+        // Spawn player
+        let playerIntent: SystemCommunications.SpawnEntityIntent = {
+          EntityId = spawnPlayerId
+          Type = SystemCommunications.SpawnType.Player 0
+          Position = playerSpawnPos
+        }
 
-                eventBus.Publish intent
-                enemyCount <- enemyCount + 1
-            | _ -> ()
+        eventBus.Publish playerIntent
+        playerSpawned <- true
 
-        if not playerSpawned then
-          let intent: SystemCommunications.SpawnEntityIntent = {
-            EntityId = spawnPlayerId
-            Type = SystemCommunications.SpawnType.Player 0
-            Position = Vector2.Zero
-          }
+        // Spawn enemies
+        let enemySpawnCandidates =
+          spawnCandidates |> IndexList.filter(fun (isPlayer, _) -> not isPlayer)
 
-          eventBus.Publish intent
+        for (isPlayer, pos) in enemySpawnCandidates do
+          if enemyCount < maxEnemies then
+            let enemyId = Guid.NewGuid() |> UMX.tag
+            let archetypeId = if enemyCount % 2 = 0 then %1 else %2
+
+            let enemyIntent: SystemCommunications.SpawnEntityIntent = {
+              EntityId = enemyId
+              Type = SystemCommunications.SpawnType.Enemy archetypeId
+              Position = pos
+            }
+
+            eventBus.Publish enemyIntent
+            enemyCount <- enemyCount + 1
 
       let loadMap(newMapKey: string) =
         currentMapKey <- ValueSome newMapKey
@@ -373,13 +388,11 @@ module CompositionRoot =
         spawnEntitiesForMap mapDef playerId
 
       // UI for Gameplay (HUD)
-      let hudDesktop = new Desktop()
+      let mutable hudDesktop = ValueNone
 
       let publishHudGuiAction(action: GuiAction) =
         match action with
-        | GuiAction.BackToMainMenu ->
-          MyraEnvironment.Game <- null
-          transition SceneType.MainMenu
+        | GuiAction.BackToMainMenu -> transition SceneType.MainMenu
         | _ -> ()
 
       // Sort components based on their Order properties
@@ -391,10 +404,8 @@ module CompositionRoot =
       // Return the Scene
       { new Scene() with
           override _.Initialize() =
-            // Initialize Myra for HUD
-            MyraEnvironment.Game <- game
             let root = Systems.GameplayUI.build game publishHudGuiAction
-            hudDesktop.Root <- root
+            hudDesktop <- ValueSome(new Desktop(Root = root))
 
             // Initialize all base systems
             baseComponents.Initialize()
@@ -426,12 +437,14 @@ module CompositionRoot =
             mapDependentComponents.Update(gameTime)
 
             // Update HUD
-            scope.UIService.SetMouseOverUI hudDesktop.IsMouseOverGUI
+            hudDesktop
+            |> ValueOption.iter(fun d ->
+              scope.UIService.SetMouseOverUI d.IsMouseOverGUI)
 
           override _.Draw(gameTime) =
             baseComponents.Draw(gameTime)
             mapDependentComponents.Draw(gameTime)
-            hudDesktop.Render()
+            hudDesktop |> ValueOption.iter(fun d -> d.Render())
 
           member _.LoadMap(mapKey: string) = loadMap mapKey
 
@@ -439,7 +452,7 @@ module CompositionRoot =
             subs.Dispose()
             baseComponents.Dispose()
             mapDependentComponents.Dispose()
-            hudDesktop.Dispose()
+            hudDesktop |> ValueOption.iter(fun d -> d.Dispose())
       }
 
     /// <summary>
@@ -450,34 +463,35 @@ module CompositionRoot =
       (scope: GlobalScope)
       (transition: SceneType -> unit)
       =
-      let desktop = new Desktop() // Desktop per scene
+      let mutable desktop = ValueNone
       let subs = new System.Reactive.Disposables.CompositeDisposable()
 
       let publishGuiAction(action: GuiAction) =
         match action with
-        | GuiAction.StartNewGame ->
-          MyraEnvironment.Game <- null // Clear Myra's reference to Game. The GameplayScene will re-set it.
-          transition(SceneType.Gameplay "Lobby")
+        | GuiAction.StartNewGame -> transition(SceneType.Gameplay "Lobby")
         | GuiAction.OpenSettings -> () // TODO: Implement settings menu
         | GuiAction.ExitGame -> game.Exit()
         | GuiAction.BackToMainMenu -> () // Should not happen in MainMenu
 
       { new Scene() with
           override _.Initialize() =
-            MyraEnvironment.Game <- game // Myra needs the Game object. This is a bit global, but Myra is designed this way.
             let root = Systems.MainMenuUI.build game publishGuiAction
-            desktop.Root <- root
+            desktop <- ValueSome(new Desktop(Root = root))
 
           override _.Update(gameTime) =
-            // Desktop updates automatically when MyraEnvironment.Game is set.
-            // Only need to update IsMouseOverUI here.
-            scope.UIService.SetMouseOverUI desktop.IsMouseOverGUI
+            desktop
+            |> ValueOption.iter(fun d ->
+              scope.UIService.SetMouseOverUI d.IsMouseOverGUI)
 
-          override _.Draw(gameTime) = desktop.Render()
+          override _.Draw(gameTime) =
+            desktop
+            |> ValueOption.iter(fun d ->
+              printfn "Rendering desktop"
+              d.Render())
 
           override _.Dispose() =
             subs.Dispose()
-            desktop.Dispose()
+            desktop |> ValueOption.iter(fun d -> d.Dispose())
       }
 
   module SceneCoordinator =
@@ -494,25 +508,29 @@ module CompositionRoot =
 
       let transitionSubject = new System.Reactive.Subjects.Subject<SceneType>()
 
+      let mainMenuScene =
+        SceneFactory.createMainMenu game scope transitionSubject.OnNext
+
+      let scenes = Dictionary<SceneType, Scene>()
+      scenes.Add(SceneType.MainMenu, mainMenuScene)
+
       transitionSubject
       |> Observable.subscribe(fun sceneType ->
 
         match sceneType with
-        | SceneType.MainMenu ->
-          let scene =
-            SceneFactory.createMainMenu game scope transitionSubject.OnNext
-
-          sceneManager.LoadScene(scene)
+        | SceneType.MainMenu -> sceneManager.LoadScene(mainMenuScene)
         | SceneType.Gameplay mapKey ->
-          let scene =
-            SceneFactory.createGameplay
-              game
-              scope
-              playerId
-              mapKey
-              transitionSubject.OnNext
+            // Always create a new Gameplay scene for "New Game" or map transitions
+            // This ensures fresh World, EventBus, and Systems.
+            let gameplayScene =
+              SceneFactory.createGameplay
+                game
+                scope
+                playerId
+                mapKey
+                transitionSubject.OnNext
 
-          sceneManager.LoadScene(scene))
+            sceneManager.LoadScene(gameplayScene))
       |> ignore // We should probably keep this subscription alive, but SceneManager logic handles the scene lifecycle. The coordinator is global.
 
       // Start by loading Main Menu
