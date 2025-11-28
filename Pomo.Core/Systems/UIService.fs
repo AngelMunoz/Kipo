@@ -2,6 +2,13 @@ namespace Pomo.Core.Systems
 
 open FSharp.Data.Adaptive
 
+[<Struct>]
+type GuiAction =
+  | StartNewGame
+  | OpenSettings
+  | ExitGame
+  | BackToMainMenu
+
 module UIService =
 
   let create() =

@@ -57,6 +57,7 @@
     <Compile Include="Systems/EntitySpawner.fs" />
     <Compile Include="Systems/UIService.fs" />
     <Compile Include="Systems/UISystem.fs" />
+    <Compile Include="Scenes.fs" />
     <Compile Include="CompositionRoot.fs" />
     <Compile Include="PomoGame.fs" />
   </ItemGroup>
