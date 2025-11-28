@@ -3,58 +3,43 @@ namespace Pomo.Core
 open System
 open System.Collections.Generic
 open Microsoft.Xna.Framework
-open Microsoft.Xna.Framework.Graphics
-open Microsoft.Xna.Framework.Content
 open FSharp.UMX
 open FSharp.Data.Adaptive
-open FSharp.Control.Reactive // For Subject and Observable
-open Myra
-open Myra.Graphics2D
+open FSharp.Control.Reactive
 open Myra.Graphics2D.UI
 
 open Pomo.Core.EventBus
 open Pomo.Core.Domain
 open Pomo.Core.Domain.Events
 open Pomo.Core.Domain.Units
-open Pomo.Core.Domain.Camera
 open Pomo.Core.Domain.Map
 open Pomo.Core.Stores
-open Pomo.Core.Projections
-open Pomo.Core.Serialization
 open Pomo.Core.Scenes
 open Pomo.Core.Environment
 
 // System Imports
 open Pomo.Core.Systems
-open Pomo.Core.Systems.Targeting
 open Pomo.Core.Systems.Effects
 open Pomo.Core.Systems.StateUpdate
 open Pomo.Core.Systems.Movement
-open Pomo.Core.Systems.Render
 open Pomo.Core.Systems.RawInput
 open Pomo.Core.Systems.InputMapping
 open Pomo.Core.Systems.PlayerMovement
-open Pomo.Core.Systems.Navigation
 open Pomo.Core.Systems.AbilityActivation
 open Pomo.Core.Systems.UnitMovement
 open Pomo.Core.Systems.Combat
 open Pomo.Core.Systems.Notification
 open Pomo.Core.Systems.Projectile
-open Pomo.Core.Systems.ActionHandler
 open Pomo.Core.Systems.DebugRender
 open Pomo.Core.Systems.ResourceManager
-open Pomo.Core.Systems.Inventory
-open Pomo.Core.Systems.Equipment
-open Pomo.Core.Systems.TerrainRenderSystem
 open Pomo.Core.Systems.EntitySpawnerLogic
-open Pomo.Core.Systems.Collision
 
 
 type GlobalScope = {
   Stores: StoreServices
   MonoGame: MonoGameServices
   Random: Random
-  UIService: IUIService // UIService is effectively global (toast notifications etc)
+  UIService: IUIService
 }
 
 [<Struct>]
@@ -102,10 +87,9 @@ module CompositionRoot =
     }
 
   module SceneFactory =
+    open Pomo.Core.Systems.Collision
+    open System.Reactive.Disposables
 
-    /// <summary>
-    /// Creates the main Gameplay scene.
-    /// </summary>
     let createGameplay
       (game: Game)
       (scope: GlobalScope)
@@ -143,7 +127,12 @@ module CompositionRoot =
         )
 
       let navigationService =
-        Navigation.create(eventBus, scope.Stores.MapStore, "Lobby", worldView) // Initialized with Lobby, will be updated
+        Navigation.create(
+          eventBus,
+          scope.Stores.MapStore,
+          initialMapKey,
+          worldView
+        )
 
       let inventoryService =
         Inventory.create(eventBus, scope.Stores.ItemStore, worldView)
@@ -191,12 +180,12 @@ module CompositionRoot =
       baseComponents.Add(new CombatSystem(game, pomoEnv))
       baseComponents.Add(new ResourceManagerSystem(game, pomoEnv))
       baseComponents.Add(new ProjectileSystem(game, pomoEnv))
-      baseComponents.Add(new CollisionSystem(game, pomoEnv, "Lobby")) // Will be recreated or updated? CollisionSystem takes mapKey in constructor.
+      baseComponents.Add(new CollisionSystem(game, pomoEnv, initialMapKey))
       baseComponents.Add(new MovementSystem(game, pomoEnv))
 
-      let notificationSys = new NotificationSystem(game, pomoEnv)
-      notificationSys.DrawOrder <- Render.Layer.UI
-      baseComponents.Add(notificationSys)
+      baseComponents.Add(
+        new NotificationSystem(game, pomoEnv, DrawOrder = Render.Layer.UI)
+      )
 
       baseComponents.Add(new EffectProcessingSystem(game, pomoEnv))
       baseComponents.Add(new EntitySpawnerSystem(game, pomoEnv))
@@ -207,31 +196,7 @@ module CompositionRoot =
       let mapDependentComponents = new SceneComponentCollection()
 
       let clearCurrentMapData() =
-        transact(fun () ->
-          // Remove all entities except potentially player if we want persistence, but here we clear everything for simplicity of spawn logic re-run
-          // Ideally we keep player data but reset position.
-          mutableWorld.Positions.Clear()
-          mutableWorld.Velocities.Clear()
-          mutableWorld.MovementStates.Clear()
-          mutableWorld.RawInputStates.Clear()
-          mutableWorld.InputMaps.Clear()
-          mutableWorld.GameActionStates.Clear()
-          mutableWorld.ActionSets.Clear()
-          mutableWorld.ActiveActionSets.Clear()
-          mutableWorld.Resources.Clear()
-          mutableWorld.Factions.Clear()
-          mutableWorld.BaseStats.Clear()
-          mutableWorld.DerivedStats.Clear()
-          mutableWorld.ActiveEffects.Clear()
-          mutableWorld.AbilityCooldowns.Clear()
-          mutableWorld.LiveProjectiles.Clear()
-          mutableWorld.InCombatUntil.Clear()
-          mutableWorld.PendingSkillCast.Clear()
-          mutableWorld.ItemInstances.Clear()
-          mutableWorld.EntityInventories.Clear()
-          mutableWorld.EquippedItems.Clear()
-          mutableWorld.AIControllers.Clear()
-          mutableWorld.SpawningEntities.Clear())
+        eventBus.Publish(EntityLifecycle(Removed playerId))
 
       let getRandomPointInPolygon (poly: IndexList<Vector2>) (random: Random) =
         if poly.IsEmpty then
@@ -351,36 +316,39 @@ module CompositionRoot =
             eventBus.Publish enemyIntent
             enemyCount <- enemyCount + 1
 
+      // TODO: MapDependentSystems should be monitoring the
+      // ScenarioState which should include the map data
+      // This is a small temporary workaround to allow the game to run.
       let loadMap(newMapKey: string) =
         currentMapKey <- ValueSome newMapKey
 
         // Dispose and clear map-dependent systems
         mapDependentComponents.Dispose()
-        // mapDependentComponents.Clear() is implied by logic re-adding them, but Dispose just calls Dispose on items.
-        // We need to clear the list to avoid duplicate disposed systems.
-        // Note: SceneComponentCollection needs a Clear method if not present? It has one.
 
         clearCurrentMapData()
 
         let mapDef = scope.Stores.MapStore.find newMapKey
 
         // Recreate Renderers with new map key
-        let newRenderOrch =
+        mapDependentComponents.Add(
           new RenderOrchestratorSystem.RenderOrchestratorSystem(
             game,
             pomoEnv,
             newMapKey,
-            playerId
+            playerId,
+            DrawOrder = Render.Layer.TerrainBase
           )
+        )
 
-        newRenderOrch.DrawOrder <- Render.Layer.TerrainBase
-        mapDependentComponents.Add(newRenderOrch)
-
-        let newDebugRender =
-          new DebugRenderSystem(game, pomoEnv, playerId, newMapKey)
-
-        newDebugRender.DrawOrder <- Render.Layer.Debug
-        mapDependentComponents.Add(newDebugRender)
+        mapDependentComponents.Add(
+          new DebugRenderSystem(
+            game,
+            pomoEnv,
+            playerId,
+            newMapKey,
+            DrawOrder = Render.Layer.Debug
+          )
+        )
 
         mapDependentComponents.Sort()
         mapDependentComponents.Initialize()
@@ -455,27 +423,24 @@ module CompositionRoot =
             hudDesktop |> ValueOption.iter(fun d -> d.Dispose())
       }
 
-    /// <summary>
-    /// Creates a MainMenu scene.
-    /// </summary>
     let createMainMenu
       (game: Game)
       (scope: GlobalScope)
       (transition: SceneType -> unit)
       =
       let mutable desktop = ValueNone
-      let subs = new System.Reactive.Disposables.CompositeDisposable()
+      let subs = new CompositeDisposable()
 
       let publishGuiAction(action: GuiAction) =
         match action with
-        | GuiAction.StartNewGame -> transition(SceneType.Gameplay "Lobby")
-        | GuiAction.OpenSettings -> () // TODO: Implement settings menu
-        | GuiAction.ExitGame -> game.Exit()
-        | GuiAction.BackToMainMenu -> () // Should not happen in MainMenu
+        | StartNewGame -> transition(Gameplay "Lobby")
+        | OpenSettings -> () // TODO: Implement settings menu
+        | ExitGame -> game.Exit()
+        | BackToMainMenu -> () // Should not happen in MainMenu
 
       { new Scene() with
           override _.Initialize() =
-            let root = Systems.MainMenuUI.build game publishGuiAction
+            let root = MainMenuUI.build game publishGuiAction
             desktop <- ValueSome(new Desktop(Root = root))
 
           override _.Update(gameTime) =
@@ -506,35 +471,32 @@ module CompositionRoot =
       (playerId: Guid<EntityId>)
       =
 
-      let transitionSubject = new System.Reactive.Subjects.Subject<SceneType>()
+      let transitionSubject = Subject<SceneType>.broadcast
 
       let mainMenuScene =
         SceneFactory.createMainMenu game scope transitionSubject.OnNext
 
-      let scenes = Dictionary<SceneType, Scene>()
-      scenes.Add(SceneType.MainMenu, mainMenuScene)
 
       transitionSubject
-      |> Observable.subscribe(fun sceneType ->
+      |> Observable.add(fun sceneType ->
 
         match sceneType with
-        | SceneType.MainMenu -> sceneManager.LoadScene(mainMenuScene)
-        | SceneType.Gameplay mapKey ->
-            // Always create a new Gameplay scene for "New Game" or map transitions
-            // This ensures fresh World, EventBus, and Systems.
-            let gameplayScene =
-              SceneFactory.createGameplay
-                game
-                scope
-                playerId
-                mapKey
-                transitionSubject.OnNext
+        | MainMenu -> sceneManager.LoadScene mainMenuScene
+        | Gameplay mapKey ->
+          // Always create a new Gameplay scene for "New Game" or map transitions
+          // This ensures fresh World, EventBus, and Systems.
+          let gameplayScene =
+            SceneFactory.createGameplay
+              game
+              scope
+              playerId
+              mapKey
+              transitionSubject.OnNext
 
-            sceneManager.LoadScene(gameplayScene))
-      |> ignore // We should probably keep this subscription alive, but SceneManager logic handles the scene lifecycle. The coordinator is global.
+          sceneManager.LoadScene gameplayScene)
 
       // Start by loading Main Menu
-      transitionSubject.OnNext SceneType.MainMenu
+      transitionSubject.OnNext MainMenu
 
       // Return subscription if we wanted to dispose the coordinator, but it lives for app lifetime.
       transitionSubject

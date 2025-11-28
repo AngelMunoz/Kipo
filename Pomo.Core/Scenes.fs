@@ -3,10 +3,7 @@ namespace Pomo.Core.Scenes
 open System
 open Microsoft.Xna.Framework
 
-/// <summary>
-/// Helper class to manage a collection of GameComponents within a Scene.
-/// Handles sorting, updating, drawing, and disposing.
-/// </summary>
+
 type SceneComponentCollection() =
   let components = ResizeArray<IGameComponent>()
   let updateables = ResizeArray<IUpdateable>()
@@ -23,10 +20,6 @@ type SceneComponentCollection() =
     | :? IDrawable as d -> drawables.Add(d)
     | _ -> ()
 
-  /// <summary>
-  /// Sorts components by UpdateOrder and DrawOrder.
-  /// Call this after adding all components.
-  /// </summary>
   member _.Sort() =
     updateables.Sort(fun a b -> a.UpdateOrder.CompareTo(b.UpdateOrder))
     drawables.Sort(fun a b -> a.DrawOrder.CompareTo(b.DrawOrder))
@@ -55,28 +48,15 @@ type SceneComponentCollection() =
     updateables.Clear()
     drawables.Clear()
 
-/// <summary>
-/// Represents a distinct state of the game (e.g., Main Menu, Gameplay, Credits).
-/// It owns its own World, Systems, and UI.
-/// Implementations should prefer F# Object Expressions.
-/// </summary>
 [<AbstractClass>]
 type Scene() =
-  /// <summary>
-  /// Called once when the scene is loaded.
-  /// </summary>
+
   abstract member Initialize: unit -> unit
   default _.Initialize() = ()
 
-  /// <summary>
-  /// Called every frame to update game logic.
-  /// </summary>
   abstract member Update: GameTime -> unit
   default _.Update(_) = ()
 
-  /// <summary>
-  /// Called every frame to draw elements to the screen.
-  /// </summary>
   abstract member Draw: GameTime -> unit
   default _.Draw(_) = ()
 
@@ -90,44 +70,27 @@ type Scene() =
   interface IDisposable with
     member this.Dispose() = this.Dispose()
 
-/// <summary>
-/// Manages the active scene and transitions between them.
-/// </summary>
-type SceneManager(game: Game) =
+
+type SceneManager() =
   let mutable currentScene: Scene voption = ValueNone
   let mutable nextScene: Scene voption = ValueNone
 
-  /// <summary>
-  /// Queues a scene transition to happen at the start of the next Update cycle.
-  /// </summary>
-  member this.LoadScene(scene: Scene) =
-    nextScene <- ValueSome scene
+  member _.LoadScene(scene: Scene) = nextScene <- ValueSome scene
 
-  /// <summary>
-  /// Updates the currently active scene and handles transitions.
-  /// </summary>
-  member this.Update(gameTime: GameTime) =
-    // Handle Transition
-    match nextScene with
-    | ValueSome newScene ->
-        currentScene |> ValueOption.iter(fun s -> s.Dispose())
-        currentScene <- ValueSome newScene
-        newScene.Initialize()
-        nextScene <- ValueNone
-    | ValueNone -> ()
+  member _.Update(gameTime: GameTime) =
+    nextScene
+    |> ValueOption.iter(fun newScene ->
+      currentScene |> ValueOption.iter(fun s -> s.Dispose())
+      currentScene <- ValueSome newScene
+      newScene.Initialize()
+      nextScene <- ValueNone)
 
-    currentScene |> ValueOption.iter(fun s -> s.Update(gameTime))
+    currentScene |> ValueOption.iter(fun s -> s.Update gameTime)
 
-  /// <summary>
-  /// Draws the currently active scene.
-  /// </summary>
-  member this.Draw(gameTime: GameTime) =
-    currentScene |> ValueOption.iter(fun s -> s.Draw(gameTime))
+  member _.Draw(gameTime: GameTime) =
+    currentScene |> ValueOption.iter(fun s -> s.Draw gameTime)
 
-  /// <summary>
-  /// Disposes the current scene when the manager itself is disposed.
-  /// </summary>
   interface IDisposable with
-    member this.Dispose() =
+    member _.Dispose() =
       currentScene |> ValueOption.iter(fun s -> s.Dispose())
       nextScene |> ValueOption.iter(fun s -> s.Dispose())

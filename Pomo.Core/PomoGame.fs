@@ -1,13 +1,10 @@
 namespace Pomo.Core
 
 open System
-open System.Collections.Generic
 open Microsoft.Xna.Framework
-open Microsoft.Xna.Framework.Graphics
 open FSharp.UMX
 open Pomo.Core.Localization
 open Pomo.Core.Scenes
-open Pomo.Core.Domain.Units
 open Myra
 
 type PomoGame() as this =
@@ -17,9 +14,11 @@ type PomoGame() as this =
 
   let playerId = %Guid.NewGuid()
 
-  let mutable sceneManager: SceneManager voption = ValueNone
-  let mutable globalScope: GlobalScope voption = ValueNone
-  let mutable coordinatorDisposable: IDisposable voption = ValueNone
+  // 1. Create Global Scope
+  let globalScope = CompositionRoot.createGlobalScope this
+  // 2. Create Scene Manager
+  let sceneManager = new SceneManager()
+  let mutable coordinatorDisposable: IDisposable = Unchecked.defaultof<_>
 
   do
     base.IsMouseVisible <- true
@@ -39,44 +38,35 @@ type PomoGame() as this =
 
     LocalizationManager.DefaultCultureCode |> LocalizationManager.SetCulture
 
-    // 1. Create Global Scope
-    let scope = CompositionRoot.createGlobalScope this
-    globalScope <- ValueSome scope
-
-    // 2. Create Scene Manager
-    let manager = new SceneManager(this)
-    sceneManager <- ValueSome manager
-
     base.Initialize()
 
   override _.LoadContent() =
-    match globalScope, sceneManager with
-    | ValueSome scope, ValueSome manager ->
-      // 3. Start Scene Coordinator (which handles initial scene loading and transitions)
-      let coordinatorSub =
-        CompositionRoot.SceneCoordinator.start this scope manager playerId
+    // 3. Start Scene Coordinator (which handles initial scene loading and transitions)
+    let coordinatorSub =
+      CompositionRoot.SceneCoordinator.start
+        this
+        globalScope
+        sceneManager
+        playerId
 
-      coordinatorDisposable <- ValueSome coordinatorSub
-    | _ -> () // Should not happen if Initialize ran correctly
+    coordinatorDisposable <- coordinatorSub
 
   override _.Dispose(disposing: bool) =
     if disposing then
-      coordinatorDisposable |> ValueOption.iter(fun d -> d.Dispose())
+      coordinatorDisposable.Dispose()
 
-      sceneManager |> ValueOption.iter(fun m -> (m :> IDisposable).Dispose())
+      (sceneManager :> IDisposable).Dispose()
 
     base.Dispose disposing
 
   override _.Update gameTime =
-    // Delegate to SceneManager
-    sceneManager |> ValueOption.iter(fun m -> m.Update(gameTime))
+    sceneManager.Update gameTime
 
     base.Update gameTime
 
   override _.Draw gameTime =
-    base.GraphicsDevice.Clear Color.Black // Clear to black to detect if rendering fails
+    base.GraphicsDevice.Clear Color.Black
 
-    // Delegate to SceneManager
-    sceneManager |> ValueOption.iter(fun m -> m.Draw(gameTime))
+    sceneManager.Draw gameTime
 
     base.Draw gameTime
