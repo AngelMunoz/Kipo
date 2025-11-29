@@ -133,25 +133,37 @@ module Projectile =
     let (Gameplay gameplay) = env.GameplayServices
 
     override this.Update _ =
-      let snapshot = gameplay.Projections.ComputeMovementSnapshot()
       let liveEntities = gameplay.Projections.LiveEntities |> ASet.force
       let liveProjectiles = core.World.LiveProjectiles |> AMap.force
+      let entityScenarios = core.World.EntityScenario |> AMap.force
 
-      let sysEvents, stateEvents =
+      // Group projectiles by scenario
+      let projectilesByScenario =
         liveProjectiles
-        |> HashMap.fold
-          (fun (sysAcc, stateAcc) projectileId projectile ->
-            let struct (sysEvents, stateEvents) =
-              processProjectile
-                core.World.Rng
-                snapshot.Positions
-                liveEntities
-                projectileId
-                projectile
+        |> HashMap.toSeq
+        |> Seq.choose(fun (id, proj) ->
+          match entityScenarios.TryFindV id with
+          | ValueSome sId -> Some(sId, (id, proj))
+          | ValueNone -> None)
+        |> Seq.groupBy fst
 
-            IndexList.append sysEvents sysAcc,
-            IndexList.append stateEvents stateAcc)
-          (IndexList.empty, IndexList.empty)
+      let sysEvents = ResizeArray()
+      let stateEvents = ResizeArray()
 
-      sysEvents |> IndexList.iter core.EventBus.Publish
-      stateEvents |> IndexList.iter core.EventBus.Publish
+      for (scenarioId, projectiles) in projectilesByScenario do
+        let snapshot = gameplay.Projections.ComputeMovementSnapshot(scenarioId)
+
+        for (_, (projectileId, projectile)) in projectiles do
+          let struct (evs, states) =
+            processProjectile
+              core.World.Rng
+              snapshot.Positions
+              liveEntities
+              projectileId
+              projectile
+
+          sysEvents.AddRange evs
+          stateEvents.AddRange states
+
+      sysEvents |> Seq.iter core.EventBus.Publish
+      stateEvents |> Seq.iter core.EventBus.Publish

@@ -249,7 +249,12 @@ module Projections =
   type MovementSnapshot = {
     Positions: HashMap<Guid<EntityId>, Vector2>
     SpatialGrid: HashMap<GridCell, IndexList<Guid<EntityId>>>
-  }
+  } with
+
+    static member Empty = {
+      Positions = HashMap.empty
+      SpatialGrid = HashMap.empty
+    }
 
   type ProjectionService =
     abstract LiveEntities: aset<Guid<EntityId>>
@@ -257,12 +262,13 @@ module Projections =
     abstract DerivedStats: amap<Guid<EntityId>, Entity.DerivedStats>
     abstract EquipedItems: amap<Guid<EntityId>, HashMap<Slot, ItemDefinition>>
     abstract Inventories: amap<Guid<EntityId>, HashSet<ItemDefinition>>
+    abstract EntityScenarios: amap<Guid<EntityId>, Guid<ScenarioId>>
 
     abstract ActionSets:
       amap<Guid<EntityId>, HashMap<Action.GameAction, SlotProcessing>>
 
     /// Forces the current world state and computes the physics/grid for this frame.
-    abstract ComputeMovementSnapshot: unit -> MovementSnapshot
+    abstract ComputeMovementSnapshot: Guid<ScenarioId> -> MovementSnapshot
 
     /// Helper to query a snapshot (pure function, no longer adaptive)
     abstract GetNearbyEntitiesSnapshot:
@@ -274,31 +280,36 @@ module Projections =
     (time: TimeSpan)
     (velocities: HashMap<Guid<EntityId>, Vector2>)
     (positions: HashMap<Guid<EntityId>, Vector2>)
+    (entityScenarios: HashMap<Guid<EntityId>, Guid<ScenarioId>>)
+    (scenarioId: Guid<ScenarioId>)
     =
     let dt = float32 time.TotalSeconds
     let mutable newPositions = HashMap.empty
     let mutable newGrid = HashMap.empty
 
     for (id, startPos) in positions do
-      // Calculate Position
-      let currentPos =
-        match velocities |> HashMap.tryFindV id with
-        | ValueSome v -> startPos + (v * dt)
-        | ValueNone -> startPos
+      match entityScenarios |> HashMap.tryFindV id with
+      | ValueSome sId when sId = scenarioId ->
+        // Calculate Position
+        let currentPos =
+          match velocities |> HashMap.tryFindV id with
+          | ValueSome v -> startPos + (v * dt)
+          | ValueNone -> startPos
 
-      newPositions <- newPositions |> HashMap.add id currentPos
+        newPositions <- newPositions |> HashMap.add id currentPos
 
-      // Calculate Grid
-      let cell =
-        Spatial.getGridCell Core.Constants.Collision.GridCellSize currentPos
+        // Calculate Grid
+        let cell =
+          Spatial.getGridCell Core.Constants.Collision.GridCellSize currentPos
 
-      // Add to Grid
-      let cellContent =
-        match newGrid |> HashMap.tryFindV cell with
-        | ValueSome list -> list
-        | ValueNone -> IndexList.empty
+        // Add to Grid
+        let cellContent =
+          match newGrid |> HashMap.tryFindV cell with
+          | ValueSome list -> list
+          | ValueNone -> IndexList.empty
 
-      newGrid <- newGrid |> HashMap.add cell (cellContent |> IndexList.add id)
+        newGrid <- newGrid |> HashMap.add cell (cellContent |> IndexList.add id)
+      | _ -> ()
 
     {
       Positions = newPositions
@@ -313,13 +324,21 @@ module Projections =
         member _.DerivedStats = calculateDerivedStats itemStore world
         member _.EquipedItems = equippedItemDefs(world, itemStore)
         member _.Inventories = inventoryDefs(world, itemStore)
+        member _.EntityScenarios = world.EntityScenario
         member _.ActionSets = activeActionSets world
 
-        member _.ComputeMovementSnapshot() =
+        member _.ComputeMovementSnapshot(scenarioId) =
           let time = world.Time |> AVal.map _.Delta |> AVal.force
           let velocities = world.Velocities |> AMap.force
           let positions = world.Positions |> AMap.force
-          calculateMovementSnapshot time velocities positions
+          let entityScenarios = world.EntityScenario |> AMap.force
+
+          calculateMovementSnapshot
+            time
+            velocities
+            positions
+            entityScenarios
+            scenarioId
 
         member _.GetNearbyEntitiesSnapshot(snapshot, center, radius) =
           let cells =

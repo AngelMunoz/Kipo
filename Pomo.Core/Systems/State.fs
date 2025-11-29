@@ -28,6 +28,7 @@ module StateUpdate =
     let addEntity (world: MutableWorld) (entity: Entity.EntitySnapshot) =
       world.Positions[entity.Id] <- entity.Position
       world.Velocities[entity.Id] <- entity.Velocity
+      world.EntityScenario[entity.Id] <- entity.ScenarioId
       // Remove from spawning entities if it was spawning
       world.SpawningEntities.Remove entity.Id |> ignore
 
@@ -53,10 +54,11 @@ module StateUpdate =
       world.EntityInventories.Remove(entity) |> ignore
       world.EquippedItems.Remove(entity) |> ignore
       world.AIControllers.Remove(entity) |> ignore
+      world.EntityScenario.Remove(entity) |> ignore
 
     let inline addSpawningEntity
       (world: MutableWorld)
-      struct (entityId: Guid<EntityId>,
+      struct (entityId: Guid<EntityId>, scenarioId: Guid<ScenarioId>,
               spawnType: SystemCommunications.SpawnType, position: Vector2)
       =
       // Capture current time for animation

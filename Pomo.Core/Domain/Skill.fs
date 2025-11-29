@@ -165,9 +165,7 @@ module Skill =
     | Cone of angle: float32 * length: float32 * maxConeTargets: int
     | Line of width: float32 * length: float32 * maxLineTargets: int
     | MultiPoint of radius: float32 * maxPointTargets: int
-    | AdaptiveCone of
-      length: float32 *
-      maxTargets: int
+    | AdaptiveCone of length: float32 * maxTargets: int
 
   [<Struct>]
   type CastOrigin =
@@ -868,11 +866,7 @@ module Skill =
                 and! maxTargets =
                   Required.Property.get ("MaxTargets", Required.int) json
 
-                return
-                  AdaptiveCone(
-                    float32 length,
-                    maxTargets
-                  )
+                return AdaptiveCone(float32 length, maxTargets)
               | _ ->
                 return!
                   DecodeError.ofError(

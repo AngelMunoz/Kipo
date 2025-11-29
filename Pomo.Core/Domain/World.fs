@@ -9,6 +9,7 @@ open Pomo.Core.Domain.Units
 open Pomo.Core.Domain.Units
 open Pomo.Core.Domain.Item
 open Pomo.Core.Domain.AI
+open Pomo.Core.Domain.Map
 
 
 module World =
@@ -16,6 +17,12 @@ module World =
   open RawInput
   open Action
   open Core
+
+  [<Struct>]
+  type Scenario = {
+    Id: Guid<ScenarioId>
+    Map: MapDefinition
+  }
 
   [<Struct>]
   type Time = {
@@ -59,6 +66,9 @@ module World =
         Guid<EntityId>,
         struct (SystemCommunications.SpawnType * Vector2 * TimeSpan)
        >
+    // Scenario State
+    Scenarios: cmap<Guid<ScenarioId>, Scenario>
+    EntityScenario: cmap<Guid<EntityId>, Guid<ScenarioId>>
   }
 
   type World =
@@ -113,6 +123,9 @@ module World =
         struct (SystemCommunications.SpawnType * Vector2 * TimeSpan)
        >
 
+    abstract Scenarios: amap<Guid<ScenarioId>, Scenario>
+    abstract EntityScenario: amap<Guid<EntityId>, Guid<ScenarioId>>
+
 
   let create(rng: Random) =
     let mutableWorld: MutableWorld = {
@@ -144,6 +157,8 @@ module World =
       EquippedItems = cmap()
       AIControllers = cmap()
       SpawningEntities = cmap()
+      Scenarios = cmap()
+      EntityScenario = cmap()
     }
 
     let worldView =
@@ -172,6 +187,8 @@ module World =
           member _.EquippedItems = mutableWorld.EquippedItems
           member _.AIControllers = mutableWorld.AIControllers
           member _.SpawningEntities = mutableWorld.SpawningEntities
+          member _.Scenarios = mutableWorld.Scenarios
+          member _.EntityScenario = mutableWorld.EntityScenario
       }
 
     struct (mutableWorld, worldView)

@@ -125,12 +125,7 @@ module CompositionRoot =
         )
 
       let navigationService =
-        Navigation.create(
-          eventBus,
-          scope.Stores.MapStore,
-          initialMapKey,
-          worldView
-        )
+        Navigation.create(eventBus, scope.Stores.MapStore, worldView)
 
       let inventoryService =
         Inventory.create(eventBus, scope.Stores.ItemStore, worldView)
@@ -178,7 +173,7 @@ module CompositionRoot =
       baseComponents.Add(new CombatSystem(game, pomoEnv))
       baseComponents.Add(new ResourceManagerSystem(game, pomoEnv))
       baseComponents.Add(new ProjectileSystem(game, pomoEnv))
-      baseComponents.Add(new CollisionSystem(game, pomoEnv, initialMapKey))
+      baseComponents.Add(new CollisionSystem(game, pomoEnv))
       baseComponents.Add(new MovementSystem(game, pomoEnv))
 
       baseComponents.Add(
@@ -238,6 +233,7 @@ module CompositionRoot =
       let spawnEntitiesForMap
         (mapDef: Map.MapDefinition)
         (spawnPlayerId: Guid<EntityId>)
+        (scenarioId: Guid<ScenarioId>)
         =
         let mutable playerSpawned = false
         let mutable enemyCount = 0
@@ -289,6 +285,7 @@ module CompositionRoot =
         // Spawn player
         let playerIntent: SystemCommunications.SpawnEntityIntent = {
           EntityId = spawnPlayerId
+          ScenarioId = scenarioId
           Type = SystemCommunications.SpawnType.Player 0
           Position = playerSpawnPos
         }
@@ -307,6 +304,7 @@ module CompositionRoot =
 
             let enemyIntent: SystemCommunications.SpawnEntityIntent = {
               EntityId = enemyId
+              ScenarioId = scenarioId
               Type = SystemCommunications.SpawnType.Enemy archetypeId
               Position = pos
             }
@@ -334,6 +332,11 @@ module CompositionRoot =
 
         let mapDef = scope.Stores.MapStore.find newMapKey
 
+        // Create Scenario
+        let scenarioId = Guid.NewGuid() |> UMX.tag<ScenarioId>
+        let scenario: World.Scenario = { Id = scenarioId; Map = mapDef }
+        mutableWorld.Scenarios[scenarioId] <- scenario
+
         // Recreate Renderers with new map key
         mapDependentComponents.Add(
           new RenderOrchestratorSystem.RenderOrchestratorSystem(
@@ -355,7 +358,7 @@ module CompositionRoot =
           )
         )
 
-        spawnEntitiesForMap mapDef playerId
+        spawnEntitiesForMap mapDef playerId scenarioId
 
       // UI for Gameplay (HUD)
       let mutable hudDesktop: Desktop voption = ValueNone

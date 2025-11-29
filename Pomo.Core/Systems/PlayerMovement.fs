@@ -97,7 +97,17 @@ module PlayerMovement =
       base.Dispose(disposing)
 
     override this.Update _ =
-      let snapshot = gameplay.Projections.ComputeMovementSnapshot()
+      let entityScenarios = gameplay.Projections.EntityScenarios |> AMap.force
+
+      let snapshot =
+        match entityScenarios |> HashMap.tryFindV playerId with
+        | ValueSome scenarioId ->
+          gameplay.Projections.ComputeMovementSnapshot(scenarioId)
+        | ValueNone ->
+            {
+              Positions = HashMap.empty
+              SpatialGrid = HashMap.empty
+            }
 
       // Process collisions
       let mutable accumulatedMtv = Vector2.Zero

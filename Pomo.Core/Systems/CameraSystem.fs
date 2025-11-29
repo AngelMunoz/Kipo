@@ -54,10 +54,15 @@ module CameraSystem =
               | _ ->
                 Microsoft.Xna.Framework.Graphics.Viewport(0, 0, width, height)
 
+            let entityScenarios = projections.EntityScenarios |> AMap.force
+
             let position =
-              projections.ComputeMovementSnapshot().Positions
-              |> HashMap.tryFind playerId
-              |> Option.defaultValue Vector2.Zero
+              match entityScenarios |> HashMap.tryFindV playerId with
+              | ValueSome scenarioId ->
+                projections.ComputeMovementSnapshot(scenarioId).Positions
+                |> HashMap.tryFind playerId
+                |> Option.defaultValue Vector2.Zero
+              | ValueNone -> Vector2.Zero
 
             ValueSome {
               Position = position

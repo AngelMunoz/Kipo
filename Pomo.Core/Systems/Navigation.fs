@@ -18,15 +18,21 @@ open Pomo.Core.Algorithms.Pathfinding
 module Navigation =
   open Pomo.Core.Domain.Core
 
-  let create
-    (eventBus: EventBus, mapStore: MapStore, mapKey: string, world: World)
-    =
-
-    let mapDef = mapStore.find mapKey
+  let create(eventBus: EventBus, mapStore: MapStore, world: World) =
     let entitySize = Constants.Entity.Size
+    let gridCache = System.Collections.Generic.Dictionary<string, NavGrid>()
 
-    let navGrid =
-      Grid.generate mapDef Constants.Navigation.GridCellSize entitySize
+    let getNavGrid(mapKey: string) =
+      match gridCache.TryGetValue mapKey with
+      | true, grid -> grid
+      | false, _ ->
+        let mapDef = mapStore.find mapKey
+
+        let grid =
+          Grid.generate mapDef Constants.Navigation.GridCellSize entitySize
+
+        gridCache[mapKey] <- grid
+        grid
 
     // Define the threshold for free movement (16 units * 5 = 80 units)
     let freeMovementThreshold = Constants.Entity.Size.X * 5.0f
@@ -38,32 +44,44 @@ module Navigation =
             let entityId = event.EntityId
             let targetPosition = event.Target
 
-            match
-              world.Positions |> AMap.force |> HashMap.tryFindV entityId
-            with
-            | ValueSome currentPosition ->
-              let distance = Vector2.Distance(currentPosition, targetPosition)
+            let entityScenarios = world.EntityScenario |> AMap.force
+            let scenarios = world.Scenarios |> AMap.force
 
-              if distance < freeMovementThreshold then
-                // Use direct movement for close targets (free movement)
-                eventBus.Publish(
-                  StateChangeEvent.Physics(
-                    PhysicsEvents.MovementStateChanged
-                      struct (entityId, MovingTo targetPosition)
-                  )
-                )
-              else
-                // Use pathfinding for distant targets
+            match entityScenarios |> HashMap.tryFindV entityId with
+            | ValueSome scenarioId ->
+              match scenarios |> HashMap.tryFindV scenarioId with
+              | ValueSome scenario ->
                 match
-                  AStar.findPath navGrid currentPosition targetPosition
+                  world.Positions |> AMap.force |> HashMap.tryFindV entityId
                 with
-                | ValueSome path when not(List.isEmpty path) ->
-                  eventBus.Publish(
-                    StateChangeEvent.Physics(
-                      PhysicsEvents.MovementStateChanged
-                        struct (entityId, MovingAlongPath path)
+                | ValueSome currentPosition ->
+                  let distance =
+                    Vector2.Distance(currentPosition, targetPosition)
+
+                  if distance < freeMovementThreshold then
+                    // Use direct movement for close targets (free movement)
+                    eventBus.Publish(
+                      StateChangeEvent.Physics(
+                        PhysicsEvents.MovementStateChanged
+                          struct (entityId, MovingTo targetPosition)
+                      )
                     )
-                  )
-                | _ -> () // No path found, do nothing (effectively canceling move)
+                  else
+                    // Use pathfinding for distant targets
+                    let navGrid = getNavGrid scenario.Map.Key
+
+                    match
+                      AStar.findPath navGrid currentPosition targetPosition
+                    with
+                    | ValueSome path when not(List.isEmpty path) ->
+                      eventBus.Publish(
+                        StateChangeEvent.Physics(
+                          PhysicsEvents.MovementStateChanged
+                            struct (entityId, MovingAlongPath path)
+                        )
+                      )
+                    | _ -> () // No path found
+                | ValueNone -> ()
+              | ValueNone -> ()
             | ValueNone -> ())
     }

@@ -770,58 +770,75 @@ module Combat =
 
       // make it inline to be sure the AMap forcing
       // is done in the subscription callbacks
-      let inline createCtx() =
-        let snapshot = gameplay.Projections.ComputeMovementSnapshot()
+      // make it inline to be sure the AMap forcing
+      // is done in the subscription callbacks
+      let inline createCtx(entityId: Guid<EntityId>) =
+        let entityScenarios = gameplay.Projections.EntityScenarios |> AMap.force
 
-        let getNearbyEntities center radius =
-          gameplay.Projections.GetNearbyEntitiesSnapshot(
-            snapshot,
-            center,
-            radius
-          )
+        match entityScenarios |> HashMap.tryFindV entityId with
+        | ValueSome scenarioId ->
+          let snapshot =
+            gameplay.Projections.ComputeMovementSnapshot(scenarioId)
 
-        let searchCtx: Spatial.Search.SearchContext = {
-          GetNearbyEntities = getNearbyEntities
-        }
+          let getNearbyEntities center radius =
+            gameplay.Projections.GetNearbyEntitiesSnapshot(
+              snapshot,
+              center,
+              radius
+            )
 
-        let entityContext = {
-          Positions = snapshot.Positions
-          Cooldowns = core.World.AbilityCooldowns |> AMap.force
-          Resources = core.World.Resources |> AMap.force
-          DerivedStats = derivedStats |> AMap.force
-        }
+          let searchCtx: Spatial.Search.SearchContext = {
+            GetNearbyEntities = getNearbyEntities
+          }
 
-        {
-          Rng = core.World.Rng
-          Time = core.World.Time |> AVal.force
-          EventBus = eventBus
-          SearchContext = searchCtx
-          EntityContext = entityContext
-          SkillStore = skillStore
-        }
+          let entityContext = {
+            Positions = snapshot.Positions
+            Cooldowns = core.World.AbilityCooldowns |> AMap.force
+            Resources = core.World.Resources |> AMap.force
+            DerivedStats = derivedStats |> AMap.force
+          }
+
+          ValueSome {
+            Rng = core.World.Rng
+            Time = core.World.Time |> AVal.force
+            EventBus = eventBus
+            SearchContext = searchCtx
+            EntityContext = entityContext
+            SkillStore = skillStore
+          }
+        | ValueNone -> ValueNone
 
       eventBus.GetObservableFor<SystemCommunications.AbilityIntent>()
       |> Observable.subscribe(fun event ->
-        Handlers.handleAbilityIntent
-          (createCtx())
-          event.Caster
-          event.SkillId
-          event.Target)
+        match createCtx event.Caster with
+        | ValueSome ctx ->
+          Handlers.handleAbilityIntent
+            ctx
+            event.Caster
+            event.SkillId
+            event.Target
+        | ValueNone -> ())
       |> subscriptions.Add
 
       eventBus.GetObservableFor<SystemCommunications.ProjectileImpacted>()
       |> Observable.subscribe(fun event ->
-        Handlers.handleProjectileImpact (createCtx()) event)
+        match createCtx event.CasterId with
+        | ValueSome ctx -> Handlers.handleProjectileImpact ctx event
+        | ValueNone -> ())
       |> subscriptions.Add
 
       eventBus.GetObservableFor<SystemCommunications.EffectDamageIntent>()
       |> Observable.subscribe(fun event ->
-        Handlers.handleEffectDamageIntent (createCtx()) event)
+        match createCtx event.SourceEntity with
+        | ValueSome ctx -> Handlers.handleEffectDamageIntent ctx event
+        | ValueNone -> ())
       |> subscriptions.Add
 
       eventBus.GetObservableFor<SystemCommunications.EffectResourceIntent>()
       |> Observable.subscribe(fun event ->
-        Handlers.handleEffectResourceIntent (createCtx()) event)
+        match createCtx event.SourceEntity with
+        | ValueSome ctx -> Handlers.handleEffectResourceIntent ctx event
+        | ValueNone -> ())
       |> subscriptions.Add
 
     override _.Dispose disposing =

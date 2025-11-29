@@ -40,6 +40,7 @@ module SystemCommunications =
   [<Struct>]
   type SpawnEntityIntent = {
     EntityId: Guid<EntityId>
+    ScenarioId: Guid<ScenarioId>
     Type: SpawnType
     Position: Vector2
   }
@@ -170,7 +171,11 @@ module SystemCommunications =
 
 type EntityLifecycleEvents =
   | Spawning of
-    spawning: struct (Guid<EntityId> * SystemCommunications.SpawnType * Vector2)
+    spawning:
+      struct (Guid<EntityId> *
+      Guid<ScenarioId> *
+      SystemCommunications.SpawnType *
+      Vector2)
   | Created of created: EntitySnapshot
   | Removed of removed: Guid<EntityId>
 

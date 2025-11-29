@@ -206,7 +206,7 @@ module Targeting =
 
   let handleTargetSelected
     (args: HandleSelectedTargetArgs)
-    (getPositions: unit -> Projections.MovementSnapshot)
+    (projections: Projections.ProjectionService)
     (currentSelection: struct (Guid<EntityId> * Selection))
     =
     let {
@@ -216,49 +216,56 @@ module Targeting =
         } =
       args
 
-    let positions = getPositions().Positions
     let struct (selector, selection) = currentSelection
 
     match _entityId.Value with
     | ValueSome casterId ->
       if casterId = selector then
-        let skillOpt = skillBeingTargeted |> AVal.force
+        let entityScenarios = projections.EntityScenarios |> AMap.force
 
-        match skillOpt with
-        | ValueSome(Active activeSkill) ->
-          match activeSkill.Targeting, selection with
-          | TargetEntity, SelectedEntity targetId ->
-            TargetingHandlers.handleTargetEntity
-              eventBus
-              positions
-              activeSkill
-              casterId
-              targetId
-          | TargetPosition, SelectedPosition targetPos ->
-            TargetingHandlers.handleTargetPosition
-              eventBus
-              positions
-              activeSkill
-              casterId
-              targetPos
-          | TargetDirection, SelectedPosition targetPos ->
-            TargetingHandlers.handleTargetDirection
-              eventBus
-              positions
-              activeSkill
-              casterId
-              targetPos
-          | _ -> () // Invalid selection for the targeting mode
+        match entityScenarios |> HashMap.tryFindV casterId with
+        | ValueSome scenarioId ->
+          let positions =
+            projections.ComputeMovementSnapshot(scenarioId).Positions
 
-          // Always clear targeting mode after a selection is made
-          transact(fun () ->
-            _action.Value <- ValueNone
-            _entityId.Value <- ValueNone)
-        | _ ->
-          // Skill not active or passive, clear targeting mode
-          transact(fun () ->
-            _action.Value <- ValueNone
-            _entityId.Value <- ValueNone)
+          let skillOpt = skillBeingTargeted |> AVal.force
+
+          match skillOpt with
+          | ValueSome(Active activeSkill) ->
+            match activeSkill.Targeting, selection with
+            | TargetEntity, SelectedEntity targetId ->
+              TargetingHandlers.handleTargetEntity
+                eventBus
+                positions
+                activeSkill
+                casterId
+                targetId
+            | TargetPosition, SelectedPosition targetPos ->
+              TargetingHandlers.handleTargetPosition
+                eventBus
+                positions
+                activeSkill
+                casterId
+                targetPos
+            | TargetDirection, SelectedPosition targetPos ->
+              TargetingHandlers.handleTargetDirection
+                eventBus
+                positions
+                activeSkill
+                casterId
+                targetPos
+            | _ -> () // Invalid selection for the targeting mode
+
+            // Always clear targeting mode after a selection is made
+            transact(fun () ->
+              _action.Value <- ValueNone
+              _entityId.Value <- ValueNone)
+          | _ ->
+            // Skill not active or passive, clear targeting mode
+            transact(fun () ->
+              _action.Value <- ValueNone
+              _entityId.Value <- ValueNone)
+        | ValueNone -> ()
       else
         () // Event selector was not the active caster
     | ValueNone -> () // No active caster
@@ -291,7 +298,7 @@ module Targeting =
           skillBeingTargeted = skillBeingTargeted
           currentAction = struct (_entityId, _action)
         }
-        projections.ComputeMovementSnapshot
+        projections
 
 
 
