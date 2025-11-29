@@ -260,7 +260,8 @@
   </object>
   <object id="3" name="GateB" type="Teleport" x="288" y="96">
    <properties>
-    <property name="TravelTo" value="Proto:GateA"/>
+    <property name="TeleportTarget" value="GateA"/>
+    <property name="TravelTo" value="Proto"/>
    </properties>
    <polygon points="0,0 32,-16 0,-32 -32,-16"/>
   </object>
