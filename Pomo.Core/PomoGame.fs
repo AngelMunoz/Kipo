@@ -23,7 +23,7 @@ type PomoGame() as this =
     new SceneManager(
       this,
       CompositionRoot.sceneTransitionSubject,
-      CompositionRoot.sceneLoader this globalScope playerId
+      CompositionRoot.SceneFactory.sceneLoader this globalScope playerId
     )
 
   do

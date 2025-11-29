@@ -97,6 +97,13 @@ module SystemCommunications =
   }
 
   [<Struct>]
+  type PortalTravel = {
+    EntityId: Guid<EntityId>
+    TargetMap: string
+    TargetSpawn: string
+  }
+
+  [<Struct>]
   type SetMovementTarget = {
     EntityId: Guid<EntityId>
     Target: Vector2

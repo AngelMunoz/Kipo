@@ -94,6 +94,7 @@ module CompositionRoot =
       (scope: GlobalScope)
       (playerId: Guid<EntityId>)
       (initialMapKey: string)
+      (initialTargetSpawn: string voption)
       =
       // Mutable state for the GameplayScene instance
       let mutable currentMapKey: string voption = ValueNone
@@ -191,6 +192,12 @@ module CompositionRoot =
       let clearCurrentMapData() =
         eventBus.Publish(EntityLifecycle(Removed playerId))
 
+      // Initialize WorldMapService
+      let worldMapService =
+        new Pomo.Core.Systems.WorldMapService.WorldMapService()
+
+      worldMapService.Initialize()
+
       let getRandomPointInPolygon (poly: IndexList<Vector2>) (random: Random) =
         if poly.IsEmpty then
           Vector2.Zero
@@ -234,6 +241,7 @@ module CompositionRoot =
         (mapDef: Map.MapDefinition)
         (spawnPlayerId: Guid<EntityId>)
         (scenarioId: Guid<ScenarioId>)
+        (targetSpawn: string voption)
         =
         let mutable playerSpawned = false
         let mutable enemyCount = 0
@@ -267,27 +275,36 @@ module CompositionRoot =
                     Vector2(obj.X + offset.X, obj.Y + offset.Y)
                   | _ -> Vector2(obj.X, obj.Y)
 
-                Some(isPlayerSpawn, pos)
+                Some(obj.Name, isPlayerSpawn, pos)
               | _ -> None))
 
-        // Prioritize explicit player spawn, otherwise take the first spawn found
+        // Prioritize target spawn if provided, otherwise explicit player spawn, otherwise first spawn
         let playerSpawnPos =
-          spawnCandidates
-          |> IndexList.tryFind(fun _ (isPlayer, _) -> isPlayer)
+          match targetSpawn with
+          | ValueSome targetName ->
+            spawnCandidates
+            |> Seq.tryFind(fun (name, _, _) -> name = targetName)
+            |> Option.map(fun (_, _, pos) -> pos)
+          | ValueNone -> None
+
+        let finalPlayerSpawnPos =
+          playerSpawnPos
           |> Option.orElse(
             spawnCandidates
-            |> IndexList.tryAt 0
-            |> Option.map(fun (isPlayer, pos) -> (isPlayer, pos))
+            |> Seq.tryFind(fun (_, isPlayer, _) -> isPlayer)
+            |> Option.map(fun (_, _, pos) -> pos)
           )
-          |> Option.map snd // Get just the position
-          |> Option.defaultValue Vector2.Zero // Fallback to 0,0 if no spawn points defined
+          |> Option.orElse(
+            spawnCandidates |> Seq.tryHead |> Option.map(fun (_, _, pos) -> pos)
+          )
+          |> Option.defaultValue Vector2.Zero
 
         // Spawn player
         let playerIntent: SystemCommunications.SpawnEntityIntent = {
           EntityId = spawnPlayerId
           ScenarioId = scenarioId
           Type = SystemCommunications.SpawnType.Player 0
-          Position = playerSpawnPos
+          Position = finalPlayerSpawnPos
         }
 
         eventBus.Publish playerIntent
@@ -295,9 +312,9 @@ module CompositionRoot =
 
         // Spawn enemies
         let enemySpawnCandidates =
-          spawnCandidates |> IndexList.filter(fun (isPlayer, _) -> not isPlayer)
+          spawnCandidates |> Seq.filter(fun (_, isPlayer, _) -> not isPlayer)
 
-        for (isPlayer, pos) in enemySpawnCandidates do
+        for (_, _, pos) in enemySpawnCandidates do
           if enemyCount < maxEnemies then
             let enemyId = Guid.NewGuid() |> UMX.tag
             let archetypeId = if enemyCount % 2 = 0 then %1 else %2
@@ -315,19 +332,14 @@ module CompositionRoot =
       // TODO: MapDependentSystems should be monitoring the
       // ScenarioState which should include the map data
       // This is a small temporary workaround to allow the game to run.
-      let loadMap(newMapKey: string) =
-        currentMapKey <- ValueSome newMapKey
-
+      let loadMap (newMapKey: string) (targetSpawn: string voption) =
         // Dispose and clear map-dependent systems
-        for c in mapDependentComponents do
-          game.Components.Remove(c) |> ignore
-
-          match c with
-          | :? IDisposable as d -> d.Dispose()
-          | _ -> ()
+        // Note: In scene-based approach, we don't need to remove from game.Components here
+        // because we are building the initial component list.
+        // But if we reused this function for dynamic switching, we would.
+        // Since we are only using it for initial load now, we can simplify.
 
         mapDependentComponents.Clear()
-
         clearCurrentMapData()
 
         let mapDef = scope.Stores.MapStore.find newMapKey
@@ -338,7 +350,7 @@ module CompositionRoot =
         mutableWorld.Scenarios[scenarioId] <- scenario
 
         // Recreate Renderers with new map key
-        mapDependentComponents.Add(
+        let renderOrchestrator =
           new RenderOrchestratorSystem.RenderOrchestratorSystem(
             game,
             pomoEnv,
@@ -346,9 +358,10 @@ module CompositionRoot =
             playerId,
             DrawOrder = Render.Layer.TerrainBase
           )
-        )
 
-        mapDependentComponents.Add(
+        mapDependentComponents.Add(renderOrchestrator)
+
+        let debugRender =
           new DebugRenderSystem(
             game,
             pomoEnv,
@@ -356,9 +369,10 @@ module CompositionRoot =
             newMapKey,
             DrawOrder = Render.Layer.Debug
           )
-        )
 
-        spawnEntitiesForMap mapDef playerId scenarioId
+        mapDependentComponents.Add(debugRender)
+
+        spawnEntitiesForMap mapDef playerId scenarioId targetSpawn
 
       // UI for Gameplay (HUD)
       let mutable hudDesktop: Desktop voption = ValueNone
@@ -388,7 +402,18 @@ module CompositionRoot =
       subs.Add(equipmentService.StartListening())
 
       // Load initial map
-      loadMap initialMapKey
+      loadMap initialMapKey initialTargetSpawn
+
+      // Handle Portal Travel
+      subs.Add(
+        eventBus.GetObservableFor<SystemCommunications.PortalTravel>()
+        |> Observable.subscribe(fun event ->
+          if event.EntityId = playerId then
+            // Trigger Scene Transition instead of local loadMap
+            sceneTransitionSubject.OnNext(
+              Gameplay(event.TargetMap, ValueSome event.TargetSpawn)
+            ))
+      )
 
       // Create ad-hoc components for World Update and HUD
       let worldUpdateComponent =
@@ -431,7 +456,13 @@ module CompositionRoot =
             member _.Dispose() =
               subs.Dispose()
               hudDesktop |> ValueOption.iter(fun d -> d.Dispose())
-              ()
+              // Cleanup map dependent components
+              for c in mapDependentComponents do
+                match c with
+                | :? IDisposable as d -> d.Dispose()
+                | _ -> ()
+
+              mapDependentComponents.Clear()
         }
 
       struct (allComponents, disposable)
@@ -442,7 +473,8 @@ module CompositionRoot =
 
       let publishGuiAction(action: GuiAction) =
         match action with
-        | StartNewGame -> sceneTransitionSubject.OnNext(Gameplay "Lobby")
+        | StartNewGame ->
+          sceneTransitionSubject.OnNext(Gameplay("Lobby", ValueNone))
         | OpenSettings -> () // TODO: Implement settings menu
         | ExitGame -> game.Exit()
         | BackToMainMenu -> () // Should not happen in MainMenu
@@ -471,12 +503,13 @@ module CompositionRoot =
 
       struct ([ uiComponent :> IGameComponent ], disposable)
 
-  let sceneLoader
-    (game: Game)
-    (scope: GlobalScope)
-    (playerId: Guid<EntityId>)
-    (scene: Scene)
-    =
-    match scene with
-    | MainMenu -> SceneFactory.createMainMenu game scope
-    | Gameplay mapKey -> SceneFactory.createGameplay game scope playerId mapKey
+    let sceneLoader
+      (game: Game)
+      (scope: GlobalScope)
+      (playerId: Guid<EntityId>)
+      (scene: Scene)
+      =
+      match scene with
+      | MainMenu -> createMainMenu game scope
+      | Gameplay(mapKey, targetSpawn) ->
+        createGameplay game scope playerId mapKey targetSpawn

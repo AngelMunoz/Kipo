@@ -2,7 +2,7 @@
 <map version="1.10" tiledversion="1.11.2" class="Map" orientation="staggered" renderorder="right-down" width="30" height="30" tilewidth="64" tileheight="32" infinite="0" staggeraxis="x" staggerindex="odd" nextlayerid="11" nextobjectid="178">
  <properties>
   <property name="BattleMode" value="PVE"/>
-  <property name="MapKey" value="Proto1"/>
+  <property name="MapKey" value="Proto"/>
   <property name="MaxEnemyEntities" type="int" value="20"/>
  </properties>
  <tileset firstgid="1" name="ProtoTileset" tilewidth="64" tileheight="64" tilecount="66" columns="0">
@@ -408,11 +408,16 @@
   </object>
  </objectgroup>
  <objectgroup id="8" name="Gameplay">
-  <object id="145" name="GateA" type="Spawn" x="29.25" y="890" width="30.5" height="30.5">
+  <object id="145" name="GateA_Trigger" type="Teleport" x="29.25" y="890" width="30.5" height="30.5">
+   <properties>
+    <property name="TeleportTarget" value="GateB_Spawn"/>
+    <property name="TravelTo" value="Lobby"/>
+   </properties>
+   <ellipse/>
+  </object>
+  <object id="178" name="GateA_Spawn" type="Spawn" x="80" y="890" width="30.5" height="30.5">
    <properties>
     <property name="PlayerSpawn" type="bool" value="true"/>
-    <property name="TeleportTarget" value="GateB"/>
-    <property name="TeleportTo" value="Lobby"/>
    </properties>
    <ellipse/>
   </object>

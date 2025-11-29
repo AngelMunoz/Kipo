@@ -125,9 +125,13 @@ module Collision =
                 | ValueSome MapObjectType.Wall -> true
                 | _ -> false
 
-              if isCollidable then
+              let isTrigger = obj.PortalData.IsValueSome
+
+              if isCollidable || isTrigger then
                 match mapObjects.TryFindV obj.Id with
                 | ValueSome struct (objPoly, objAxes) ->
+                  // For triggers, we just need intersection, not MTV
+                  // But SAT gives us both.
                   match
                     Spatial.intersectsMTVWithAxes
                       entityPoly
@@ -136,10 +140,23 @@ module Collision =
                       objAxes
                   with
                   | ValueSome mtv ->
-
-                    core.EventBus.Publish(
-                      SystemCommunications.MapObjectCollision
-                        struct (entityId, obj, mtv)
-                    )
+                    if isTrigger then
+                      match obj.PortalData with
+                      | ValueSome portalData ->
+                        core.EventBus.Publish(
+                          {
+                            EntityId = entityId
+                            TargetMap = portalData.TargetMap
+                            TargetSpawn = portalData.TargetSpawn
+                          }
+                          : SystemCommunications.PortalTravel
+                        )
+                      | ValueNone -> ()
+                    else
+                      // It's a wall/collidable
+                      core.EventBus.Publish(
+                        SystemCommunications.MapObjectCollision
+                          struct (entityId, obj, mtv)
+                      )
                   | ValueNone -> ()
                 | ValueNone -> ()

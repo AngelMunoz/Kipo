@@ -182,6 +182,7 @@ module MapLoader =
       | "wall" -> ValueSome Wall
       | "zone" -> ValueSome Zone
       | "spawn" -> ValueSome Spawn
+      | "teleport" -> ValueSome Teleport
       | _ -> ValueNone
 
     let type' = attr "type" element |> ValueOption.bind parseMapObjectType
@@ -222,6 +223,23 @@ module MapLoader =
         ValueNone
 
     let isEllipse = not(isNull(element.Element(xname "ellipse")))
+    let properties = parseProperties element
+
+    let portalData =
+      let travelTo =
+        properties
+        |> HashMap.tryFind "TravelTo"
+        |> Option.orElse(properties |> HashMap.tryFind "TeleportTo")
+
+      let targetSpawn =
+        properties
+        |> HashMap.tryFind "TeleportTarget"
+        |> Option.orElse(properties |> HashMap.tryFind "TargetSpawn")
+
+      match travelTo, targetSpawn with
+      | Some map, Some spawn ->
+        ValueSome { TargetMap = map; TargetSpawn = spawn }
+      | _ -> ValueNone
 
     {
       Id = %id
@@ -233,9 +251,10 @@ module MapLoader =
       Height = height
       Rotation = rotation
       Gid = gid
-      Properties = parseProperties element
+      Properties = properties
       Points = points
       IsEllipse = isEllipse
+      PortalData = portalData
     }
 
   let private parseObjectGroup(element: XElement) : ObjectGroup =

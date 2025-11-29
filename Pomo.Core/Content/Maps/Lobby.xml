@@ -260,9 +260,12 @@
   </object>
   <object id="3" name="GateB" type="Teleport" x="288" y="96">
    <properties>
-    <property name="TeleportTarget" value="GateA"/>
+    <property name="TeleportTarget" value="GateA_Spawn"/>
     <property name="TravelTo" value="Proto"/>
    </properties>
+   <polygon points="0,0 32,-16 0,-32 -32,-16"/>
+  </object>
+  <object id="10" name="GateB_Spawn" type="Spawn" x="271.333" y="131.333">
    <polygon points="0,0 32,-16 0,-32 -32,-16"/>
   </object>
   <object id="4" name="LobbySpawn" type="Spawn" x="32" y="224">
