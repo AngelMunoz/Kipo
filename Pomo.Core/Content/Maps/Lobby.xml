@@ -253,9 +253,15 @@
  </objectgroup>
  <objectgroup id="4" name="Gameplay">
   <object id="2" name="GateA" type="Teleport" x="160" y="64">
+   <properties>
+    <property name="TravelTo" value="Undefined"/>
+   </properties>
    <polygon points="0,0 32,-16 0,-32 -32,-16"/>
   </object>
   <object id="3" name="GateB" type="Teleport" x="288" y="96">
+   <properties>
+    <property name="TravelTo" value="Proto:GateA"/>
+   </properties>
    <polygon points="0,0 32,-16 0,-32 -32,-16"/>
   </object>
   <object id="4" name="LobbySpawn" type="Spawn" x="32" y="224">

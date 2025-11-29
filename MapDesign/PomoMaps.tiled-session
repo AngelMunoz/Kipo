@@ -38,11 +38,11 @@
                 4,
                 3
             ],
-            "scale": 11,
+            "scale": 1.5,
             "selectedLayer": 3,
             "viewCenter": {
-                "x": 300.54545454545456,
-                "y": 183.77272727272725
+                "x": 340.66666666666663,
+                "y": 113.66666666666669
             }
         },
         "X:/Kipo/Pomo.Core/Content/Maps/Lobby.xml#ProtoTileset": {
@@ -56,11 +56,11 @@
                 8,
                 5
             ],
-            "scale": 2,
-            "selectedLayer": 2,
+            "scale": 1.5,
+            "selectedLayer": 4,
             "viewCenter": {
-                "x": 517.5,
-                "y": 153.25
+                "x": 20.666666666666686,
+                "y": 977.6666666666665
             }
         },
         "X:/Kipo/Pomo.Core/Content/Maps/Proto.xml#ProtoTileset": {
@@ -83,9 +83,9 @@
         }
     },
     "last.imagePath": "X:/Kipo/Pomo.Core/Content/Tiles/64x64",
-    "last.worldFilePath": "/home/amunoz/repos/Kipo/MapDesign",
+    "last.worldFilePath": "X:/Kipo/Pomo.Core/Content/Maps",
     "loadedWorlds": [
-        "/home/amunoz/repos/Kipo/MapDesign/Pomo.world"
+        "X:/Kipo/Pomo.Core/Content/Maps/Pomo.world"
     ],
     "map.height": 10,
     "map.lastUsedFormat": "tmx",

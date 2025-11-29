@@ -72,6 +72,9 @@
     <Content Include="Content/Skills.json">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
+    <Content Include="Content/Maps/Pomo.world">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
     <Content Include="Content/Maps/Proto.xml">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
@@ -84,13 +87,13 @@
     <PackageReference Include="FSharp.Data.Adaptive" Version="1.2.25" />
     <PackageReference Include="FSharp.UMX" Version="1.1.0" />
     <PackageReference Include="JDeck" Version="1.0.0" />
+    <PackageReference Include="Myra" Version="1.5.10" />
 
     <PackageReference Include="MonoGame.Framework.DesktopGL" Version="3.8.*" PrivateAssets="All" />
 
-
+    <!-- Build and analysis tools -->
     <PackageReference Include="Ionide.Analyzers" Version="0.*" PrivateAssets="All" />
     <PackageReference Include="FSharp.Analyzers.Build" Version="0.*" PrivateAssets="All" IncludeAssets="build" />
-    <PackageReference Include="Myra" Version="1.5.10" />
   </ItemGroup>
 
 </Project>

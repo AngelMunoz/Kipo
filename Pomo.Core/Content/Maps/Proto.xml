@@ -408,9 +408,10 @@
   </object>
  </objectgroup>
  <objectgroup id="8" name="Gameplay">
-  <object id="145" name="GateA" type="Spawn" x="43.25" y="884" width="30.5" height="30.5">
+  <object id="145" name="GateA" type="Spawn" x="29.25" y="890" width="30.5" height="30.5">
    <properties>
     <property name="PlayerSpawn" type="bool" value="true"/>
+    <property name="TeleportTo" value="Lobby:GateB"/>
    </properties>
    <ellipse/>
   </object>
