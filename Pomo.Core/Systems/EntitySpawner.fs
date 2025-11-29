@@ -258,9 +258,7 @@ module EntitySpawnerLogic =
 
     let subscriptions = new System.Reactive.Disposables.CompositeDisposable()
 
-    override this.Initialize() =
-      base.Initialize()
-
+    do
       core.EventBus
         .GetObservableFor<SystemCommunications.SpawnEntityIntent>()
         .Subscribe(fun intent ->

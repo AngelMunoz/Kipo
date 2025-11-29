@@ -2,95 +2,73 @@ namespace Pomo.Core.Scenes
 
 open System
 open Microsoft.Xna.Framework
+open Pomo.Core.Domain.Scenes
 
+type SceneManager
+  (
+    game: Game,
+    sceneEvents: IObservable<Scene>,
+    loader: Scene -> struct (IGameComponent list * IDisposable)
+  ) =
+  inherit GameComponent(game)
 
-type SceneComponentCollection() =
-  let components = ResizeArray<IGameComponent>()
-  let updateables = ResizeArray<IUpdateable>()
-  let drawables = ResizeArray<IDrawable>()
+  let mutable currentDisposable: IDisposable voption = ValueNone
+  let mutable currentComponents: IGameComponent list = []
+  let mutable subscription: IDisposable voption = ValueNone
+  let mutable nextScene: Scene voption = ValueNone
 
-  member _.Add(gameComponent: IGameComponent) =
-    components.Add(gameComponent)
+  let switchTo(scene: Scene) =
+    // 1. Remove components first to ensure they stop updating/drawing
+    for c in currentComponents do
+      game.Components.Remove(c) |> ignore
 
-    match gameComponent with
-    | :? IUpdateable as u -> updateables.Add(u)
-    | _ -> ()
+    // 2. Cleanup old scene
+    currentDisposable |> ValueOption.iter(fun d -> d.Dispose())
 
-    match gameComponent with
-    | :? IDrawable as d -> drawables.Add(d)
-    | _ -> ()
-
-  member _.Sort() =
-    updateables.Sort(fun a b -> a.UpdateOrder.CompareTo(b.UpdateOrder))
-    drawables.Sort(fun a b -> a.DrawOrder.CompareTo(b.DrawOrder))
-
-  member _.Initialize() =
-    for c in components do
-      c.Initialize()
-
-  member _.Update(gameTime: GameTime) =
-    for u in updateables do
-      if u.Enabled then
-        u.Update(gameTime)
-
-  member _.Draw(gameTime: GameTime) =
-    for d in drawables do
-      if d.Visible then
-        d.Draw(gameTime)
-
-  member _.Dispose() =
-    for c in components do
+    for c in currentComponents do
       match c with
       | :? IDisposable as d -> d.Dispose()
       | _ -> ()
 
-    components.Clear()
-    updateables.Clear()
-    drawables.Clear()
+    // 3. Load new scene
+    let struct (newComponents, newDisposable) = loader scene
 
-[<AbstractClass>]
-type Scene() =
+    // 4. Register new components
+    for c in newComponents do
+      game.Components.Add(c)
 
-  abstract member Initialize: unit -> unit
-  default _.Initialize() = ()
+    // 5. Update state
+    currentComponents <- newComponents
+    currentDisposable <- ValueSome newDisposable
 
-  abstract member Update: GameTime -> unit
-  default _.Update(_) = ()
+  override _.Initialize() =
+    base.Initialize()
 
-  abstract member Draw: GameTime -> unit
-  default _.Draw(_) = ()
+    subscription <-
+      ValueSome(
+        sceneEvents
+        |> Observable.subscribe(fun scene -> nextScene <- ValueSome scene)
+      )
 
+  override _.Update(gameTime) =
+    match nextScene with
+    | ValueSome scene ->
+      switchTo scene
+      nextScene <- ValueNone
+    | ValueNone -> ()
 
-  abstract member LoadMap: string -> unit
-  default _.LoadMap(_) = ()
+  override _.Dispose(disposing: bool) =
+    if disposing then
+      subscription |> ValueOption.iter(fun s -> s.Dispose())
+      currentDisposable |> ValueOption.iter(fun d -> d.Dispose())
 
-  abstract member Dispose: unit -> unit
-  default _.Dispose() = ()
+      for c in currentComponents do
+        game.Components.Remove(c) |> ignore
 
-  interface IDisposable with
-    member this.Dispose() = this.Dispose()
+        match c with
+        | :? IDisposable as d -> d.Dispose()
+        | _ -> ()
 
+      currentComponents <- []
 
-type SceneManager() =
-  let mutable currentScene: Scene voption = ValueNone
-  let mutable nextScene: Scene voption = ValueNone
-
-  member _.LoadScene(scene: Scene) = nextScene <- ValueSome scene
-
-  member _.Update(gameTime: GameTime) =
-    nextScene
-    |> ValueOption.iter(fun newScene ->
-      currentScene |> ValueOption.iter(fun s -> s.Dispose())
-      currentScene <- ValueSome newScene
-      newScene.Initialize()
-      nextScene <- ValueNone)
-
-    currentScene |> ValueOption.iter(fun s -> s.Update gameTime)
-
-  member _.Draw(gameTime: GameTime) =
-    currentScene |> ValueOption.iter(fun s -> s.Draw gameTime)
-
-  interface IDisposable with
-    member _.Dispose() =
-      currentScene |> ValueOption.iter(fun s -> s.Dispose())
-      nextScene |> ValueOption.iter(fun s -> s.Dispose())
+    base.Dispose disposing

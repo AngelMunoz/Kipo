@@ -163,6 +163,9 @@ module SystemCommunications =
     | MapObjectCollision of
       object: struct (Guid<EntityId> * MapObject * Vector2)
 
+  [<Struct>]
+  type SceneTransition = { Scene: Pomo.Core.Domain.Scenes.Scene }
+
 // --- State Change Events ---
 
 type EntityLifecycleEvents =

@@ -34,6 +34,7 @@ open Pomo.Core.Systems.DebugRender
 open Pomo.Core.Systems.ResourceManager
 open Pomo.Core.Systems.EntitySpawnerLogic
 
+open Pomo.Core.Domain.Scenes
 
 type GlobalScope = {
   Stores: StoreServices
@@ -42,12 +43,10 @@ type GlobalScope = {
   UIService: IUIService
 }
 
-[<Struct>]
-type SceneType =
-  | MainMenu
-  | Gameplay of selectedMap: string
 
 module CompositionRoot =
+
+  let sceneTransitionSubject = Subject<Scene>.broadcast
 
   let createGlobalScope(game: Game) =
     let deserializer = Serialization.create()
@@ -95,7 +94,6 @@ module CompositionRoot =
       (scope: GlobalScope)
       (playerId: Guid<EntityId>)
       (initialMapKey: string)
-      (transition: SceneType -> unit)
       =
       // Mutable state for the GameplayScene instance
       let mutable currentMapKey: string voption = ValueNone
@@ -171,7 +169,7 @@ module CompositionRoot =
         }
 
       // Systems that are always present
-      let baseComponents = new SceneComponentCollection()
+      let baseComponents = new ResizeArray<IGameComponent>()
       baseComponents.Add(new RawInputSystem(game, pomoEnv, playerId))
       baseComponents.Add(new InputMappingSystem(game, pomoEnv, playerId))
       baseComponents.Add(new PlayerMovementSystem(game, pomoEnv, playerId))
@@ -193,7 +191,7 @@ module CompositionRoot =
       baseComponents.Add(new StateUpdateSystem(game, pomoEnv, mutableWorld))
 
       // Map Dependent Systems (Renderers)
-      let mapDependentComponents = new SceneComponentCollection()
+      let mapDependentComponents = new ResizeArray<IGameComponent>()
 
       let clearCurrentMapData() =
         eventBus.Publish(EntityLifecycle(Removed playerId))
@@ -323,7 +321,14 @@ module CompositionRoot =
         currentMapKey <- ValueSome newMapKey
 
         // Dispose and clear map-dependent systems
-        mapDependentComponents.Dispose()
+        for c in mapDependentComponents do
+          game.Components.Remove(c) |> ignore
+
+          match c with
+          | :? IDisposable as d -> d.Dispose()
+          | _ -> ()
+
+        mapDependentComponents.Clear()
 
         clearCurrentMapData()
 
@@ -350,153 +355,125 @@ module CompositionRoot =
           )
         )
 
-        mapDependentComponents.Sort()
-        mapDependentComponents.Initialize()
-
         spawnEntitiesForMap mapDef playerId
 
       // UI for Gameplay (HUD)
-      let mutable hudDesktop = ValueNone
+      let mutable hudDesktop: Desktop voption = ValueNone
 
       let publishHudGuiAction(action: GuiAction) =
         match action with
-        | GuiAction.BackToMainMenu -> transition SceneType.MainMenu
+        | GuiAction.BackToMainMenu -> sceneTransitionSubject.OnNext MainMenu
         | _ -> ()
-
-      // Sort components based on their Order properties
-      baseComponents.Sort()
 
       // 6. Setup Listeners (Subs)
       let subs = new System.Reactive.Disposables.CompositeDisposable()
 
-      // Return the Scene
-      { new Scene() with
-          override _.Initialize() =
-            let root = Systems.GameplayUI.build game publishHudGuiAction
-            hudDesktop <- ValueSome(new Desktop(Root = root))
+      // Bridge EventBus to SceneTransitionSubject
+      subs.Add(
+        eventBus.GetObservableFor<SystemCommunications.SceneTransition>()
+        |> Observable.subscribe(fun event ->
+          sceneTransitionSubject.OnNext event.Scene)
+      )
 
-            // Initialize all base systems
-            baseComponents.Initialize()
+      // Initialize
+      // Setup Listeners
+      subs.Add(actionHandler.StartListening())
+      subs.Add(navigationService.StartListening())
+      subs.Add(targetingService.StartListening())
+      subs.Add(effectApplication.StartListening())
+      subs.Add(inventoryService.StartListening())
+      subs.Add(equipmentService.StartListening())
 
-            // Setup Listeners
-            subs.Add(actionHandler.StartListening())
-            subs.Add(navigationService.StartListening())
-            subs.Add(targetingService.StartListening())
-            subs.Add(effectApplication.StartListening())
-            subs.Add(inventoryService.StartListening())
-            subs.Add(equipmentService.StartListening())
+      // Load initial map
+      loadMap initialMapKey
 
-            // Load initial map
-            loadMap initialMapKey
+      // Create ad-hoc components for World Update and HUD
+      let worldUpdateComponent =
+        { new GameComponent(game) with
+            override _.Update(gameTime) =
+              transact(fun () ->
+                let previous = mutableWorld.Time.Value.TotalGameTime
 
-          override _.Update(gameTime) =
-            // Update MutableWorld time
-            transact(fun () ->
-              let previous = mutableWorld.Time.Value.TotalGameTime
+                mutableWorld.Time.Value <- {
+                  Delta = gameTime.ElapsedGameTime
+                  TotalGameTime = gameTime.TotalGameTime
+                  Previous = previous
+                })
 
-              mutableWorld.Time.Value <- {
-                Delta = gameTime.ElapsedGameTime
-                TotalGameTime = gameTime.TotalGameTime
-                Previous = previous
-              })
+              hudDesktop
+              |> ValueOption.iter(fun d ->
+                scope.UIService.SetMouseOverUI d.IsMouseOverGUI)
+        }
 
-            // Update systems
-            baseComponents.Update(gameTime)
-            mapDependentComponents.Update(gameTime)
+      let hudDrawComponent =
+        { new DrawableGameComponent(game) with
+            override _.LoadContent() =
+              let root = Systems.GameplayUI.build game publishHudGuiAction
+              hudDesktop <- ValueSome(new Desktop(Root = root))
 
-            // Update HUD
-            hudDesktop
-            |> ValueOption.iter(fun d ->
-              scope.UIService.SetMouseOverUI d.IsMouseOverGUI)
+            override _.Draw(gameTime) =
+              hudDesktop |> ValueOption.iter(fun d -> d.Render())
+        }
 
-          override _.Draw(gameTime) =
-            baseComponents.Draw(gameTime)
-            mapDependentComponents.Draw(gameTime)
-            hudDesktop |> ValueOption.iter(fun d -> d.Render())
+      baseComponents.Add(worldUpdateComponent)
+      baseComponents.Add(hudDrawComponent)
 
-          member _.LoadMap(mapKey: string) = loadMap mapKey
+      let allComponents = [
+        yield! baseComponents
+        yield! mapDependentComponents
+      ]
 
-          override _.Dispose() =
-            subs.Dispose()
-            baseComponents.Dispose()
-            mapDependentComponents.Dispose()
-            hudDesktop |> ValueOption.iter(fun d -> d.Dispose())
-      }
+      let disposable =
+        { new IDisposable with
+            member _.Dispose() =
+              subs.Dispose()
+              hudDesktop |> ValueOption.iter(fun d -> d.Dispose())
+              ()
+        }
 
-    let createMainMenu
-      (game: Game)
-      (scope: GlobalScope)
-      (transition: SceneType -> unit)
-      =
-      let mutable desktop = ValueNone
+      struct (allComponents, disposable)
+
+    let createMainMenu (game: Game) (scope: GlobalScope) =
+      let mutable desktop: Desktop voption = ValueNone
       let subs = new CompositeDisposable()
 
       let publishGuiAction(action: GuiAction) =
         match action with
-        | StartNewGame -> transition(Gameplay "Lobby")
+        | StartNewGame -> sceneTransitionSubject.OnNext(Gameplay "Lobby")
         | OpenSettings -> () // TODO: Implement settings menu
         | ExitGame -> game.Exit()
         | BackToMainMenu -> () // Should not happen in MainMenu
 
-      { new Scene() with
-          override _.Initialize() =
-            let root = MainMenuUI.build game publishGuiAction
-            desktop <- ValueSome(new Desktop(Root = root))
+      let uiComponent =
+        { new DrawableGameComponent(game) with
+            override _.LoadContent() =
+              let root = MainMenuUI.build game publishGuiAction
+              desktop <- ValueSome(new Desktop(Root = root))
 
-          override _.Update(gameTime) =
-            desktop
-            |> ValueOption.iter(fun d ->
-              scope.UIService.SetMouseOverUI d.IsMouseOverGUI)
+            override _.Update(gameTime) =
+              desktop
+              |> ValueOption.iter(fun d ->
+                scope.UIService.SetMouseOverUI d.IsMouseOverGUI)
 
-          override _.Draw(gameTime) =
-            desktop
-            |> ValueOption.iter(fun d ->
-              printfn "Rendering desktop"
-              d.Render())
+            override _.Draw(gameTime) =
+              desktop |> ValueOption.iter(fun d -> d.Render())
+        }
 
-          override _.Dispose() =
-            subs.Dispose()
-            desktop |> ValueOption.iter(fun d -> d.Dispose())
-      }
+      let disposable =
+        { new IDisposable with
+            member _.Dispose() =
+              subs.Dispose()
+              desktop |> ValueOption.iter(fun d -> d.Dispose())
+        }
 
-  module SceneCoordinator =
+      struct ([ uiComponent :> IGameComponent ], disposable)
 
-    /// <summary>
-    /// Starts the game flow by handling scene transitions via an event stream.
-    /// </summary>
-    let start
-      (game: Game)
-      (scope: GlobalScope)
-      (sceneManager: SceneManager)
-      (playerId: Guid<EntityId>)
-      =
-
-      let transitionSubject = Subject<SceneType>.broadcast
-
-      let mainMenuScene =
-        SceneFactory.createMainMenu game scope transitionSubject.OnNext
-
-
-      transitionSubject
-      |> Observable.add(fun sceneType ->
-
-        match sceneType with
-        | MainMenu -> sceneManager.LoadScene mainMenuScene
-        | Gameplay mapKey ->
-          // Always create a new Gameplay scene for "New Game" or map transitions
-          // This ensures fresh World, EventBus, and Systems.
-          let gameplayScene =
-            SceneFactory.createGameplay
-              game
-              scope
-              playerId
-              mapKey
-              transitionSubject.OnNext
-
-          sceneManager.LoadScene gameplayScene)
-
-      // Start by loading Main Menu
-      transitionSubject.OnNext MainMenu
-
-      // Return subscription if we wanted to dispose the coordinator, but it lives for app lifetime.
-      transitionSubject
+  let sceneLoader
+    (game: Game)
+    (scope: GlobalScope)
+    (playerId: Guid<EntityId>)
+    (scene: Scene)
+    =
+    match scene with
+    | MainMenu -> SceneFactory.createMainMenu game scope
+    | Gameplay mapKey -> SceneFactory.createGameplay game scope playerId mapKey
