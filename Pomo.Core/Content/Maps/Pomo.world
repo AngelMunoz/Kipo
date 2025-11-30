@@ -1,14 +1,14 @@
 {
     "maps": [
         {
-            "fileName": "../Pomo.Core/Content/Maps/Proto.xml",
+            "fileName": "Proto.xml",
             "height": 976,
             "width": 992,
             "x": 320,
             "y": -864
         },
         {
-            "fileName": "../Pomo.Core/Content/Maps/Lobby.xml",
+            "fileName": "Lobby.xml",
             "height": 336,
             "width": 352,
             "x": 0,
