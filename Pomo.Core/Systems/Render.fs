@@ -204,51 +204,57 @@ module Render =
 
     { new RenderService with
         member _.Draw(camera: Camera) =
-          let snapshot = projections.ComputeMovementSnapshot()
+          let entityScenarios = world.EntityScenario |> AMap.force
 
-          let mouseState =
-            world.RawInputStates |> AMap.map' _.Mouse |> AMap.force
+          match entityScenarios |> HashMap.tryFindV playerId with
+          | ValueSome scenarioId ->
+            let snapshot = projections.ComputeMovementSnapshot(scenarioId)
 
-          let targetingMode = targetingService.TargetingMode |> AVal.force
-          let mouseState = HashMap.tryFindV playerId mouseState
-          let liveProjectiles = world.LiveProjectiles |> AMap.force
-          let liveEntities = projections.LiveEntities |> ASet.force
+            let mouseState =
+              world.RawInputStates |> AMap.map' _.Mouse |> AMap.force
 
-          let drawCommands =
-            generateDrawCommands {
-              LiveProjectiles = liveProjectiles
-              LiveEntities = liveEntities
-              CameraService = cameraService
-              PlayerId = playerId
-              Snapshot = snapshot
-              TargetingMode = targetingMode
-              MouseState = mouseState
-            }
+            let targetingMode = targetingService.TargetingMode |> AVal.force
+            let mouseState = HashMap.tryFindV playerId mouseState
+            let liveProjectiles = world.LiveProjectiles |> AMap.force
+            let liveEntities = projections.LiveEntities |> ASet.force
 
-          let transform =
-            Matrix.CreateTranslation(
-              -camera.Position.X,
-              -camera.Position.Y,
-              0.0f
-            )
-            * Matrix.CreateScale(camera.Zoom, camera.Zoom, 1.0f)
-            * Matrix.CreateTranslation(
-              float32 camera.Viewport.Width / 2.0f,
-              float32 camera.Viewport.Height / 2.0f,
-              0.0f
-            )
+            let drawCommands =
+              generateDrawCommands {
+                LiveProjectiles = liveProjectiles
+                LiveEntities = liveEntities
+                CameraService = cameraService
+                PlayerId = playerId
+                Snapshot = snapshot
+                TargetingMode = targetingMode
+                MouseState = mouseState
+              }
 
-          game.GraphicsDevice.Viewport <- camera.Viewport
+            let transform =
+              Matrix.CreateTranslation(
+                -camera.Position.X,
+                -camera.Position.Y,
+                0.0f
+              )
+              * Matrix.CreateScale(camera.Zoom, camera.Zoom, 1.0f)
+              * Matrix.CreateTranslation(
+                float32 camera.Viewport.Width / 2.0f,
+                float32 camera.Viewport.Height / 2.0f,
+                0.0f
+              )
 
-          spriteBatch.Begin(transformMatrix = transform)
+            game.GraphicsDevice.Viewport <- camera.Viewport
 
-          for command in drawCommands do
-            match command with
-            | DrawPlayer rect -> spriteBatch.Draw(texture, rect, Color.White)
-            | DrawEnemy rect -> spriteBatch.Draw(texture, rect, Color.Green)
-            | DrawProjectile rect -> spriteBatch.Draw(texture, rect, Color.Red)
-            | DrawTargetingIndicator rect ->
-              spriteBatch.Draw(texture, rect, Color.Blue * 0.5f)
+            spriteBatch.Begin(transformMatrix = transform)
 
-          spriteBatch.End()
+            for command in drawCommands do
+              match command with
+              | DrawPlayer rect -> spriteBatch.Draw(texture, rect, Color.White)
+              | DrawEnemy rect -> spriteBatch.Draw(texture, rect, Color.Green)
+              | DrawProjectile rect ->
+                spriteBatch.Draw(texture, rect, Color.Red)
+              | DrawTargetingIndicator rect ->
+                spriteBatch.Draw(texture, rect, Color.Blue * 0.5f)
+
+            spriteBatch.End()
+          | ValueNone -> ()
     }

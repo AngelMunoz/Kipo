@@ -171,12 +171,16 @@ module ActionHandler =
                   targetingService.TargetingMode |> AVal.force
 
                 // Get the entity under the cursor AT THIS MOMENT by forcing the projection.
+                let entityScenarios = projections.EntityScenarios |> AMap.force
+
+                let positions =
+                  match entityScenarios |> HashMap.tryFindV entityId with
+                  | ValueSome scenarioId ->
+                    projections.ComputeMovementSnapshot(scenarioId).Positions
+                  | ValueNone -> HashMap.empty
+
                 let clickedEntity =
-                  findHoveredEntity
-                    world
-                    (projections.ComputeMovementSnapshot().Positions)
-                    cameraService
-                    entityId
+                  findHoveredEntity world positions cameraService entityId
 
                 match targetingMode with
                 | ValueNone ->

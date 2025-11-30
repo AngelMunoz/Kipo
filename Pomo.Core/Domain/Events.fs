@@ -40,6 +40,7 @@ module SystemCommunications =
   [<Struct>]
   type SpawnEntityIntent = {
     EntityId: Guid<EntityId>
+    ScenarioId: Guid<ScenarioId>
     Type: SpawnType
     Position: Vector2
   }
@@ -93,6 +94,13 @@ module SystemCommunications =
   type AttackIntent = {
     Attacker: Guid<EntityId>
     Target: Guid<EntityId>
+  }
+
+  [<Struct>]
+  type PortalTravel = {
+    EntityId: Guid<EntityId>
+    TargetMap: string
+    TargetSpawn: string
   }
 
   [<Struct>]
@@ -163,11 +171,18 @@ module SystemCommunications =
     | MapObjectCollision of
       object: struct (Guid<EntityId> * MapObject * Vector2)
 
+  [<Struct>]
+  type SceneTransition = { Scene: Pomo.Core.Domain.Scenes.Scene }
+
 // --- State Change Events ---
 
 type EntityLifecycleEvents =
   | Spawning of
-    spawning: struct (Guid<EntityId> * SystemCommunications.SpawnType * Vector2)
+    spawning:
+      struct (Guid<EntityId> *
+      Guid<ScenarioId> *
+      SystemCommunications.SpawnType *
+      Vector2)
   | Created of created: EntitySnapshot
   | Removed of removed: Guid<EntityId>
 

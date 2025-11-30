@@ -472,36 +472,49 @@ type AISystem(game: Game, env: PomoEnvironment) =
 
   override _.Update _ =
     // Snapshot all necessary data
-    let snapshot = gameplay.Projections.ComputeMovementSnapshot()
-    let positions = snapshot.Positions
-    let factions = core.World.Factions |> AMap.force
-    let spatialGrid = snapshot.SpatialGrid
     let controllers = core.World.AIControllers |> AMap.force
+    let entityScenarios = core.World.EntityScenario |> AMap.force
+    let factions = core.World.Factions |> AMap.force
     let currentTick = (core.World.Time |> AVal.force).TotalGameTime
 
-    for controllerId, controller in controllers do
+    // Group controllers by scenario
+    let controllersByScenario =
+      controllers
+      |> HashMap.toSeq
+      |> Seq.choose(fun (id, ctrl) ->
+        match entityScenarios.TryFindV ctrl.controlledEntityId with
+        | ValueSome sId -> Some(sId, (id, ctrl))
+        | ValueNone -> None)
+      |> Seq.groupBy fst
 
-      let archetype =
-        archetypeStore.tryFind controller.archetypeId
-        |> ValueOption.defaultValue fallbackArchetype
+    for (scenarioId, group) in controllersByScenario do
+      let snapshot = gameplay.Projections.ComputeMovementSnapshot(scenarioId)
+      let positions = snapshot.Positions
+      let spatialGrid = snapshot.SpatialGrid
 
-      let struct (updatedController, command) =
-        AISystemLogic.processAndGenerateCommands
-          controller
-          archetype
-          positions
-          factions
-          spatialGrid
-          skillStore
-          currentTick
+      for (_, (controllerId, controller)) in group do
 
-      match command with
-      | ValueSome cmd -> core.EventBus.Publish cmd
-      | ValueNone -> ()
+        let archetype =
+          archetypeStore.tryFind controller.archetypeId
+          |> ValueOption.defaultValue fallbackArchetype
 
-      if updatedController <> controller then
-        core.EventBus.Publish(
-          StateChangeEvent.AI(
-            ControllerUpdated struct (controllerId, updatedController)
+        let struct (updatedController, command) =
+          AISystemLogic.processAndGenerateCommands
+            controller
+            archetype
+            positions
+            factions
+            spatialGrid
+            skillStore
+            currentTick
+
+        match command with
+        | ValueSome cmd -> core.EventBus.Publish cmd
+        | ValueNone -> ()
+
+        if updatedController <> controller then
+          core.EventBus.Publish(
+            StateChangeEvent.AI(
+              ControllerUpdated struct (controllerId, updatedController)
+            )
           )
-        )

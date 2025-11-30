@@ -61,6 +61,13 @@ module Map =
     | Wall
     | Zone
     | Spawn
+    | Teleport
+
+  [<Struct>]
+  type PortalData = {
+    TargetMap: string
+    TargetSpawn: string
+  }
 
   [<Struct>]
   type MapObject = {
@@ -76,6 +83,7 @@ module Map =
     Properties: HashMap<string, string>
     Points: IndexList<Vector2> voption // For polygons/polylines
     IsEllipse: bool
+    PortalData: PortalData voption
   }
 
   [<Struct>]

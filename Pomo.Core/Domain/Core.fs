@@ -29,6 +29,9 @@ module Units =
   [<Measure>]
   type ObjectId
 
+  [<Measure>]
+  type ScenarioId
+
 
 module Render =
   [<RequireQualifiedAccess>]

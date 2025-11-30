@@ -564,80 +564,94 @@ module DebugRender =
       |> FSharp.Control.Reactive.Observable.subscribe(fun intent ->
         match skillStore.tryFind intent.SkillId with
         | ValueSome(Active skill) ->
-          let positions = projections.ComputeMovementSnapshot().Positions
+          let entityScenarios = projections.EntityScenarios |> AMap.force
 
-          let casterPos =
-            positions
-            |> HashMap.tryFind intent.Caster
-            |> Option.defaultValue Vector2.Zero
+          match entityScenarios |> HashMap.tryFindV intent.Caster with
+          | ValueSome scenarioId ->
+            let positions =
+              projections.ComputeMovementSnapshot(scenarioId).Positions
 
-          let targetPos =
-            match intent.Target with
-            | SystemCommunications.TargetPosition pos -> pos
-            | SystemCommunications.TargetDirection pos -> pos
-            | SystemCommunications.TargetEntity id ->
-              positions |> HashMap.tryFind id |> Option.defaultValue casterPos
-            | _ -> casterPos
+            let casterPos =
+              positions
+              |> HashMap.tryFind intent.Caster
+              |> Option.defaultValue Vector2.Zero
 
-          let color = Color.Orange
+            let targetPos =
+              match intent.Target with
+              | SystemCommunications.TargetPosition pos -> pos
+              | SystemCommunications.TargetDirection pos -> pos
+              | SystemCommunications.TargetEntity id ->
+                positions
+                |> HashMap.tryFind id
+                |> Option.defaultValue casterPos
+              | _ -> casterPos
 
-          let command =
-            match skill.Area with
-            | Cone(angle, length, _) ->
-              let direction =
-                if Vector2.DistanceSquared(casterPos, targetPos) > 0.001f then
-                  Vector2.Normalize(targetPos - casterPos)
-                else
-                  Vector2.UnitX
+            let color = Color.Orange
 
-              Some(DrawCone(casterPos, direction, angle, length, color))
-            | Line(width, length, _) ->
-              let direction =
-                if Vector2.DistanceSquared(casterPos, targetPos) > 0.001f then
-                  Vector2.Normalize(targetPos - casterPos)
-                else
-                  Vector2.UnitX
+            let command =
+              match skill.Area with
+              | Cone(angle, length, _) ->
+                let direction =
+                  if
+                    Vector2.DistanceSquared(casterPos, targetPos) > 0.001f
+                  then
+                    Vector2.Normalize(targetPos - casterPos)
+                  else
+                    Vector2.UnitX
 
-              let endPoint = casterPos + direction * length
-              Some(DrawLineShape(casterPos, endPoint, width, color))
-            | Circle(radius, _) -> Some(DrawCircle(casterPos, radius, color))
-            | AdaptiveCone(length, _) -> // length and maxTargets remain
-              let direction =
-                if Vector2.DistanceSquared(casterPos, targetPos) > 0.001f then
-                  Vector2.Normalize(targetPos - casterPos)
-                else
-                  Vector2.UnitX
+                Some(DrawCone(casterPos, direction, angle, length, color))
+              | Line(width, length, _) ->
+                let direction =
+                  if
+                    Vector2.DistanceSquared(casterPos, targetPos) > 0.001f
+                  then
+                    Vector2.Normalize(targetPos - casterPos)
+                  else
+                    Vector2.UnitX
 
-              let referenceForward = Vector2.UnitY // Assuming caster's forward
+                let endPoint = casterPos + direction * length
+                Some(DrawLineShape(casterPos, endPoint, width, color))
+              | Circle(radius, _) -> Some(DrawCircle(casterPos, radius, color))
+              | AdaptiveCone(length, _) -> // length and maxTargets remain
+                let direction =
+                  if
+                    Vector2.DistanceSquared(casterPos, targetPos) > 0.001f
+                  then
+                    Vector2.Normalize(targetPos - casterPos)
+                  else
+                    Vector2.UnitX
 
-              let angleFromForwardRad =
-                MathF.Acos(Vector2.Dot(referenceForward, direction))
+                let referenceForward = Vector2.UnitY // Assuming caster's forward
 
-              let angleFromForwardDeg =
-                MathHelper.ToDegrees(angleFromForwardRad)
+                let angleFromForwardRad =
+                  MathF.Acos(Vector2.Dot(referenceForward, direction))
 
-              let apertureAngle =
-                if angleFromForwardDeg <= 90.0f then
-                  30.0f + (angleFromForwardDeg / 90.0f) * 150.0f
-                else
-                  180.0f
+                let angleFromForwardDeg =
+                  MathHelper.ToDegrees(angleFromForwardRad)
 
-              Some(
-                DrawCone(
-                  casterPos,
-                  direction,
-                  apertureAngle,
-                  length, // Use skill's full length
-                  color
+                let apertureAngle =
+                  if angleFromForwardDeg <= 90.0f then
+                    30.0f + (angleFromForwardDeg / 90.0f) * 150.0f
+                  else
+                    180.0f
+
+                Some(
+                  DrawCone(
+                    casterPos,
+                    direction,
+                    apertureAngle,
+                    length, // Use skill's full length
+                    color
+                  )
                 )
-              )
-            | _ -> None
+              | _ -> None
 
-          match command with
-          | Some cmd ->
-            transientCommands.Add
-              struct (cmd, Core.Constants.Debug.TransientCommandDuration)
-          | None -> ()
+            match command with
+            | Some cmd ->
+              transientCommands.Add
+                struct (cmd, Core.Constants.Debug.TransientCommandDuration)
+            | None -> ()
+          | ValueNone -> ()
         | _ -> ())
       |> subscriptions.Add
 
@@ -645,49 +659,59 @@ module DebugRender =
       |> FSharp.Control.Reactive.Observable.subscribe(fun impact ->
         match skillStore.tryFind impact.SkillId with
         | ValueSome(Active skill) ->
-          let positions = projections.ComputeMovementSnapshot().Positions
+          let entityScenarios = projections.EntityScenarios |> AMap.force
 
-          let casterPos =
-            positions
-            |> HashMap.tryFind impact.CasterId
-            |> Option.defaultValue Vector2.Zero
+          match entityScenarios |> HashMap.tryFindV impact.CasterId with
+          | ValueSome scenarioId ->
+            let positions =
+              projections.ComputeMovementSnapshot(scenarioId).Positions
 
-          let impactPos =
-            positions
-            |> HashMap.tryFind impact.TargetId
-            |> Option.defaultValue Vector2.Zero
+            let casterPos =
+              positions
+              |> HashMap.tryFind impact.CasterId
+              |> Option.defaultValue Vector2.Zero
 
-          let color = Color.Red
+            let impactPos =
+              positions
+              |> HashMap.tryFind impact.TargetId
+              |> Option.defaultValue Vector2.Zero
 
-          let command =
-            match skill.Area with
-            | Cone(angle, length, _) ->
-              let direction =
-                if Vector2.DistanceSquared(casterPos, impactPos) > 0.001f then
-                  Vector2.Normalize(impactPos - casterPos)
-                else
-                  Vector2.UnitX
+            let color = Color.Red
 
-              Some(DrawCone(impactPos, direction, angle, length, color))
-            | Line(width, length, _) ->
-              let direction =
-                if Vector2.DistanceSquared(casterPos, impactPos) > 0.001f then
-                  Vector2.Normalize(impactPos - casterPos)
-                else
-                  Vector2.UnitX
+            let command =
+              match skill.Area with
+              | Cone(angle, length, _) ->
+                let direction =
+                  if
+                    Vector2.DistanceSquared(casterPos, impactPos) > 0.001f
+                  then
+                    Vector2.Normalize(impactPos - casterPos)
+                  else
+                    Vector2.UnitX
 
-              let endPoint = impactPos + direction * length
-              Some(DrawLineShape(impactPos, endPoint, width, color))
-            | AdaptiveCone _ -> None // Do not draw cone on impact for AdaptiveCone
-            | Circle(radius, _) -> Some(DrawCircle(impactPos, radius, color))
-            | _ -> None
+                Some(DrawCone(impactPos, direction, angle, length, color))
+              | Line(width, length, _) ->
+                let direction =
+                  if
+                    Vector2.DistanceSquared(casterPos, impactPos) > 0.001f
+                  then
+                    Vector2.Normalize(impactPos - casterPos)
+                  else
+                    Vector2.UnitX
 
-          match command with
-          | Some cmd ->
-            transientCommands.Add(
-              struct (cmd, Core.Constants.Debug.TransientCommandDuration)
-            )
-          | None -> ()
+                let endPoint = impactPos + direction * length
+                Some(DrawLineShape(impactPos, endPoint, width, color))
+              | AdaptiveCone _ -> None // Do not draw cone on impact for AdaptiveCone
+              | Circle(radius, _) -> Some(DrawCircle(impactPos, radius, color))
+              | _ -> None
+
+            match command with
+            | Some cmd ->
+              transientCommands.Add(
+                struct (cmd, Core.Constants.Debug.TransientCommandDuration)
+              )
+            | None -> ()
+          | ValueNone -> ()
         | _ -> ())
       |> subscriptions.Add
 
@@ -710,300 +734,336 @@ module DebugRender =
       base.Draw gameTime
 
       let sb = spriteBatch.Value
-      let snapshot = projections.ComputeMovementSnapshot()
+      let entityScenarios = projections.EntityScenarios |> AMap.force
 
-      let liveEntities = projections.LiveEntities |> ASet.force
+      match entityScenarios |> HashMap.tryFindV playerId with
+      | ValueSome scenarioId ->
+        let snapshot = projections.ComputeMovementSnapshot(scenarioId)
 
-      let positions =
-        snapshot.Positions
-        |> HashMap.filter(fun id _ -> liveEntities.Contains id)
+        let liveEntities = projections.LiveEntities |> ASet.force
 
-      let entityContext = {
-        Positions = positions
-        ActiveEffects = world.ActiveEffects |> AMap.force
-        Resources = world.Resources |> AMap.force
-        DerivedStats = projections.DerivedStats |> AMap.force
-        Inventories = projections.Inventories |> AMap.force
-        EquippedItems = projections.EquipedItems |> AMap.force
-        AIControllers = world.AIControllers |> AMap.force
-        LiveEntities = liveEntities
-      }
+        let positions =
+          snapshot.Positions
+          |> HashMap.filter(fun id _ -> liveEntities.Contains id)
 
-      let renderContext = {
-        Entities = entityContext
-        SpatialGrid = snapshot.SpatialGrid
-        Map = mapStore.tryFind mapKey
-        ShowStats = showStats.Value
-        ShowInventory = showInventory.Value
-      }
+        let entityContext = {
+          Positions = positions
+          ActiveEffects = world.ActiveEffects |> AMap.force
+          Resources = world.Resources |> AMap.force
+          DerivedStats = projections.DerivedStats |> AMap.force
+          Inventories = projections.Inventories |> AMap.force
+          EquippedItems = projections.EquipedItems |> AMap.force
+          AIControllers = world.AIControllers |> AMap.force
+          LiveEntities = liveEntities
+        }
 
-      let commandsToExecute = generateDebugCommands renderContext
+        let renderContext = {
+          Entities = entityContext
+          SpatialGrid = snapshot.SpatialGrid
+          Map = mapStore.tryFind mapKey
+          ShowStats = showStats.Value
+          ShowInventory = showInventory.Value
+        }
 
-      let totalGameTime = world.Time |> AVal.map _.TotalGameTime |> AVal.force
+        let commandsToExecute = generateDebugCommands renderContext
 
-      // Prune expired transient commands
-      let activeTransient = ResizeArray()
+        let totalGameTime = world.Time |> AVal.map _.TotalGameTime |> AVal.force
 
-      for struct (cmd, duration) in transientCommands do
-        let newDuration = duration - gameTime.ElapsedGameTime
+        // Prune expired transient commands
+        let activeTransient = ResizeArray()
 
-        if newDuration > TimeSpan.Zero then
-          activeTransient.Add struct (cmd, newDuration)
+        for struct (cmd, duration) in transientCommands do
+          let newDuration = duration - gameTime.ElapsedGameTime
 
-      transientCommands.Clear()
-      transientCommands.AddRange activeTransient
+          if newDuration > TimeSpan.Zero then
+            activeTransient.Add struct (cmd, newDuration)
 
-      let mutable yOffsets = HashMap.empty<Guid<EntityId>, float32>
+        transientCommands.Clear()
+        transientCommands.AddRange activeTransient
 
-      let cameraService = gameplay.CameraService
-      let cameras = cameraService.GetAllCameras()
+        let mutable yOffsets = HashMap.empty<Guid<EntityId>, float32>
 
-      for struct (_, camera) in cameras do
-        // Reset yOffsets for each camera to ensure text stacks correctly per view
-        yOffsets <- HashMap.empty
+        let cameraService = gameplay.CameraService
+        let cameras = cameraService.GetAllCameras()
 
-        let transform =
-          Matrix.CreateTranslation(-camera.Position.X, -camera.Position.Y, 0.0f)
-          * Matrix.CreateScale camera.Zoom
-          * Matrix.CreateTranslation(
-            float32 camera.Viewport.Width / 2.0f,
-            float32 camera.Viewport.Height / 2.0f,
-            0.0f
-          )
+        for struct (_, camera) in cameras do
+          // Reset yOffsets for each camera to ensure text stacks correctly per view
+          yOffsets <- HashMap.empty
 
-        game.GraphicsDevice.Viewport <- camera.Viewport
-        sb.Begin(transformMatrix = transform)
-
-        for command in commandsToExecute do
-          match command with
-          | DrawActiveEffect(effect, entityPos) ->
-            let yOffset =
-              yOffsets.TryFind effect.TargetEntity
-              |> Option.defaultValue Core.Constants.Debug.StatYOffset
-
-            yOffsets <-
-              yOffsets
-              |> HashMap.add
-                effect.TargetEntity
-                (yOffset + Core.Constants.Debug.EffectYOffset)
-
-            let struct (text, textPosition) =
-              drawActiveEffect(effect, entityPos, yOffset, totalGameTime)
-
-            sb.DrawString(hudFont, text, textPosition, Color.Yellow)
-
-          | DrawDerivedStats(ownerId, stats, resources, entityPos) ->
-            let yOffset =
-              yOffsets.TryFind ownerId
-              |> Option.defaultValue Core.Constants.Debug.StatYOffset
-
-            let text = formatStats(stats, resources)
-            let textPosition = Vector2(entityPos.X, entityPos.Y + yOffset)
-            sb.DrawString(hudFont, text, textPosition, Color.Cyan)
-
-          | DrawInventory(ownerId, inventory, entityPos) ->
-            let yOffset =
-              yOffsets.TryFind ownerId
-              |> Option.defaultValue Core.Constants.Debug.StatYOffset
-
-            let strBuilder = System.Text.StringBuilder()
-            strBuilder.AppendLine("Inventory:") |> ignore
-
-            for item in inventory do
-              strBuilder.AppendLine($"- {item.Name}") |> ignore
-
-            sb.DrawString(
-              hudFont,
-              strBuilder.ToString(),
-              entityPos + Vector2(0.0f, yOffset),
-              Color.White
+          let transform =
+            Matrix.CreateTranslation(
+              -camera.Position.X,
+              -camera.Position.Y,
+              0.0f
+            )
+            * Matrix.CreateScale camera.Zoom
+            * Matrix.CreateTranslation(
+              float32 camera.Viewport.Width / 2.0f,
+              float32 camera.Viewport.Height / 2.0f,
+              0.0f
             )
 
-          | DrawEquipped(ownerId, equipped, entityPos) ->
-            let yOffset =
-              yOffsets.TryFind ownerId
-              |> Option.defaultValue Core.Constants.Debug.StatYOffset
+          game.GraphicsDevice.Viewport <- camera.Viewport
+          sb.Begin(transformMatrix = transform)
 
-            let strBuilder = System.Text.StringBuilder()
-            strBuilder.AppendLine("Equipped:") |> ignore
+          for command in commandsToExecute do
+            match command with
+            | DrawActiveEffect(effect, entityPos) ->
+              let yOffset =
+                yOffsets.TryFind effect.TargetEntity
+                |> Option.defaultValue Core.Constants.Debug.StatYOffset
 
-            for (slot, item) in equipped do
-              strBuilder.AppendLine($"- %A{slot}: {item.Name}") |> ignore
+              yOffsets <-
+                yOffsets
+                |> HashMap.add
+                  effect.TargetEntity
+                  (yOffset + Core.Constants.Debug.EffectYOffset)
 
-            sb.DrawString(
-              hudFont,
-              strBuilder.ToString(),
-              entityPos + Vector2(0.0f, yOffset + 100.0f),
-              Color.White
-            )
+              let struct (text, textPosition) =
+                drawActiveEffect(effect, entityPos, yOffset, totalGameTime)
 
-          | DrawAIState(ownerId, state, entityPos) ->
-            let yOffset =
-              yOffsets.TryFind ownerId
-              |> Option.defaultValue Core.Constants.Debug.StatYOffset
+              sb.DrawString(hudFont, text, textPosition, Color.Yellow)
 
-            let text = $"AI: %A{state}"
+            | DrawDerivedStats(ownerId, stats, resources, entityPos) ->
+              let yOffset =
+                yOffsets.TryFind ownerId
+                |> Option.defaultValue Core.Constants.Debug.StatYOffset
 
-            let textPosition =
-              Vector2(entityPos.X, entityPos.Y + yOffset - 20.0f)
+              let text = formatStats(stats, resources)
 
-            sb.DrawString(hudFont, text, textPosition, Color.Magenta)
+              let textSize = hudFont.MeasureString(text)
 
-          | DrawMapObject(points,
-                          position,
-                          width,
-                          height,
-                          rotation,
-                          isEllipse,
-                          color) ->
-            match pixel with
-            | ValueSome px ->
-              match points with
-              | ValueSome pts -> drawPolygon sb px pts position rotation color
-              | ValueNone ->
-                if isEllipse then
-                  drawEllipse sb px position width height rotation color
-                else
-                  let radians = MathHelper.ToRadians(rotation)
-                  let halfWidth = width / 2.0f
-                  let halfHeight = height / 2.0f
-                  let centerOffset = Vector2(halfWidth, halfHeight)
+              let textPosition =
+                Vector2(entityPos.X - textSize.X / 2.0f, entityPos.Y + yOffset)
 
-                  let topLeftLocal = Vector2(-halfWidth, -halfHeight)
-                  let topRightLocal = Vector2(halfWidth, -halfHeight)
-                  let bottomRightLocal = Vector2(halfWidth, halfHeight)
-                  let bottomLeftLocal = Vector2(-halfWidth, halfHeight)
+              yOffsets <-
+                yOffsets
+                |> HashMap.add
+                  ownerId
+                  (yOffset + textSize.Y + Core.Constants.Debug.StatYOffset)
 
-                  let topLeftUnrotated = topLeftLocal + centerOffset
-                  let topRightUnrotated = topRightLocal + centerOffset
-                  let bottomRightUnrotated = bottomRightLocal + centerOffset
-                  let bottomLeftUnrotated = bottomLeftLocal + centerOffset
+              sb.DrawString(hudFont, text, textPosition, Color.White)
 
-                  let topLeftRotated = rotate topLeftUnrotated radians
-                  let topRightRotated = rotate topRightUnrotated radians
-                  let bottomRightRotated = rotate bottomRightUnrotated radians
-                  let bottomLeftRotated = rotate bottomLeftUnrotated radians
+            | DrawInventory(ownerId, inventory, entityPos) ->
+              let yOffset =
+                yOffsets.TryFind ownerId
+                |> Option.defaultValue Core.Constants.Debug.StatYOffset
 
-                  let p1 = topLeftRotated + position
-                  let p2 = topRightRotated + position
-                  let p3 = bottomRightRotated + position
-                  let p4 = bottomLeftRotated + position
+              let text =
+                inventory
+                |> Seq.map(fun item -> item.Name)
+                |> String.concat ", "
 
-                  drawLine sb px p1 p2 color
-                  drawLine sb px p2 p3 color
-                  drawLine sb px p3 p4 color
-                  drawLine sb px p4 p1 color
-            | ValueNone -> ()
+              let textSize = hudFont.MeasureString(text)
 
-          | DrawEntityBounds position ->
-            match pixel with
-            | ValueSome px ->
-              let poly = Spatial.getEntityPolygon position
-              drawPolygon sb px poly Vector2.Zero 0.0f Color.Red
-            | ValueNone -> ()
+              let textPosition =
+                Vector2(entityPos.X - textSize.X / 2.0f, entityPos.Y + yOffset)
 
-          | DrawSpatialGrid grid ->
-            match pixel with
-            | ValueSome px ->
-              for (cell, entities) in grid |> HashMap.toSeq do
-                let cellSize = Core.Constants.Collision.GridCellSize
-                let x = float32 cell.X * cellSize
-                let y = float32 cell.Y * cellSize
+              yOffsets <-
+                yOffsets
+                |> HashMap.add
+                  ownerId
+                  (yOffset + textSize.Y + Core.Constants.Debug.StatYOffset)
 
-                let rect =
-                  Microsoft.Xna.Framework.Rectangle(
-                    int x,
-                    int y,
-                    int cellSize,
-                    int cellSize
-                  )
+              sb.DrawString(hudFont, text, textPosition, Color.LightGray)
 
-                let color =
-                  if entities.Count > 0 then Color.Red else Color.Gray * 0.5f
+            | DrawEquipped(ownerId, equipped, entityPos) ->
+              let yOffset =
+                yOffsets.TryFind ownerId
+                |> Option.defaultValue Core.Constants.Debug.StatYOffset
 
-                drawLine sb px (Vector2(x, y)) (Vector2(x + cellSize, y)) color
+              let text =
+                equipped
+                |> HashMap.toSeq
+                |> Seq.map(fun (slot, item) -> $"%A{slot}: %s{item.Name}")
+                |> String.concat "\n"
 
-                drawLine
-                  sb
-                  px
-                  (Vector2(x + cellSize, y))
-                  (Vector2(x + cellSize, y + cellSize))
-                  color
+              let textSize = hudFont.MeasureString(text)
 
-                drawLine
-                  sb
-                  px
-                  (Vector2(x + cellSize, y + cellSize))
-                  (Vector2(x, y + cellSize))
-                  color
+              let textPosition =
+                Vector2(entityPos.X - textSize.X / 2.0f, entityPos.Y + yOffset)
 
-                drawLine sb px (Vector2(x, y + cellSize)) (Vector2(x, y)) color
+              yOffsets <-
+                yOffsets
+                |> HashMap.add
+                  ownerId
+                  (yOffset + textSize.Y + Core.Constants.Debug.StatYOffset)
 
-                if entities.Count > 0 then
-                  let text = $"{entities.Count}"
-                  let textPos = Vector2(x + 5.0f, y + 5.0f)
-                  sb.DrawString(hudFont, text, textPos, Color.White)
-            | ValueNone -> ()
+              sb.DrawString(hudFont, text, textPosition, Color.Gold)
 
-          | DrawCone(origin, direction, angle, length, color) ->
-            match pixel with
-            | ValueSome px -> drawCone sb px origin direction angle length color
-            | ValueNone -> ()
+            | DrawAIState(ownerId, state, entityPos) ->
+              let yOffset =
+                yOffsets.TryFind ownerId
+                |> Option.defaultValue Core.Constants.Debug.StatYOffset
 
-          | DrawLineShape(start, end', width, color) ->
-            match pixel with
-            | ValueSome px -> drawLineShape sb px start end' width color
-            | ValueNone -> ()
+              let text = $"AI: %A{state}"
+              let textSize = hudFont.MeasureString(text)
 
-          | DrawCircle(center, radius, color) ->
-            match pixel with
-            | ValueSome px -> drawCircle sb px center radius color
-            | ValueNone -> ()
+              let textPosition =
+                Vector2(entityPos.X - textSize.X / 2.0f, entityPos.Y + yOffset)
 
-        for struct (cmd, _) in transientCommands do
-          match cmd with
-          | DrawCone(origin, direction, angle, length, color) ->
-            match pixel with
-            | ValueSome px -> drawCone sb px origin direction angle length color
-            | ValueNone -> ()
+              yOffsets <-
+                yOffsets
+                |> HashMap.add
+                  ownerId
+                  (yOffset + textSize.Y + Core.Constants.Debug.StatYOffset)
 
-          | DrawLineShape(start, end', width, color) ->
-            match pixel with
-            | ValueSome px -> drawLineShape sb px start end' width color
-            | ValueNone -> ()
+              sb.DrawString(hudFont, text, textPosition, Color.Cyan)
 
-          | DrawCircle(center, radius, color) ->
-            match pixel with
-            | ValueSome px -> drawCircle sb px center radius color
-            | ValueNone -> ()
-          | _ -> ()
+            | DrawMapObject(points,
+                            position,
+                            width,
+                            height,
+                            rotation,
+                            isEllipse,
+                            color) ->
+              match pixel with
+              | ValueSome px ->
+                match points with
+                | ValueSome pts -> drawPolygon sb px pts position rotation color
+                | ValueNone ->
+                  if isEllipse then
+                    drawEllipse sb px position width height rotation color
+                  else
+                    // Draw rectangle using DrawLineShape or similar
+                    // Or construct points for rectangle
+                    // Tiled objects are positioned at top-left (or bottom-left for tiles),
+                    // and rotation is around that point.
+                    // Spatial.fs treats them as 0,0 to w,h relative to Position.
 
+                    let pts =
+                      IndexList.ofList [
+                        Vector2.Zero
+                        Vector2(width, 0.0f)
+                        Vector2(width, height)
+                        Vector2(0.0f, height)
+                      ]
+
+                    drawPolygon sb px pts position rotation color
+              | ValueNone -> ()
+
+            | DrawEntityBounds position ->
+              match pixel with
+              | ValueSome px ->
+                let poly = Spatial.getEntityPolygon position
+                drawPolygon sb px poly Vector2.Zero 0.0f Color.Red
+              | ValueNone -> ()
+
+            | DrawSpatialGrid grid ->
+              match pixel with
+              | ValueSome px ->
+                for (cell, entities) in grid |> HashMap.toSeq do
+                  let cellSize = Core.Constants.Collision.GridCellSize
+                  let x = float32 cell.X * cellSize
+                  let y = float32 cell.Y * cellSize
+
+                  let rect =
+                    Microsoft.Xna.Framework.Rectangle(
+                      int x,
+                      int y,
+                      int cellSize,
+                      int cellSize
+                    )
+
+                  let color =
+                    if entities.Count > 0 then Color.Red else Color.Gray * 0.5f
+
+                  drawLine
+                    sb
+                    px
+                    (Vector2(x, y))
+                    (Vector2(x + cellSize, y))
+                    color
+
+                  drawLine
+                    sb
+                    px
+                    (Vector2(x + cellSize, y))
+                    (Vector2(x + cellSize, y + cellSize))
+                    color
+
+                  drawLine
+                    sb
+                    px
+                    (Vector2(x + cellSize, y + cellSize))
+                    (Vector2(x, y + cellSize))
+                    color
+
+                  drawLine
+                    sb
+                    px
+                    (Vector2(x, y + cellSize))
+                    (Vector2(x, y))
+                    color
+
+                  if entities.Count > 0 then
+                    let text = $"{entities.Count}"
+                    let textPos = Vector2(x + 5.0f, y + 5.0f)
+                    sb.DrawString(hudFont, text, textPos, Color.White)
+              | ValueNone -> ()
+
+            | DrawCone(origin, direction, angle, length, color) ->
+              match pixel with
+              | ValueSome px ->
+                drawCone sb px origin direction angle length color
+              | ValueNone -> ()
+
+            | DrawLineShape(start, end', width, color) ->
+              match pixel with
+              | ValueSome px -> drawLineShape sb px start end' width color
+              | ValueNone -> ()
+
+            | DrawCircle(center, radius, color) ->
+              match pixel with
+              | ValueSome px -> drawCircle sb px center radius color
+              | ValueNone -> ()
+
+          for struct (cmd, _) in transientCommands do
+            match cmd with
+            | DrawCone(origin, direction, angle, length, color) ->
+              match pixel with
+              | ValueSome px ->
+                drawCone sb px origin direction angle length color
+              | ValueNone -> ()
+
+            | DrawLineShape(start, end', width, color) ->
+              match pixel with
+              | ValueSome px -> drawLineShape sb px start end' width color
+              | ValueNone -> ()
+
+            | DrawCircle(center, radius, color) ->
+              match pixel with
+              | ValueSome px -> drawCircle sb px center radius color
+              | ValueNone -> ()
+            | _ -> ()
+
+          sb.End()
+
+        // Calculate FPS
+        frameCount <- frameCount + 1
+
+        if
+          gameTime.TotalGameTime.TotalSeconds - lastFPSTime.TotalSeconds >= 1.0
+        then
+          fps <- float32 frameCount
+          frameCount <- 0
+          lastFPSTime <- gameTime.TotalGameTime
+
+        // Count total entities for culling stats
+        totalEntities <- snapshot.Positions.Count
+
+        // Render performance stats overlay at top-left of screen
+        let screenTransform = Matrix.Identity
+        sb.Begin(transformMatrix = screenTransform)
+
+        let statsText =
+          System.Text
+            .StringBuilder()
+            .AppendLine($"FPS: %.1f{fps}")
+            .AppendLine($"Entities: {totalEntities}")
+            .AppendLine("Culling: 0% (TODO)")
+            .ToString()
+
+        sb.DrawString(hudFont, statsText, Vector2(10.0f, 10.0f), Color.White)
         sb.End()
-
-      // Calculate FPS
-      frameCount <- frameCount + 1
-
-      if
-        gameTime.TotalGameTime.TotalSeconds - lastFPSTime.TotalSeconds >= 1.0
-      then
-        fps <- float32 frameCount
-        frameCount <- 0
-        lastFPSTime <- gameTime.TotalGameTime
-
-      // Count total entities for culling stats
-      totalEntities <- snapshot.Positions.Count
-
-      // Render performance stats overlay at top-left of screen
-      let screenTransform = Matrix.Identity
-      sb.Begin(transformMatrix = screenTransform)
-
-      let statsText =
-        System.Text
-          .StringBuilder()
-          .AppendLine($"FPS: %.1f{fps}")
-          .AppendLine($"Entities: {totalEntities}")
-          .AppendLine("Culling: 0% (TODO)")
-          .ToString()
-
-      sb.DrawString(hudFont, statsText, Vector2(10.0f, 10.0f), Color.White)
-      sb.End()
+      | ValueNone -> ()

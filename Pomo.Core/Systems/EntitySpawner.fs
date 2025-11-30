@@ -19,6 +19,7 @@ module EntitySpawnerLogic =
 
   type PendingSpawn = {
     EntityId: Guid<EntityId>
+    ScenarioId: Guid<ScenarioId>
     Type: SystemCommunications.SpawnType
     Position: Vector2
     SpawnStartTime: TimeSpan
@@ -161,6 +162,7 @@ module EntitySpawnerLogic =
 
     let snapshot: EntitySnapshot = {
       Id = entityId
+      ScenarioId = pending.ScenarioId
       Position = pos
       Velocity = Vector2.Zero
     }
@@ -258,9 +260,7 @@ module EntitySpawnerLogic =
 
     let subscriptions = new System.Reactive.Disposables.CompositeDisposable()
 
-    override this.Initialize() =
-      base.Initialize()
-
+    do
       core.EventBus
         .GetObservableFor<SystemCommunications.SpawnEntityIntent>()
         .Subscribe(fun intent ->
@@ -274,6 +274,7 @@ module EntitySpawnerLogic =
 
           let pending: PendingSpawn = {
             EntityId = intent.EntityId
+            ScenarioId = intent.ScenarioId
             Type = intent.Type
             Position = intent.Position
             SpawnStartTime = totalGameTime
@@ -285,7 +286,11 @@ module EntitySpawnerLogic =
           // Notify that spawning has started (visuals can pick this up)
           core.EventBus.Publish(
             EntityLifecycle(
-              Spawning struct (intent.EntityId, intent.Type, intent.Position)
+              Spawning
+                struct (intent.EntityId,
+                        intent.ScenarioId,
+                        intent.Type,
+                        intent.Position)
             )
           )
 

@@ -282,7 +282,7 @@ module AbilityActivation =
       World: World
       AbilityActivationContext: AbilityActivationContext
       CombatStatuses: HashMap<Guid<EntityId>, CombatStatus IndexList>
-      Snapshot: unit -> MovementSnapshot
+      Projections: Pomo.Core.Projections.ProjectionService
     }
 
     let handleMovementStateChanged
@@ -326,9 +326,18 @@ module AbilityActivation =
             EntityId = entityId
           }
 
+          let entityScenarios =
+            changeCtx.Projections.EntityScenarios |> AMap.force
+
+          let snapshot =
+            match entityScenarios |> HashMap.tryFindV entityId with
+            | ValueSome scenarioId ->
+              changeCtx.Projections.ComputeMovementSnapshot(scenarioId)
+            | ValueNone -> Pomo.Core.Projections.MovementSnapshot.Empty
+
           handlePendingCast changeCtx.AbilityActivationContext {
             ValidationContext = validationContext
-            Positions = changeCtx.Snapshot().Positions
+            Positions = snapshot.Positions
             Skill = skill
             Target = target
           }
@@ -361,12 +370,18 @@ module AbilityActivation =
       SearchContext =
         ValueSome {
           GetNearbyEntities =
-            fun v2 ce ->
-              gameplay.Projections.GetNearbyEntitiesSnapshot(
-                gameplay.Projections.ComputeMovementSnapshot(),
-                v2,
-                ce
-              )
+            fun v2 radius ->
+              let entityScenarios =
+                gameplay.Projections.EntityScenarios |> AMap.force
+
+              match entityScenarios |> HashMap.tryFindV playerId with
+              | ValueSome scenarioId ->
+                gameplay.Projections.GetNearbyEntitiesSnapshot(
+                  gameplay.Projections.ComputeMovementSnapshot(scenarioId),
+                  v2,
+                  radius
+                )
+              | ValueNone -> IndexList.empty
         }
     }
 
@@ -416,7 +431,7 @@ module AbilityActivation =
             World = core.World
             AbilityActivationContext = activationContext
             CombatStatuses = gameplay.Projections.CombatStatuses |> AMap.force
-            Snapshot = gameplay.Projections.ComputeMovementSnapshot
+            Projections = gameplay.Projections
           }
           e)
       |> subscriptions.Add
@@ -434,7 +449,13 @@ module AbilityActivation =
       let statuses = playerCombatStatuses |> AVal.force
       let resources = playerResources |> AVal.force
       let cooldowns = playerCooldowns |> AVal.force
-      let snapshot = gameplay.Projections.ComputeMovementSnapshot()
+      let entityScenarios = gameplay.Projections.EntityScenarios |> AMap.force
+
+      let snapshot =
+        match entityScenarios |> HashMap.tryFindV playerId with
+        | ValueSome scenarioId ->
+          gameplay.Projections.ComputeMovementSnapshot(scenarioId)
+        | ValueNone -> Pomo.Core.Projections.MovementSnapshot.Empty
 
       let publishNotification(msg: string) =
         let casterPos =

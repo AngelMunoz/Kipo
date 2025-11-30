@@ -46,43 +46,51 @@ module Collision =
   open Pomo.Core.Environment
   open Pomo.Core.Environment.Patterns
 
-  type CollisionSystem(game: Game, env: PomoEnvironment, mapKey: string) =
+  type CollisionSystem(game: Game, env: PomoEnvironment) =
     inherit GameSystem(game)
 
     let (Core core) = env.CoreServices
     let (Stores stores) = env.StoreServices
     let (Gameplay gameplay) = env.GameplayServices
 
-    let mapStore = stores.MapStore
-    let map = mapStore.tryFind mapKey
+    let mutable mapObjectCache =
+      HashMap.empty<
+        string,
+        HashMap<int<ObjectId>, struct (IndexList<Vector2> * IndexList<Vector2>)>
+       >
 
-    let mapObjectCache =
-      match map with
-      | ValueSome m ->
-        m.ObjectGroups
-        |> IndexList.collect(fun g -> g.Objects)
-        |> IndexList.map(fun obj ->
-          let poly = Spatial.getMapObjectPolygon obj
-          let axes = Spatial.getAxes poly
-          obj.Id, struct (poly, axes))
-        |> HashMap.ofSeq
-      | ValueNone -> HashMap.empty
+    let getMapObjects(map: MapDefinition) =
+      match mapObjectCache.TryFindV map.Key with
+      | ValueSome objects -> objects
+      | ValueNone ->
+        let objects =
+          map.ObjectGroups
+          |> IndexList.collect(fun g -> g.Objects)
+          |> IndexList.map(fun obj ->
+            let poly = Spatial.getMapObjectPolygon obj
+            let axes = Spatial.getAxes poly
+            obj.Id, struct (poly, axes))
+          |> HashMap.ofSeq
+
+        mapObjectCache <- mapObjectCache.Add(map.Key, objects)
+        objects
 
 
 
     override val Kind = SystemKind.Collision with get
 
     override this.Update _ =
-      let snapshot = gameplay.Projections.ComputeMovementSnapshot()
-      let grid = snapshot.SpatialGrid
-      let positions = snapshot.Positions
-      let liveEntities = gameplay.Projections.LiveEntities |> ASet.force
-      let getNearbyTo = getNearbyEntities grid
+      let scenarios = core.World.Scenarios |> AMap.force
+      let entityScenarios = core.World.EntityScenario |> AMap.force
 
-      // Check for collisions
-      for entityId in liveEntities do
-        match positions |> HashMap.tryFindV entityId with
-        | ValueSome pos ->
+      for (scenarioId, scenario) in scenarios do
+        let snapshot = gameplay.Projections.ComputeMovementSnapshot(scenarioId)
+        let grid = snapshot.SpatialGrid
+        let positions = snapshot.Positions
+        let getNearbyTo = getNearbyEntities grid
+
+        // Check for collisions
+        for (entityId, pos) in positions do
           let cell = getGridCell Core.Constants.Collision.GridCellSize pos
           let nearbyEntities = getNearbyTo cell
 
@@ -98,41 +106,57 @@ module Collision =
                       struct (entityId, otherId)
                   )
               | ValueNone -> ()
-        | ValueNone -> ()
 
-      // Check for map object collisions
-      match map with
-      | ValueSome mapDef ->
-        for entityId in liveEntities do
-          match positions |> HashMap.tryFindV entityId with
-          | ValueSome pos ->
-            let entityPoly = getEntityPolygon pos
-            let entityAxes = getAxes entityPoly
+        // Check for map object collisions per scenario
+        let mapDef = scenario.Map
+        let mapObjects = getMapObjects mapDef
 
-            for group in mapDef.ObjectGroups do
-              for obj in group.Objects do
-                let isCollidable =
-                  match obj.Type with
-                  | ValueSome MapObjectType.Wall -> true
-                  | _ -> false
+        // Filter entities in this scenario
+        // Optimization: We could maintain a reverse index of Scenario -> Entities,
+        // but for now iterating liveEntities is okay if count is low.
+        for (entityId, pos) in positions do
+          let entityPoly = getEntityPolygon pos
+          let entityAxes = getAxes entityPoly
 
-                if isCollidable then
-                  match mapObjectCache.TryFindV obj.Id with
-                  | ValueSome struct (objPoly, objAxes) ->
-                    match
-                      Spatial.intersectsMTVWithAxes
-                        entityPoly
-                        entityAxes
-                        objPoly
-                        objAxes
-                    with
-                    | ValueSome mtv ->
+          for group in mapDef.ObjectGroups do
+            for obj in group.Objects do
+              let isCollidable =
+                match obj.Type with
+                | ValueSome MapObjectType.Wall -> true
+                | _ -> false
 
+              let isTrigger = obj.PortalData.IsValueSome
+
+              if isCollidable || isTrigger then
+                match mapObjects.TryFindV obj.Id with
+                | ValueSome struct (objPoly, objAxes) ->
+                  // For triggers, we just need intersection, not MTV
+                  // But SAT gives us both.
+                  match
+                    Spatial.intersectsMTVWithAxes
+                      entityPoly
+                      entityAxes
+                      objPoly
+                      objAxes
+                  with
+                  | ValueSome mtv ->
+                    if isTrigger then
+                      match obj.PortalData with
+                      | ValueSome portalData ->
+                        core.EventBus.Publish(
+                          {
+                            EntityId = entityId
+                            TargetMap = portalData.TargetMap
+                            TargetSpawn = portalData.TargetSpawn
+                          }
+                          : SystemCommunications.PortalTravel
+                        )
+                      | ValueNone -> ()
+                    else
+                      // It's a wall/collidable
                       core.EventBus.Publish(
                         SystemCommunications.MapObjectCollision
                           struct (entityId, obj, mtv)
                       )
-                    | ValueNone -> ()
                   | ValueNone -> ()
-          | ValueNone -> ()
-      | ValueNone -> ()
+                | ValueNone -> ()
