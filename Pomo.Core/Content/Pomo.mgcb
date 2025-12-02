@@ -1020,18 +1020,6 @@
 /processorParam:TextureFormat=Compressed
 /build:3d_models/kaykit_prototype/Primitive_Window.obj
 
-#begin 3d_models/kaykit_prototype/prototypebits_texture.png
-/importer:TextureImporter
-/processor:TextureProcessor
-/processorParam:ColorKeyColor=255,0,255,255
-/processorParam:ColorKeyEnabled=True
-/processorParam:GenerateMipmaps=False
-/processorParam:PremultiplyAlpha=True
-/processorParam:ResizeToPowerOfTwo=False
-/processorParam:MakeSquare=False
-/processorParam:TextureFormat=Color
-/build:3d_models/kaykit_prototype/prototypebits_texture.png
-
 #begin 3d_models/kaykit_prototype/table_medium_Decorated.obj
 /importer:FbxImporter
 /processor:ModelProcessor
