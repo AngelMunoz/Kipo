@@ -276,6 +276,7 @@ module Render =
                   RenderMath.GetEntityWorldMatrix
                     renderPos
                     rotation
+                    MathHelper.PiOver4
                     squishFactor
                     Core.Constants.Entity.ModelScale
 
