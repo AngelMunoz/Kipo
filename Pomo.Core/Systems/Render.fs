@@ -3,6 +3,7 @@ namespace Pomo.Core.Systems
 open System
 open Microsoft.Xna.Framework
 open Microsoft.Xna.Framework.Graphics
+open Pomo.Core.Graphics
 
 open FSharp.UMX
 open FSharp.Data.Adaptive
@@ -280,13 +281,13 @@ module Render =
                 | ValueSome configId -> modelStore.find configId
                 | ValueNone -> [| "Dummy_Base" |] // Fallback
 
+              let renderPos = RenderMath.LogicToRender pos
+
               let worldMatrix =
                 Matrix.CreateRotationY rotation
                 * correction
                 * squishCompensation
-                * Matrix.CreateTranslation(
-                  Vector3(pos.X / pixelsPerUnitX, 0.0f, pos.Y / pixelsPerUnitY)
-                )
+                * Matrix.CreateTranslation(renderPos)
 
               for partName in modelParts do
                 models

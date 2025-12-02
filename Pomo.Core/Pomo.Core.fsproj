@@ -46,6 +46,8 @@
     <Compile Include="Systems/UnitMovement.fs" />
     <Compile Include="Systems/Collision.fs" />
     <Compile Include="Systems/MapLoader.fs" />
+    <Compile Include="Graphics/RenderMath.fs" />
+    <Compile Include="Graphics/QuadBatch.fs" />
     <Compile Include="Systems/CameraSystem.fs" />
     <Compile Include="Systems/TerrainRender.fs" />
     <Compile Include="Systems/Render.fs" />
