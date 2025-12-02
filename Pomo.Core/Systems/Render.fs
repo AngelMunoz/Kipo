@@ -277,6 +277,7 @@ module Render =
                     renderPos
                     rotation
                     squishFactor
+                    Core.Constants.Entity.ModelScale
 
                 for partName in modelParts do
                   models

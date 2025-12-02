@@ -61,10 +61,13 @@ module RenderMath =
     (renderPos: Vector3)
     (rotationY: float32)
     (squishFactor: float32)
+    (modelScale: float32)
     : Matrix =
     let squishCompensation = Matrix.CreateScale(1.0f, 1.0f, squishFactor)
+    let scale = Matrix.CreateScale(modelScale)
 
     Matrix.CreateRotationY(rotationY)
     * correction
     * squishCompensation
+    * scale
     * Matrix.CreateTranslation(renderPos)
