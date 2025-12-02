@@ -90,7 +90,7 @@ module RenderOrchestratorSystem =
       // Create RenderService
       let cameraService = gameplay.CameraService
 
-      let renderService = Render.create(game, env, playerId)
+      let renderService = Render.create(game, env, playerId, stores.ModelStore)
 
       renderServices <- [ renderService ]
 

@@ -107,6 +107,8 @@ module PlayerMovement =
             {
               Positions = HashMap.empty
               SpatialGrid = HashMap.empty
+              Rotations = HashMap.empty
+              ModelConfigIds = HashMap.empty
             }
 
       // Process collisions

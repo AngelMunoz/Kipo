@@ -199,6 +199,7 @@ type InputEvents =
 type PhysicsEvents =
   | PositionChanged of posChanged: struct (Guid<EntityId> * Vector2)
   | VelocityChanged of velChanged: struct (Guid<EntityId> * Vector2)
+  | RotationChanged of rotChanged: struct (Guid<EntityId> * float32)
   | MovementStateChanged of
     mStateChanged: struct (Guid<EntityId> * MovementState)
 
@@ -238,6 +239,8 @@ type AIStateChange =
   | ControllerUpdated of
     struct (Guid<EntityId> * Pomo.Core.Domain.AI.AIController)
 
+type VisualsEvents = ModelConfigChanged of struct (Guid<EntityId> * string)
+
 [<Struct>]
 type StateChangeEvent =
   | EntityLifecycle of entityLifeCycle: EntityLifecycleEvents
@@ -246,6 +249,7 @@ type StateChangeEvent =
   | Combat of combat: CombatEvents
   | Inventory of inventory: InventoryEvents
   | AI of ai: AIStateChange
+  | Visuals of visuals: VisualsEvents
   // Uncategorized
   | CreateProjectile of
     projParams: struct (Guid<EntityId> * LiveProjectile * Vector2 voption)

@@ -16,6 +16,11 @@ module CameraSystem =
   let create
     (game: Game, projections: ProjectionService, localPlayers: Guid<EntityId>[])
     =
+    // Constants
+    let pixelsPerUnitX = 64.0f
+    let pixelsPerUnitY = 32.0f
+    let defaultZoom = 2.0f
+
     { new CameraService with
         member this.GetCamera(playerId: Guid<EntityId>) =
           if Array.contains playerId localPlayers then
@@ -64,10 +69,36 @@ module CameraSystem =
                 |> Option.defaultValue Vector2.Zero
               | ValueNone -> Vector2.Zero
 
+            // 3D Camera Logic (axis-aligned top-down view)
+            let target =
+              Vector3(
+                position.X / pixelsPerUnitX,
+                0.0f,
+                position.Y / pixelsPerUnitY
+              )
+
+            // Look straight down from above
+            let cameraPos = target + Vector3.Up * 100.0f
+            // Up vector is Forward (0, 0, -1) so that Z maps to screen Y (down)
+            let view = Matrix.CreateLookAt(cameraPos, target, Vector3.Forward)
+
+            // Orthographic Projection respecting zoom and unit scale
+            // We want 1 unit in 3D to correspond to pixelsPerUnit * Zoom pixels on screen
+            let viewWidth =
+              float32 viewport.Width / (defaultZoom * pixelsPerUnitX)
+
+            let viewHeight =
+              float32 viewport.Height / (defaultZoom * pixelsPerUnitY)
+
+            let projection =
+              Matrix.CreateOrthographic(viewWidth, viewHeight, 0.1f, 5000.0f)
+
             ValueSome {
               Position = position
-              Zoom = 2.0f
+              Zoom = defaultZoom
               Viewport = viewport
+              View = view
+              Projection = projection
             }
           else
             ValueNone

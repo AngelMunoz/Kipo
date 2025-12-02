@@ -187,6 +187,13 @@ module EntitySpawnerLogic =
         StateChangeEvent.Combat(BaseStatsChanged struct (entityId, baseStats))
       )
 
+      // Set Model Configuration
+      eventBus.Publish(
+        StateChangeEvent.Visuals(
+          ModelConfigChanged struct (entityId, "HumanoidBase")
+        )
+      )
+
       // Initialize Input Map
       let inputMap = InputMapping.createDefaultInputMap()
       eventBus.Publish(Input(MapChanged struct (entityId, inputMap)))
@@ -209,6 +216,13 @@ module EntitySpawnerLogic =
 
       eventBus.Publish(
         StateChangeEvent.Combat(BaseStatsChanged struct (entityId, baseStats))
+      )
+
+      // Set Model Configuration
+      eventBus.Publish(
+        StateChangeEvent.Visuals(
+          ModelConfigChanged struct (entityId, "HumanoidBase")
+        )
       )
 
       // Initialize AI Controller

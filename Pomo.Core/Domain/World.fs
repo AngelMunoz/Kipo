@@ -69,6 +69,9 @@ module World =
     // Scenario State
     Scenarios: cmap<Guid<ScenarioId>, Scenario>
     EntityScenario: cmap<Guid<EntityId>, Guid<ScenarioId>>
+    // 3D Integration
+    Rotations: cmap<Guid<EntityId>, float32>
+    ModelConfigId: cmap<Guid<EntityId>, string>
   }
 
   type World =
@@ -125,6 +128,8 @@ module World =
 
     abstract Scenarios: amap<Guid<ScenarioId>, Scenario>
     abstract EntityScenario: amap<Guid<EntityId>, Guid<ScenarioId>>
+    abstract Rotations: amap<Guid<EntityId>, float32>
+    abstract ModelConfigId: amap<Guid<EntityId>, string>
 
 
   let create(rng: Random) =
@@ -159,6 +164,8 @@ module World =
       SpawningEntities = cmap()
       Scenarios = cmap()
       EntityScenario = cmap()
+      Rotations = cmap()
+      ModelConfigId = cmap()
     }
 
     let worldView =
@@ -189,6 +196,8 @@ module World =
           member _.SpawningEntities = mutableWorld.SpawningEntities
           member _.Scenarios = mutableWorld.Scenarios
           member _.EntityScenario = mutableWorld.EntityScenario
+          member _.Rotations = mutableWorld.Rotations
+          member _.ModelConfigId = mutableWorld.ModelConfigId
       }
 
     struct (mutableWorld, worldView)

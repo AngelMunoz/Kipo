@@ -11,6 +11,7 @@ open Pomo.Core.Domain
 open Pomo.Core.Domain.Units
 open Pomo.Core.Domain.Camera
 open Pomo.Core.Systems.Targeting
+open Pomo.Core.Stores
 
 
 module Render =
@@ -190,7 +191,13 @@ module Render =
 
   open Pomo.Core.Environment.Patterns
 
-  let create(game: Game, env: PomoEnvironment, playerId: Guid<EntityId>) =
+  let create
+    (
+      game: Game,
+      env: PomoEnvironment,
+      playerId: Guid<EntityId>,
+      modelStore: ModelStore
+    ) =
     let (Core core) = env.CoreServices
     let (Gameplay gameplay) = env.GameplayServices
 
@@ -202,59 +209,135 @@ module Render =
     let texture = new Texture2D(game.GraphicsDevice, 1, 1)
     texture.SetData [| Color.White |]
 
+    // Load Models
+    let models =
+      modelStore.all()
+      |> Seq.collect id
+      |> Seq.distinct
+      |> Seq.choose(fun assetName ->
+        try
+          let path = "3d_models/kaykit_prototype/" + assetName
+          Some(assetName, game.Content.Load<Model> path)
+        with _ ->
+          None)
+      |> HashMap.ofSeq
+
+    let drawModel (camera: Camera) (model: Model) (worldMatrix: Matrix) =
+      for mesh in model.Meshes do
+        for effect in mesh.Effects do
+          let effect = effect :?> BasicEffect
+          effect.EnableDefaultLighting()
+          effect.PreferPerPixelLighting <- true
+          effect.AmbientLightColor <- Vector3(0.5f, 0.5f, 0.5f)
+          effect.DirectionalLight0.Direction <- Vector3(1.0f, -1.0f, -1.0f)
+          effect.World <- worldMatrix
+          effect.View <- camera.View
+          effect.Projection <- camera.Projection
+
+        mesh.Draw()
+
+    // Pre-calculate constant matrices for isometric correction
+    let pixelsPerUnitX = 64.0f
+    let pixelsPerUnitY = 32.0f
+
+    // Use Vector3.Zero as camera position to get pure rotation matrices (no translation).
+    let isoRot =
+      Matrix.CreateLookAt(
+        Vector3.Zero,
+        Vector3.Normalize(Vector3(-1.0f, -1.0f, -1.0f)),
+        Vector3.Up
+      )
+
+    let topDownRot =
+      Matrix.CreateLookAt(Vector3.Zero, Vector3.Down, Vector3.Forward)
+
+    // Correction matrix: IsoView * TopDownView^-1
+    let correction = isoRot * Matrix.Invert topDownRot
+
+    // Scale to compensate for the 2:1 pixel-to-unit ratio (64x32).
+    let squishCompensation = Matrix.CreateScale(1.0f, 1.0f, 2.0f)
+
     { new RenderService with
         member _.Draw(camera: Camera) =
           let entityScenarios = world.EntityScenario |> AMap.force
 
           match entityScenarios |> HashMap.tryFindV playerId with
           | ValueSome scenarioId ->
-            let snapshot = projections.ComputeMovementSnapshot(scenarioId)
+            let snapshot = projections.ComputeMovementSnapshot scenarioId
+
+            // 3D Pass
+            game.GraphicsDevice.DepthStencilState <- DepthStencilState.Default
+            game.GraphicsDevice.RasterizerState <- RasterizerState.CullNone
+
+            for id, pos in snapshot.Positions do
+              let rotation =
+                snapshot.Rotations
+                |> HashMap.tryFind id
+                |> Option.defaultValue 0.0f
+
+              let modelParts =
+                match snapshot.ModelConfigIds |> HashMap.tryFindV id with
+                | ValueSome configId -> modelStore.find configId
+                | ValueNone -> [| "Dummy_Base" |] // Fallback
+
+              let worldMatrix =
+                Matrix.CreateRotationY rotation
+                * correction
+                * squishCompensation
+                * Matrix.CreateTranslation(
+                  Vector3(pos.X / pixelsPerUnitX, 0.0f, pos.Y / pixelsPerUnitY)
+                )
+
+              for partName in modelParts do
+                models
+                |> HashMap.tryFindV partName
+                |> ValueOption.iter(fun model ->
+                  drawModel camera model worldMatrix)
+
+            // 2D Pass (UI / Debug)
+            // Restore states for SpriteBatch if needed
+            game.GraphicsDevice.DepthStencilState <- DepthStencilState.None
+
+            // ... (Keep existing 2D logic if needed for UI, or remove if fully 3D)
+            // For now, we'll keep the targeting indicator logic but remove the 2D entity sprites
 
             let mouseState =
               world.RawInputStates |> AMap.map' _.Mouse |> AMap.force
 
             let targetingMode = targetingService.TargetingMode |> AVal.force
             let mouseState = HashMap.tryFindV playerId mouseState
-            let liveProjectiles = world.LiveProjectiles |> AMap.force
-            let liveEntities = projections.LiveEntities |> ASet.force
 
-            let drawCommands =
-              generateDrawCommands {
-                LiveProjectiles = liveProjectiles
-                LiveEntities = liveEntities
-                CameraService = cameraService
-                PlayerId = playerId
-                Snapshot = snapshot
-                TargetingMode = targetingMode
-                MouseState = mouseState
-              }
+            let targetingCmds =
+              generateTargetingIndicatorCommands
+                targetingMode
+                mouseState
+                cameraService
+                playerId
 
-            let transform =
-              Matrix.CreateTranslation(
-                -camera.Position.X,
-                -camera.Position.Y,
-                0.0f
-              )
-              * Matrix.CreateScale(camera.Zoom, camera.Zoom, 1.0f)
-              * Matrix.CreateTranslation(
-                float32 camera.Viewport.Width / 2.0f,
-                float32 camera.Viewport.Height / 2.0f,
-                0.0f
-              )
+            if not(IndexList.isEmpty targetingCmds) then
+              let transform =
+                Matrix.CreateTranslation(
+                  -camera.Position.X,
+                  -camera.Position.Y,
+                  0.0f
+                )
+                * Matrix.CreateScale(camera.Zoom, camera.Zoom, 1.0f)
+                * Matrix.CreateTranslation(
+                  float32 camera.Viewport.Width / 2.0f,
+                  float32 camera.Viewport.Height / 2.0f,
+                  0.0f
+                )
 
-            game.GraphicsDevice.Viewport <- camera.Viewport
+              game.GraphicsDevice.Viewport <- camera.Viewport
+              spriteBatch.Begin(transformMatrix = transform)
 
-            spriteBatch.Begin(transformMatrix = transform)
+              for cmd in targetingCmds do
+                match cmd with
+                | DrawTargetingIndicator rect ->
+                  spriteBatch.Draw(texture, rect, Color.Blue * 0.5f)
+                | _ -> ()
 
-            for command in drawCommands do
-              match command with
-              | DrawPlayer rect -> spriteBatch.Draw(texture, rect, Color.White)
-              | DrawEnemy rect -> spriteBatch.Draw(texture, rect, Color.Green)
-              | DrawProjectile rect ->
-                spriteBatch.Draw(texture, rect, Color.Red)
-              | DrawTargetingIndicator rect ->
-                spriteBatch.Draw(texture, rect, Color.Blue * 0.5f)
+              spriteBatch.End()
 
-            spriteBatch.End()
           | ValueNone -> ()
     }

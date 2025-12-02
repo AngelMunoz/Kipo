@@ -35,3 +35,11 @@ module Movement =
           core.EventBus.Publish(
             Physics(PositionChanged struct (id, newPosition))
           )
+
+        let rotations =
+          gameplay.Projections.ComputeMovementSnapshot(scenarioId).Rotations
+
+        for id, newRotation in rotations do
+          core.EventBus.Publish(
+            Physics(RotationChanged struct (id, newRotation))
+          )

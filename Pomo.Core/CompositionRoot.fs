@@ -62,12 +62,15 @@ module CompositionRoot =
         "Content/Maps/Lobby.xml"
       ]
 
+    let modelStore = Model.create(JsonFileLoader.readModels deserializer)
+
     let stores =
       { new StoreServices with
           member _.SkillStore = skillStore
           member _.ItemStore = itemStore
           member _.MapStore = mapStore
           member _.AIArchetypeStore = aiArchetypeStore
+          member _.ModelStore = modelStore
       }
 
     let monoGame =
