@@ -8,6 +8,7 @@ open Pomo.Core.EventBus
 open Pomo.Core.Domain.Events
 open Pomo.Core.Domain.Core
 open Pomo.Core.Domain.Camera
+open Pomo.Core.Graphics
 
 
 module Notification =
@@ -92,13 +93,11 @@ module Notification =
         game.GraphicsDevice.Viewport <- camera.Viewport
 
         let transform =
-          Matrix.CreateTranslation(-camera.Position.X, -camera.Position.Y, 0.0f)
-          * Matrix.CreateScale(camera.Zoom)
-          * Matrix.CreateTranslation(
-            float32 camera.Viewport.Width / 2.0f,
-            float32 camera.Viewport.Height / 2.0f,
-            0.0f
-          )
+          RenderMath.GetSpriteBatchTransform
+            camera.Position
+            camera.Zoom
+            camera.Viewport.Width
+            camera.Viewport.Height
 
         sb.Begin(transformMatrix = transform)
 

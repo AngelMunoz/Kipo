@@ -237,108 +237,92 @@ module Render =
 
         mesh.Draw()
 
-    // Pre-calculate constant matrices for isometric correction
-    let pixelsPerUnitX = 64.0f
-    let pixelsPerUnitY = 32.0f
-
-    // Use Vector3.Zero as camera position to get pure rotation matrices (no translation).
-    let isoRot =
-      Matrix.CreateLookAt(
-        Vector3.Zero,
-        Vector3.Normalize(Vector3(-1.0f, -1.0f, -1.0f)),
-        Vector3.Up
-      )
-
-    let topDownRot =
-      Matrix.CreateLookAt(Vector3.Zero, Vector3.Down, Vector3.Forward)
-
-    // Correction matrix: IsoView * TopDownView^-1
-    let correction = isoRot * Matrix.Invert topDownRot
-
-    // Scale to compensate for the 2:1 pixel-to-unit ratio (64x32).
-    let squishCompensation = Matrix.CreateScale(1.0f, 1.0f, 2.0f)
-
     { new RenderService with
         member _.Draw(camera: Camera) =
           let entityScenarios = world.EntityScenario |> AMap.force
+          let scenarios = world.Scenarios |> AMap.force
 
           match entityScenarios |> HashMap.tryFindV playerId with
           | ValueSome scenarioId ->
-            let snapshot = projections.ComputeMovementSnapshot scenarioId
+            match scenarios |> HashMap.tryFindV scenarioId with
+            | ValueSome scenario ->
+              let map = scenario.Map
 
-            // 3D Pass
-            game.GraphicsDevice.DepthStencilState <- DepthStencilState.Default
-            game.GraphicsDevice.RasterizerState <- RasterizerState.CullNone
+              let pixelsPerUnit =
+                Vector2(float32 map.TileWidth, float32 map.TileHeight)
 
-            for id, pos in snapshot.Positions do
-              let rotation =
-                snapshot.Rotations
-                |> HashMap.tryFind id
-                |> Option.defaultValue 0.0f
+              let squishFactor = pixelsPerUnit.X / pixelsPerUnit.Y
 
-              let modelParts =
-                match snapshot.ModelConfigIds |> HashMap.tryFindV id with
-                | ValueSome configId -> modelStore.find configId
-                | ValueNone -> [| "Dummy_Base" |] // Fallback
+              let snapshot = projections.ComputeMovementSnapshot scenarioId
 
-              let renderPos = RenderMath.LogicToRender pos
+              // 3D Pass
+              game.GraphicsDevice.DepthStencilState <- DepthStencilState.Default
+              game.GraphicsDevice.RasterizerState <- RasterizerState.CullNone
 
-              let worldMatrix =
-                Matrix.CreateRotationY rotation
-                * correction
-                * squishCompensation
-                * Matrix.CreateTranslation(renderPos)
+              for id, pos in snapshot.Positions do
+                let rotation =
+                  snapshot.Rotations
+                  |> HashMap.tryFind id
+                  |> Option.defaultValue 0.0f
 
-              for partName in modelParts do
-                models
-                |> HashMap.tryFindV partName
-                |> ValueOption.iter(fun model ->
-                  drawModel camera model worldMatrix)
+                let modelParts =
+                  match snapshot.ModelConfigIds |> HashMap.tryFindV id with
+                  | ValueSome configId -> modelStore.find configId
+                  | ValueNone -> [| "Dummy_Base" |] // Fallback
 
-            // 2D Pass (UI / Debug)
-            // Restore states for SpriteBatch if needed
-            game.GraphicsDevice.DepthStencilState <- DepthStencilState.None
+                let renderPos = RenderMath.LogicToRender pos pixelsPerUnit
 
-            // ... (Keep existing 2D logic if needed for UI, or remove if fully 3D)
-            // For now, we'll keep the targeting indicator logic but remove the 2D entity sprites
+                let worldMatrix =
+                  RenderMath.GetEntityWorldMatrix
+                    renderPos
+                    rotation
+                    squishFactor
 
-            let mouseState =
-              world.RawInputStates |> AMap.map' _.Mouse |> AMap.force
+                for partName in modelParts do
+                  models
+                  |> HashMap.tryFindV partName
+                  |> ValueOption.iter(fun model ->
+                    drawModel camera model worldMatrix)
 
-            let targetingMode = targetingService.TargetingMode |> AVal.force
-            let mouseState = HashMap.tryFindV playerId mouseState
+              // 2D Pass (UI / Debug)
+              // Restore states for SpriteBatch if needed
+              game.GraphicsDevice.DepthStencilState <- DepthStencilState.None
 
-            let targetingCmds =
-              generateTargetingIndicatorCommands
-                targetingMode
-                mouseState
-                cameraService
-                playerId
+              // ... (Keep existing 2D logic if needed for UI, or remove if fully 3D)
+              // For now, we'll keep the targeting indicator logic but remove the 2D entity sprites
 
-            if not(IndexList.isEmpty targetingCmds) then
-              let transform =
-                Matrix.CreateTranslation(
-                  -camera.Position.X,
-                  -camera.Position.Y,
-                  0.0f
-                )
-                * Matrix.CreateScale(camera.Zoom, camera.Zoom, 1.0f)
-                * Matrix.CreateTranslation(
-                  float32 camera.Viewport.Width / 2.0f,
-                  float32 camera.Viewport.Height / 2.0f,
-                  0.0f
-                )
+              let mouseState =
+                world.RawInputStates |> AMap.map' _.Mouse |> AMap.force
 
-              game.GraphicsDevice.Viewport <- camera.Viewport
-              spriteBatch.Begin(transformMatrix = transform)
+              let targetingMode = targetingService.TargetingMode |> AVal.force
+              let mouseState = HashMap.tryFindV playerId mouseState
 
-              for cmd in targetingCmds do
-                match cmd with
-                | DrawTargetingIndicator rect ->
-                  spriteBatch.Draw(texture, rect, Color.Blue * 0.5f)
-                | _ -> ()
+              let targetingCmds =
+                generateTargetingIndicatorCommands
+                  targetingMode
+                  mouseState
+                  cameraService
+                  playerId
 
-              spriteBatch.End()
+              if not(IndexList.isEmpty targetingCmds) then
+                let transform =
+                  RenderMath.GetSpriteBatchTransform
+                    camera.Position
+                    camera.Zoom
+                    camera.Viewport.Width
+                    camera.Viewport.Height
+
+                game.GraphicsDevice.Viewport <- camera.Viewport
+                spriteBatch.Begin(transformMatrix = transform)
+
+                for cmd in targetingCmds do
+                  match cmd with
+                  | DrawTargetingIndicator rect ->
+                    spriteBatch.Draw(texture, rect, Color.Blue * 0.5f)
+                  | _ -> ()
+
+                spriteBatch.End()
+            | ValueNone -> ()
 
           | ValueNone -> ()
     }

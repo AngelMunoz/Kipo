@@ -205,21 +205,26 @@ module TerrainRenderSystem =
 
                             if isVisible then
                               // 3D Conversion
+                              let pixelsPerUnit =
+                                Vector2(
+                                  float32 map.TileWidth,
+                                  float32 map.TileHeight
+                                )
+
                               let depthY =
                                 (drawY + float32 texture.Height)
-                                / RenderMath.PixelsPerUnitY
+                                / pixelsPerUnit.Y
 
                               let worldPos =
                                 RenderMath.LogicToRenderWithDepth
                                   (Vector2(drawX, drawY))
                                   depthY
+                                  pixelsPerUnit
 
                               let size =
                                 Vector2(
-                                  float32 texture.Width
-                                  / RenderMath.PixelsPerUnitX,
-                                  float32 texture.Height
-                                  / RenderMath.PixelsPerUnitY
+                                  float32 texture.Width / pixelsPerUnit.X,
+                                  float32 texture.Height / pixelsPerUnit.Y
                                 )
 
                               quadBatch.Draw(texture, worldPos, size)
@@ -230,17 +235,11 @@ module TerrainRenderSystem =
             else
               // 2D SpriteBatch Rendering for Background (Ground)
               let transform =
-                Matrix.CreateTranslation(
-                  -camera.Position.X,
-                  -camera.Position.Y,
-                  0.0f
-                )
-                * Matrix.CreateScale(camera.Zoom, camera.Zoom, 1.0f)
-                * Matrix.CreateTranslation(
-                  float32 camera.Viewport.Width / 2.0f,
-                  float32 camera.Viewport.Height / 2.0f,
-                  0.0f
-                )
+                RenderMath.GetSpriteBatchTransform
+                  camera.Position
+                  camera.Zoom
+                  camera.Viewport.Width
+                  camera.Viewport.Height
 
               spriteBatch.Begin(
                 SpriteSortMode.Deferred,

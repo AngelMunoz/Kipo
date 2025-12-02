@@ -110,7 +110,12 @@ module CompositionRoot =
       let projections = Projections.create(scope.Stores.ItemStore, worldView)
 
       let cameraService =
-        CameraSystem.create(game, projections, Array.singleton playerId)
+        CameraSystem.create(
+          game,
+          projections,
+          worldView,
+          Array.singleton playerId
+        )
 
       let targetingService =
         Targeting.create(eventBus, scope.Stores.SkillStore, projections)
