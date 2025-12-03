@@ -36,6 +36,15 @@ type PomoGame() as this =
     graphicsDeviceManager.SupportedOrientations <-
       DisplayOrientation.LandscapeLeft ||| DisplayOrientation.LandscapeRight
 
+    graphicsDeviceManager.PreferMultiSampling <- true
+
+    graphicsDeviceManager.PreparingDeviceSettings
+    |> Observable.add(fun e ->
+      e.GraphicsDeviceInformation.GraphicsProfile <-
+        Graphics.GraphicsProfile.HiDef
+
+      e.GraphicsDeviceInformation.PresentationParameters.MultiSampleCount <- 8)
+
     // We still need to register GDM
     base.Services.AddService<GraphicsDeviceManager> graphicsDeviceManager
 

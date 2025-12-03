@@ -229,8 +229,19 @@ module Render =
           let effect = effect :?> BasicEffect
           effect.EnableDefaultLighting()
           effect.PreferPerPixelLighting <- true
-          effect.AmbientLightColor <- Vector3(0.5f, 0.5f, 0.5f)
-          effect.DirectionalLight0.Direction <- Vector3(1.0f, -1.0f, -1.0f)
+
+          // Lighting adjustments to match isometric background and remove "plastic" look
+          effect.AmbientLightColor <- Vector3(0.2f, 0.2f, 0.2f) // Darker to increase contrast
+          effect.SpecularColor <- Vector3.Zero // No shine at all
+
+          effect.DirectionalLight0.Direction <- Vector3(-1.0f, -1.7f, 0.0f) // 60-degree elevation from Right, neutral Z
+          effect.DirectionalLight0.DiffuseColor <- Vector3(0.6f, 0.6f, 0.6f) // Less intense diffuse
+          effect.DirectionalLight0.SpecularColor <- Vector3.Zero // No specular from light
+
+          // Disable other default lights that might be causing excessive brightness/shine
+          effect.DirectionalLight1.Enabled <- false
+          effect.DirectionalLight2.Enabled <- false
+
           effect.World <- worldMatrix
           effect.View <- camera.View
           effect.Projection <- camera.Projection
