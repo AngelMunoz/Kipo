@@ -341,7 +341,20 @@ module Render =
                                 |> HashMap.tryFind nodeName
                                 |> Option.defaultValue Matrix.Identity
 
-                            let world = localAnim * parentWorld
+                            // Apply Pivot Correction:
+                            // 1. Translate -Pivot (Move pivot to origin)
+                            // 2. Rotate (localAnim)
+                            // 3. Translate +Pivot (Move pivot back)
+                            // 4. Translate Offset (Position adjustment relative to parent) - optional if needed
+                            
+                            let pivotTranslation = Matrix.CreateTranslation node.Pivot
+                            let inversePivotTranslation = Matrix.CreateTranslation -node.Pivot
+                            let offsetTranslation = Matrix.CreateTranslation node.Offset
+                            
+                            // Combined Transform
+                            let localWorld = inversePivotTranslation * localAnim * pivotTranslation * offsetTranslation
+                            
+                            let world = localWorld * parentWorld
                             nodeTransforms[nodeName] <- world
                             world
 

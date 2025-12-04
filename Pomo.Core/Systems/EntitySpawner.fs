@@ -198,18 +198,6 @@ module EntitySpawnerLogic =
       let inputMap = InputMapping.createDefaultInputMap()
       eventBus.Publish(Input(MapChanged struct (entityId, inputMap)))
 
-      // Initialize Animation
-      let animState: Pomo.Core.Domain.Animation.AnimationState = {
-        ClipId = "Test_Windmill"
-        Time = TimeSpan.Zero
-        Speed = 1.0f
-      }
-      eventBus.Publish(
-        StateChangeEvent.Animation(
-          Pomo.Core.Domain.Events.ActiveAnimationsChanged struct (entityId, IndexList.single animState)
-        )
-      )
-
       configurePlayerLoadout(entityId, eventBus)
 
 

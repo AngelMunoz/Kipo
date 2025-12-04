@@ -10,7 +10,8 @@ module Animation =
   type RigNode = {
     ModelAsset: string
     Parent: string voption
-  // LocalTransform could be added here for rest pose
+    Offset: Vector3
+    Pivot: Vector3
   }
 
   [<Struct>]
@@ -59,7 +60,36 @@ module Animation =
 
           and! parent = VOptional.Property.get ("Parent", Required.string) json
 
-          return { ModelAsset = model; Parent = parent }
+          and! offset =
+            VOptional.Property.get ("Offset", Required.map Required.float) json
+
+          and! pivot =
+            VOptional.Property.get ("Pivot", Required.map Required.float) json
+
+          let offsetVector =
+            match offset with
+            | ValueSome map ->
+              let x = map |> Map.tryFind "X" |> Option.defaultValue 0.0
+              let y = map |> Map.tryFind "Y" |> Option.defaultValue 0.0
+              let z = map |> Map.tryFind "Z" |> Option.defaultValue 0.0
+              Vector3(float32 x, float32 y, float32 z)
+            | ValueNone -> Vector3.Zero
+
+          let pivotVector =
+            match pivot with
+            | ValueSome map ->
+              let x = map |> Map.tryFind "X" |> Option.defaultValue 0.0
+              let y = map |> Map.tryFind "Y" |> Option.defaultValue 0.0
+              let z = map |> Map.tryFind "Z" |> Option.defaultValue 0.0
+              Vector3(float32 x, float32 y, float32 z)
+            | ValueNone -> Vector3.Zero
+
+          return {
+            ModelAsset = model
+            Parent = parent
+            Offset = offsetVector
+            Pivot = pivotVector
+          }
         }
 
     module Rig =

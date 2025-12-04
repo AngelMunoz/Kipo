@@ -197,6 +197,7 @@ module CompositionRoot =
       baseComponents.Add(new EntitySpawnerSystem(game, pomoEnv))
       baseComponents.Add(new AISystem(game, pomoEnv))
       baseComponents.Add(new AnimationSystem(game, pomoEnv))
+      baseComponents.Add(new AnimationStateSystem(game, pomoEnv))
       baseComponents.Add(new StateUpdateSystem(game, pomoEnv, mutableWorld))
 
       // Map Dependent Systems (Renderers)

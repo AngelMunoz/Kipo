@@ -61,6 +61,7 @@
     <Compile Include="Systems/AISystem.fs" />
     <Compile Include="Systems/EntitySpawner.fs" />
     <Compile Include="Systems/AnimationSystem.fs" />
+    <Compile Include="Systems/AnimationStateSystem.fs" />
     <Compile Include="Systems/WorldMapService.fs" />
     <Compile Include="Systems/UIService.fs" />
     <Compile Include="Systems/UISystem.fs" />

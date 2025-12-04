@@ -3,9 +3,20 @@
     "Root": { "Model": "Dummy_Base" },
     "Body": { "Model": "Dummy_Base_Dummy_Body", "Parent": "Root" },
     "Head": { "Model": "Dummy_Base_Dummy_Body_Dummy_Head", "Parent": "Body" },
-    "Arm_L": { "Model": "Dummy_Base_Dummy_Body_Dummy_ArmLeft", "Parent": "Body" },
-    "Arm_R": { "Model": "Dummy_Base_Dummy_Body_Dummy_ArmRight", "Parent": "Body" },
-    "Target": { "Model": "Dummy_Base_Dummy_Body_Dummy_Target", "Parent": "Body" }
+    "Arm_L": {
+      "Model": "Dummy_Base_Dummy_Body_Dummy_ArmLeft",
+      "Parent": "Body",
+      "Pivot": { "X": 0.0, "Y": 0.0, "Z": 0.0 }
+    },
+    "Arm_R": {
+      "Model": "Dummy_Base_Dummy_Body_Dummy_ArmRight",
+      "Parent": "Body",
+      "Pivot": { "X": 0.0, "Y": 0.0, "Z": 0.0 }
+    },
+    "Target": {
+      "Model": "Dummy_Base_Dummy_Body_Dummy_Target",
+      "Parent": "Body"
+    }
   },
   "Projectile": {
     "Root": { "Model": "Can_A" }
