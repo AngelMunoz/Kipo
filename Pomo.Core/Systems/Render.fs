@@ -271,14 +271,21 @@ module Render =
               game.GraphicsDevice.RasterizerState <- RasterizerState.CullNone
 
               for id, pos in snapshot.Positions do
+                let configId = snapshot.ModelConfigIds |> HashMap.tryFindV id
+
                 let rotation =
-                  snapshot.Rotations
-                  |> HashMap.tryFind id
-                  |> Option.defaultValue 0.0f
+                  match configId with
+                  | ValueSome "Projectile" ->
+                    let time = world.Time |> AVal.force
+                    float32 time.TotalGameTime.TotalSeconds * 10.0f
+                  | _ ->
+                    snapshot.Rotations
+                    |> HashMap.tryFind id
+                    |> Option.defaultValue 0.0f
 
                 let modelParts =
-                  match snapshot.ModelConfigIds |> HashMap.tryFindV id with
-                  | ValueSome configId -> modelStore.find configId
+                  match configId with
+                  | ValueSome id -> modelStore.find id
                   | ValueNone -> [| "Dummy_Base" |] // Fallback
 
                 let renderPos = RenderMath.LogicToRender pos pixelsPerUnit

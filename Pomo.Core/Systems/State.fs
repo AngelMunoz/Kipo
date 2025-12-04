@@ -108,10 +108,15 @@ module StateUpdate =
       // Get caster's position to use as the projectile's starting position.
       match startingPos with
       | Some pos ->
-        // A projectile needs a position and velocity to exist in the world.
-        world.Positions[entityId] <- pos
-        world.Velocities[entityId] <- Vector2.Zero
-        world.LiveProjectiles[entityId] <- projectile
+        match world.EntityScenario.TryGetValue projectile.Caster with
+        | Some scenarioId ->
+          // A projectile needs a position and velocity to exist in the world.
+          world.Positions[entityId] <- pos
+          world.Velocities[entityId] <- Vector2.Zero
+          world.LiveProjectiles[entityId] <- projectile
+          world.ModelConfigId[entityId] <- "Projectile"
+          world.EntityScenario[entityId] <- scenarioId
+        | None -> ()
       | None -> () // Caster/start has no position, so we can't create the projectile.
 
   module RawInput =
