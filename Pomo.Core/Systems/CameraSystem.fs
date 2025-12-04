@@ -8,14 +8,21 @@ open FSharp.Data.Adaptive
 open Pomo.Core.Domain.Core
 open Pomo.Core.Domain.Units
 open Pomo.Core.Domain.Camera
+open Pomo.Core.Domain.World
 open Pomo.Core.Projections
-
+open Pomo.Core.Graphics
 
 module CameraSystem =
 
   let create
-    (game: Game, projections: ProjectionService, localPlayers: Guid<EntityId>[])
-    =
+    (
+      game: Game,
+      projections: ProjectionService,
+      world: World,
+      localPlayers: Guid<EntityId>[]
+    ) =
+    let defaultZoom = 2.0f
+
     { new CameraService with
         member this.GetCamera(playerId: Guid<EntityId>) =
           if Array.contains playerId localPlayers then
@@ -55,19 +62,58 @@ module CameraSystem =
                 Microsoft.Xna.Framework.Graphics.Viewport(0, 0, width, height)
 
             let entityScenarios = projections.EntityScenarios |> AMap.force
+            let scenarios = world.Scenarios |> AMap.force
 
-            let position =
+            let position, pixelsPerUnit =
               match entityScenarios |> HashMap.tryFindV playerId with
               | ValueSome scenarioId ->
-                projections.ComputeMovementSnapshot(scenarioId).Positions
-                |> HashMap.tryFind playerId
-                |> Option.defaultValue Vector2.Zero
-              | ValueNone -> Vector2.Zero
+                let pos =
+                  projections.ComputeMovementSnapshot(scenarioId).Positions
+                  |> HashMap.tryFind playerId
+                  |> Option.defaultValue Vector2.Zero
+
+                let ppu =
+                  match scenarios |> HashMap.tryFindV scenarioId with
+                  | ValueSome scenario ->
+                    Vector2(
+                      float32 scenario.Map.TileWidth,
+                      float32 scenario.Map.TileHeight
+                    )
+                  | ValueNone -> Vector2(64.0f, 32.0f) // Fallback
+
+                pos, ppu
+              | ValueNone -> Vector2.Zero, Vector2(64.0f, 32.0f)
+
+            // 3D Camera Logic (axis-aligned top-down view)
+            let target =
+              Vector3(
+                position.X / pixelsPerUnit.X,
+                0.0f,
+                position.Y / pixelsPerUnit.Y
+              )
+
+            // Look straight down from above
+            let cameraPos = target + Vector3.Up * 100.0f
+            // Up vector is Forward (0, 0, -1) so that Z maps to screen Y (down)
+            let view = Matrix.CreateLookAt(cameraPos, target, Vector3.Forward)
+
+            // Orthographic Projection respecting zoom and unit scale
+            // We want 1 unit in 3D to correspond to pixelsPerUnit * Zoom pixels on screen
+            let viewWidth =
+              float32 viewport.Width / (defaultZoom * pixelsPerUnit.X)
+
+            let viewHeight =
+              float32 viewport.Height / (defaultZoom * pixelsPerUnit.Y)
+
+            let projection =
+              Matrix.CreateOrthographic(viewWidth, viewHeight, 0.1f, 5000.0f)
 
             ValueSome {
               Position = position
-              Zoom = 2.0f
+              Zoom = defaultZoom
               Viewport = viewport
+              View = view
+              Projection = projection
             }
           else
             ValueNone
@@ -96,17 +142,11 @@ module CameraSystem =
 
               // Transform
               let transform =
-                Matrix.CreateTranslation(
-                  -camera.Position.X,
-                  -camera.Position.Y,
-                  0.0f
-                )
-                * Matrix.CreateScale(camera.Zoom)
-                * Matrix.CreateTranslation(
-                  float32 viewport.Width / 2.0f,
-                  float32 viewport.Height / 2.0f,
-                  0.0f
-                )
+                RenderMath.GetSpriteBatchTransform
+                  camera.Position
+                  camera.Zoom
+                  viewport.Width
+                  viewport.Height
 
               // Invert transform to go from Screen -> World
               let inverse = Matrix.Invert(transform)

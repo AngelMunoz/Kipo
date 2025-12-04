@@ -7,6 +7,7 @@ open FSharp.Data.Adaptive
 open Pomo.Core.Domain.Map
 open Pomo.Core.Domain.Core
 open Pomo.Core.Domain.Camera
+open Pomo.Core.Graphics
 
 open Pomo.Core.Stores
 
@@ -57,30 +58,12 @@ module TerrainRenderSystem =
               $"Failed to load texture: {assetPath} - {e.Message}"
     | ValueNone -> ()
 
+    let quadBatch = new Pomo.Core.Graphics.QuadBatch(game.GraphicsDevice)
+
     { new TerrainRenderService with
         member _.Draw(camera: Camera) =
           match mapDefinition with
           | ValueSome map ->
-            let transform =
-              Matrix.CreateTranslation(
-                -camera.Position.X,
-                -camera.Position.Y,
-                0.0f
-              )
-              * Matrix.CreateScale(camera.Zoom, camera.Zoom, 1.0f)
-              * Matrix.CreateTranslation(
-                float32 camera.Viewport.Width / 2.0f,
-                float32 camera.Viewport.Height / 2.0f,
-                0.0f
-              )
-
-            spriteBatch.Begin(
-              SpriteSortMode.Deferred,
-              BlendState.AlphaBlend,
-              SamplerState.PointClamp,
-              transformMatrix = transform
-            )
-
             let layers =
               match layersToRender with
               | ValueSome names ->
@@ -88,155 +71,308 @@ module TerrainRenderSystem =
                 |> IndexList.filter(fun l -> names |> HashSet.contains l.Name)
               | ValueNone -> map.Layers
 
-            // Calculate visible viewport bounds in world coordinates
-            let viewportWorldLeft =
-              camera.Position.X
-              - float32 camera.Viewport.Width / (2.0f * camera.Zoom)
+            // Check if this is a Foreground service (RenderGroup >= 2)
+            let isForeground =
+              layers
+              |> IndexList.tryAt 0
+              |> Option.map(fun l ->
+                match l.Properties |> HashMap.tryFindV "RenderGroup" with
+                | ValueSome v -> (Int32.TryParse v |> snd) >= 2
+                | ValueNone -> false)
+              |> Option.defaultValue false
 
-            let viewportWorldRight =
-              camera.Position.X
-              + float32 camera.Viewport.Width / (2.0f * camera.Zoom)
+            if isForeground then
+              // 3D Quad Rendering for Foreground (Walls)
+              quadBatch.Begin(camera.View, camera.Projection)
 
-            let viewportWorldTop =
-              camera.Position.Y
-              - float32 camera.Viewport.Height / (2.0f * camera.Zoom)
+              // Calculate visible viewport bounds in world coordinates
+              let viewportWorldLeft =
+                camera.Position.X
+                - float32 camera.Viewport.Width / (2.0f * camera.Zoom)
 
-            let viewportWorldBottom =
-              camera.Position.Y
-              + float32 camera.Viewport.Height / (2.0f * camera.Zoom)
+              let viewportWorldRight =
+                camera.Position.X
+                + float32 camera.Viewport.Width / (2.0f * camera.Zoom)
 
-            // Render order: RightDown is standard
-            // For staggered iso, we iterate Y then X usually, or just iterate the array.
+              let viewportWorldTop =
+                camera.Position.Y
+                - float32 camera.Viewport.Height / (2.0f * camera.Zoom)
 
-            // Always iterate Right-Down (0..W, 0..H) for correct occlusion in Staggered/Isometric views.
-            // Tiled's "RenderOrder" might specify otherwise (e.g. Left-Down), but for standard
-            // top-down/isometric projection with overlapping tiles, we must draw back-to-front.
-            // (0,0) is top-left (back), (W,H) is bottom-right (front).
+              let viewportWorldBottom =
+                camera.Position.Y
+                + float32 camera.Viewport.Height / (2.0f * camera.Zoom)
 
-            for layer in layers do
-              if layer.Visible then
-                // For Staggered X, we must draw "Unstaggered" columns (High) then "Staggered" columns (Low)
-                // for each row to ensure correct occlusion.
-                // For Staggered Y or Isometric, standard Y-then-X is usually fine (or X-then-Y).
+              for layer in layers do
+                if layer.Visible then
+                  let isStaggeredX =
+                    match map.Orientation, map.StaggerAxis with
+                    | Staggered, ValueSome X -> true
+                    | _ -> false
 
-                let isStaggeredX =
-                  match map.Orientation, map.StaggerAxis with
-                  | Staggered, ValueSome X -> true
-                  | _ -> false
+                  for y in 0 .. layer.Height - 1 do
+                    let xPasses =
+                      if isStaggeredX then
+                        [|
+                          [| 0 .. layer.Width - 1 |]
+                          |> Array.filter(fun x ->
+                            match map.StaggerIndex with
+                            | ValueSome Odd -> x % 2 = 0
+                            | ValueSome Even -> x % 2 = 1
+                            | _ -> true)
 
-                for y in 0 .. layer.Height - 1 do
-                  let xPasses =
-                    if isStaggeredX then
-                      // Pass 1: Unstaggered cols, Pass 2: Staggered cols
-                      [|
-                        [| 0 .. layer.Width - 1 |]
-                        |> Array.filter(fun x ->
-                          match map.StaggerIndex with
-                          | ValueSome Odd -> x % 2 = 0 // Evens are unstaggered (High)
-                          | ValueSome Even -> x % 2 = 1 // Odds are unstaggered (High)
-                          | _ -> true)
+                          [| 0 .. layer.Width - 1 |]
+                          |> Array.filter(fun x ->
+                            match map.StaggerIndex with
+                            | ValueSome Odd -> x % 2 = 1
+                            | ValueSome Even -> x % 2 = 0
+                            | _ -> false)
+                        |]
+                      else
+                        [| [| 0 .. layer.Width - 1 |] |]
 
-                        [| 0 .. layer.Width - 1 |]
-                        |> Array.filter(fun x ->
-                          match map.StaggerIndex with
-                          | ValueSome Odd -> x % 2 = 1 // Odds are staggered (Low)
-                          | ValueSome Even -> x % 2 = 0 // Evens are staggered (Low)
-                          | _ -> false)
-                      |]
-                    else
-                      // Standard single pass
-                      [| [| 0 .. layer.Width - 1 |] |]
+                    for xIndices in xPasses do
+                      for x in xIndices do
+                        match layer.Tiles.[x, y] with
+                        | ValueSome tile ->
+                          let gid = int tile.TileId
 
-                  for xIndices in xPasses do
-                    for x in xIndices do
-                      match layer.Tiles.[x, y] with
-                      | ValueSome tile ->
-                        let gid = int tile.TileId
+                          if tileTextures.ContainsKey(gid) then
+                            let texture = tileTextures[gid]
+                            let tileW = float32 map.TileWidth
+                            let tileH = float32 map.TileHeight
 
-                        if tileTextures.ContainsKey(gid) then
-                          let texture = tileTextures[gid]
+                            let posX, posY =
+                              match
+                                map.Orientation,
+                                map.StaggerAxis,
+                                map.StaggerIndex
+                              with
+                              | Staggered, ValueSome X, ValueSome index ->
+                                let xStep = tileW / 2.0f
+                                let yStep = tileH
+                                let px = float32 x * xStep
 
-                          // Calculate position based on Stagger settings
-                          let tileW = float32 map.TileWidth
-                          let tileH = float32 map.TileHeight
+                                let isStaggeredCol =
+                                  match index with
+                                  | Odd -> x % 2 = 1
+                                  | Even -> x % 2 = 0
 
-                          let posX, posY =
-                            match
-                              map.Orientation, map.StaggerAxis, map.StaggerIndex
-                            with
-                            | Staggered, ValueSome X, ValueSome index ->
-                              // Staggered X
-                              let xStep = tileW / 2.0f
-                              let yStep = tileH
-                              let px = float32 x * xStep
+                                let yOffset =
+                                  if isStaggeredCol then tileH / 2.0f else 0.0f
 
-                              let isStaggeredCol =
-                                match index with
-                                | Odd -> x % 2 = 1
-                                | Even -> x % 2 = 0
+                                let py = float32 y * yStep + yOffset
+                                px, py
+                              | Staggered, ValueSome Y, ValueSome index ->
+                                let xStep = tileW
+                                let yStep = tileH / 2.0f
+                                let py = float32 y * yStep
 
-                              let yOffset =
-                                if isStaggeredCol then tileH / 2.0f else 0.0f
+                                let isStaggeredRow =
+                                  match index with
+                                  | Odd -> y % 2 = 1
+                                  | Even -> y % 2 = 0
 
-                              let py = float32 y * yStep + yOffset
-                              px, py
+                                let xOffset =
+                                  if isStaggeredRow then tileW / 2.0f else 0.0f
 
-                            | Staggered, ValueSome Y, ValueSome index ->
-                              // Staggered Y
-                              let xStep = tileW
-                              let yStep = tileH / 2.0f
-                              let py = float32 y * yStep
+                                let px = float32 x * xStep + xOffset
+                                px, py
+                              | Isometric, _, _ ->
+                                let originX = float32 map.Width * tileW / 2.0f
 
-                              let isStaggeredRow =
-                                match index with
-                                | Odd -> y % 2 = 1
-                                | Even -> y % 2 = 0
+                                let px =
+                                  originX
+                                  + (float32 x - float32 y) * tileW / 2.0f
 
-                              let xOffset =
-                                if isStaggeredRow then tileW / 2.0f else 0.0f
+                                let py = (float32 x + float32 y) * tileH / 2.0f
+                                px, py
+                              | _ -> float32 x * tileW, float32 y * tileH
 
-                              let px = float32 x * xStep + xOffset
-                              px, py
+                            let drawX = posX
+                            let drawY = posY + tileH - float32 texture.Height
 
-                            | Isometric, _, _ ->
-                              // Standard Isometric (Diamond)
-                              let originX = float32 map.Width * tileW / 2.0f
+                            // Culling
+                            let tileLeft = drawX
+                            let tileRight = drawX + float32 texture.Width
+                            let tileTop = drawY
+                            let tileBottom = drawY + float32 texture.Height
 
-                              let px =
-                                originX + (float32 x - float32 y) * tileW / 2.0f
+                            let isVisible =
+                              tileRight >= viewportWorldLeft
+                              && tileLeft <= viewportWorldRight
+                              && tileBottom >= viewportWorldTop
+                              && tileTop <= viewportWorldBottom
 
-                              let py = (float32 x + float32 y) * tileH / 2.0f
-                              px, py
+                            if isVisible then
+                              // 3D Conversion
+                              let pixelsPerUnit =
+                                Vector2(
+                                  float32 map.TileWidth,
+                                  float32 map.TileHeight
+                                )
 
-                            | _ ->
-                              // Orthogonal or fallback
-                              float32 x * tileW, float32 y * tileH
+                              let depthY =
+                                (drawY + float32 texture.Height)
+                                / pixelsPerUnit.Y
 
-                          // Adjust for texture height (bottom-align)
-                          let drawX = posX
-                          let drawY = posY + tileH - float32 texture.Height
+                              let worldPos =
+                                RenderMath.LogicToRenderWithDepth
+                                  (Vector2(drawX, drawY))
+                                  depthY
+                                  pixelsPerUnit
 
-                          // Calculate tile bounds for culling
-                          let tileLeft = drawX
-                          let tileRight = drawX + float32 texture.Width
-                          let tileTop = drawY
-                          let tileBottom = drawY + float32 texture.Height
+                              let size =
+                                Vector2(
+                                  float32 texture.Width / pixelsPerUnit.X,
+                                  float32 texture.Height / pixelsPerUnit.Y
+                                )
 
-                          // Check if tile is within camera viewport bounds
-                          let isVisible =
-                            tileRight >= viewportWorldLeft
-                            && tileLeft <= viewportWorldRight
-                            && tileBottom >= viewportWorldTop
-                            && tileTop <= viewportWorldBottom
+                              quadBatch.Draw(texture, worldPos, size)
+                        | ValueNone -> ()
 
-                          if isVisible then
-                            spriteBatch.Draw(
-                              texture,
-                              Vector2(drawX, drawY),
-                              Color.White
-                            )
-                      | ValueNone -> ()
+              quadBatch.End()
 
-            spriteBatch.End()
+            else
+              // 2D SpriteBatch Rendering for Background (Ground)
+              let transform =
+                RenderMath.GetSpriteBatchTransform
+                  camera.Position
+                  camera.Zoom
+                  camera.Viewport.Width
+                  camera.Viewport.Height
+
+              spriteBatch.Begin(
+                SpriteSortMode.Deferred,
+                BlendState.AlphaBlend,
+                SamplerState.PointClamp,
+                transformMatrix = transform
+              )
+
+              // Calculate visible viewport bounds in world coordinates
+              let viewportWorldLeft =
+                camera.Position.X
+                - float32 camera.Viewport.Width / (2.0f * camera.Zoom)
+
+              let viewportWorldRight =
+                camera.Position.X
+                + float32 camera.Viewport.Width / (2.0f * camera.Zoom)
+
+              let viewportWorldTop =
+                camera.Position.Y
+                - float32 camera.Viewport.Height / (2.0f * camera.Zoom)
+
+              let viewportWorldBottom =
+                camera.Position.Y
+                + float32 camera.Viewport.Height / (2.0f * camera.Zoom)
+
+              for layer in layers do
+                if layer.Visible then
+                  let isStaggeredX =
+                    match map.Orientation, map.StaggerAxis with
+                    | Staggered, ValueSome X -> true
+                    | _ -> false
+
+                  for y in 0 .. layer.Height - 1 do
+                    let xPasses =
+                      if isStaggeredX then
+                        [|
+                          [| 0 .. layer.Width - 1 |]
+                          |> Array.filter(fun x ->
+                            match map.StaggerIndex with
+                            | ValueSome Odd -> x % 2 = 0
+                            | ValueSome Even -> x % 2 = 1
+                            | _ -> true)
+
+                          [| 0 .. layer.Width - 1 |]
+                          |> Array.filter(fun x ->
+                            match map.StaggerIndex with
+                            | ValueSome Odd -> x % 2 = 1
+                            | ValueSome Even -> x % 2 = 0
+                            | _ -> false)
+                        |]
+                      else
+                        [| [| 0 .. layer.Width - 1 |] |]
+
+                    for xIndices in xPasses do
+                      for x in xIndices do
+                        match layer.Tiles.[x, y] with
+                        | ValueSome tile ->
+                          let gid = int tile.TileId
+
+                          if tileTextures.ContainsKey(gid) then
+                            let texture = tileTextures[gid]
+                            let tileW = float32 map.TileWidth
+                            let tileH = float32 map.TileHeight
+
+                            let posX, posY =
+                              match
+                                map.Orientation,
+                                map.StaggerAxis,
+                                map.StaggerIndex
+                              with
+                              | Staggered, ValueSome X, ValueSome index ->
+                                let xStep = tileW / 2.0f
+                                let yStep = tileH
+                                let px = float32 x * xStep
+
+                                let isStaggeredCol =
+                                  match index with
+                                  | Odd -> x % 2 = 1
+                                  | Even -> x % 2 = 0
+
+                                let yOffset =
+                                  if isStaggeredCol then tileH / 2.0f else 0.0f
+
+                                let py = float32 y * yStep + yOffset
+                                px, py
+                              | Staggered, ValueSome Y, ValueSome index ->
+                                let xStep = tileW
+                                let yStep = tileH / 2.0f
+                                let py = float32 y * yStep
+
+                                let isStaggeredRow =
+                                  match index with
+                                  | Odd -> y % 2 = 1
+                                  | Even -> y % 2 = 0
+
+                                let xOffset =
+                                  if isStaggeredRow then tileW / 2.0f else 0.0f
+
+                                let px = float32 x * xStep + xOffset
+                                px, py
+                              | Isometric, _, _ ->
+                                let originX = float32 map.Width * tileW / 2.0f
+
+                                let px =
+                                  originX
+                                  + (float32 x - float32 y) * tileW / 2.0f
+
+                                let py = (float32 x + float32 y) * tileH / 2.0f
+                                px, py
+                              | _ -> float32 x * tileW, float32 y * tileH
+
+                            let drawX = posX
+                            let drawY = posY + tileH - float32 texture.Height
+
+                            let tileLeft = drawX
+                            let tileRight = drawX + float32 texture.Width
+                            let tileTop = drawY
+                            let tileBottom = drawY + float32 texture.Height
+
+                            let isVisible =
+                              tileRight >= viewportWorldLeft
+                              && tileLeft <= viewportWorldRight
+                              && tileBottom >= viewportWorldTop
+                              && tileTop <= viewportWorldBottom
+
+                            if isVisible then
+                              spriteBatch.Draw(
+                                texture,
+                                Vector2(drawX, drawY),
+                                Color.White
+                              )
+                        | ValueNone -> ()
+
+              spriteBatch.End()
           | _ -> ()
     }

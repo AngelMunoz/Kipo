@@ -249,11 +249,15 @@ module Projections =
   type MovementSnapshot = {
     Positions: HashMap<Guid<EntityId>, Vector2>
     SpatialGrid: HashMap<GridCell, IndexList<Guid<EntityId>>>
+    Rotations: HashMap<Guid<EntityId>, float32>
+    ModelConfigIds: HashMap<Guid<EntityId>, string>
   } with
 
     static member Empty = {
       Positions = HashMap.empty
       SpatialGrid = HashMap.empty
+      Rotations = HashMap.empty
+      ModelConfigIds = HashMap.empty
     }
 
   type ProjectionService =
@@ -280,12 +284,16 @@ module Projections =
     (time: TimeSpan)
     (velocities: HashMap<Guid<EntityId>, Vector2>)
     (positions: HashMap<Guid<EntityId>, Vector2>)
+    (rotations: HashMap<Guid<EntityId>, float32>)
+    (modelConfigIds: HashMap<Guid<EntityId>, string>)
     (entityScenarios: HashMap<Guid<EntityId>, Guid<ScenarioId>>)
     (scenarioId: Guid<ScenarioId>)
     =
     let dt = float32 time.TotalSeconds
     let mutable newPositions = HashMap.empty
     let mutable newGrid = HashMap.empty
+    let mutable newRotations = HashMap.empty
+    let mutable newModelConfigIds = HashMap.empty
 
     for (id, startPos) in positions do
       match entityScenarios |> HashMap.tryFindV id with
@@ -297,6 +305,21 @@ module Projections =
           | ValueNone -> startPos
 
         newPositions <- newPositions |> HashMap.add id currentPos
+
+        // Calculate Rotation (Derived from Velocity if moving, else keep existing)
+        let rotation =
+          match velocities |> HashMap.tryFindV id with
+          | ValueSome v when v <> Vector2.Zero ->
+            float32(Math.Atan2(float v.X, float v.Y))
+          | _ -> rotations |> HashMap.tryFind id |> Option.defaultValue 0.0f
+
+        newRotations <- newRotations |> HashMap.add id rotation
+
+        // Model Config
+        match modelConfigIds |> HashMap.tryFindV id with
+        | ValueSome configId ->
+          newModelConfigIds <- newModelConfigIds |> HashMap.add id configId
+        | ValueNone -> ()
 
         // Calculate Grid
         let cell =
@@ -314,6 +337,8 @@ module Projections =
     {
       Positions = newPositions
       SpatialGrid = newGrid
+      Rotations = newRotations
+      ModelConfigIds = newModelConfigIds
     }
 
   let create(itemStore: ItemStore, world: World) =
@@ -331,12 +356,16 @@ module Projections =
           let time = world.Time |> AVal.map _.Delta |> AVal.force
           let velocities = world.Velocities |> AMap.force
           let positions = world.Positions |> AMap.force
+          let rotations = world.Rotations |> AMap.force
+          let modelConfigIds = world.ModelConfigId |> AMap.force
           let entityScenarios = world.EntityScenario |> AMap.force
 
           calculateMovementSnapshot
             time
             velocities
             positions
+            rotations
+            modelConfigIds
             entityScenarios
             scenarioId
 

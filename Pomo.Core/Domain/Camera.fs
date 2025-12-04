@@ -13,6 +13,8 @@ module Camera =
     Position: Vector2
     Zoom: float32
     Viewport: Viewport
+    View: Matrix
+    Projection: Matrix
   }
 
   type CameraService =

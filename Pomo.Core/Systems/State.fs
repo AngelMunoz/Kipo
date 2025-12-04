@@ -81,6 +81,13 @@ module StateUpdate =
       if world.Velocities.ContainsKey entity then
         world.Velocities[entity] <- velocity
 
+    let inline updateRotation
+      (world: MutableWorld)
+      struct (entity: Guid<EntityId>, rotation: float32)
+      =
+      if world.Positions.ContainsKey entity then
+        world.Rotations[entity] <- rotation
+
     let inline updateMovementState
       (world: MutableWorld)
       struct (entity: Guid<EntityId>, movementState: MovementState)
@@ -395,6 +402,8 @@ module StateUpdate =
               Entity.updatePosition mutableWorld posChanged
             | VelocityChanged velChanged ->
               Entity.updateVelocity mutableWorld velChanged
+            | RotationChanged rotChanged ->
+              Entity.updateRotation mutableWorld rotChanged
             | MovementStateChanged mStateChanged ->
               Entity.updateMovementState mutableWorld mStateChanged
           | Combat event ->
@@ -449,6 +458,11 @@ module StateUpdate =
             match event with
             | ControllerUpdated(entityId, controller) ->
               AI.updateController mutableWorld (entityId, controller)
+          | Visuals event ->
+            match event with
+            | ModelConfigChanged(entityId, configId) ->
+              if mutableWorld.Positions.ContainsKey entityId then
+                mutableWorld.ModelConfigId[entityId] <- configId
 
           // Uncategorized
           | CreateProjectile projParams ->

@@ -24,6 +24,7 @@ open Pomo.Core.Domain.Camera
 
 module DebugRender =
   open Pomo.Core
+  open Pomo.Core.Graphics
 
   type DebugDrawCommand =
     | DrawActiveEffect of effect: ActiveEffect * entityPosition: Vector2
@@ -791,17 +792,11 @@ module DebugRender =
           yOffsets <- HashMap.empty
 
           let transform =
-            Matrix.CreateTranslation(
-              -camera.Position.X,
-              -camera.Position.Y,
-              0.0f
-            )
-            * Matrix.CreateScale camera.Zoom
-            * Matrix.CreateTranslation(
-              float32 camera.Viewport.Width / 2.0f,
-              float32 camera.Viewport.Height / 2.0f,
-              0.0f
-            )
+            RenderMath.GetSpriteBatchTransform
+              camera.Position
+              camera.Zoom
+              camera.Viewport.Width
+              camera.Viewport.Height
 
           game.GraphicsDevice.Viewport <- camera.Viewport
           sb.Begin(transformMatrix = transform)

@@ -69,6 +69,23 @@ module JsonFileLoader =
     with ex ->
       Error $"Failed to load file '{filePath}': {ex.Message}"
 
+  let readModels (deserializer: JDeckDeserializer) (filePath: string) =
+    try
+      let json =
+        Path.Combine(AppContext.BaseDirectory, filePath) |> File.ReadAllBytes
+
+      match deserializer.Deserialize<Map<string, string[]>> json with
+      | Ok result ->
+        let mutable newMap = HashMap.empty<string, string[]>
+
+        for KeyValue(key, value) in result do
+          newMap <- HashMap.add key value newMap
+
+        Ok newMap
+      | Error decodeError -> Error $"Deserialization error: {decodeError}"
+    with ex ->
+      Error $"Failed to load file '{filePath}': {ex.Message}"
+
 
 module Stores =
   open Pomo.Core.Domain.Units
@@ -95,6 +112,11 @@ module Stores =
     abstract member find: key: string -> Map.MapDefinition
     abstract member tryFind: key: string -> Map.MapDefinition voption
     abstract member all: unit -> seq<Map.MapDefinition>
+
+  type ModelStore =
+    abstract member find: configId: string -> string[]
+    abstract member tryFind: configId: string -> string[] voption
+    abstract member all: unit -> seq<string[]>
 
 
   module Skill =
@@ -173,3 +195,17 @@ module Stores =
           member _.tryFind(key) = HashMap.tryFindV key maps
           member _.all() = maps |> HashMap.toValueSeq
       }
+
+  module Model =
+    let create(loader: string -> Result<HashMap<string, string[]>, string>) =
+      match loader "Content/Models.json" with
+      | Ok modelMap ->
+        { new ModelStore with
+            member _.find(configId: string) = HashMap.find configId modelMap
+
+            member _.tryFind(configId: string) =
+              HashMap.tryFindV configId modelMap
+
+            member _.all() = modelMap |> HashMap.toValueSeq
+        }
+      | Error errMsg -> failwith $"Failed to create ModelStore: {errMsg}"

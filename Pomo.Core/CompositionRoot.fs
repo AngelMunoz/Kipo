@@ -62,12 +62,15 @@ module CompositionRoot =
         "Content/Maps/Lobby.xml"
       ]
 
+    let modelStore = Model.create(JsonFileLoader.readModels deserializer)
+
     let stores =
       { new StoreServices with
           member _.SkillStore = skillStore
           member _.ItemStore = itemStore
           member _.MapStore = mapStore
           member _.AIArchetypeStore = aiArchetypeStore
+          member _.ModelStore = modelStore
       }
 
     let monoGame =
@@ -107,7 +110,12 @@ module CompositionRoot =
       let projections = Projections.create(scope.Stores.ItemStore, worldView)
 
       let cameraService =
-        CameraSystem.create(game, projections, Array.singleton playerId)
+        CameraSystem.create(
+          game,
+          projections,
+          worldView,
+          Array.singleton playerId
+        )
 
       let targetingService =
         Targeting.create(eventBus, scope.Stores.SkillStore, projections)
