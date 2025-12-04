@@ -1,0 +1,18 @@
+{
+  "Test_Windmill": {
+    "Duration": 1.0,
+    "Loop": true,
+    "Tracks": {
+      "Arm_L": [
+        { "Time": 0.0, "Rotation": { "X": 0, "Y": 0, "Z": 0 } },
+        { "Time": 0.5, "Rotation": { "X": 180, "Y": 0, "Z": 0 } },
+        { "Time": 1.0, "Rotation": { "X": 360, "Y": 0, "Z": 0 } }
+      ],
+      "Arm_R": [
+        { "Time": 0.0, "Rotation": { "X": 180, "Y": 0, "Z": 0 } },
+        { "Time": 0.5, "Rotation": { "X": 360, "Y": 0, "Z": 0 } },
+        { "Time": 1.0, "Rotation": { "X": 540, "Y": 0, "Z": 0 } }
+      ]
+    }
+  }
+}

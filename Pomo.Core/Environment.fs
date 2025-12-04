@@ -37,6 +37,7 @@ module Environment =
     abstract MapStore: MapStore
     abstract AIArchetypeStore: AIArchetypeStore
     abstract ModelStore: ModelStore
+    abstract AnimationStore: AnimationStore
 
   type GameplayServices =
     abstract Projections: ProjectionService

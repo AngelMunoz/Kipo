@@ -16,6 +16,7 @@
     <Compile Include="Domain/Spatial.fs" />
     <Compile Include="Domain/Navigation.fs" />
     <Compile Include="Domain/AI.fs" />
+    <Compile Include="Domain/Animation.fs" />
     <Compile Include="Domain/Scenes.fs" />
     <Compile Include="Domain/Events.fs" />
     <Compile Include="Domain/World.fs" />
@@ -59,6 +60,7 @@
     <Compile Include="Systems/Equipment.fs" />
     <Compile Include="Systems/AISystem.fs" />
     <Compile Include="Systems/EntitySpawner.fs" />
+    <Compile Include="Systems/AnimationSystem.fs" />
     <Compile Include="Systems/WorldMapService.fs" />
     <Compile Include="Systems/UIService.fs" />
     <Compile Include="Systems/UISystem.fs" />
@@ -86,6 +88,9 @@
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
     <Content Include="Content/Models.json">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+    <Content Include="Content/Animations.json">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
   </ItemGroup>

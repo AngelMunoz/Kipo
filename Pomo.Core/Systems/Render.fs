@@ -13,6 +13,7 @@ open Pomo.Core.Domain.Units
 open Pomo.Core.Domain.Camera
 open Pomo.Core.Systems.Targeting
 open Pomo.Core.Stores
+open Pomo.Core.Domain.Animation
 
 
 module Render =
@@ -211,9 +212,12 @@ module Render =
     texture.SetData [| Color.White |]
 
     // Load Models
+    // The store returns Rigs (HashMap<string, RigNode>)
+    // We need to extract all unique ModelAsset names from all nodes in all Rigs
     let models =
       modelStore.all()
-      |> Seq.collect id
+      |> Seq.collect(fun rig ->
+          rig |> HashMap.toValueSeq |> Seq.map(fun node -> node.ModelAsset))
       |> Seq.distinct
       |> Seq.choose(fun assetName ->
         try
@@ -252,6 +256,7 @@ module Render =
         member _.Draw(camera: Camera) =
           let entityScenarios = world.EntityScenario |> AMap.force
           let scenarios = world.Scenarios |> AMap.force
+          let currentPoses = world.Poses |> AMap.force
 
           match entityScenarios |> HashMap.tryFindV playerId with
           | ValueSome scenarioId ->
@@ -279,45 +284,101 @@ module Render =
                   |> HashMap.tryFind id
                   |> Option.defaultValue 0.0f
 
-                // Time-based Spin Rotation (Roll) for Projectiles
-                let spin =
+                let rig =
                   match configId with
-                  | ValueSome "Projectile" ->
-                    let time = world.Time |> AVal.force
-                    float32 time.TotalGameTime.TotalSeconds * 10.0f
-                  | _ -> 0.0f
+                  | ValueSome id -> modelStore.tryFind id
+                  | ValueNone -> ValueNone
 
-                let modelParts =
-                  match configId with
-                  | ValueSome id -> modelStore.find id
-                  | ValueNone -> [| "Dummy_Base" |] // Fallback
+                match rig with
+                | ValueSome rigData ->
+                    let entityPose =
+                        currentPoses
+                        |> HashMap.tryFind id
+                        |> Option.defaultValue HashMap.empty
 
-                let renderPos = RenderMath.LogicToRender pos pixelsPerUnit
+                    let renderPos = RenderMath.LogicToRender pos pixelsPerUnit
 
-                let worldMatrix =
-                  match configId with
-                  | ValueSome "Projectile" ->
-                    RenderMath.GetTiltedEntityWorldMatrix
-                      renderPos
-                      facing
-                      MathHelper.PiOver2 // Tilt 90 degrees to lie flat
-                      spin
-                      MathHelper.PiOver4
-                      squishFactor
-                      Core.Constants.Entity.ModelScale
-                  | _ ->
-                    RenderMath.GetEntityWorldMatrix
-                      renderPos
-                      facing
-                      MathHelper.PiOver4
-                      squishFactor
-                      Core.Constants.Entity.ModelScale
+                    // Calculate Base Transform (Position + Facing)
+                    // Note: We apply squish and scale here for the root,
+                    // but child nodes should inherit appropriately.
+                    // RenderMath helpers combine everything, so we might need to decompose
+                    // if we want strict hierarchy.
+                    // For now, let's treat "Root" special or apply BaseTransform to all if parent is None.
 
-                for partName in modelParts do
-                  models
-                  |> HashMap.tryFindV partName
-                  |> ValueOption.iter(fun model ->
-                    drawModel camera model worldMatrix)
+                    // Simplified Hierarchy Traversal
+                    // We need World Matrices for each node.
+                    let nodeTransforms = System.Collections.Generic.Dictionary<string, Matrix>()
+
+                    // Helper to get parent transform
+                    let getParentTransform (parentName: string voption) =
+                        match parentName with
+                        | ValueSome name ->
+                            match nodeTransforms.TryGetValue name with
+                            | true, m -> m
+                            | false, _ -> Matrix.Identity // Should process parents first ideally
+                        | ValueNone -> Matrix.Identity // Root parent is Identity (local space)
+
+                    // Process nodes. Ideally topologically sorted.
+                    // For simple rigs (Root -> Body -> ...), iterating might be okay if order is guaranteed,
+                    // but HashMap is unordered.
+                    // Let's do a simple recursive resolve or multi-pass.
+                    // Given small depth, recursive get is fine with memoization (nodeTransforms).
+
+                    let rec resolveNode (nodeName: string) (node: RigNode) =
+                        if nodeTransforms.ContainsKey nodeName then
+                            nodeTransforms[nodeName]
+                        else
+                            let parentWorld =
+                                match node.Parent with
+                                | ValueSome pName ->
+                                    match rigData |> HashMap.tryFindV pName with
+                                    | ValueSome pNode -> resolveNode pName pNode
+                                    | ValueNone -> Matrix.Identity
+                                | ValueNone -> Matrix.Identity
+
+                            let localAnim =
+                                entityPose
+                                |> HashMap.tryFind nodeName
+                                |> Option.defaultValue Matrix.Identity
+
+                            let world = localAnim * parentWorld
+                            nodeTransforms[nodeName] <- world
+                            world
+
+                    // Calculate Entity World Transform (Location in game world)
+                    let entityBaseMatrix =
+                         // Check if projectile to apply special tilt
+                         match configId with
+                         | ValueSome "Projectile" ->
+                            // Projectiles often don't have "animations" in the rig sense yet,
+                            // but if they do (like spinning), the Rig "Root" handles it.
+                            // The "Base" matrix positions it in the world.
+                            RenderMath.GetTiltedEntityWorldMatrix
+                              renderPos
+                              facing
+                              MathHelper.PiOver2
+                              0.0f // Spin handled by animation system now!
+                              MathHelper.PiOver4
+                              squishFactor
+                              Core.Constants.Entity.ModelScale
+                         | _ ->
+                            RenderMath.GetEntityWorldMatrix
+                              renderPos
+                              facing
+                              MathHelper.PiOver4
+                              squishFactor
+                              Core.Constants.Entity.ModelScale
+
+                    for (nodeName, node) in rigData do
+                        let nodeLocalWorld = resolveNode nodeName node
+                        let finalWorld = nodeLocalWorld * entityBaseMatrix
+
+                        models
+                        |> HashMap.tryFindV node.ModelAsset
+                        |> ValueOption.iter(fun model ->
+                            drawModel camera model finalWorld)
+
+                | ValueNone -> () // No rig, can't draw
 
               // 2D Pass (UI / Debug)
               // Restore states for SpriteBatch if needed
