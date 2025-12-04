@@ -30,7 +30,7 @@
     "Area": "Point",
     "Delivery": {
       "Type": "Projectile",
-      "Speed": 200.0,
+      "Speed": 100.0,
       "CollisionMode": "IgnoreTerrain"
     },
     "ElementFormula": {
@@ -210,7 +210,7 @@
     "Area": "Point",
     "Delivery": {
       "Type": "Projectile",
-      "Speed": 250.0,
+      "Speed": 80.0,
       "CollisionMode": "IgnoreTerrain",
       "Kind": {
         "Type": "Chained",
@@ -288,7 +288,7 @@
     },
     "Delivery": {
       "Type": "Projectile",
-      "Speed": 300.0,
+      "Speed": 100.0,
       "CollisionMode": "IgnoreTerrain"
     },
     "ElementFormula": {
@@ -317,7 +317,7 @@
     },
     "Delivery": {
       "Type": "Projectile",
-      "Speed": 400.0,
+      "Speed": 200.0,
       "CollisionMode": "IgnoreTerrain"
     },
     "Formula": "AP * 1.5",
@@ -342,7 +342,7 @@
     },
     "Delivery": {
       "Type": "Projectile",
-      "Speed": 600.0,
+      "Speed": 150.0,
       "CollisionMode": "IgnoreTerrain",
       "Visual": "Dagger"
     },

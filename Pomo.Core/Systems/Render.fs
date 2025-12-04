@@ -273,15 +273,19 @@ module Render =
               for id, pos in snapshot.Positions do
                 let configId = snapshot.ModelConfigIds |> HashMap.tryFindV id
 
-                let rotation =
+                // Standard Facing Rotation (Yaw)
+                let facing =
+                  snapshot.Rotations
+                  |> HashMap.tryFind id
+                  |> Option.defaultValue 0.0f
+
+                // Time-based Spin Rotation (Roll) for Projectiles
+                let spin =
                   match configId with
                   | ValueSome "Projectile" ->
                     let time = world.Time |> AVal.force
                     float32 time.TotalGameTime.TotalSeconds * 10.0f
-                  | _ ->
-                    snapshot.Rotations
-                    |> HashMap.tryFind id
-                    |> Option.defaultValue 0.0f
+                  | _ -> 0.0f
 
                 let modelParts =
                   match configId with
@@ -291,12 +295,23 @@ module Render =
                 let renderPos = RenderMath.LogicToRender pos pixelsPerUnit
 
                 let worldMatrix =
-                  RenderMath.GetEntityWorldMatrix
-                    renderPos
-                    rotation
-                    MathHelper.PiOver4
-                    squishFactor
-                    Core.Constants.Entity.ModelScale
+                  match configId with
+                  | ValueSome "Projectile" ->
+                    RenderMath.GetTiltedEntityWorldMatrix
+                      renderPos
+                      facing
+                      MathHelper.PiOver2 // Tilt 90 degrees to lie flat
+                      spin
+                      MathHelper.PiOver4
+                      squishFactor
+                      Core.Constants.Entity.ModelScale
+                  | _ ->
+                    RenderMath.GetEntityWorldMatrix
+                      renderPos
+                      facing
+                      MathHelper.PiOver4
+                      squishFactor
+                      Core.Constants.Entity.ModelScale
 
                 for partName in modelParts do
                   models

@@ -72,3 +72,25 @@ module RenderMath =
     * squishCompensation
     * scale
     * Matrix.CreateTranslation(renderPos)
+
+  /// Calculates the World Matrix for a 3D entity with an additional X-axis tilt and local spin.
+  /// Useful for projectiles that need to spin while facing their movement direction.
+  let GetTiltedEntityWorldMatrix
+    (renderPos: Vector3)
+    (facing: float32)
+    (tilt: float32)
+    (spin: float32)
+    (rotationOffset: float32)
+    (squishFactor: float32)
+    (modelScale: float32)
+    : Matrix =
+    let squishCompensation = Matrix.CreateScale(1.0f, 1.0f, squishFactor)
+    let scale = Matrix.CreateScale(modelScale)
+
+    Matrix.CreateRotationY(spin)      // 1. Spin around local axis
+    * Matrix.CreateRotationX(tilt)    // 2. Tilt to align Y with Z (Forward)
+    * Matrix.CreateRotationY(facing + rotationOffset) // 3. Face movement direction
+    * correction
+    * squishCompensation
+    * scale
+    * Matrix.CreateTranslation(renderPos)
