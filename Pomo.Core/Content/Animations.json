@@ -11,11 +11,11 @@
         { "Time": 0.8, "Rotation": { "X": 0, "Y": -30, "Z": -20 } }
       ],
       "Arm_R": [
-        { "Time": 0.0, "Rotation": { "X": 0, "Y": -30, "Z": -20 } },
-        { "Time": 0.2, "Rotation": { "X": 0, "Y": 30, "Z": -20 } },
-        { "Time": 0.4, "Rotation": { "X": 0, "Y": 30, "Z": 20 } },
-        { "Time": 0.6, "Rotation": { "X": 0, "Y": -30, "Z": 20 } },
-        { "Time": 0.8, "Rotation": { "X": 0, "Y": -30, "Z": -20 } }
+        { "Time": 0.0, "Rotation": { "X": 0, "Y": 30, "Z": 20 } },
+        { "Time": 0.2, "Rotation": { "X": 0, "Y": -30, "Z": 20 } },
+        { "Time": 0.4, "Rotation": { "X": 0, "Y": -30, "Z": -20 } },
+        { "Time": 0.6, "Rotation": { "X": 0, "Y": 30, "Z": -20 } },
+        { "Time": 0.8, "Rotation": { "X": 0, "Y": 30, "Z": 20 } }
       ]
     }
   }
