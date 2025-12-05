@@ -10,6 +10,7 @@ open Pomo.Core.Domain.Units
 open Pomo.Core.Domain.Item
 open Pomo.Core.Domain.AI
 open Pomo.Core.Domain.Map
+open Pomo.Core.Domain.Animation
 
 
 module World =
@@ -72,6 +73,9 @@ module World =
     // 3D Integration
     Rotations: cmap<Guid<EntityId>, float32>
     ModelConfigId: cmap<Guid<EntityId>, string>
+    // Animation
+    Poses: cmap<Guid<EntityId>, HashMap<string, Matrix>>
+    ActiveAnimations: cmap<Guid<EntityId>, AnimationState IndexList>
   }
 
   type World =
@@ -130,6 +134,9 @@ module World =
     abstract EntityScenario: amap<Guid<EntityId>, Guid<ScenarioId>>
     abstract Rotations: amap<Guid<EntityId>, float32>
     abstract ModelConfigId: amap<Guid<EntityId>, string>
+    
+    abstract Poses: amap<Guid<EntityId>, HashMap<string, Matrix>>
+    abstract ActiveAnimations: amap<Guid<EntityId>, AnimationState IndexList>
 
 
   let create(rng: Random) =
@@ -166,6 +173,8 @@ module World =
       EntityScenario = cmap()
       Rotations = cmap()
       ModelConfigId = cmap()
+      Poses = cmap()
+      ActiveAnimations = cmap()
     }
 
     let worldView =
@@ -198,6 +207,8 @@ module World =
           member _.EntityScenario = mutableWorld.EntityScenario
           member _.Rotations = mutableWorld.Rotations
           member _.ModelConfigId = mutableWorld.ModelConfigId
+          member _.Poses = mutableWorld.Poses
+          member _.ActiveAnimations = mutableWorld.ActiveAnimations
       }
 
     struct (mutableWorld, worldView)

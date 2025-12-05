@@ -10,6 +10,7 @@ open Pomo.Core.Domain.Skill.Serialization
 open Pomo.Core.Domain.Projectile.Serialization
 open Pomo.Core.Domain.Item.Serialization
 open Pomo.Core.Domain.AI.Serialization
+open Pomo.Core.Domain.Animation.Serialization
 
 let private JsonSerializerOptions =
   JsonSerializerOptions()
@@ -42,6 +43,8 @@ let private JsonSerializerOptions =
   |> Codec.useDecoder Delivery.decoder
   |> Codec.useDecoder ItemDefinition.decoder
   |> Codec.useDecoder AIArchetype.decoder
+  |> Codec.useDecoder Rig.decoder
+  |> Codec.useDecoder AnimationClip.decoder
 
 
 type JDeckDeserializer =
