@@ -38,15 +38,15 @@ module AnimationSystemLogic =
       else
         findKeyframesForTime keyframes time (idx + 1)
 
-  /// Calculates the interpolated rotation for a given track at a specific time.
+  /// Calculates the interpolated rotation and position for a given track at a specific time.
   let evaluateTrack
     (track: Track)
     (time: TimeSpan)
     (duration: TimeSpan)
     (loop: bool)
-    : Quaternion =
+    : struct (Quaternion * Vector3) =
     if track.Keyframes.Length = 0 then
-      Quaternion.Identity
+      struct (Quaternion.Identity, Vector3.Zero)
     else
       // Handle time wrapping
       let t =
@@ -60,7 +60,11 @@ module AnimationSystemLogic =
             time
 
       let struct (k1, k2, amount) = findKeyframesForTime track.Keyframes t 0
-      Quaternion.Slerp(k1.Rotation, k2.Rotation, amount)
+      
+      let rotation = Quaternion.Slerp(k1.Rotation, k2.Rotation, amount)
+      let position = Vector3.Lerp(k1.Position, k2.Position, amount)
+      
+      struct (rotation, position)
 
   /// Advances an animation state and returns the updated state or ValueNone if finished.
   let private updateAnimationState
@@ -93,14 +97,14 @@ module AnimationSystemLogic =
         | ValueSome newAnimState ->
           // Calculate pose for this clip
           for track in clip.Tracks do
-            let rotation =
+            let struct (rotation, position) =
               evaluateTrack
                 track
                 newAnimState.Time
                 clip.Duration
                 clip.IsLooping
 
-            let matrix = Matrix.CreateFromQuaternion(rotation)
+            let matrix = Matrix.CreateFromQuaternion(rotation) * Matrix.CreateTranslation(position)
 
             // For now, simple overwrite (last animation in list wins if tracks overlap)
             entityPose <- HashMap.add track.NodeName matrix entityPose

@@ -18,7 +18,7 @@ module Animation =
   type Keyframe = {
     Time: TimeSpan
     Rotation: Quaternion
-  // Position/Scale can be added here later
+    Position: Vector3
   }
 
   [<Struct>]
@@ -107,19 +107,33 @@ module Animation =
           let! timeSeconds = Required.Property.get ("Time", Required.float) json
 
           and! rot =
-            Required.Property.get ("Rotation", Required.map Required.float) json
+            VOptional.Property.get ("Rotation", Required.map Required.float) json
 
-          let x = rot |> Map.tryFind "X" |> Option.defaultValue 0.0 |> degToRad
+          and! pos =
+            VOptional.Property.get ("Position", Required.map Required.float) json
 
-          let y = rot |> Map.tryFind "Y" |> Option.defaultValue 0.0 |> degToRad
+          let rotation =
+            match rot with
+            | ValueSome map ->
+                let x = map |> Map.tryFind "X" |> Option.defaultValue 0.0 |> degToRad
+                let y = map |> Map.tryFind "Y" |> Option.defaultValue 0.0 |> degToRad
+                let z = map |> Map.tryFind "Z" |> Option.defaultValue 0.0 |> degToRad
+                Quaternion.CreateFromYawPitchRoll(y, x, z)
+            | ValueNone -> Quaternion.Identity
 
-          let z = rot |> Map.tryFind "Z" |> Option.defaultValue 0.0 |> degToRad
-
-          let rotation = Quaternion.CreateFromYawPitchRoll(y, x, z)
+          let position =
+            match pos with
+            | ValueSome map ->
+                let x = map |> Map.tryFind "X" |> Option.defaultValue 0.0 |> float32
+                let y = map |> Map.tryFind "Y" |> Option.defaultValue 0.0 |> float32
+                let z = map |> Map.tryFind "Z" |> Option.defaultValue 0.0 |> float32
+                Vector3(x, y, z)
+            | ValueNone -> Vector3.Zero
 
           return {
             Time = TimeSpan.FromSeconds timeSeconds
             Rotation = rotation
+            Position = position
           }
         }
 

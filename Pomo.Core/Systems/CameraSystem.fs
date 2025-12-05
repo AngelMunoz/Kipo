@@ -21,7 +21,7 @@ module CameraSystem =
       world: World,
       localPlayers: Guid<EntityId>[]
     ) =
-    let defaultZoom = 4.0f
+    let defaultZoom = 2.5f
 
     { new CameraService with
         member this.GetCamera(playerId: Guid<EntityId>) =
