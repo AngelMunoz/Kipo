@@ -216,8 +216,10 @@ module Render =
     // We need to extract all unique ModelAsset names from all nodes in all Rigs
     let models =
       modelStore.all()
-      |> Seq.collect(fun rig ->
-          rig |> HashMap.toValueSeq |> Seq.map(fun node -> node.ModelAsset))
+      |> Seq.collect(fun config ->
+        config.Rig
+        |> HashMap.toValueSeq
+        |> Seq.map(fun node -> node.ModelAsset))
       |> Seq.distinct
       |> Seq.choose(fun assetName ->
         try
@@ -284,112 +286,123 @@ module Render =
                   |> HashMap.tryFind id
                   |> Option.defaultValue 0.0f
 
-                let rig =
+                let modelConfig =
                   match configId with
                   | ValueSome id -> modelStore.tryFind id
                   | ValueNone -> ValueNone
 
-                match rig with
-                | ValueSome rigData ->
-                    let entityPose =
-                        currentPoses
-                        |> HashMap.tryFind id
-                        |> Option.defaultValue HashMap.empty
+                match modelConfig with
+                | ValueSome config ->
+                  let rigData = config.Rig
 
-                    let renderPos = RenderMath.LogicToRender pos pixelsPerUnit
+                  let entityPose =
+                    currentPoses
+                    |> HashMap.tryFind id
+                    |> Option.defaultValue HashMap.empty
 
-                    // Calculate Base Transform (Position + Facing)
-                    // Note: We apply squish and scale here for the root,
-                    // but child nodes should inherit appropriately.
-                    // RenderMath helpers combine everything, so we might need to decompose
-                    // if we want strict hierarchy.
-                    // For now, let's treat "Root" special or apply BaseTransform to all if parent is None.
+                  let renderPos = RenderMath.LogicToRender pos pixelsPerUnit
 
-                    // Simplified Hierarchy Traversal
-                    // We need World Matrices for each node.
-                    let nodeTransforms = System.Collections.Generic.Dictionary<string, Matrix>()
+                  // Calculate Base Transform (Position + Facing)
+                  // Note: We apply squish and scale here for the root,
+                  // but child nodes should inherit appropriately.
+                  // RenderMath helpers combine everything, so we might need to decompose
+                  // if we want strict hierarchy.
+                  // For now, let's treat "Root" special or apply BaseTransform to all if parent is None.
 
-                    // Helper to get parent transform
-                    let getParentTransform (parentName: string voption) =
-                        match parentName with
-                        | ValueSome name ->
-                            match nodeTransforms.TryGetValue name with
-                            | true, m -> m
-                            | false, _ -> Matrix.Identity // Should process parents first ideally
-                        | ValueNone -> Matrix.Identity // Root parent is Identity (local space)
+                  // Simplified Hierarchy Traversal
+                  // We need World Matrices for each node.
+                  let nodeTransforms =
+                    System.Collections.Generic.Dictionary<string, Matrix>()
 
-                    // Process nodes. Ideally topologically sorted.
-                    // For simple rigs (Root -> Body -> ...), iterating might be okay if order is guaranteed,
-                    // but HashMap is unordered.
-                    // Let's do a simple recursive resolve or multi-pass.
-                    // Given small depth, recursive get is fine with memoization (nodeTransforms).
+                  // Helper to get parent transform
+                  let getParentTransform(parentName: string voption) =
+                    match parentName with
+                    | ValueSome name ->
+                      match nodeTransforms.TryGetValue name with
+                      | true, m -> m
+                      | false, _ -> Matrix.Identity // Should process parents first ideally
+                    | ValueNone -> Matrix.Identity // Root parent is Identity (local space)
 
-                    let rec resolveNode (nodeName: string) (node: RigNode) =
-                        if nodeTransforms.ContainsKey nodeName then
-                            nodeTransforms[nodeName]
-                        else
-                            let parentWorld =
-                                match node.Parent with
-                                | ValueSome pName ->
-                                    match rigData |> HashMap.tryFindV pName with
-                                    | ValueSome pNode -> resolveNode pName pNode
-                                    | ValueNone -> Matrix.Identity
-                                | ValueNone -> Matrix.Identity
+                  // Process nodes. Ideally topologically sorted.
+                  // For simple rigs (Root -> Body -> ...), iterating might be okay if order is guaranteed,
+                  // but HashMap is unordered.
+                  // Let's do a simple recursive resolve or multi-pass.
+                  // Given small depth, recursive get is fine with memoization (nodeTransforms).
 
-                            let localAnim =
-                                entityPose
-                                |> HashMap.tryFind nodeName
-                                |> Option.defaultValue Matrix.Identity
+                  let rec resolveNode (nodeName: string) (node: RigNode) =
+                    if nodeTransforms.ContainsKey nodeName then
+                      nodeTransforms[nodeName]
+                    else
+                      let parentWorld =
+                        match node.Parent with
+                        | ValueSome pName ->
+                          match rigData |> HashMap.tryFindV pName with
+                          | ValueSome pNode -> resolveNode pName pNode
+                          | ValueNone -> Matrix.Identity
+                        | ValueNone -> Matrix.Identity
 
-                            // Apply Pivot Correction:
-                            // 1. Translate -Pivot (Move pivot to origin)
-                            // 2. Rotate (localAnim)
-                            // 3. Translate +Pivot (Move pivot back)
-                            // 4. Translate Offset (Position adjustment relative to parent) - optional if needed
-                            
-                            let pivotTranslation = Matrix.CreateTranslation node.Pivot
-                            let inversePivotTranslation = Matrix.CreateTranslation -node.Pivot
-                            let offsetTranslation = Matrix.CreateTranslation node.Offset
-                            
-                            // Combined Transform
-                            let localWorld = inversePivotTranslation * localAnim * pivotTranslation * offsetTranslation
-                            
-                            let world = localWorld * parentWorld
-                            nodeTransforms[nodeName] <- world
-                            world
+                      let localAnim =
+                        entityPose
+                        |> HashMap.tryFind nodeName
+                        |> Option.defaultValue Matrix.Identity
 
-                    // Calculate Entity World Transform (Location in game world)
-                    let entityBaseMatrix =
-                         // Check if projectile to apply special tilt
-                         match configId with
-                         | ValueSome "Projectile" ->
-                            // Projectiles often don't have "animations" in the rig sense yet,
-                            // but if they do (like spinning), the Rig "Root" handles it.
-                            // The "Base" matrix positions it in the world.
-                            RenderMath.GetTiltedEntityWorldMatrix
-                              renderPos
-                              facing
-                              MathHelper.PiOver2
-                              0.0f // Spin handled by animation system now!
-                              MathHelper.PiOver4
-                              squishFactor
-                              Core.Constants.Entity.ModelScale
-                         | _ ->
-                            RenderMath.GetEntityWorldMatrix
-                              renderPos
-                              facing
-                              MathHelper.PiOver4
-                              squishFactor
-                              Core.Constants.Entity.ModelScale
+                      // Apply Pivot Correction:
+                      // 1. Translate -Pivot (Move pivot to origin)
+                      // 2. Rotate (localAnim)
+                      // 3. Translate +Pivot (Move pivot back)
+                      // 4. Translate Offset (Position adjustment relative to parent) - optional if needed
 
-                    for (nodeName, node) in rigData do
-                        let nodeLocalWorld = resolveNode nodeName node
-                        let finalWorld = nodeLocalWorld * entityBaseMatrix
+                      let pivotTranslation = Matrix.CreateTranslation node.Pivot
 
-                        models
-                        |> HashMap.tryFindV node.ModelAsset
-                        |> ValueOption.iter(fun model ->
-                            drawModel camera model finalWorld)
+                      let inversePivotTranslation =
+                        Matrix.CreateTranslation -node.Pivot
+
+                      let offsetTranslation =
+                        Matrix.CreateTranslation node.Offset
+
+                      // Combined Transform
+                      let localWorld =
+                        inversePivotTranslation
+                        * localAnim
+                        * pivotTranslation
+                        * offsetTranslation
+
+                      let world = localWorld * parentWorld
+                      nodeTransforms[nodeName] <- world
+                      world
+
+                  // Calculate Entity World Transform (Location in game world)
+                  let entityBaseMatrix =
+                    // Check if projectile to apply special tilt
+                    match configId with
+                    | ValueSome "Projectile" ->
+                      // Projectiles often don't have "animations" in the rig sense yet,
+                      // but if they do (like spinning), the Rig "Root" handles it.
+                      // The "Base" matrix positions it in the world.
+                      RenderMath.GetTiltedEntityWorldMatrix
+                        renderPos
+                        facing
+                        MathHelper.PiOver2
+                        0.0f // Spin handled by animation system now!
+                        MathHelper.PiOver4
+                        squishFactor
+                        Core.Constants.Entity.ModelScale
+                    | _ ->
+                      RenderMath.GetEntityWorldMatrix
+                        renderPos
+                        facing
+                        MathHelper.PiOver4
+                        squishFactor
+                        Core.Constants.Entity.ModelScale
+
+                  for (nodeName, node) in rigData do
+                    let nodeLocalWorld = resolveNode nodeName node
+                    let finalWorld = nodeLocalWorld * entityBaseMatrix
+
+                    models
+                    |> HashMap.tryFindV node.ModelAsset
+                    |> ValueOption.iter(fun model ->
+                      drawModel camera model finalWorld)
 
                 | ValueNone -> () // No rig, can't draw
 

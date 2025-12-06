@@ -10,53 +10,53 @@ open Pomo.Core.Domain.Events
 open Pomo.Core.Domain.Animation
 open Pomo.Core.Environment
 open Pomo.Core.Domain.World
+open Pomo.Core.Stores
 
-// This module contains the core logic for deciding which animation should play
-// based on game state (e.g., movement speed).
 module AnimationStateLogic =
 
-  let private RUN_THRESHOLD = 10.0f // Speed threshold to trigger run animation
-  let private RUN_ANIMATION_CLIP_ID = "Test_Windmill" // Placeholder run animation clip ID
+  let private RUN_THRESHOLD = 10.0f
 
-  // Determines if an animation state change event should be published
-  // Returns a ValueSome event if a change is needed, otherwise ValueNone
+  let private createAnimationsFromBindings(clipIds: string[]) =
+    clipIds
+    |> Array.map(fun clipId -> {
+      ClipId = clipId
+      Time = TimeSpan.Zero
+      Speed = 1.0f
+    })
+    |> IndexList.ofArray
+
+  let private hasAnyOfClips
+    (clipIds: string[])
+    (animations: AnimationState IndexList)
+    =
+    animations
+    |> IndexList.exists(fun _ anim -> clipIds |> Array.contains anim.ClipId)
+
   let determineAnimationChange
     (entityId: Guid<EntityId>)
     (currentVelocity: Vector2)
-    (currentActiveAnimations: AnimationState IndexList) // All animations currently active on the entity
+    (currentActiveAnimations: AnimationState IndexList)
+    (runClipIds: string[] voption)
     : StateChangeEvent voption =
 
-    let speed = currentVelocity.Length()
-    let isMoving = speed > RUN_THRESHOLD
+    match runClipIds with
+    | ValueNone -> ValueNone
+    | ValueSome clips when clips.Length = 0 -> ValueNone
+    | ValueSome clips ->
+      let speed = currentVelocity.Length()
+      let isMoving = speed > RUN_THRESHOLD
+      let isRunAnimActive = hasAnyOfClips clips currentActiveAnimations
 
-    // Check if the "run" animation is currently active
-    let isRunAnimActive =
-      currentActiveAnimations
-      |> IndexList.exists(fun _ (anim: AnimationState) ->
-        anim.ClipId = RUN_ANIMATION_CLIP_ID)
+      if isMoving && not isRunAnimActive then
+        let runAnims = createAnimationsFromBindings clips
 
-    if isMoving && not isRunAnimActive then
-      // Entity is moving but run animation is not active: Start run animation
-      let runAnimState = {
-        ClipId = RUN_ANIMATION_CLIP_ID
-        Time = TimeSpan.Zero
-        Speed = 1.0f
-      }
-      // For simplicity, we replace all animations with just the run animation.
-      // A more complex system would handle blending/layering.
-      ValueSome(
-        Animation(
-          ActiveAnimationsChanged
-            struct (entityId, IndexList.single runAnimState)
+        ValueSome(
+          Animation(ActiveAnimationsChanged struct (entityId, runAnims))
         )
-      )
-    elif not isMoving && isRunAnimActive then
-      // Entity is stationary but run animation is active: Stop run animation
-      // For simplicity, we remove all animations, effectively transitioning to an implicit "idle"
-      ValueSome(Animation(AnimationStateRemoved entityId))
-    else
-      // No change needed
-      ValueNone
+      elif not isMoving && isRunAnimActive then
+        ValueSome(Animation(AnimationStateRemoved entityId))
+      else
+        ValueNone
 
 open Pomo.Core.Environment.Patterns
 
@@ -65,13 +65,14 @@ type AnimationStateSystem(game: Game, env: PomoEnvironment) =
 
   let (Core core) = env.CoreServices
   let (Gameplay gameplay) = env.GameplayServices
+  let (Stores stores) = env.StoreServices
 
   override this.Update(gameTime) =
     let velocities = core.World.Velocities |> AMap.force
     let activeAnimations = core.World.ActiveAnimations |> AMap.force
+    let modelConfigIds = core.World.ModelConfigId |> AMap.force
     let liveEntities = gameplay.Projections.LiveEntities |> ASet.force
 
-    // Process each live entity
     for entityId in liveEntities do
       let velocity =
         velocities
@@ -81,13 +82,22 @@ type AnimationStateSystem(game: Game, env: PomoEnvironment) =
       let currentAnims =
         activeAnimations
         |> HashMap.tryFindV entityId
-        |> ValueOption.defaultValue IndexList.empty // Default to empty list if no animations
+        |> ValueOption.defaultValue IndexList.empty
+
+      let runClipIds =
+        modelConfigIds
+        |> HashMap.tryFindV entityId
+        |> ValueOption.bind(fun configId ->
+          stores.ModelStore.tryFind configId
+          |> ValueOption.bind(fun config ->
+            config.AnimationBindings |> HashMap.tryFindV "Run"))
 
       match
         AnimationStateLogic.determineAnimationChange
           entityId
           velocity
           currentAnims
+          runClipIds
       with
       | ValueSome event -> core.EventBus.Publish(event)
-      | ValueNone -> () // No animation state change needed
+      | ValueNone -> ()

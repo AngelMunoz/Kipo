@@ -1,23 +1,36 @@
 {
   "HumanoidBase": {
-    "Root": { "Model": "Dummy_Base" },
-    "Body": { "Model": "Dummy_Base_Dummy_Body", "Parent": "Root" },
-    "Head": { "Model": "Dummy_Base_Dummy_Body_Dummy_Head", "Parent": "Body" },
-    "Arm_L": { 
-      "Model": "Dummy_Base_Dummy_Body_Dummy_ArmLeft", 
-      "Parent": "Body",
-      "Offset": { "X": 0.0, "Y": 0.0, "Z": 0.0 },
-      "Pivot": { "X": 0.0, "Y": 1.5, "Z": 0.0 }
+    "Rig": {
+      "Root": { "Model": "Dummy_Base" },
+      "Body": { "Model": "Dummy_Base_Dummy_Body", "Parent": "Root" },
+      "Head": { "Model": "Dummy_Base_Dummy_Body_Dummy_Head", "Parent": "Body" },
+      "Arm_L": {
+        "Model": "Dummy_Base_Dummy_Body_Dummy_ArmLeft",
+        "Parent": "Body",
+        "Offset": { "X": 0.0, "Y": 0.0, "Z": 0.0 },
+        "Pivot": { "X": 0.0, "Y": 1.5, "Z": 0.0 }
+      },
+      "Arm_R": {
+        "Model": "Dummy_Base_Dummy_Body_Dummy_ArmRight",
+        "Parent": "Body",
+        "Offset": { "X": 0.0, "Y": 0.0, "Z": 0.0 },
+        "Pivot": { "X": 0.0, "Y": 1.5, "Z": 0.0 }
+      },
+      "Target": {
+        "Model": "Dummy_Base_Dummy_Body_Dummy_Target",
+        "Parent": "Body"
+      }
     },
-    "Arm_R": { 
-      "Model": "Dummy_Base_Dummy_Body_Dummy_ArmRight", 
-      "Parent": "Body",
-      "Offset": { "X": 0.0, "Y": 0.0, "Z": 0.0 },
-      "Pivot": { "X": 0.0, "Y": 1.5, "Z": 0.0 }
-    },
-    "Target": { "Model": "Dummy_Base_Dummy_Body_Dummy_Target", "Parent": "Body" }
+    "AnimationBindings": {
+      "Run": ["Arm_Swing", "Run_Bounce"]
+    }
   },
   "Projectile": {
-    "Root": { "Model": "Can_A" }
+    "Rig": {
+      "Root": { "Model": "Can_A" }
+    },
+    "AnimationBindings": {
+      "Spin": ["Projectile_Spin"]
+    }
   }
 }

@@ -44,6 +44,7 @@ let private JsonSerializerOptions =
   |> Codec.useDecoder ItemDefinition.decoder
   |> Codec.useDecoder AIArchetype.decoder
   |> Codec.useDecoder Rig.decoder
+  |> Codec.useDecoder ModelConfig.decoder
   |> Codec.useDecoder AnimationClip.decoder
 
 

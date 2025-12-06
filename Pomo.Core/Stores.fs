@@ -75,9 +75,9 @@ module JsonFileLoader =
       let json =
         Path.Combine(AppContext.BaseDirectory, filePath) |> File.ReadAllBytes
 
-      match deserializer.Deserialize<Map<string, HashMap<string, RigNode>>> json with
+      match deserializer.Deserialize<Map<string, ModelConfig>> json with
       | Ok result ->
-        let mutable newMap = HashMap.empty<string, HashMap<string, RigNode>>
+        let mutable newMap = HashMap.empty<string, ModelConfig>
 
         for KeyValue(key, value) in result do
           newMap <- HashMap.add key value newMap
@@ -134,9 +134,9 @@ module Stores =
     abstract member all: unit -> seq<Map.MapDefinition>
 
   type ModelStore =
-    abstract member find: configId: string -> HashMap<string, RigNode>
-    abstract member tryFind: configId: string -> HashMap<string, RigNode> voption
-    abstract member all: unit -> seq<HashMap<string, RigNode>>
+    abstract member find: configId: string -> ModelConfig
+    abstract member tryFind: configId: string -> ModelConfig voption
+    abstract member all: unit -> seq<ModelConfig>
 
   type AnimationStore =
     abstract member find: clipId: string -> AnimationClip
@@ -222,10 +222,7 @@ module Stores =
       }
 
   module Model =
-    let create
-      (loader:
-        string -> Result<HashMap<string, HashMap<string, RigNode>>, string>)
-      =
+    let create(loader: string -> Result<HashMap<string, ModelConfig>, string>) =
       match loader "Content/Models.json" with
       | Ok modelMap ->
         { new ModelStore with

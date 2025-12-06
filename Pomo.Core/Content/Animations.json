@@ -1,5 +1,5 @@
 {
-  "Test_Windmill": {
+  "Arm_Swing": {
     "Duration": 0.8,
     "Loop": true,
     "Tracks": {
@@ -16,17 +16,20 @@
         { "Time": 0.4, "Rotation": { "X": 0, "Y": -30, "Z": -20 } },
         { "Time": 0.6, "Rotation": { "X": 0, "Y": 30, "Z": -20 } },
         { "Time": 0.8, "Rotation": { "X": 0, "Y": 30, "Z": 20 } }
-      ],
-      "Root": [
-        { "Time": 0.0, "Position": { "X": 0.0, "Y": 0.0, "Z": 0.0 } },
-        { "Time": 0.2, "Position": { "X": 0.0, "Y": 1, "Z": 0.0 } },
-        { "Time": 0.4, "Position": { "X": 0.0, "Y": 0.0, "Z": 0.0 } },
-        { "Time": 0.6, "Position": { "X": 0.0, "Y": 1, "Z": 0.0 } },
-        { "Time": 0.8, "Position": { "X": 0.0, "Y": 0.0, "Z": 0.0 } }
       ]
     }
-  }
-  ,
+  },
+  "Run_Bounce": {
+    "Duration": 0.4,
+    "Loop": true,
+    "Tracks": {
+      "Root": [
+        { "Time": 0.0, "Position": { "X": 0.0, "Y": 0.0, "Z": 0.0 } },
+        { "Time": 0.2, "Position": { "X": 0.0, "Y": 1.0, "Z": 0.0 } },
+        { "Time": 0.4, "Position": { "X": 0.0, "Y": 0.0, "Z": 0.0 } }
+      ]
+    }
+  },
   "Projectile_Spin": {
     "Duration": 1.0,
     "Loop": true,

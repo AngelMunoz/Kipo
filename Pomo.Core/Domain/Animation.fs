@@ -48,6 +48,12 @@ module Animation =
     | Override
     | Additive
 
+  [<Struct>]
+  type ModelConfig = {
+    Rig: HashMap<string, RigNode>
+    AnimationBindings: HashMap<string, string[]>
+  }
+
   module Serialization =
     open JDeck
     open JDeck.Decode
@@ -99,6 +105,41 @@ module Animation =
           return map |> HashMap.ofMap
         }
 
+    module AnimationBindings =
+      let clipArrayDecoder: Decoder<string[]> =
+        fun json -> decode {
+          let inline stringDecoder index json =
+            Required.string json
+            |> Result.mapError(fun e ->
+              DecodeError.ofIndexed(
+                json.Clone(),
+                index,
+                $"String decode error at index {index}: {e.message}"
+              ))
+
+          let! clips = Decode.array stringDecoder json
+          return clips
+        }
+
+    module ModelConfig =
+      let decoder: Decoder<ModelConfig> =
+        fun json -> decode {
+          let! rig = Required.Property.get ("Rig", Rig.decoder) json
+
+          and! bindings =
+            VOptional.Property.map
+              ("AnimationBindings", AnimationBindings.clipArrayDecoder)
+              json
+
+          return {
+            Rig = rig
+            AnimationBindings =
+              bindings
+              |> ValueOption.map HashMap.ofMap
+              |> ValueOption.defaultValue HashMap.empty
+          }
+        }
+
     module Keyframe =
       let private degToRad(deg: float) = float32(Math.PI * deg / 180.0)
 
@@ -107,27 +148,43 @@ module Animation =
           let! timeSeconds = Required.Property.get ("Time", Required.float) json
 
           and! rot =
-            VOptional.Property.get ("Rotation", Required.map Required.float) json
+            VOptional.Property.get
+              ("Rotation", Required.map Required.float)
+              json
 
           and! pos =
-            VOptional.Property.get ("Position", Required.map Required.float) json
+            VOptional.Property.get
+              ("Position", Required.map Required.float)
+              json
 
           let rotation =
             match rot with
             | ValueSome map ->
-                let x = map |> Map.tryFind "X" |> Option.defaultValue 0.0 |> degToRad
-                let y = map |> Map.tryFind "Y" |> Option.defaultValue 0.0 |> degToRad
-                let z = map |> Map.tryFind "Z" |> Option.defaultValue 0.0 |> degToRad
-                Quaternion.CreateFromYawPitchRoll(y, x, z)
+              let x =
+                map |> Map.tryFind "X" |> Option.defaultValue 0.0 |> degToRad
+
+              let y =
+                map |> Map.tryFind "Y" |> Option.defaultValue 0.0 |> degToRad
+
+              let z =
+                map |> Map.tryFind "Z" |> Option.defaultValue 0.0 |> degToRad
+
+              Quaternion.CreateFromYawPitchRoll(y, x, z)
             | ValueNone -> Quaternion.Identity
 
           let position =
             match pos with
             | ValueSome map ->
-                let x = map |> Map.tryFind "X" |> Option.defaultValue 0.0 |> float32
-                let y = map |> Map.tryFind "Y" |> Option.defaultValue 0.0 |> float32
-                let z = map |> Map.tryFind "Z" |> Option.defaultValue 0.0 |> float32
-                Vector3(x, y, z)
+              let x =
+                map |> Map.tryFind "X" |> Option.defaultValue 0.0 |> float32
+
+              let y =
+                map |> Map.tryFind "Y" |> Option.defaultValue 0.0 |> float32
+
+              let z =
+                map |> Map.tryFind "Z" |> Option.defaultValue 0.0 |> float32
+
+              Vector3(x, y, z)
             | ValueNone -> Vector3.Zero
 
           return {
