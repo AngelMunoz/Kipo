@@ -28,7 +28,7 @@ module AnimationSystemLogic =
       struct (last, last, 0.0f) // If past last keyframe, use the last one
     else
       let k1 = keyframes.[idx]
-      let k2 = keyframes.[idx+1]
+      let k2 = keyframes.[idx + 1]
 
       if time >= k1.Time && time <= k2.Time then
         let total = (k2.Time - k1.Time).TotalSeconds
@@ -52,18 +52,19 @@ module AnimationSystemLogic =
       let t =
         if loop && duration > TimeSpan.Zero then
           TimeSpan.FromTicks(time.Ticks % duration.Ticks)
-        else
+        else if
           // Clamp time to duration if not looping
-          if time > duration then
-            duration
-          else
-            time
+          time > duration
+        then
+          duration
+        else
+          time
 
       let struct (k1, k2, amount) = findKeyframesForTime track.Keyframes t 0
-      
+
       let rotation = Quaternion.Slerp(k1.Rotation, k2.Rotation, amount)
       let position = Vector3.Lerp(k1.Position, k2.Position, amount)
-      
+
       struct (rotation, position)
 
   /// Advances an animation state and returns the updated state or ValueNone if finished.
@@ -72,7 +73,7 @@ module AnimationSystemLogic =
     (clip: AnimationClip)
     (gameTimeDelta: TimeSpan)
     : AnimationState voption =
-    let newTime = animState.Time + (gameTimeDelta * float animState.Speed)
+    let newTime = animState.Time + gameTimeDelta * float animState.Speed
 
     if not clip.IsLooping && newTime >= clip.Duration then
       ValueNone // Animation finished and not looping
@@ -98,13 +99,11 @@ module AnimationSystemLogic =
           // Calculate pose for this clip
           for track in clip.Tracks do
             let struct (rotation, position) =
-              evaluateTrack
-                track
-                newAnimState.Time
-                clip.Duration
-                clip.IsLooping
+              evaluateTrack track newAnimState.Time clip.Duration clip.IsLooping
 
-            let matrix = Matrix.CreateFromQuaternion(rotation) * Matrix.CreateTranslation(position)
+            let matrix =
+              Matrix.CreateFromQuaternion(rotation)
+              * Matrix.CreateTranslation(position)
 
             // For now, simple overwrite (last animation in list wins if tracks overlap)
             entityPose <- HashMap.add track.NodeName matrix entityPose
@@ -119,15 +118,13 @@ module AnimationSystemLogic =
     else
       ValueNone
 
-open Pomo.Core.Environment.Patterns
-
 type AnimationSystem(game: Game, env: PomoEnvironment) =
   inherit GameComponent(game)
 
   let (Core core) = env.CoreServices
   let (Stores stores) = env.StoreServices
 
-  override this.Update(gameTime) =
+  override _.Update _ =
     // Get the game time delta from the World's time source
     let gameTimeDelta = core.World.Time |> AVal.map _.Delta |> AVal.force
     let currentAnims = core.World.ActiveAnimations |> AMap.force
@@ -135,13 +132,15 @@ type AnimationSystem(game: Game, env: PomoEnvironment) =
     // Collect updates and removals to apply
     let updates =
       ResizeArray<
-        Guid<EntityId> * AnimationState IndexList * HashMap<string, Matrix>
+        struct (Guid<EntityId> *
+        AnimationState IndexList *
+        HashMap<string, Matrix>)
        >()
 
     let removals = ResizeArray<Guid<EntityId>>()
 
     // Iterate over snapshot
-    for (entityId, anims) in currentAnims do
+    for entityId, anims in currentAnims do
       match
         AnimationSystemLogic.processEntityAnimations
           anims
@@ -150,10 +149,10 @@ type AnimationSystem(game: Game, env: PomoEnvironment) =
       with
       | ValueSome(newAnims, newPose) ->
         updates.Add((entityId, newAnims, newPose))
-      | ValueNone -> removals.Add(entityId)
+      | ValueNone -> removals.Add entityId
 
     // Publish events
-    for (entityId, newAnims, newPose) in updates do
+    for entityId, newAnims, newPose in updates do
       core.EventBus.Publish(
         Animation(ActiveAnimationsChanged struct (entityId, newAnims))
       )

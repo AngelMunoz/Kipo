@@ -60,7 +60,7 @@ module AnimationStateLogic =
 
 open Pomo.Core.Environment.Patterns
 
-type AnimationStateSystem(game: Game, env: PomoEnvironment) =
+type MotionStateAnimationSystem(game: Game, env: PomoEnvironment) =
   inherit GameComponent(game)
 
   let (Core core) = env.CoreServices

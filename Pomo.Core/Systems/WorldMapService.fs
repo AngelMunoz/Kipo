@@ -19,7 +19,7 @@ module WorldMapService =
   type WorldMap = {
     maps: WorldMapEntry list
     onlyShowAdjacentMaps: bool
-    [<JsonPropertyName("type")>] // Use JsonPropertyName to map "Type" from JSON to "type'" in F#
+    [<JsonPropertyName("type")>]
     type': string
   }
 

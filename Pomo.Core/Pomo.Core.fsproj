@@ -56,12 +56,12 @@
     <Compile Include="Systems/RenderOrchestrator.fs" />
     <Compile Include="Systems/DebugRender.fs" />
     <Compile Include="Systems/State.fs" />
-    <Compile Include="Systems/Inventory.fs" />
-    <Compile Include="Systems/Equipment.fs" />
+    <Compile Include="Systems/Inventory.fs" /><Compile Include="Systems/Equipment.fs" />
+    
     <Compile Include="Systems/AISystem.fs" />
     <Compile Include="Systems/EntitySpawner.fs" />
     <Compile Include="Systems/AnimationSystem.fs" />
-    <Compile Include="Systems/AnimationStateSystem.fs" />
+    <Compile Include="Systems/MotionStateAnimation.fs" />
     <Compile Include="Systems/WorldMapService.fs" />
     <Compile Include="Systems/UIService.fs" />
     <Compile Include="Systems/UISystem.fs" />

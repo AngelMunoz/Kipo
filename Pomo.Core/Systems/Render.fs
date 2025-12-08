@@ -39,12 +39,11 @@ module Render =
     let projectileKeys = projectiles |> HashMap.keys
 
     positions
-    |> HashMap.toArrayV
-    |> Array.choose(fun struct (entityId, pos) ->
+    |> HashMap.chooseV(fun entityId pos ->
       if projectileKeys.Contains entityId then
-        None
+        ValueNone
       elif not(liveEntities.Contains entityId) then
-        None
+        ValueNone
       else
         let size = Core.Constants.Entity.Size
 
@@ -90,11 +89,12 @@ module Render =
 
         if isVisible then
           if entityId = playerId then
-            Some(DrawPlayer entityRect)
+            ValueSome(DrawPlayer entityRect)
           else
-            Some(DrawEnemy entityRect)
+            ValueSome(DrawEnemy entityRect)
         else
-          None)
+          ValueNone)
+    |> HashMap.toValueArray
 
   let private generateProjectileCommands
     (projectiles: HashMap<Guid<EntityId>, LiveProjectile>)
@@ -126,31 +126,28 @@ module Render =
     (cameraService: CameraService)
     (playerId: Guid<EntityId>)
     =
-    match targetingMode with
-    | ValueSome _ ->
-      match mouseState with
-      | ValueNone -> IndexList.empty
-      | ValueSome mouseState ->
-        let rawPos =
-          Vector2(float32 mouseState.Position.X, float32 mouseState.Position.Y)
+    targetingMode
+    |> ValueOption.bind(fun _ -> mouseState)
+    |> ValueOption.map(fun mouseState ->
+      let rawPos =
+        Vector2(float32 mouseState.Position.X, float32 mouseState.Position.Y)
 
-        let indicatorPosition =
-          match cameraService.ScreenToWorld(rawPos, playerId) with
-          | ValueSome worldPos -> worldPos
-          | ValueNone -> rawPos
+      let indicatorPosition =
+        match cameraService.ScreenToWorld(rawPos, playerId) with
+        | ValueSome worldPos -> worldPos
+        | ValueNone -> rawPos
 
-        let indicatorSize = Core.Constants.UI.TargetingIndicatorSize
+      let indicatorSize = Core.Constants.UI.TargetingIndicatorSize
 
-        let rect =
-          Rectangle(
-            int(indicatorPosition.X - indicatorSize.X / 2.0f),
-            int(indicatorPosition.Y - indicatorSize.Y / 2.0f),
-            int indicatorSize.X,
-            int indicatorSize.Y
-          )
+      let rect =
+        Rectangle(
+          int(indicatorPosition.X - indicatorSize.X / 2.0f),
+          int(indicatorPosition.Y - indicatorSize.Y / 2.0f),
+          int indicatorSize.X,
+          int indicatorSize.Y
+        )
 
-        IndexList.single(DrawTargetingIndicator rect)
-    | ValueNone -> IndexList.empty
+      DrawTargetingIndicator rect)
 
   [<Struct>]
   type DrawCommandContext = {
@@ -185,13 +182,69 @@ module Render =
     seq {
       yield! entityCmds
       yield! projectileCmds
-      yield! targetingCmds
+
+      match targetingCmds with
+      | ValueSome cmd -> cmd
+      | ValueNone -> ()
     }
+
+  [<TailCall>]
+  let rec private collectPath
+    (nodeTransforms: System.Collections.Generic.Dictionary<string, Matrix>)
+    (rigData: HashMap<string, RigNode>)
+    (currentName: string)
+    (currentNode: RigNode)
+    (path: (string * RigNode) list)
+    =
+    if nodeTransforms.ContainsKey currentName then
+      struct (path, nodeTransforms.[currentName])
+    else
+      match currentNode.Parent with
+      | ValueNone ->
+        struct ((currentName, currentNode) :: path, Matrix.Identity)
+      | ValueSome pName ->
+        match rigData |> HashMap.tryFindV pName with
+        | ValueNone ->
+          struct ((currentName, currentNode) :: path, Matrix.Identity)
+        | ValueSome pNode ->
+          collectPath
+            nodeTransforms
+            rigData
+            pName
+            pNode
+            ((currentName, currentNode) :: path)
+
+  [<TailCall>]
+  let rec private applyTransforms
+    (entityPose: HashMap<string, Matrix>)
+    (nodeTransforms: System.Collections.Generic.Dictionary<string, Matrix>)
+    (struct (nodes, currentParentWorld):
+      struct ((string * RigNode) list * Matrix))
+    =
+    match nodes with
+    | [] -> currentParentWorld
+    | (name, node) :: rest ->
+      let localAnim =
+        entityPose
+        |> HashMap.tryFind name
+        |> Option.defaultValue Matrix.Identity
+
+      let pivotTranslation = Matrix.CreateTranslation node.Pivot
+      let inversePivotTranslation = Matrix.CreateTranslation -node.Pivot
+      let offsetTranslation = Matrix.CreateTranslation node.Offset
+
+      let localWorld =
+        inversePivotTranslation
+        * localAnim
+        * pivotTranslation
+        * offsetTranslation
+
+      let world = localWorld * currentParentWorld
+      nodeTransforms.[name] <- world
+      applyTransforms entityPose nodeTransforms struct (rest, world)
 
   type RenderService =
     abstract Draw: Camera -> unit
-
-  open Pomo.Core.Environment.Patterns
 
   let create
     (
@@ -218,8 +271,8 @@ module Render =
       modelStore.all()
       |> Seq.collect(fun config ->
         config.Rig
-        |> HashMap.toValueSeq
-        |> Seq.map(fun node -> node.ModelAsset))
+        |> HashMap.toValueArray
+        |> Array.map(fun node -> node.ModelAsset))
       |> Seq.distinct
       |> Seq.choose(fun assetName ->
         try
@@ -314,63 +367,6 @@ module Render =
                   let nodeTransforms =
                     System.Collections.Generic.Dictionary<string, Matrix>()
 
-                  // Helper to get parent transform
-                  let getParentTransform(parentName: string voption) =
-                    match parentName with
-                    | ValueSome name ->
-                      match nodeTransforms.TryGetValue name with
-                      | true, m -> m
-                      | false, _ -> Matrix.Identity // Should process parents first ideally
-                    | ValueNone -> Matrix.Identity // Root parent is Identity (local space)
-
-                  // Process nodes. Ideally topologically sorted.
-                  // For simple rigs (Root -> Body -> ...), iterating might be okay if order is guaranteed,
-                  // but HashMap is unordered.
-                  // Let's do a simple recursive resolve or multi-pass.
-                  // Given small depth, recursive get is fine with memoization (nodeTransforms).
-
-                  let rec resolveNode (nodeName: string) (node: RigNode) =
-                    if nodeTransforms.ContainsKey nodeName then
-                      nodeTransforms[nodeName]
-                    else
-                      let parentWorld =
-                        match node.Parent with
-                        | ValueSome pName ->
-                          match rigData |> HashMap.tryFindV pName with
-                          | ValueSome pNode -> resolveNode pName pNode
-                          | ValueNone -> Matrix.Identity
-                        | ValueNone -> Matrix.Identity
-
-                      let localAnim =
-                        entityPose
-                        |> HashMap.tryFind nodeName
-                        |> Option.defaultValue Matrix.Identity
-
-                      // Apply Pivot Correction:
-                      // 1. Translate -Pivot (Move pivot to origin)
-                      // 2. Rotate (localAnim)
-                      // 3. Translate +Pivot (Move pivot back)
-                      // 4. Translate Offset (Position adjustment relative to parent) - optional if needed
-
-                      let pivotTranslation = Matrix.CreateTranslation node.Pivot
-
-                      let inversePivotTranslation =
-                        Matrix.CreateTranslation -node.Pivot
-
-                      let offsetTranslation =
-                        Matrix.CreateTranslation node.Offset
-
-                      // Combined Transform
-                      let localWorld =
-                        inversePivotTranslation
-                        * localAnim
-                        * pivotTranslation
-                        * offsetTranslation
-
-                      let world = localWorld * parentWorld
-                      nodeTransforms[nodeName] <- world
-                      world
-
                   // Calculate Entity World Transform (Location in game world)
                   let entityBaseMatrix =
                     // Check if projectile to apply special tilt
@@ -395,8 +391,11 @@ module Render =
                         squishFactor
                         Core.Constants.Entity.ModelScale
 
-                  for (nodeName, node) in rigData do
-                    let nodeLocalWorld = resolveNode nodeName node
+                  for nodeName, node in rigData do
+                    let nodeLocalWorld =
+                      collectPath nodeTransforms rigData nodeName node []
+                      |> applyTransforms entityPose nodeTransforms
+
                     let finalWorld = nodeLocalWorld * entityBaseMatrix
 
                     models
@@ -426,7 +425,8 @@ module Render =
                   cameraService
                   playerId
 
-              if not(IndexList.isEmpty targetingCmds) then
+              match targetingCmds with
+              | ValueSome(DrawTargetingIndicator rect) ->
                 let transform =
                   RenderMath.GetSpriteBatchTransform
                     camera.Position
@@ -436,15 +436,9 @@ module Render =
 
                 game.GraphicsDevice.Viewport <- camera.Viewport
                 spriteBatch.Begin(transformMatrix = transform)
-
-                for cmd in targetingCmds do
-                  match cmd with
-                  | DrawTargetingIndicator rect ->
-                    spriteBatch.Draw(texture, rect, Color.Blue * 0.5f)
-                  | _ -> ()
-
+                spriteBatch.Draw(texture, rect, Color.Blue * 0.5f)
                 spriteBatch.End()
+              | _ -> ()
             | ValueNone -> ()
-
           | ValueNone -> ()
     }
