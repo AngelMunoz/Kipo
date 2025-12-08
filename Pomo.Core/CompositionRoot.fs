@@ -64,6 +64,9 @@ module CompositionRoot =
 
     let modelStore = Model.create(JsonFileLoader.readModels deserializer)
 
+    let animationStore =
+      Animation.create(JsonFileLoader.readAnimations deserializer)
+
     let stores =
       { new StoreServices with
           member _.SkillStore = skillStore
@@ -71,6 +74,7 @@ module CompositionRoot =
           member _.MapStore = mapStore
           member _.AIArchetypeStore = aiArchetypeStore
           member _.ModelStore = modelStore
+          member _.AnimationStore = animationStore
       }
 
     let monoGame =
@@ -192,6 +196,8 @@ module CompositionRoot =
       baseComponents.Add(new EffectProcessingSystem(game, pomoEnv))
       baseComponents.Add(new EntitySpawnerSystem(game, pomoEnv))
       baseComponents.Add(new AISystem(game, pomoEnv))
+      baseComponents.Add(new AnimationSystem(game, pomoEnv))
+      baseComponents.Add(new MotionStateAnimationSystem(game, pomoEnv))
       baseComponents.Add(new StateUpdateSystem(game, pomoEnv, mutableWorld))
 
       // Map Dependent Systems (Renderers)

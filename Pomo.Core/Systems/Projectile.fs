@@ -125,6 +125,7 @@ module Projectile =
 
   open Pomo.Core.Environment
   open Pomo.Core.Environment.Patterns
+  open Pomo.Core.Domain.Animation
 
   type ProjectileSystem(game: Game, env: PomoEnvironment) =
     inherit GameSystem(game)
@@ -154,6 +155,27 @@ module Projectile =
         let snapshot = gameplay.Projections.ComputeMovementSnapshot(scenarioId)
 
         for (_, (projectileId, projectile)) in projectiles do
+          // Ensure projectile has a default spinning animation if none is set.
+          // We publish an ActiveAnimationsChanged event so the StateUpdate handler
+          // will attach the animations to the world (consistent with other systems).
+          let activeAnims = core.World.ActiveAnimations |> AMap.force
+
+          match activeAnims |> HashMap.tryFindV projectileId with
+          | ValueNone ->
+            let spinAnim: AnimationState = {
+              ClipId = "Projectile_Spin"
+              Time = TimeSpan.Zero
+              Speed = 1.0f
+            }
+
+            core.EventBus.Publish(
+              Animation(
+                ActiveAnimationsChanged
+                  struct (projectileId, IndexList.single spinAnim)
+              )
+            )
+          | ValueSome _ -> ()
+
           let struct (evs, states) =
             processProjectile
               core.World.Rng

@@ -352,6 +352,28 @@ module StateUpdate =
       if world.Positions.ContainsKey entityId then
         world.AIControllers[entityId] <- controller
 
+  module Animation =
+    let inline updateActiveAnimations
+      (world: MutableWorld)
+      struct (entityId: Guid<EntityId>, anims: Animation.AnimationState IndexList)
+      =
+      if world.Positions.ContainsKey entityId then
+        world.ActiveAnimations[entityId] <- anims
+
+    let inline updatePose
+      (world: MutableWorld)
+      struct (entityId: Guid<EntityId>, pose: HashMap<string, Matrix>)
+      =
+      if world.Positions.ContainsKey entityId then
+        world.Poses[entityId] <- pose
+
+    let inline removeAnimationState
+      (world: MutableWorld)
+      (entityId: Guid<EntityId>)
+      =
+      world.ActiveAnimations.Remove entityId |> ignore
+      world.Poses.Remove entityId |> ignore
+
   open Pomo.Core.Environment
   open Pomo.Core.Environment.Patterns
 
@@ -468,6 +490,14 @@ module StateUpdate =
             | ModelConfigChanged(entityId, configId) ->
               if mutableWorld.Positions.ContainsKey entityId then
                 mutableWorld.ModelConfigId[entityId] <- configId
+          | Animation event ->
+            match event with
+            | ActiveAnimationsChanged animsChanged ->
+              Animation.updateActiveAnimations mutableWorld animsChanged
+            | PoseChanged poseChanged ->
+              Animation.updatePose mutableWorld poseChanged
+            | AnimationStateRemoved entityId ->
+              Animation.removeAnimationState mutableWorld entityId
 
           // Uncategorized
           | CreateProjectile projParams ->

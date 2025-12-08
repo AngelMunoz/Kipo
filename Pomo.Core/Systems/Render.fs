@@ -13,6 +13,7 @@ open Pomo.Core.Domain.Units
 open Pomo.Core.Domain.Camera
 open Pomo.Core.Systems.Targeting
 open Pomo.Core.Stores
+open Pomo.Core.Domain.Animation
 
 
 module Render =
@@ -38,12 +39,11 @@ module Render =
     let projectileKeys = projectiles |> HashMap.keys
 
     positions
-    |> HashMap.toArrayV
-    |> Array.choose(fun struct (entityId, pos) ->
+    |> HashMap.chooseV(fun entityId pos ->
       if projectileKeys.Contains entityId then
-        None
+        ValueNone
       elif not(liveEntities.Contains entityId) then
-        None
+        ValueNone
       else
         let size = Core.Constants.Entity.Size
 
@@ -89,11 +89,12 @@ module Render =
 
         if isVisible then
           if entityId = playerId then
-            Some(DrawPlayer entityRect)
+            ValueSome(DrawPlayer entityRect)
           else
-            Some(DrawEnemy entityRect)
+            ValueSome(DrawEnemy entityRect)
         else
-          None)
+          ValueNone)
+    |> HashMap.toValueArray
 
   let private generateProjectileCommands
     (projectiles: HashMap<Guid<EntityId>, LiveProjectile>)
@@ -125,31 +126,28 @@ module Render =
     (cameraService: CameraService)
     (playerId: Guid<EntityId>)
     =
-    match targetingMode with
-    | ValueSome _ ->
-      match mouseState with
-      | ValueNone -> IndexList.empty
-      | ValueSome mouseState ->
-        let rawPos =
-          Vector2(float32 mouseState.Position.X, float32 mouseState.Position.Y)
+    targetingMode
+    |> ValueOption.bind(fun _ -> mouseState)
+    |> ValueOption.map(fun mouseState ->
+      let rawPos =
+        Vector2(float32 mouseState.Position.X, float32 mouseState.Position.Y)
 
-        let indicatorPosition =
-          match cameraService.ScreenToWorld(rawPos, playerId) with
-          | ValueSome worldPos -> worldPos
-          | ValueNone -> rawPos
+      let indicatorPosition =
+        match cameraService.ScreenToWorld(rawPos, playerId) with
+        | ValueSome worldPos -> worldPos
+        | ValueNone -> rawPos
 
-        let indicatorSize = Core.Constants.UI.TargetingIndicatorSize
+      let indicatorSize = Core.Constants.UI.TargetingIndicatorSize
 
-        let rect =
-          Rectangle(
-            int(indicatorPosition.X - indicatorSize.X / 2.0f),
-            int(indicatorPosition.Y - indicatorSize.Y / 2.0f),
-            int indicatorSize.X,
-            int indicatorSize.Y
-          )
+      let rect =
+        Rectangle(
+          int(indicatorPosition.X - indicatorSize.X / 2.0f),
+          int(indicatorPosition.Y - indicatorSize.Y / 2.0f),
+          int indicatorSize.X,
+          int indicatorSize.Y
+        )
 
-        IndexList.single(DrawTargetingIndicator rect)
-    | ValueNone -> IndexList.empty
+      DrawTargetingIndicator rect)
 
   [<Struct>]
   type DrawCommandContext = {
@@ -184,13 +182,69 @@ module Render =
     seq {
       yield! entityCmds
       yield! projectileCmds
-      yield! targetingCmds
+
+      match targetingCmds with
+      | ValueSome cmd -> cmd
+      | ValueNone -> ()
     }
+
+  [<TailCall>]
+  let rec private collectPath
+    (nodeTransforms: System.Collections.Generic.Dictionary<string, Matrix>)
+    (rigData: HashMap<string, RigNode>)
+    (currentName: string)
+    (currentNode: RigNode)
+    (path: (string * RigNode) list)
+    =
+    if nodeTransforms.ContainsKey currentName then
+      struct (path, nodeTransforms.[currentName])
+    else
+      match currentNode.Parent with
+      | ValueNone ->
+        struct ((currentName, currentNode) :: path, Matrix.Identity)
+      | ValueSome pName ->
+        match rigData |> HashMap.tryFindV pName with
+        | ValueNone ->
+          struct ((currentName, currentNode) :: path, Matrix.Identity)
+        | ValueSome pNode ->
+          collectPath
+            nodeTransforms
+            rigData
+            pName
+            pNode
+            ((currentName, currentNode) :: path)
+
+  [<TailCall>]
+  let rec private applyTransforms
+    (entityPose: HashMap<string, Matrix>)
+    (nodeTransforms: System.Collections.Generic.Dictionary<string, Matrix>)
+    (struct (nodes, currentParentWorld):
+      struct ((string * RigNode) list * Matrix))
+    =
+    match nodes with
+    | [] -> currentParentWorld
+    | (name, node) :: rest ->
+      let localAnim =
+        entityPose
+        |> HashMap.tryFind name
+        |> Option.defaultValue Matrix.Identity
+
+      let pivotTranslation = Matrix.CreateTranslation node.Pivot
+      let inversePivotTranslation = Matrix.CreateTranslation -node.Pivot
+      let offsetTranslation = Matrix.CreateTranslation node.Offset
+
+      let localWorld =
+        inversePivotTranslation
+        * localAnim
+        * pivotTranslation
+        * offsetTranslation
+
+      let world = localWorld * currentParentWorld
+      nodeTransforms.[name] <- world
+      applyTransforms entityPose nodeTransforms struct (rest, world)
 
   type RenderService =
     abstract Draw: Camera -> unit
-
-  open Pomo.Core.Environment.Patterns
 
   let create
     (
@@ -211,9 +265,14 @@ module Render =
     texture.SetData [| Color.White |]
 
     // Load Models
+    // The store returns Rigs (HashMap<string, RigNode>)
+    // We need to extract all unique ModelAsset names from all nodes in all Rigs
     let models =
       modelStore.all()
-      |> Seq.collect id
+      |> Seq.collect(fun config ->
+        config.Rig
+        |> HashMap.toValueArray
+        |> Array.map(fun node -> node.ModelAsset))
       |> Seq.distinct
       |> Seq.choose(fun assetName ->
         try
@@ -252,6 +311,7 @@ module Render =
         member _.Draw(camera: Camera) =
           let entityScenarios = world.EntityScenario |> AMap.force
           let scenarios = world.Scenarios |> AMap.force
+          let currentPoses = world.Poses |> AMap.force
 
           match entityScenarios |> HashMap.tryFindV playerId with
           | ValueSome scenarioId ->
@@ -279,45 +339,71 @@ module Render =
                   |> HashMap.tryFind id
                   |> Option.defaultValue 0.0f
 
-                // Time-based Spin Rotation (Roll) for Projectiles
-                let spin =
+                let modelConfig =
                   match configId with
-                  | ValueSome "Projectile" ->
-                    let time = world.Time |> AVal.force
-                    float32 time.TotalGameTime.TotalSeconds * 10.0f
-                  | _ -> 0.0f
+                  | ValueSome id -> modelStore.tryFind id
+                  | ValueNone -> ValueNone
 
-                let modelParts =
-                  match configId with
-                  | ValueSome id -> modelStore.find id
-                  | ValueNone -> [| "Dummy_Base" |] // Fallback
+                match modelConfig with
+                | ValueSome config ->
+                  let rigData = config.Rig
 
-                let renderPos = RenderMath.LogicToRender pos pixelsPerUnit
+                  let entityPose =
+                    currentPoses
+                    |> HashMap.tryFind id
+                    |> Option.defaultValue HashMap.empty
 
-                let worldMatrix =
-                  match configId with
-                  | ValueSome "Projectile" ->
-                    RenderMath.GetTiltedEntityWorldMatrix
-                      renderPos
-                      facing
-                      MathHelper.PiOver2 // Tilt 90 degrees to lie flat
-                      spin
-                      MathHelper.PiOver4
-                      squishFactor
-                      Core.Constants.Entity.ModelScale
-                  | _ ->
-                    RenderMath.GetEntityWorldMatrix
-                      renderPos
-                      facing
-                      MathHelper.PiOver4
-                      squishFactor
-                      Core.Constants.Entity.ModelScale
+                  let renderPos = RenderMath.LogicToRender pos pixelsPerUnit
 
-                for partName in modelParts do
-                  models
-                  |> HashMap.tryFindV partName
-                  |> ValueOption.iter(fun model ->
-                    drawModel camera model worldMatrix)
+                  // Calculate Base Transform (Position + Facing)
+                  // Note: We apply squish and scale here for the root,
+                  // but child nodes should inherit appropriately.
+                  // RenderMath helpers combine everything, so we might need to decompose
+                  // if we want strict hierarchy.
+                  // For now, let's treat "Root" special or apply BaseTransform to all if parent is None.
+
+                  // Simplified Hierarchy Traversal
+                  // We need World Matrices for each node.
+                  let nodeTransforms =
+                    System.Collections.Generic.Dictionary<string, Matrix>()
+
+                  // Calculate Entity World Transform (Location in game world)
+                  let entityBaseMatrix =
+                    // Check if projectile to apply special tilt
+                    match configId with
+                    | ValueSome "Projectile" ->
+                      // Projectiles often don't have "animations" in the rig sense yet,
+                      // but if they do (like spinning), the Rig "Root" handles it.
+                      // The "Base" matrix positions it in the world.
+                      RenderMath.GetTiltedEntityWorldMatrix
+                        renderPos
+                        facing
+                        MathHelper.PiOver2
+                        0.0f // Spin handled by animation system now!
+                        MathHelper.PiOver4
+                        squishFactor
+                        Core.Constants.Entity.ModelScale
+                    | _ ->
+                      RenderMath.GetEntityWorldMatrix
+                        renderPos
+                        facing
+                        MathHelper.PiOver4
+                        squishFactor
+                        Core.Constants.Entity.ModelScale
+
+                  for nodeName, node in rigData do
+                    let nodeLocalWorld =
+                      collectPath nodeTransforms rigData nodeName node []
+                      |> applyTransforms entityPose nodeTransforms
+
+                    let finalWorld = nodeLocalWorld * entityBaseMatrix
+
+                    models
+                    |> HashMap.tryFindV node.ModelAsset
+                    |> ValueOption.iter(fun model ->
+                      drawModel camera model finalWorld)
+
+                | ValueNone -> () // No rig, can't draw
 
               // 2D Pass (UI / Debug)
               // Restore states for SpriteBatch if needed
@@ -339,7 +425,8 @@ module Render =
                   cameraService
                   playerId
 
-              if not(IndexList.isEmpty targetingCmds) then
+              match targetingCmds with
+              | ValueSome(DrawTargetingIndicator rect) ->
                 let transform =
                   RenderMath.GetSpriteBatchTransform
                     camera.Position
@@ -349,15 +436,9 @@ module Render =
 
                 game.GraphicsDevice.Viewport <- camera.Viewport
                 spriteBatch.Begin(transformMatrix = transform)
-
-                for cmd in targetingCmds do
-                  match cmd with
-                  | DrawTargetingIndicator rect ->
-                    spriteBatch.Draw(texture, rect, Color.Blue * 0.5f)
-                  | _ -> ()
-
+                spriteBatch.Draw(texture, rect, Color.Blue * 0.5f)
                 spriteBatch.End()
+              | _ -> ()
             | ValueNone -> ()
-
           | ValueNone -> ()
     }

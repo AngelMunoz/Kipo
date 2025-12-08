@@ -18,7 +18,7 @@ module RenderOrchestratorSystem =
   let private findRenderGroup(layer: Map.MapLayer) : int =
     match layer.Properties |> HashMap.tryFindV "RenderGroup" with
     | ValueSome value ->
-      match Int32.TryParse(value) with
+      match Int32.TryParse value with
       | true, intValue -> intValue
       | false, _ -> 0
     | ValueNone -> 0
@@ -31,22 +31,14 @@ module RenderOrchestratorSystem =
     =
     inherit DrawableGameComponent(game)
 
-    let (Core core) = env.CoreServices
     let (Stores stores) = env.StoreServices
     let (Gameplay gameplay) = env.GameplayServices
-    let (MonoGame monoGame) = env.MonoGameServices
 
     let mutable renderServices: Render.RenderService list = []
     let mutable terrainServices: TerrainRenderSystem.TerrainRenderService list = []
 
     let mutable foregroundTerrainServices
       : TerrainRenderSystem.TerrainRenderService list = []
-
-    let world = core.World
-
-    let targetingService = gameplay.TargetingService
-
-    let projections = gameplay.Projections
 
     override _.Initialize() =
       base.Initialize()
@@ -80,38 +72,35 @@ module RenderOrchestratorSystem =
           TerrainRenderSystem.create(game, env, mapKey, ValueSome layerNames)
 
         if group < 2 then
-          backgroundServices.Add(service)
+          backgroundServices.Add service
         else
-          foregroundServices.Add(service))
+          foregroundServices.Add service)
 
       terrainServices <- backgroundServices |> List.ofSeq
       foregroundTerrainServices <- foregroundServices |> List.ofSeq
-
-      // Create RenderService
-      let cameraService = gameplay.CameraService
 
       let renderService = Render.create(game, env, playerId, stores.ModelStore)
 
       renderServices <- [ renderService ]
 
-    override _.Draw(gameTime) =
+    override _.Draw _ =
       let graphicsDevice = game.GraphicsDevice
       let originalViewport = graphicsDevice.Viewport
       let cameraService = gameplay.CameraService
 
       // Iterate through cameras and render
-      for (playerId, camera) in cameraService.GetAllCameras() do
+      for playerId, camera in cameraService.GetAllCameras() do
         // Render Background Terrain (RenderGroup < 2)
         for terrainService in terrainServices do
-          terrainService.Draw(camera)
+          terrainService.Draw camera
 
         // Render Entities
         for renderService in renderServices do
-          renderService.Draw(camera)
+          renderService.Draw camera
 
         // Render Foreground Terrain (RenderGroup >= 2) - Decorations on top
         for terrainService in foregroundTerrainServices do
-          terrainService.Draw(camera)
+          terrainService.Draw camera
 
       // Restore viewport
       graphicsDevice.Viewport <- originalViewport

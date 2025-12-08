@@ -258,3 +258,29 @@ module System =
          // for example to trigger events:
          publishEventsFromTransformation currentValue this.EventBus
 ```
+
+## Animation System & 3D Assets
+
+### 1. Model Coordinate Space & Pivots
+
+- **Origin Point:** KayKit assets have their origin `(0,0,0)` at the **feet/floor**, not at the geometric center or joint.
+- **Rotation Issue:** Rotating these models directly causes them to swing in a wide arc around the floor.
+- **The Fix (Pivots):** We use a `Pivot` property in `RigNode` (defined in `Models.json`).
+  - `Pivot` represents the local coordinate of the joint (e.g., Shoulder) relative to the model's origin.
+  - **Render Logic:** The system applies `Translate(-Pivot) * Rotation * Translate(Pivot)` to force rotation around the joint.
+  - **Typical Shoulder Pivot:** `{ "X": 0.0, "Y": 1.5, "Z": 0.0 }` (for a standard humanoid).
+
+### 2. Animation Axes (Isometric Context)
+
+- **Y-Axis (Yaw):** Controls **Forward/Backward** swing.
+  - Left Arm Forward: Negative Y (`-30`).
+  - Right Arm Forward: Positive Y (`+30`) (Due to symmetry/mirroring).
+- **Z-Axis (Pitch):** Controls **Up/Down** flapping.
+  - Up: Positive Z (`+20`).
+  - Down: Negative Z (`-20`).
+- **X-Axis (Roll):** Controls twisting (Drill motion).
+
+### 3. Data Structures
+
+- **Animations:** Stored in `Content/Animations.json`. Defined by `Keyframes` (Time, Rotation Quaternion).
+- **Rigs:** Stored in `Content/Models.json`. Defines hierarchy (`Root` -> `Body` -> `Arm_L`) and Pivots.
