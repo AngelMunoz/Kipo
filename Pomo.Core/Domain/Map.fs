@@ -63,6 +63,7 @@ module Map =
     | OpenPolyline of openPoly: IndexList<Vector2>
     | RectangleShape of width: float32 * height: float32
     | EllipseShape of width: float32 * height: float32
+    | Circle of radius: float32
 
   [<Struct>]
   type MapObjectType =

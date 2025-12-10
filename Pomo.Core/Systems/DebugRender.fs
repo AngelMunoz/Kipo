@@ -918,9 +918,11 @@ module DebugRender =
                     let p1 = rotate pts.[i] radians + position
                     let p2 = rotate pts.[i + 1] radians + position
                     drawLine sb px p1 p2 color
-                | ValueSome(EllipseShape(ew, eh)) ->
+                | ValueSome(Map.CollisionShape.Circle radius) ->
+                  drawCircle sb px position radius color
+                | ValueSome(Map.CollisionShape.EllipseShape(ew, eh)) ->
                   drawEllipse sb px position ew eh rotation color
-                | ValueSome(RectangleShape(rw, rh)) ->
+                | ValueSome(Map.CollisionShape.RectangleShape(rw, rh)) ->
                   let pts =
                     IndexList.ofList [
                       Vector2.Zero
@@ -947,8 +949,12 @@ module DebugRender =
             | DrawEntityBounds position ->
               match pixel with
               | ValueSome px ->
-                let poly = Spatial.getEntityPolygon position
-                drawPolygon sb px poly Vector2.Zero 0.0f Color.Red
+                match Spatial.getEntityCollisionShape position with
+                | Map.CollisionShape.Circle radius ->
+                  drawCircle sb px position radius Color.Cyan
+                | Map.CollisionShape.ClosedPolygon poly ->
+                  drawPolygon sb px poly position 0.0f Color.Cyan
+                | _ -> ()
               | ValueNone -> ()
 
             | DrawSpatialGrid grid ->

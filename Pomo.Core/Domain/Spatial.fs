@@ -149,6 +149,10 @@ module Spatial =
       Vector2(pos.X - halfSize, pos.Y + halfSize)
     ]
 
+  let getEntityCollisionShape(pos: Vector2) =
+    // Standard circular collision for entities
+    Map.CollisionShape.Circle Core.Constants.Entity.CollisionRadius
+
   let rotate (v: Vector2) (radians: float32) =
     let cos = MathF.Cos radians
     let sin = MathF.Sin radians
@@ -161,7 +165,26 @@ module Spatial =
     let pos = Vector2(obj.X, obj.Y)
 
     match obj.CollisionShape with
-    | ValueSome(Map.ClosedPolygon points) ->
+    | ValueSome(Map.CollisionShape.Circle radius) ->
+      // Approximate circle as polygon with 16 segments
+      let segments = 16
+      let step = MathHelper.TwoPi / float32 segments
+      let centerOffset = Vector2(radius, radius) // Assume top-left origin
+
+      let points =
+        [
+          for i in 0 .. segments - 1 do
+            let theta = float32 i * step
+
+            let local =
+              Vector2(radius * cos theta, radius * sin theta) + centerOffset
+
+            rotate local radians + pos
+        ]
+        |> IndexList.ofList
+
+      ValueSome points
+    | ValueSome(Map.CollisionShape.ClosedPolygon points) ->
       ValueSome(points |> IndexList.map(fun p -> rotate p radians + pos))
     | ValueSome(Map.RectangleShape(w, h)) ->
       let corners =
