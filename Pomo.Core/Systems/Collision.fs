@@ -46,6 +46,13 @@ module Collision =
   open Pomo.Core.Environment
   open Pomo.Core.Environment.Patterns
 
+  // Composite key for caching: (groupId, objectId) to handle duplicate IDs across groups
+  [<Struct>]
+  type CacheKey = {
+    GroupId: int
+    ObjectId: int<ObjectId>
+  }
+
   type CollisionSystem(game: Game, env: PomoEnvironment) =
     inherit GameSystem(game)
 
@@ -53,31 +60,65 @@ module Collision =
     let (Stores stores) = env.StoreServices
     let (Gameplay gameplay) = env.GameplayServices
 
-    let mutable mapObjectCache =
+    // Cache for polygon colliders (for SAT)
+    let mutable polygonCache =
       HashMap.empty<
         string,
-        HashMap<int<ObjectId>, struct (IndexList<Vector2> * IndexList<Vector2>)>
+        HashMap<CacheKey, struct (IndexList<Vector2> * IndexList<Vector2>)>
        >
 
-    let getMapObjects(map: MapDefinition) =
-      match mapObjectCache.TryFindV map.Key with
+    // Cache for polyline colliders (for segment-based collision)
+    let mutable polylineCache =
+      HashMap.empty<string, HashMap<CacheKey, IndexList<Vector2>>>
+
+    let getPolygonObjects(map: MapDefinition) =
+      match polygonCache.TryFindV map.Key with
       | ValueSome objects -> objects
       | ValueNone ->
         let objects =
           map.ObjectGroups
-          |> IndexList.collect(fun g -> g.Objects)
-          |> IndexList.collect(fun obj ->
-            match Spatial.getMapObjectPolygon obj with
-            | ValueSome poly ->
-              let axes = Spatial.getAxes poly
-              IndexList.single(obj.Id, struct (poly, axes))
-            | ValueNone -> IndexList.empty)
+          |> IndexList.collect(fun g ->
+            g.Objects
+            |> IndexList.collect(fun obj ->
+              // Cache all objects with polygon shapes
+              // The collision loop filters by isCollidable || isTrigger
+              match Spatial.getMapObjectPolygon obj with
+              | ValueSome poly ->
+                let axes = Spatial.getAxes poly
+                let key = { GroupId = g.Id; ObjectId = obj.Id }
+                IndexList.single(key, struct (poly, axes))
+              | ValueNone -> IndexList.empty))
           |> HashMap.ofSeq
 
-        mapObjectCache <- mapObjectCache.Add(map.Key, objects)
+        polygonCache <- polygonCache.Add(map.Key, objects)
         objects
 
+    let getPolylineObjects(map: MapDefinition) =
+      match polylineCache.TryFindV map.Key with
+      | ValueSome objects -> objects
+      | ValueNone ->
+        let objects =
+          map.ObjectGroups
+          |> IndexList.collect(fun g ->
+            g.Objects
+            |> IndexList.collect(fun obj ->
+              // Cache all objects with polyline shapes
+              // The collision loop filters by isCollidable || isTrigger
+              match Spatial.getMapObjectPolyline obj with
+              | ValueSome chain ->
+                let key = { GroupId = g.Id; ObjectId = obj.Id }
+                IndexList.single(key, chain)
+              | ValueNone -> IndexList.empty))
+          |> HashMap.ofSeq
 
+        polylineCache <- polylineCache.Add(map.Key, objects)
+        objects
+
+    // Entity collision radius for circle-based polyline collision
+    // For a square entity, we use the circumscribed circle (touching corners)
+    // so the circle fully contains the square: radius = halfDiagonal = halfSize * sqrt(2)
+    let entityHalfSize = Core.Constants.Entity.Size.X / 2.0f
+    let entityRadius = entityHalfSize * sqrt(2.0f)
 
     override val Kind = SystemKind.Collision with get
 
@@ -91,7 +132,7 @@ module Collision =
         let positions = snapshot.Positions
         let getNearbyTo = getNearbyEntities grid
 
-        // Check for collisions
+        // Check for entity-entity collisions
         for (entityId, pos) in positions do
           let cell = getGridCell Core.Constants.Collision.GridCellSize pos
           let nearbyEntities = getNearbyTo cell
@@ -111,14 +152,16 @@ module Collision =
 
         // Check for map object collisions per scenario
         let mapDef = scenario.Map
-        let mapObjects = getMapObjects mapDef
+        let polygonObjects = getPolygonObjects mapDef
+        let polylineObjects = getPolylineObjects mapDef
 
-        // Filter entities in this scenario
-        // Optimization: We could maintain a reverse index of Scenario -> Entities,
-        // but for now iterating liveEntities is okay if count is low.
         for (entityId, pos) in positions do
           let entityPoly = getEntityPolygon pos
           let entityAxes = getAxes entityPoly
+
+          // Accumulate all MTVs for this entity across all collisions
+          let mutable accumulatedMTV = Vector2.Zero
+          let mutable hasWallCollision = false
 
           for group in mapDef.ObjectGroups do
             for obj in group.Objects do
@@ -130,10 +173,14 @@ module Collision =
               let isTrigger = obj.PortalData.IsValueSome
 
               if isCollidable || isTrigger then
-                match mapObjects.TryFindV obj.Id with
+                let cacheKey = {
+                  GroupId = group.Id
+                  ObjectId = obj.Id
+                }
+
+                // Try polygon collision first (for closed shapes)
+                match polygonObjects.TryFindV cacheKey with
                 | ValueSome struct (objPoly, objAxes) ->
-                  // For triggers, we just need intersection, not MTV
-                  // But SAT gives us both.
                   match
                     Spatial.intersectsMTVWithAxes
                       entityPoly
@@ -155,10 +202,51 @@ module Collision =
                         )
                       | ValueNone -> ()
                     else
-                      // It's a wall/collidable
+                      // Accumulate MTV for combined correction
+                      accumulatedMTV <- accumulatedMTV + mtv
+                      hasWallCollision <- true
+
+                      // Emit collision event for velocity sliding
                       core.EventBus.Publish(
                         SystemCommunications.MapObjectCollision
                           struct (entityId, obj, mtv)
                       )
                   | ValueNone -> ()
-                | ValueNone -> ()
+                | ValueNone ->
+                  // Try polyline collision (for open chains)
+                  match polylineObjects.TryFindV cacheKey with
+                  | ValueSome chain ->
+                    match Spatial.circleChainMTV pos entityRadius chain with
+                    | ValueSome mtv ->
+                      if isTrigger then
+                        match obj.PortalData with
+                        | ValueSome portalData ->
+                          core.EventBus.Publish(
+                            {
+                              EntityId = entityId
+                              TargetMap = portalData.TargetMap
+                              TargetSpawn = portalData.TargetSpawn
+                            }
+                            : SystemCommunications.PortalTravel
+                          )
+                        | ValueNone -> ()
+                      else
+                        // Accumulate MTV for combined correction
+                        accumulatedMTV <- accumulatedMTV + mtv
+                        hasWallCollision <- true
+
+                        // Emit collision event for velocity sliding
+                        core.EventBus.Publish(
+                          SystemCommunications.MapObjectCollision
+                            struct (entityId, obj, mtv)
+                        )
+                    | ValueNone -> ()
+                  | ValueNone -> ()
+
+          // Apply single combined position correction after checking all objects
+          if hasWallCollision then
+            let correctedPos = pos + accumulatedMTV
+
+            core.EventBus.Publish(
+              Physics(PositionChanged struct (entityId, correctedPos))
+            )

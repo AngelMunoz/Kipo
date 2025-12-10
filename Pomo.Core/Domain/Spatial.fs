@@ -209,6 +209,102 @@ module Spatial =
       ValueSome(points |> IndexList.map(fun p -> rotate p radians + pos))
     | _ -> ValueNone
 
+  // ============================================================================
+  // Segment-Based Collision for Polylines
+  // ============================================================================
+
+  /// Calculates the closest point on a line segment to a given point
+  let closestPointOnSegment (p: Vector2) (a: Vector2) (b: Vector2) : Vector2 =
+    let ab = b - a
+    let lenSq = ab.LengthSquared()
+
+    if lenSq = 0.0f then
+      a // Degenerate segment (a == b)
+    else
+      let t = Vector2.Dot(p - a, ab) / lenSq
+      let tClamped = Math.Clamp(t, 0.0f, 1.0f)
+      a + ab * tClamped
+
+  /// Calculates the distance from a point to a line segment
+  let distanceToSegment (p: Vector2) (a: Vector2) (b: Vector2) : float32 =
+    let closest = closestPointOnSegment p a b
+    Vector2.Distance(p, closest)
+
+  /// Checks if a circle intersects a line segment, returning the MTV if so
+  /// The MTV is the minimum translation vector to push the circle out of the segment
+  let circleSegmentMTV
+    (center: Vector2)
+    (radius: float32)
+    (a: Vector2)
+    (b: Vector2)
+    : Vector2 voption =
+    let closest = closestPointOnSegment center a b
+    let dist = Vector2.Distance(center, closest)
+
+    if dist < radius then
+      // Circle intersects the segment
+      if dist = 0.0f then
+        // Center is exactly on the segment, push perpendicular to segment
+        let segDir = b - a
+
+        if segDir.LengthSquared() = 0.0f then
+          // Degenerate segment, push in any direction
+          ValueSome(Vector2.UnitX * radius)
+        else
+          let perpendicular = Vector2.Normalize(Vector2(-segDir.Y, segDir.X))
+          ValueSome(perpendicular * radius)
+      else
+        // Normal case: push away from closest point
+        let pushDir = Vector2.Normalize(center - closest)
+        let penetration = radius - dist
+        ValueSome(pushDir * penetration)
+    else
+      ValueNone
+
+  /// Checks a circle against an open chain of segments (polyline), returning combined MTV
+  /// This iterates through each segment and accumulates all MTVs to handle corners properly
+  /// Also checks vertices (polyline joints) to prevent slipping through sharp corners
+  let circleChainMTV
+    (center: Vector2)
+    (radius: float32)
+    (chain: IndexList<Vector2>)
+    : Vector2 voption =
+    if chain.Count < 2 then
+      ValueNone
+    else
+      let mutable accumulatedMTV = Vector2.Zero
+      let mutable hasCollision = false
+
+      // Check each segment in the chain and accumulate all MTVs
+      for i in 0 .. chain.Count - 2 do
+        let a = chain.[i]
+        let b = chain.[i + 1]
+
+        match circleSegmentMTV center radius a b with
+        | ValueSome mtv ->
+          hasCollision <- true
+          accumulatedMTV <- accumulatedMTV + mtv
+        | ValueNone -> ()
+
+      // Also check interior vertices (joints) explicitly
+      // This prevents slipping through acute angle corners
+      for i in 1 .. chain.Count - 2 do
+        let vertex = chain.[i]
+        let dist = Vector2.Distance(center, vertex)
+
+        if dist < radius then
+          hasCollision <- true
+
+          if dist > 0.0f then
+            let pushDir = Vector2.Normalize(center - vertex)
+            let penetration = radius - dist
+            accumulatedMTV <- accumulatedMTV + pushDir * penetration
+          else
+            // Entity center exactly on vertex, push in any direction
+            accumulatedMTV <- accumulatedMTV + Vector2.UnitX * radius
+
+      if hasCollision then ValueSome accumulatedMTV else ValueNone
+
   let isPointInCone (cone: Cone) (point: Vector2) =
     let distanceSquared = Vector2.DistanceSquared(cone.Origin, point)
 
