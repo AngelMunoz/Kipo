@@ -154,18 +154,16 @@ module Spatial =
     let sin = MathF.Sin radians
     Vector2(v.X * cos - v.Y * sin, v.X * sin + v.Y * cos)
 
-  let getMapObjectPolygon(obj: Map.MapObject) =
+  /// Gets the collision polygon for a map object (for closed shapes only)
+  /// Returns ValueNone for shapes that shouldn't use polygon collision (like polylines)
+  let getMapObjectPolygon(obj: Map.MapObject) : IndexList<Vector2> voption =
     let radians = MathHelper.ToRadians obj.Rotation
     let pos = Vector2(obj.X, obj.Y)
 
-    match obj.Points with
-    | ValueSome points ->
-      points |> IndexList.map(fun p -> rotate p radians + pos)
-    | ValueNone ->
-      // Rectangle
-      let w = obj.Width
-      let h = obj.Height
-
+    match obj.CollisionShape with
+    | ValueSome(Map.ClosedPolygon points) ->
+      ValueSome(points |> IndexList.map(fun p -> rotate p radians + pos))
+    | ValueSome(Map.RectangleShape(w, h)) ->
       let corners =
         IndexList.ofList [
           Vector2.Zero
@@ -174,7 +172,42 @@ module Spatial =
           Vector2(0.0f, h)
         ]
 
-      corners |> IndexList.map(fun p -> rotate p radians + pos)
+      ValueSome(corners |> IndexList.map(fun p -> rotate p radians + pos))
+    | ValueSome(Map.EllipseShape(w, h)) ->
+      // Approximate ellipse as polygon with 16 segments
+      let segments = 16
+      let radiusX = w / 2.0f
+      let radiusY = h / 2.0f
+      let centerOffset = Vector2(radiusX, radiusY)
+      let step = MathHelper.TwoPi / float32 segments
+
+      let points =
+        [
+          for i in 0 .. segments - 1 do
+            let theta = float32 i * step
+
+            let local =
+              Vector2(radiusX * cos theta, radiusY * sin theta) + centerOffset
+
+            rotate local radians + pos
+        ]
+        |> IndexList.ofList
+
+      ValueSome points
+    | ValueSome(Map.OpenPolyline _) ->
+      // Polylines should not be treated as closed polygons for SAT
+      ValueNone
+    | ValueNone -> ValueNone
+
+  /// Gets the polyline chain for a map object (for open polylines only)
+  let getMapObjectPolyline(obj: Map.MapObject) : IndexList<Vector2> voption =
+    let radians = MathHelper.ToRadians obj.Rotation
+    let pos = Vector2(obj.X, obj.Y)
+
+    match obj.CollisionShape with
+    | ValueSome(Map.OpenPolyline points) ->
+      ValueSome(points |> IndexList.map(fun p -> rotate p radians + pos))
+    | _ -> ValueNone
 
   let isPointInCone (cone: Cone) (point: Vector2) =
     let distanceSquared = Vector2.DistanceSquared(cone.Origin, point)

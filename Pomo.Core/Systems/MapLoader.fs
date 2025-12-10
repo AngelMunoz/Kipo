@@ -195,34 +195,31 @@ module MapLoader =
 
     let gid = attr "gid" element |> ValueOption.map parseGid
 
-    let points =
+    let parsePointsString(pts: string) =
+      pts.Split(' ')
+      |> Array.map(fun p ->
+        let coords = p.Split(',')
+        Vector2(parseFloat coords.[0], parseFloat coords.[1]))
+      |> IndexList.ofArray
+
+    let collisionShape =
       let polygon = element.Element(xname "polygon")
       let polyline = element.Element(xname "polyline")
+      let ellipse = element.Element(xname "ellipse")
 
       if not(isNull polygon) then
         let pts = attr "points" polygon |> ValueOption.defaultValue ""
-
-        ValueSome(
-          pts.Split(' ')
-          |> Array.map(fun p ->
-            let coords = p.Split(',')
-            Vector2(parseFloat coords.[0], parseFloat coords.[1]))
-          |> IndexList.ofArray
-        )
+        ValueSome(ClosedPolygon(parsePointsString pts))
       elif not(isNull polyline) then
         let pts = attr "points" polyline |> ValueOption.defaultValue ""
-
-        ValueSome(
-          pts.Split(' ')
-          |> Array.map(fun p ->
-            let coords = p.Split(',')
-            Vector2(parseFloat coords.[0], parseFloat coords.[1]))
-          |> IndexList.ofArray
-        )
+        ValueSome(OpenPolyline(parsePointsString pts))
+      elif not(isNull ellipse) then
+        ValueSome(EllipseShape(width, height))
+      elif width > 0.0f && height > 0.0f then
+        ValueSome(RectangleShape(width, height))
       else
         ValueNone
 
-    let isEllipse = not(isNull(element.Element(xname "ellipse")))
     let properties = parseProperties element
 
     let portalData =
@@ -252,8 +249,7 @@ module MapLoader =
       Rotation = rotation
       Gid = gid
       Properties = properties
-      Points = points
-      IsEllipse = isEllipse
+      CollisionShape = collisionShape
       PortalData = portalData
     }
 

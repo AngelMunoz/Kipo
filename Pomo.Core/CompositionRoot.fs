@@ -283,8 +283,8 @@ module CompositionRoot =
                   |> ValueOption.defaultValue false
 
                 let pos =
-                  match obj.Points with
-                  | ValueSome points when not points.IsEmpty ->
+                  match obj.CollisionShape with
+                  | ValueSome(ClosedPolygon points) when not points.IsEmpty ->
                     let offset = getRandomPointInPolygon points scope.Random
                     Vector2(obj.X + offset.X, obj.Y + offset.Y)
                   | _ -> Vector2(obj.X, obj.Y)

@@ -46,12 +46,11 @@ module DebugRender =
       state: AIState *
       entityPosition: Vector2
     | DrawMapObject of
-      points: IndexList<Vector2> voption *
+      shape: CollisionShape voption *
       position: Vector2 *
       width: float32 *
       height: float32 *
       rotation: float32 *
-      isEllipse: bool *
       color: Color
     | DrawEntityBounds of position: Vector2
     | DrawSpatialGrid of grid: HashMap<GridCell, IndexList<Guid<EntityId>>>
@@ -190,12 +189,11 @@ module DebugRender =
               | _ -> Color.White
 
             DrawMapObject(
-              obj.Points,
+              obj.CollisionShape,
               Vector2(obj.X, obj.Y),
               obj.Width,
               obj.Height,
               obj.Rotation,
-              obj.IsEllipse,
               color
             ))
         else
@@ -905,27 +903,36 @@ module DebugRender =
 
               sb.DrawString(hudFont, text, textPosition, Color.Cyan)
 
-            | DrawMapObject(points,
-                            position,
-                            width,
-                            height,
-                            rotation,
-                            isEllipse,
-                            color) ->
+            | DrawMapObject(shape, position, width, height, rotation, color) ->
               match pixel with
               | ValueSome px ->
-                match points with
-                | ValueSome pts -> drawPolygon sb px pts position rotation color
-                | ValueNone ->
-                  if isEllipse then
-                    drawEllipse sb px position width height rotation color
-                  else
-                    // Draw rectangle using DrawLineShape or similar
-                    // Or construct points for rectangle
-                    // Tiled objects are positioned at top-left (or bottom-left for tiles),
-                    // and rotation is around that point.
-                    // Spatial.fs treats them as 0,0 to w,h relative to Position.
+                match shape with
+                | ValueSome(ClosedPolygon pts) ->
+                  drawPolygon sb px pts position rotation color
+                | ValueSome(OpenPolyline pts) ->
+                  // Draw polyline (open chain, not closed)
+                  let radians = MathHelper.ToRadians(rotation)
+                  let count = pts.Count
 
+                  for i in 0 .. count - 2 do
+                    let p1 = rotate pts.[i] radians + position
+                    let p2 = rotate pts.[i + 1] radians + position
+                    drawLine sb px p1 p2 color
+                | ValueSome(EllipseShape(ew, eh)) ->
+                  drawEllipse sb px position ew eh rotation color
+                | ValueSome(RectangleShape(rw, rh)) ->
+                  let pts =
+                    IndexList.ofList [
+                      Vector2.Zero
+                      Vector2(rw, 0.0f)
+                      Vector2(rw, rh)
+                      Vector2(0.0f, rh)
+                    ]
+
+                  drawPolygon sb px pts position rotation color
+                | ValueNone ->
+                  // No shape, use width/height as rectangle if provided
+                  if width > 0.0f && height > 0.0f then
                     let pts =
                       IndexList.ofList [
                         Vector2.Zero

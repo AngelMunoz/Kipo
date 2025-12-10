@@ -66,10 +66,12 @@ module Collision =
         let objects =
           map.ObjectGroups
           |> IndexList.collect(fun g -> g.Objects)
-          |> IndexList.map(fun obj ->
-            let poly = Spatial.getMapObjectPolygon obj
-            let axes = Spatial.getAxes poly
-            obj.Id, struct (poly, axes))
+          |> IndexList.collect(fun obj ->
+            match Spatial.getMapObjectPolygon obj with
+            | ValueSome poly ->
+              let axes = Spatial.getAxes poly
+              IndexList.single(obj.Id, struct (poly, axes))
+            | ValueNone -> IndexList.empty)
           |> HashMap.ofSeq
 
         mapObjectCache <- mapObjectCache.Add(map.Key, objects)

@@ -56,6 +56,14 @@ module Map =
     Properties: HashMap<string, string>
   }
 
+  /// Collision shape types for map objects
+  [<Struct>]
+  type CollisionShape =
+    | ClosedPolygon of closedPoly: IndexList<Vector2>
+    | OpenPolyline of openPoly: IndexList<Vector2>
+    | RectangleShape of width: float32 * height: float32
+    | EllipseShape of width: float32 * height: float32
+
   [<Struct>]
   type MapObjectType =
     | Wall
@@ -81,8 +89,7 @@ module Map =
     Rotation: float32
     Gid: int voption // For tile objects
     Properties: HashMap<string, string>
-    Points: IndexList<Vector2> voption // For polygons/polylines
-    IsEllipse: bool
+    CollisionShape: CollisionShape voption
     PortalData: PortalData voption
   }
 

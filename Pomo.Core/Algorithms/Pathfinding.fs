@@ -109,24 +109,21 @@ module Pathfinding =
 
             let pos = Vector2(obj.X, obj.Y)
 
-            // Determine the shape to rasterize
-            match obj.IsEllipse, obj.Points with
-            | true, _ ->
+            // Determine the shape to rasterize based on CollisionShape
+            match obj.CollisionShape with
+            | ValueSome(EllipseShape(ew, eh)) ->
               // Handle Ellipse
-              // Ellipse defined by bounding box at (X,Y) with Width, Height
+              // Ellipse defined by bounding box at (X,Y) with ew, eh
               // We approximate collision by checking if a point is within the ellipse + entityRadius
-              // For simplicity, we'll assume the ellipse is axis-aligned relative to its rotation
-              // But Tiled ellipses can be rotated.
-              // Center of ellipse:
-              let localCenter = Vector2(obj.Width / 2.0f, obj.Height / 2.0f)
+              let localCenter = Vector2(ew / 2.0f, eh / 2.0f)
               let worldCenter = (rotate localCenter) + pos
 
-              let radiusX = obj.Width / 2.0f
-              let radiusY = obj.Height / 2.0f
+              let radiusX = ew / 2.0f
+              let radiusY = eh / 2.0f
 
               // Bounding box for the ellipse (approximate with rotation)
               // A safe bound is the max dimension / 2.0f + entityRadius (circumscribed radius)
-              let maxDim = max obj.Width obj.Height
+              let maxDim = max ew eh
               let searchRadius = maxDim / 2.0f + entityRadius
 
               let minX =
@@ -173,27 +170,11 @@ module Pathfinding =
                     then
                       isBlocked[x, y] <- true
 
-            | false, _ ->
-              // Handle Polygon/Polyline/Rectangle (Rotated)
-              // We treat everything as a polygon and check intersection with the Entity's Square (AABB)
-
+            | ValueSome(ClosedPolygon points)
+            | ValueSome(OpenPolyline points) ->
+              // Handle Polygon/Polyline (both block nav grid cells)
               let worldPoints =
-                match obj.Points with
-                | ValueSome points when points.Count > 0 ->
-                  points |> Seq.map(fun p -> (rotate p) + pos) |> Seq.toArray
-                | _ ->
-                  // Rectangle as 4-point polygon
-                  let w = obj.Width
-                  let h = obj.Height
-
-                  let localCorners = [|
-                    Vector2.Zero
-                    Vector2(w, 0.0f)
-                    Vector2(w, h)
-                    Vector2(0.0f, h)
-                  |]
-
-                  localCorners |> Array.map(fun p -> (rotate p) + pos)
+                points |> Seq.map(fun p -> (rotate p) + pos) |> Seq.toArray
 
               // Calculate bounding box for search optimization
               let minPX =
@@ -330,6 +311,158 @@ module Pathfinding =
 
                         if edgeIntersect then
                           isBlocked[x, y] <- true
+
+            | ValueSome(RectangleShape(rw, rh)) ->
+              // Handle Rectangle as 4-point polygon
+              let localCorners = [|
+                Vector2.Zero
+                Vector2(rw, 0.0f)
+                Vector2(rw, rh)
+                Vector2(0.0f, rh)
+              |]
+
+              let worldPoints =
+                localCorners |> Array.map(fun p -> (rotate p) + pos)
+
+              // Calculate bounding box for search optimization
+              let minPX =
+                worldPoints |> Array.minBy(fun p -> p.X) |> (fun p -> p.X)
+
+              let minPY =
+                worldPoints |> Array.minBy(fun p -> p.Y) |> (fun p -> p.Y)
+
+              let maxPX =
+                worldPoints |> Array.maxBy(fun p -> p.X) |> (fun p -> p.X)
+
+              let maxPY =
+                worldPoints |> Array.maxBy(fun p -> p.Y) |> (fun p -> p.Y)
+
+              // Expand search area by entity radius (approx) to catch all potential collisions
+              let searchMinX = minPX - entityRadius
+              let searchMinY = minPY - entityRadius
+              let searchMaxX = maxPX + entityRadius
+              let searchMaxY = maxPY + entityRadius
+
+              let minX = max 0 (int(floor(searchMinX / cellSize)))
+              let minY = max 0 (int(floor(searchMinY / cellSize)))
+              let maxX = min (width - 1) (int(ceil(searchMaxX / cellSize)))
+              let maxY = min (height - 1) (int(ceil(searchMaxY / cellSize)))
+
+              // Helper: Segment Intersection
+              let segmentsIntersect
+                (a: Vector2)
+                (b: Vector2)
+                (c: Vector2)
+                (d: Vector2)
+                =
+                let denominator =
+                  ((b.X - a.X) * (d.Y - c.Y)) - ((b.Y - a.Y) * (d.X - c.X))
+
+                if denominator = 0.0f then
+                  false
+                else
+                  let numerator1 =
+                    ((a.Y - c.Y) * (d.X - c.X)) - ((a.X - c.X) * (d.Y - c.Y))
+
+                  let numerator2 =
+                    ((a.Y - c.Y) * (b.X - a.X)) - ((a.X - c.X) * (b.Y - a.Y))
+
+                  let r = numerator1 / denominator
+                  let s = numerator2 / denominator
+                  (r >= 0.0f && r <= 1.0f) && (s >= 0.0f && s <= 1.0f)
+
+              // Helper: Point in Polygon (Ray Casting)
+              let isPointInPolygon (p: Vector2) (poly: Vector2[]) =
+                let mutable inside = false
+                let count = poly.Length
+                let mutable j = count - 1
+
+                for i in 0 .. count - 1 do
+                  let pi = poly.[i]
+                  let pj = poly.[j]
+
+                  if
+                    ((pi.Y > p.Y) <> (pj.Y > p.Y))
+                    && (p.X < (pj.X - pi.X) * (p.Y - pi.Y) / (pj.Y - pi.Y)
+                              + pi.X)
+                  then
+                    inside <- not inside
+
+                  j <- i
+
+                inside
+
+              // Entity half dimensions
+              let halfW = entitySize.X / 2.0f
+              let halfH = entitySize.Y / 2.0f
+
+              for x in minX..maxX do
+                for y in minY..maxY do
+                  if not isBlocked[x, y] then
+                    let cellCenter = gridToWorld cellSize { X = x; Y = y }
+
+                    // Define Entity AABB at this cell
+                    let entMinX = cellCenter.X - halfW
+                    let entMaxX = cellCenter.X + halfW
+                    let entMinY = cellCenter.Y - halfH
+                    let entMaxY = cellCenter.Y + halfH
+
+                    // 1. Check if Cell Center is inside Polygon (Fastest check for large polygons)
+                    if isPointInPolygon cellCenter worldPoints then
+                      isBlocked[x, y] <- true
+                    else
+                      // 2. Check if any Polygon Vertex is inside Entity AABB (Handles small polygons inside entity)
+                      let mutable vertexInside = false
+                      let count = worldPoints.Length
+                      let mutable i = 0
+
+                      while i < count && not vertexInside do
+                        let p = worldPoints.[i]
+
+                        if
+                          p.X >= entMinX
+                          && p.X <= entMaxX
+                          && p.Y >= entMinY
+                          && p.Y <= entMaxY
+                        then
+                          vertexInside <- true
+
+                        i <- i + 1
+
+                      if vertexInside then
+                        isBlocked[x, y] <- true
+                      else
+                        // 3. Check Edge Intersection (Handles overlapping edges)
+                        let mutable edgeIntersect = false
+                        let mutable i = 0
+                        // Entity Edges
+                        let entCorners = [|
+                          Vector2(entMinX, entMinY)
+                          Vector2(entMaxX, entMinY)
+                          Vector2(entMaxX, entMaxY)
+                          Vector2(entMinX, entMaxY)
+                        |]
+
+                        while i < count && not edgeIntersect do
+                          let p1 = worldPoints.[i]
+                          let p2 = worldPoints.[(i + 1) % count]
+
+                          // Check against all 4 entity edges
+                          for j in 0..3 do
+                            let e1 = entCorners.[j]
+                            let e2 = entCorners.[(j + 1) % 4]
+
+                            if segmentsIntersect p1 p2 e1 e2 then
+                              edgeIntersect <- true
+
+                          i <- i + 1
+
+                        if edgeIntersect then
+                          isBlocked[x, y] <- true
+
+            | ValueNone ->
+              // No collision shape, skip this object
+              ()
 
       {
         Width = width
