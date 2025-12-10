@@ -115,10 +115,9 @@ module Collision =
         objects
 
     // Entity collision radius for circle-based polyline collision
-    // For a square entity, we use the circumscribed circle (touching corners)
-    // so the circle fully contains the square: radius = halfDiagonal = halfSize * sqrt(2)
+    // Reduced to inscribed circle (8.0f) to avoid large visual overlap and tight corners
     let entityHalfSize = Core.Constants.Entity.Size.X / 2.0f
-    let entityRadius = entityHalfSize * sqrt(2.0f)
+    let entityRadius = entityHalfSize // * sqrt(2.0f) was too big
 
     override val Kind = SystemKind.Collision with get
 
@@ -155,98 +154,159 @@ module Collision =
         let polygonObjects = getPolygonObjects mapDef
         let polylineObjects = getPolylineObjects mapDef
 
-        for (entityId, pos) in positions do
-          let entityPoly = getEntityPolygon pos
-          let entityAxes = getAxes entityPoly
+        // Get dependencies for CCD
+        let velocities = core.World.Velocities |> AMap.force
+        let time = core.World.Time |> AVal.force
+        let dt = float32 time.Delta.TotalSeconds
 
-          // Accumulate all MTVs for this entity across all collisions
-          let mutable accumulatedMTV = Vector2.Zero
-          let mutable hasWallCollision = false
+        for (entityId, targetPos) in positions do
+          // 1. Reconstruct Start Position
+          let startPos =
+            match velocities |> HashMap.tryFindV entityId with
+            | ValueSome v -> targetPos - (v * dt)
+            | ValueNone -> targetPos
 
-          for group in mapDef.ObjectGroups do
-            for obj in group.Objects do
-              let isCollidable =
-                match obj.Type with
-                | ValueSome MapObjectType.Wall -> true
-                | _ -> false
+          // 2. Determine Steps
+          let displacement = targetPos - startPos
+          let dist = displacement.Length()
+          // Step size reduced for tighter precision with smaller radius
+          let stepSize = 3.0f
 
-              let isTrigger = obj.PortalData.IsValueSome
+          let numSteps =
+            if dist > 0.0f then
+              max 1 (int(MathF.Ceiling(dist / stepSize)))
+            else
+              1 // Always run at least one check to resolve static overlaps
 
-              if isCollidable || isTrigger then
-                let cacheKey = {
-                  GroupId = group.Id
-                  ObjectId = obj.Id
-                }
+          let stepMove =
+            if numSteps > 1 then
+              displacement / float32 numSteps
+            else
+              displacement
 
-                // Try polygon collision first (for closed shapes)
-                match polygonObjects.TryFindV cacheKey with
-                | ValueSome struct (objPoly, objAxes) ->
-                  match
-                    Spatial.intersectsMTVWithAxes
-                      entityPoly
-                      entityAxes
-                      objPoly
-                      objAxes
-                  with
-                  | ValueSome mtv ->
-                    if isTrigger then
-                      match obj.PortalData with
-                      | ValueSome portalData ->
-                        core.EventBus.Publish(
-                          {
-                            EntityId = entityId
-                            TargetMap = portalData.TargetMap
-                            TargetSpawn = portalData.TargetSpawn
-                          }
-                          : SystemCommunications.PortalTravel
-                        )
+          // State for the stepping loop
+          let mutable currentPos = startPos
+          let mutable totalMTV = Vector2.Zero
+          let mutable globalHasCollision = false
+          let mutable lastCollidedObj = ValueNone
+
+          // 3. Step Loop
+          for step = 1 to numSteps do
+            // Advance position
+            if numSteps > 1 || dist > 0.0f then
+              currentPos <- currentPos + stepMove
+            else
+              // Static case: just use targetPos (which equals startPos)
+              currentPos <- targetPos
+
+            // Run Iterative Solver at this step
+            let mutable iteration = 0
+            let maxIterations = 4
+            let mutable doneIterating = false
+
+            while not doneIterating && iteration < maxIterations do
+              iteration <- iteration + 1
+              let mutable iterationMTV = Vector2.Zero
+              let mutable iterationHasCollision = false
+
+              let entityPoly = getEntityPolygon currentPos
+              let entityAxes = getAxes entityPoly
+
+              for group in mapDef.ObjectGroups do
+                for obj in group.Objects do
+                  let isCollidable =
+                    match obj.Type with
+                    | ValueSome MapObjectType.Wall -> true
+                    | _ -> false
+
+                  let isTrigger = obj.PortalData.IsValueSome
+
+                  if isCollidable || isTrigger then
+                    let cacheKey = {
+                      GroupId = group.Id
+                      ObjectId = obj.Id
+                    }
+
+                    // Try polygon collision
+                    match polygonObjects.TryFindV cacheKey with
+                    | ValueSome struct (objPoly, objAxes) ->
+                      match
+                        Spatial.intersectsMTVWithAxes
+                          entityPoly
+                          entityAxes
+                          objPoly
+                          objAxes
+                      with
+                      | ValueSome mtv ->
+                        if isTrigger then
+                          match obj.PortalData with
+                          | ValueSome p ->
+                            core.EventBus.Publish(
+                              {
+                                EntityId = entityId
+                                TargetMap = p.TargetMap
+                                TargetSpawn = p.TargetSpawn
+                              }
+                              : SystemCommunications.PortalTravel
+                            )
+                          | ValueNone -> ()
+                        else
+                          iterationMTV <- iterationMTV + mtv
+                          iterationHasCollision <- true
+                          // Only update lastCollidedObj if it's a real wall collision
+                          lastCollidedObj <- ValueSome obj
                       | ValueNone -> ()
-                    else
-                      // Accumulate MTV for combined correction
-                      accumulatedMTV <- accumulatedMTV + mtv
-                      hasWallCollision <- true
-
-                      // Emit collision event for velocity sliding
-                      core.EventBus.Publish(
-                        SystemCommunications.MapObjectCollision
-                          struct (entityId, obj, mtv)
-                      )
-                  | ValueNone -> ()
-                | ValueNone ->
-                  // Try polyline collision (for open chains)
-                  match polylineObjects.TryFindV cacheKey with
-                  | ValueSome chain ->
-                    match Spatial.circleChainMTV pos entityRadius chain with
-                    | ValueSome mtv ->
-                      if isTrigger then
-                        match obj.PortalData with
-                        | ValueSome portalData ->
-                          core.EventBus.Publish(
-                            {
-                              EntityId = entityId
-                              TargetMap = portalData.TargetMap
-                              TargetSpawn = portalData.TargetSpawn
-                            }
-                            : SystemCommunications.PortalTravel
-                          )
+                    | ValueNone ->
+                      // Try polyline collision
+                      match polylineObjects.TryFindV cacheKey with
+                      | ValueSome chain ->
+                        match
+                          Spatial.circleChainMTV currentPos entityRadius chain
+                        with
+                        | ValueSome mtv ->
+                          if isTrigger then
+                            match obj.PortalData with
+                            | ValueSome p ->
+                              core.EventBus.Publish(
+                                {
+                                  EntityId = entityId
+                                  TargetMap = p.TargetMap
+                                  TargetSpawn = p.TargetSpawn
+                                }
+                                : SystemCommunications.PortalTravel
+                              )
+                            | ValueNone -> ()
+                          else
+                            iterationMTV <- iterationMTV + mtv
+                            iterationHasCollision <- true
+                            lastCollidedObj <- ValueSome obj
                         | ValueNone -> ()
-                      else
-                        // Accumulate MTV for combined correction
-                        accumulatedMTV <- accumulatedMTV + mtv
-                        hasWallCollision <- true
+                      | ValueNone -> ()
 
-                        // Emit collision event for velocity sliding
-                        core.EventBus.Publish(
-                          SystemCommunications.MapObjectCollision
-                            struct (entityId, obj, mtv)
-                        )
-                    | ValueNone -> ()
-                  | ValueNone -> ()
+              if iterationHasCollision then
+                currentPos <- currentPos + iterationMTV
+                totalMTV <- totalMTV + iterationMTV
+                globalHasCollision <- true
+              else
+                doneIterating <- true
 
-          // Apply single combined position correction after checking all objects
-          if hasWallCollision then
-            let correctedPos = pos + accumulatedMTV
+          // 4. Publish Results
+          if globalHasCollision then
+            // Note: totalMTV here is the sum of all corrections across all steps.
+            // But technically PositionChanged just needs the final valid position.
+            // The MTV in MapObjectCollision is used for sliding.
+            // Ideally it should be the normal of the wall we hit.
+            // Summing them might produce a large vector if we slid along a wall for many steps.
+            // However, for velocity cancellation, a large opposing vector is fine/good.
 
             core.EventBus.Publish(
-              Physics(PositionChanged struct (entityId, correctedPos))
+              Physics(PositionChanged struct (entityId, currentPos))
             )
+
+            match lastCollidedObj with
+            | ValueSome obj ->
+              core.EventBus.Publish(
+                SystemCommunications.MapObjectCollision
+                  struct (entityId, obj, totalMTV)
+              )
+            | ValueNone -> ()
