@@ -196,11 +196,21 @@ module MapLoader =
     let gid = attr "gid" element |> ValueOption.map parseGid
 
     let parsePointsString(pts: string) =
-      pts.Split(' ')
-      |> Array.map(fun p ->
-        let coords = p.Split(',')
-        Vector2(parseFloat coords.[0], parseFloat coords.[1]))
-      |> IndexList.ofArray
+      if String.IsNullOrEmpty(pts) then
+        IndexList.empty
+      else
+        match pts.Split(' ') with
+        | [||] -> IndexList.empty
+        | points ->
+          points
+          |> Array.choose(fun p ->
+            let coords = p.Split(',')
+
+            match coords with
+            | [||] -> None
+            | [| x; y |] -> Some(Vector2(parseFloat x, parseFloat y))
+            | _ -> None)
+          |> IndexList.ofArray
 
     let collisionShape =
       let polygon = element.Element(xname "polygon")
