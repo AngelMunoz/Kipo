@@ -232,6 +232,70 @@ module Spatial =
       ValueSome(points |> IndexList.map(fun p -> rotate p radians + pos))
     | _ -> ValueNone
 
+  /// Calculates the AABB (Axis Aligned Bounding Box) for a map object
+  /// Returns struct (min, max) vectors
+  let getMapObjectAABB(obj: Map.MapObject) =
+    let radians = MathHelper.ToRadians obj.Rotation
+    let pos = Vector2(obj.X, obj.Y)
+
+    // Helper to get bounds of points
+    let getBounds(points: seq<Vector2>) =
+      let mutable minX = Single.MaxValue
+      let mutable minY = Single.MaxValue
+      let mutable maxX = Single.MinValue
+      let mutable maxY = Single.MinValue
+
+      for p in points do
+        let rotated = rotate p radians + pos
+        minX <- min minX rotated.X
+        minY <- min minY rotated.Y
+        maxX <- max maxX rotated.X
+        maxY <- max maxY rotated.Y
+
+      struct (Vector2(minX, minY), Vector2(maxX, maxY))
+
+    match obj.CollisionShape with
+    | ValueSome(Map.CollisionShape.Circle radius) ->
+      // Based on getMapObjectPolygon logic: centerOffset = Vector2(radius, radius)
+      let centerOffset = Vector2(radius, radius)
+      // The circle center in world space:
+      // We need to rotate the center offset
+      let worldCenter = rotate centerOffset radians + pos
+      let r = Vector2(radius, radius)
+      struct (worldCenter - r, worldCenter + r)
+
+    | ValueSome(Map.CollisionShape.ClosedPolygon points) -> getBounds points
+
+    | ValueSome(Map.OpenPolyline points) -> getBounds points
+
+    | ValueSome(Map.RectangleShape(w, h)) ->
+      let corners = [
+        Vector2.Zero
+        Vector2(w, 0.0f)
+        Vector2(w, h)
+        Vector2(0.0f, h)
+      ]
+
+      getBounds corners
+
+    | ValueSome(Map.EllipseShape(w, h)) ->
+      // Approximate like in polygon
+      let segments = 8
+      let radiusX = w / 2.0f
+      let radiusY = h / 2.0f
+      let centerOffset = Vector2(radiusX, radiusY)
+      let step = MathHelper.TwoPi / float32 segments
+
+      let points = [
+        for i in 0 .. segments - 1 do
+          let theta = float32 i * step
+          Vector2(radiusX * cos theta, radiusY * sin theta) + centerOffset
+      ]
+
+      getBounds points
+
+    | ValueNone -> struct (pos, pos)
+
   // ============================================================================
   // Segment-Based Collision for Polylines
   // ============================================================================
