@@ -149,23 +149,44 @@ module Spatial =
       Vector2(pos.X - halfSize, pos.Y + halfSize)
     ]
 
+  let getEntityCollisionShape(pos: Vector2) =
+    // Standard circular collision for entities
+    Map.CollisionShape.Circle Core.Constants.Entity.CollisionRadius
+
   let rotate (v: Vector2) (radians: float32) =
     let cos = MathF.Cos radians
     let sin = MathF.Sin radians
     Vector2(v.X * cos - v.Y * sin, v.X * sin + v.Y * cos)
 
-  let getMapObjectPolygon(obj: Map.MapObject) =
+  /// Gets the collision polygon for a map object (for closed shapes only)
+  /// Returns ValueNone for shapes that shouldn't use polygon collision (like polylines)
+  let getMapObjectPolygon(obj: Map.MapObject) : IndexList<Vector2> voption =
     let radians = MathHelper.ToRadians obj.Rotation
     let pos = Vector2(obj.X, obj.Y)
 
-    match obj.Points with
-    | ValueSome points ->
-      points |> IndexList.map(fun p -> rotate p radians + pos)
-    | ValueNone ->
-      // Rectangle
-      let w = obj.Width
-      let h = obj.Height
+    match obj.CollisionShape with
+    | ValueSome(Map.CollisionShape.Circle radius) ->
+      // Approximate circle as polygon with 16 segments
+      let segments = 16
+      let step = MathHelper.TwoPi / float32 segments
+      let centerOffset = Vector2(radius, radius) // Assume top-left origin
 
+      let points =
+        [
+          for i in 0 .. segments - 1 do
+            let theta = float32 i * step
+
+            let local =
+              Vector2(radius * cos theta, radius * sin theta) + centerOffset
+
+            rotate local radians + pos
+        ]
+        |> IndexList.ofList
+
+      ValueSome points
+    | ValueSome(Map.CollisionShape.ClosedPolygon points) ->
+      ValueSome(points |> IndexList.map(fun p -> rotate p radians + pos))
+    | ValueSome(Map.RectangleShape(w, h)) ->
       let corners =
         IndexList.ofList [
           Vector2.Zero
@@ -174,7 +195,202 @@ module Spatial =
           Vector2(0.0f, h)
         ]
 
-      corners |> IndexList.map(fun p -> rotate p radians + pos)
+      ValueSome(corners |> IndexList.map(fun p -> rotate p radians + pos))
+    | ValueSome(Map.EllipseShape(w, h)) ->
+      // Approximate ellipse as polygon with 16 segments
+      let segments = 16
+      let radiusX = w / 2.0f
+      let radiusY = h / 2.0f
+      let centerOffset = Vector2(radiusX, radiusY)
+      let step = MathHelper.TwoPi / float32 segments
+
+      let points =
+        [
+          for i in 0 .. segments - 1 do
+            let theta = float32 i * step
+
+            let local =
+              Vector2(radiusX * cos theta, radiusY * sin theta) + centerOffset
+
+            rotate local radians + pos
+        ]
+        |> IndexList.ofList
+
+      ValueSome points
+    | ValueSome(Map.OpenPolyline _) ->
+      // Polylines should not be treated as closed polygons for SAT
+      ValueNone
+    | ValueNone -> ValueNone
+
+  /// Gets the polyline chain for a map object (for open polylines only)
+  let getMapObjectPolyline(obj: Map.MapObject) : IndexList<Vector2> voption =
+    let radians = MathHelper.ToRadians obj.Rotation
+    let pos = Vector2(obj.X, obj.Y)
+
+    match obj.CollisionShape with
+    | ValueSome(Map.OpenPolyline points) ->
+      ValueSome(points |> IndexList.map(fun p -> rotate p radians + pos))
+    | _ -> ValueNone
+
+  /// Calculates the AABB (Axis Aligned Bounding Box) for a map object
+  /// Returns struct (min, max) vectors
+  let getMapObjectAABB(obj: Map.MapObject) =
+    let radians = MathHelper.ToRadians obj.Rotation
+    let pos = Vector2(obj.X, obj.Y)
+
+    // Helper to get bounds of points
+    let getBounds(points: seq<Vector2>) =
+      let mutable minX = Single.MaxValue
+      let mutable minY = Single.MaxValue
+      let mutable maxX = Single.MinValue
+      let mutable maxY = Single.MinValue
+
+      for p in points do
+        let rotated = rotate p radians + pos
+        minX <- min minX rotated.X
+        minY <- min minY rotated.Y
+        maxX <- max maxX rotated.X
+        maxY <- max maxY rotated.Y
+
+      struct (Vector2(minX, minY), Vector2(maxX, maxY))
+
+    match obj.CollisionShape with
+    | ValueSome(Map.CollisionShape.Circle radius) ->
+      // Based on getMapObjectPolygon logic: centerOffset = Vector2(radius, radius)
+      let centerOffset = Vector2(radius, radius)
+      // The circle center in world space:
+      // We need to rotate the center offset
+      let worldCenter = rotate centerOffset radians + pos
+      let r = Vector2(radius, radius)
+      struct (worldCenter - r, worldCenter + r)
+
+    | ValueSome(Map.CollisionShape.ClosedPolygon points) -> getBounds points
+
+    | ValueSome(Map.OpenPolyline points) -> getBounds points
+
+    | ValueSome(Map.RectangleShape(w, h)) ->
+      let corners = [
+        Vector2.Zero
+        Vector2(w, 0.0f)
+        Vector2(w, h)
+        Vector2(0.0f, h)
+      ]
+
+      getBounds corners
+
+    | ValueSome(Map.EllipseShape(w, h)) ->
+      // Approximate like in polygon
+      let segments = 8
+      let radiusX = w / 2.0f
+      let radiusY = h / 2.0f
+      let centerOffset = Vector2(radiusX, radiusY)
+      let step = MathHelper.TwoPi / float32 segments
+
+      let points = [
+        for i in 0 .. segments - 1 do
+          let theta = float32 i * step
+          Vector2(radiusX * cos theta, radiusY * sin theta) + centerOffset
+      ]
+
+      getBounds points
+
+    | ValueNone -> struct (pos, pos)
+
+  // ============================================================================
+  // Segment-Based Collision for Polylines
+  // ============================================================================
+
+  /// Calculates the closest point on a line segment to a given point
+  let closestPointOnSegment (p: Vector2) (a: Vector2) (b: Vector2) : Vector2 =
+    let ab = b - a
+    let lenSq = ab.LengthSquared()
+
+    if lenSq = 0.0f then
+      a // Degenerate segment (a == b)
+    else
+      let t = Vector2.Dot(p - a, ab) / lenSq
+      let tClamped = Math.Clamp(t, 0.0f, 1.0f)
+      a + ab * tClamped
+
+  /// Calculates the distance from a point to a line segment
+  let distanceToSegment (p: Vector2) (a: Vector2) (b: Vector2) : float32 =
+    let closest = closestPointOnSegment p a b
+    Vector2.Distance(p, closest)
+
+  /// Checks if a circle intersects a line segment, returning the MTV if so
+  /// The MTV is the minimum translation vector to push the circle out of the segment
+  let circleSegmentMTV
+    (center: Vector2)
+    (radius: float32)
+    (a: Vector2)
+    (b: Vector2)
+    : Vector2 voption =
+    let closest = closestPointOnSegment center a b
+    let dist = Vector2.Distance(center, closest)
+
+    if dist < radius then
+      // Circle intersects the segment
+      if dist = 0.0f then
+        // Center is exactly on the segment, push perpendicular to segment
+        let segDir = b - a
+
+        if segDir.LengthSquared() = 0.0f then
+          // Degenerate segment, push in any direction
+          ValueSome(Vector2.UnitX * radius)
+        else
+          let perpendicular = Vector2.Normalize(Vector2(-segDir.Y, segDir.X))
+          ValueSome(perpendicular * radius)
+      else
+        // Normal case: push away from closest point
+        let pushDir = Vector2.Normalize(center - closest)
+        let penetration = radius - dist
+        ValueSome(pushDir * penetration)
+    else
+      ValueNone
+
+  /// Checks a circle against an open chain of segments (polyline), returning combined MTV
+  /// This iterates through each segment and accumulates all MTVs to handle corners properly
+  /// Also checks vertices (polyline joints) to prevent slipping through sharp corners
+  let circleChainMTV
+    (center: Vector2)
+    (radius: float32)
+    (chain: IndexList<Vector2>)
+    : Vector2 voption =
+    if chain.Count < 2 then
+      ValueNone
+    else
+      let mutable accumulatedMTV = Vector2.Zero
+      let mutable hasCollision = false
+
+      // Check each segment in the chain and accumulate all MTVs
+      for i in 0 .. chain.Count - 2 do
+        let a = chain.[i]
+        let b = chain.[i + 1]
+
+        match circleSegmentMTV center radius a b with
+        | ValueSome mtv ->
+          hasCollision <- true
+          accumulatedMTV <- accumulatedMTV + mtv
+        | ValueNone -> ()
+
+      // Also check interior vertices (joints) explicitly
+      // This prevents slipping through acute angle corners
+      for i in 1 .. chain.Count - 2 do
+        let vertex = chain.[i]
+        let dist = Vector2.Distance(center, vertex)
+
+        if dist < radius then
+          hasCollision <- true
+
+          if dist > 0.0f then
+            let pushDir = Vector2.Normalize(center - vertex)
+            let penetration = radius - dist
+            accumulatedMTV <- accumulatedMTV + pushDir * penetration
+          else
+            // Entity center exactly on vertex, push in any direction
+            accumulatedMTV <- accumulatedMTV + Vector2.UnitX * radius
+
+      if hasCollision then ValueSome accumulatedMTV else ValueNone
 
   let isPointInCone (cone: Cone) (point: Vector2) =
     let distanceSquared = Vector2.DistanceSquared(cone.Origin, point)

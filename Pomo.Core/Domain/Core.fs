@@ -73,7 +73,7 @@ module Core =
       let ModelScale = 0.25f
 
       [<Literal>]
-      let CollisionRadius = 16.0f
+      let CollisionRadius = 8.0f
 
       [<Literal>]
       let CollisionDistance = 32.0f
@@ -94,6 +94,8 @@ module Core =
     module Navigation =
       [<Literal>]
       let GridCellSize = 8.0f
+
+      let EntitySize = Vector2(4.0f, 4.0f)
 
     module Spawning =
       let DefaultDuration = TimeSpan.FromSeconds 1.0

@@ -19,7 +19,7 @@ module Navigation =
   open Pomo.Core.Domain.Core
 
   let create(eventBus: EventBus, mapStore: MapStore, world: World) =
-    let entitySize = Constants.Entity.Size
+    let entitySize = Constants.Navigation.EntitySize
     let gridCache = System.Collections.Generic.Dictionary<string, NavGrid>()
 
     let getNavGrid(mapKey: string) =

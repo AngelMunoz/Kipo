@@ -4,6 +4,7 @@ open System
 open System.Collections.Generic
 open Microsoft.Xna.Framework
 open FSharp.UMX
+open FSharp.Data.Adaptive
 open Pomo.Core.Domain.Spatial
 open Pomo.Core.Domain.Navigation
 open Pomo.Core.Domain.Map
@@ -109,91 +110,9 @@ module Pathfinding =
 
             let pos = Vector2(obj.X, obj.Y)
 
-            // Determine the shape to rasterize
-            match obj.IsEllipse, obj.Points with
-            | true, _ ->
-              // Handle Ellipse
-              // Ellipse defined by bounding box at (X,Y) with Width, Height
-              // We approximate collision by checking if a point is within the ellipse + entityRadius
-              // For simplicity, we'll assume the ellipse is axis-aligned relative to its rotation
-              // But Tiled ellipses can be rotated.
-              // Center of ellipse:
-              let localCenter = Vector2(obj.Width / 2.0f, obj.Height / 2.0f)
-              let worldCenter = (rotate localCenter) + pos
-
-              let radiusX = obj.Width / 2.0f
-              let radiusY = obj.Height / 2.0f
-
-              // Bounding box for the ellipse (approximate with rotation)
-              // A safe bound is the max dimension / 2.0f + entityRadius (circumscribed radius)
-              let maxDim = max obj.Width obj.Height
-              let searchRadius = maxDim / 2.0f + entityRadius
-
-              let minX =
-                max 0 (int(floor((worldCenter.X - searchRadius) / cellSize)))
-
-              let minY =
-                max 0 (int(floor((worldCenter.Y - searchRadius) / cellSize)))
-
-              let maxX =
-                min
-                  (width - 1)
-                  (int(ceil((worldCenter.X + searchRadius) / cellSize)))
-
-              let maxY =
-                min
-                  (height - 1)
-                  (int(ceil((worldCenter.Y + searchRadius) / cellSize)))
-
-              for x in minX..maxX do
-                for y in minY..maxY do
-                  if not isBlocked[x, y] then
-                    let cellCenter = gridToWorld cellSize { X = x; Y = y }
-
-                    // Transform cell center back to local ellipse space
-                    let relative = cellCenter - pos
-                    // Inverse rotate
-                    let local =
-                      Vector2(
-                        relative.X * cos + relative.Y * sin,
-                        -relative.X * sin + relative.Y * cos
-                      )
-
-                    // Check if inside ellipse (expanded by entityRadius)
-                    // (dx/rx)^2 + (dy/ry)^2 <= 1
-                    // We add entityRadius to radii to approximate expansion
-                    let rx = radiusX + entityRadius
-                    let ry = radiusY + entityRadius
-
-                    let dx = local.X - radiusX // relative to center (radiusX, radiusY)
-                    let dy = local.Y - radiusY
-
-                    if
-                      (dx * dx) / (rx * rx) + (dy * dy) / (ry * ry) <= 1.0f
-                    then
-                      isBlocked[x, y] <- true
-
-            | false, _ ->
-              // Handle Polygon/Polyline/Rectangle (Rotated)
-              // We treat everything as a polygon and check intersection with the Entity's Square (AABB)
-
+            let rasterizePolygon (points: IndexList<Vector2>) (isClosed: bool) =
               let worldPoints =
-                match obj.Points with
-                | ValueSome points when points.Count > 0 ->
-                  points |> Seq.map(fun p -> (rotate p) + pos) |> Seq.toArray
-                | _ ->
-                  // Rectangle as 4-point polygon
-                  let w = obj.Width
-                  let h = obj.Height
-
-                  let localCorners = [|
-                    Vector2.Zero
-                    Vector2(w, 0.0f)
-                    Vector2(w, h)
-                    Vector2(0.0f, h)
-                  |]
-
-                  localCorners |> Array.map(fun p -> (rotate p) + pos)
+                points |> Seq.map(fun p -> (rotate p) + pos) |> Seq.toArray
 
               // Calculate bounding box for search optimization
               let minPX =
@@ -279,7 +198,7 @@ module Pathfinding =
                     let entMaxY = cellCenter.Y + halfH
 
                     // 1. Check if Cell Center is inside Polygon (Fastest check for large polygons)
-                    if isPointInPolygon cellCenter worldPoints then
+                    if isClosed && isPointInPolygon cellCenter worldPoints then
                       isBlocked[x, y] <- true
                     else
                       // 2. Check if any Polygon Vertex is inside Entity AABB (Handles small polygons inside entity)
@@ -306,6 +225,7 @@ module Pathfinding =
                         // 3. Check Edge Intersection (Handles overlapping edges)
                         let mutable edgeIntersect = false
                         let mutable i = 0
+                        let edgeCount = if isClosed then count else count - 1
                         // Entity Edges
                         let entCorners = [|
                           Vector2(entMinX, entMinY)
@@ -314,7 +234,7 @@ module Pathfinding =
                           Vector2(entMinX, entMaxY)
                         |]
 
-                        while i < count && not edgeIntersect do
+                        while i < edgeCount && not edgeIntersect do
                           let p1 = worldPoints.[i]
                           let p2 = worldPoints.[(i + 1) % count]
 
@@ -330,6 +250,128 @@ module Pathfinding =
 
                         if edgeIntersect then
                           isBlocked[x, y] <- true
+
+            // Determine the shape to rasterize based on CollisionShape
+            match obj.CollisionShape with
+            | ValueSome(Pomo.Core.Domain.Map.CollisionShape.Circle radius) ->
+              // Handle Circle
+              let localCenter = Vector2(radius, radius)
+              let worldCenter = (rotate localCenter) + pos
+
+              let searchRadius = radius + entityRadius
+
+              let minX =
+                max 0 (int(floor((worldCenter.X - searchRadius) / cellSize)))
+
+              let minY =
+                max 0 (int(floor((worldCenter.Y - searchRadius) / cellSize)))
+
+              let maxX =
+                min
+                  (width - 1)
+                  (int(ceil((worldCenter.X + searchRadius) / cellSize)))
+
+              let maxY =
+                min
+                  (height - 1)
+                  (int(ceil((worldCenter.Y + searchRadius) / cellSize)))
+
+              for x in minX..maxX do
+                for y in minY..maxY do
+                  if not isBlocked[x, y] then
+                    let cellCenter = gridToWorld cellSize { X = x; Y = y }
+                    let relative = cellCenter - pos
+
+                    let local =
+                      Vector2(
+                        relative.X * cos + relative.Y * sin,
+                        -relative.X * sin + relative.Y * cos
+                      )
+
+                    let rx = radius + entityRadius
+                    let distSq = Vector2.DistanceSquared(local, localCenter)
+
+                    if distSq <= rx * rx then
+                      isBlocked[x, y] <- true
+
+            | ValueSome(Pomo.Core.Domain.Map.CollisionShape.EllipseShape(ew, eh)) ->
+              // Handle Ellipse
+              // Ellipse defined by bounding box at (X,Y) with ew, eh
+              // We approximate collision by checking if a point is within the ellipse + entityRadius
+              let localCenter = Vector2(ew / 2.0f, eh / 2.0f)
+              let worldCenter = (rotate localCenter) + pos
+
+              let radiusX = ew / 2.0f
+              let radiusY = eh / 2.0f
+
+              // Bounding box for the ellipse (approximate with rotation)
+              // A safe bound is the max dimension / 2.0f + entityRadius (circumscribed radius)
+              let maxDim = max ew eh
+              let searchRadius = maxDim / 2.0f + entityRadius
+
+              let minX =
+                max 0 (int(floor((worldCenter.X - searchRadius) / cellSize)))
+
+              let minY =
+                max 0 (int(floor((worldCenter.Y - searchRadius) / cellSize)))
+
+              let maxX =
+                min
+                  (width - 1)
+                  (int(ceil((worldCenter.X + searchRadius) / cellSize)))
+
+              let maxY =
+                min
+                  (height - 1)
+                  (int(ceil((worldCenter.Y + searchRadius) / cellSize)))
+
+              for x in minX..maxX do
+                for y in minY..maxY do
+                  if not isBlocked[x, y] then
+                    let cellCenter = gridToWorld cellSize { X = x; Y = y }
+
+                    // Transform cell center back to local ellipse space
+                    let relative = cellCenter - pos
+                    // Inverse rotate
+                    let local =
+                      Vector2(
+                        relative.X * cos + relative.Y * sin,
+                        -relative.X * sin + relative.Y * cos
+                      )
+
+                    // Check if inside ellipse (expanded by entityRadius)
+                    // (dx/rx)^2 + (dy/ry)^2 <= 1
+                    // We add entityRadius to radii to approximate expansion
+                    let rx = radiusX + entityRadius
+                    let ry = radiusY + entityRadius
+
+                    let dx = local.X - radiusX // relative to center (radiusX, radiusY)
+                    let dy = local.Y - radiusY
+
+                    if
+                      (dx * dx) / (rx * rx) + (dy * dy) / (ry * ry) <= 1.0f
+                    then
+                      isBlocked[x, y] <- true
+
+            | ValueSome(Pomo.Core.Domain.Map.CollisionShape.RectangleShape(w, h)) ->
+              let points =
+                IndexList.ofList [
+                  Vector2.Zero
+                  Vector2(w, 0.0f)
+                  Vector2(w, h)
+                  Vector2(0.0f, h)
+                ]
+
+              rasterizePolygon points true
+
+            | ValueSome(Pomo.Core.Domain.Map.CollisionShape.ClosedPolygon points) ->
+              rasterizePolygon points true
+
+            | ValueSome(Pomo.Core.Domain.Map.CollisionShape.OpenPolyline points) ->
+              rasterizePolygon points false
+
+            | ValueNone -> ()
+
 
       {
         Width = width

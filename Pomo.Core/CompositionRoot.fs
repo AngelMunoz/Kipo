@@ -186,8 +186,8 @@ module CompositionRoot =
       baseComponents.Add(new CombatSystem(game, pomoEnv))
       baseComponents.Add(new ResourceManagerSystem(game, pomoEnv))
       baseComponents.Add(new ProjectileSystem(game, pomoEnv))
-      baseComponents.Add(new CollisionSystem(game, pomoEnv))
       baseComponents.Add(new MovementSystem(game, pomoEnv))
+      baseComponents.Add(new CollisionSystem(game, pomoEnv))
 
       baseComponents.Add(
         new NotificationSystem(game, pomoEnv, DrawOrder = Render.Layer.UI)
@@ -283,8 +283,8 @@ module CompositionRoot =
                   |> ValueOption.defaultValue false
 
                 let pos =
-                  match obj.Points with
-                  | ValueSome points when not points.IsEmpty ->
+                  match obj.CollisionShape with
+                  | ValueSome(ClosedPolygon points) when not points.IsEmpty ->
                     let offset = getRandomPointInPolygon points scope.Random
                     Vector2(obj.X + offset.X, obj.Y + offset.Y)
                   | _ -> Vector2(obj.X, obj.Y)
@@ -384,7 +384,7 @@ module CompositionRoot =
             DrawOrder = Render.Layer.Debug
           )
 
-        // mapDependentComponents.Add(debugRender)
+        mapDependentComponents.Add(debugRender)
 
         spawnEntitiesForMap mapDef playerId scenarioId targetSpawn
 
