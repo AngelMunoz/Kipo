@@ -954,7 +954,7 @@ module DebugRender =
                   drawCircle sb px position radius Color.Cyan
                 | Map.CollisionShape.ClosedPolygon poly ->
                   drawPolygon sb px poly position 0.0f Color.Cyan
-                | _ -> ()
+                | _ -> () // FIXME: Handle other collision shapes (OpenPolyline, RectangleShape, EllipseShape)
               | ValueNone -> ()
 
             | DrawSpatialGrid grid ->
