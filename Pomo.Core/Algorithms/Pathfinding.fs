@@ -110,7 +110,7 @@ module Pathfinding =
 
             let pos = Vector2(obj.X, obj.Y)
 
-            let rasterizePolygon(points: IndexList<Vector2>) =
+            let rasterizePolygon (points: IndexList<Vector2>) (isClosed: bool) =
               let worldPoints =
                 points |> Seq.map(fun p -> (rotate p) + pos) |> Seq.toArray
 
@@ -198,7 +198,7 @@ module Pathfinding =
                     let entMaxY = cellCenter.Y + halfH
 
                     // 1. Check if Cell Center is inside Polygon (Fastest check for large polygons)
-                    if isPointInPolygon cellCenter worldPoints then
+                    if isClosed && isPointInPolygon cellCenter worldPoints then
                       isBlocked[x, y] <- true
                     else
                       // 2. Check if any Polygon Vertex is inside Entity AABB (Handles small polygons inside entity)
@@ -225,6 +225,7 @@ module Pathfinding =
                         // 3. Check Edge Intersection (Handles overlapping edges)
                         let mutable edgeIntersect = false
                         let mutable i = 0
+                        let edgeCount = if isClosed then count else count - 1
                         // Entity Edges
                         let entCorners = [|
                           Vector2(entMinX, entMinY)
@@ -233,7 +234,7 @@ module Pathfinding =
                           Vector2(entMinX, entMaxY)
                         |]
 
-                        while i < count && not edgeIntersect do
+                        while i < edgeCount && not edgeIntersect do
                           let p1 = worldPoints.[i]
                           let p2 = worldPoints.[(i + 1) % count]
 
@@ -361,11 +362,13 @@ module Pathfinding =
                   Vector2(0.0f, h)
                 ]
 
-              rasterizePolygon points
+              rasterizePolygon points true
 
-            | ValueSome(Pomo.Core.Domain.Map.CollisionShape.ClosedPolygon points)
+            | ValueSome(Pomo.Core.Domain.Map.CollisionShape.ClosedPolygon points) ->
+              rasterizePolygon points true
+
             | ValueSome(Pomo.Core.Domain.Map.CollisionShape.OpenPolyline points) ->
-              rasterizePolygon points
+              rasterizePolygon points false
 
             | ValueNone -> ()
 
