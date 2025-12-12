@@ -30,7 +30,7 @@
     "Radius": 0.5,
     "LocalOffset": { "X": 0.0, "Y": 0.5, "Z": 0.0 },
     "Particle": {
-      "Lifetime": [10, 0.5],
+      "Lifetime": [5, 0.5],
       "Speed": [10, 1.0],
       "SizeStart": 1.0,
       "SizeEnd": 10.0,
