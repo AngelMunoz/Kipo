@@ -487,12 +487,15 @@ module Render =
                         p.Position + effectPos
 
                     // Transform Logic Position (X, Z, Y-Up) to Render Space
+                    // Transform Logic Position (X, Z, Y-Up) to Render Space
                     let logicPos = Vector2(pWorldPos.X, pWorldPos.Z)
 
                     let baseRenderPos =
                       RenderMath.LogicToRender logicPos pixelsPerUnit
 
-                    let altitude = pWorldPos.Y / pixelsPerUnit.Y
+                    // Fix for Verticality: Use PPU.X for altitude but DOUBLE it (scales like Depth).
+                    // This counteracts the visual flattening.
+                    let altitude = (pWorldPos.Y / pixelsPerUnit.X) * 2.0f
 
                     let finalPos =
                       Vector3(
@@ -507,7 +510,7 @@ module Render =
                     billboardBatch.Draw(
                       finalPos,
                       size,
-                      p.Rotation,
+                      0.0f, // Rotation removed per user request
                       p.Color,
                       camRight,
                       camUp
@@ -536,7 +539,9 @@ module Render =
                     let baseRenderPos =
                       RenderMath.LogicToRender logicPos pixelsPerUnit
 
-                    let altitude = pWorldPos.Y / pixelsPerUnit.Y
+                    // Fix for Verticality: Use PPU.X for altitude but DOUBLE it (scales like Depth).
+                    // This counteracts the visual flattening.
+                    let altitude = (pWorldPos.Y / pixelsPerUnit.X) * 2.0f
 
                     let finalPos =
                       Vector3(
@@ -550,7 +555,7 @@ module Render =
                     billboardBatch.Draw(
                       finalPos,
                       size,
-                      p.Rotation,
+                      0.0f, // Rotation removed per user request
                       p.Color,
                       camRight,
                       camUp

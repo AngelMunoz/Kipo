@@ -107,7 +107,6 @@ module ParticleSystem =
         Position = finalSpawnPos
         Velocity = velocity
         Size = config.SizeStart
-        Rotation = float32(rng.NextDouble() * 2.0 * Math.PI)
         Color = config.ColorStart
         Life = lifetime
         MaxLife = lifetime

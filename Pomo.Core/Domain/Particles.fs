@@ -56,7 +56,6 @@ module Particles =
     Position: Vector3
     Velocity: Vector3
     Size: float32
-    Rotation: float32
     Color: Color
     Life: float32
     MaxLife: float32
