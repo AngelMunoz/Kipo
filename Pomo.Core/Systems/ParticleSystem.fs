@@ -41,33 +41,38 @@ module ParticleSystem =
         let struct (min, max) = config.Speed
         min + (float32(rng.NextDouble()) * (max - min))
 
-      // Direction based on shape
-      let dir =
+      // Direction and spawn offset based on shape
+      let struct (dir, spawnOffset) =
         match emitter.Config.Shape with
         | Point ->
+          // Random direction, spawn at center
           let theta = rng.NextDouble() * 2.0 * Math.PI
-          let phi = rng.NextDouble() * 2.0 * Math.PI
+          let phi = rng.NextDouble() * Math.PI
           let x = Math.Sin(phi) * Math.Cos(theta)
-          let y = Math.Sin(phi) * Math.Sin(theta)
-          let z = Math.Cos(phi)
-          Vector3(float32 x, float32 y, float32 z)
+          let y = Math.Cos(phi)
+          let z = Math.Sin(phi) * Math.Sin(theta)
+          struct (Vector3(float32 x, float32 y, float32 z), Vector3.Zero)
         | Sphere r ->
+          // Spherical direction, spawn on sphere surface at radius
           let theta = rng.NextDouble() * 2.0 * Math.PI
-          let phi = rng.NextDouble() * 2.0 * Math.PI
+          let phi = rng.NextDouble() * Math.PI
           let x = Math.Sin(phi) * Math.Cos(theta)
-          let y = Math.Sin(phi) * Math.Sin(theta)
-          let z = Math.Cos(phi)
-          Vector3(float32 x, float32 y, float32 z)
+          let y = Math.Cos(phi)
+          let z = Math.Sin(phi) * Math.Sin(theta)
+          let dir = Vector3(float32 x, float32 y, float32 z)
+          // Spawn ON the sphere surface, move OUTWARD
+          struct (dir, dir * r)
         | Cone(angle, radius) ->
           let rad = MathHelper.ToRadians(angle)
           let x = (rng.NextDouble() * 2.0 - 1.0) * Math.Sin(float rad)
           let z = (rng.NextDouble() * 2.0 - 1.0) * Math.Sin(float rad)
-          Vector3(float32 x, 1.0f, float32 z) |> Vector3.Normalize
+          let dir = Vector3(float32 x, 1.0f, float32 z) |> Vector3.Normalize
+          struct (dir, Vector3.Zero)
 
       let velocity = dir * speed
 
       let p = {
-        Position = worldPos + emitter.Config.LocalOffset
+        Position = worldPos + emitter.Config.LocalOffset + spawnOffset
         Velocity = velocity
         Size = config.SizeStart
         Color = config.ColorStart
