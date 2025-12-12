@@ -30,13 +30,13 @@
     "Radius": 0.5,
     "LocalOffset": { "X": 0.0, "Y": 0.5, "Z": 0.0 },
     "Particle": {
-      "Lifetime": [0.5, 1.2],
-      "Speed": [1.0, 4.0],
+      "Lifetime": [10, 0.5],
+      "Speed": [10, 1.0],
       "SizeStart": 1.0,
       "SizeEnd": 10.0,
       "ColorStart": "#FFD880FF",
       "ColorEnd": "#FF400000",
-      "Gravity": 0.1,
+      "Gravity": -600,
       "RandomVelocity": { "X": 0.5, "Y": 0.5, "Z": 0.5 }
     }
   }
