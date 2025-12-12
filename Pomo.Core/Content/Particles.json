@@ -214,20 +214,20 @@
     "Rate": 0,
     "Burst": 200,
     "Shape": "Cone",
-    "Angle": 30,
+    "Angle": 45,
     "Radius": 0.1,
     "LocalOffset": { "X": 0.0, "Y": 1.0, "Z": 0.0 },
     "Particle": {
       "Lifetime": [0.5, 1.0],
-      "Speed": [200, 400],
+      "Speed": [200, 1000],
       "SizeStart": 1.0,
       "SizeEnd": 4.0,
       "ColorStart": "#FF4500FF",
       "ColorEnd": "#FF000000",
       "Gravity": -50,
-      "Drag": 2.0
+      "Drag": 1.0
     },
-    "EmissionRotation": { "X": 90.0, "Y": 0.0, "Z": 0.0 }
+    "EmissionRotation": { "X": 90.0, "Y": 45.0, "Z": 0.0 }
   },
   {
     "Name": "ManaConcentration",
@@ -284,8 +284,8 @@
       "Speed": [50, 150],
       "SizeStart": 2.0,
       "SizeEnd": 4.0,
-      "ColorStart": "#8B4513FF",
-      "ColorEnd": "#8B451300",
+      "ColorStart": "#17120FFF",
+      "ColorEnd": "#654D3B00",
       "Gravity": 500,
       "Drag": 4.0
     },
