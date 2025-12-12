@@ -204,7 +204,7 @@
       "Gravity": 0,
       "Drag": 0.0
     },
-    "EmissionRotation": { "X": 90.0, "Y": 0.0, "Z": 0.0 }
+    "EmissionRotation": { "X": 0, "Y": 0.0, "Z": 0.0 }
   },
   {
     "Name": "FireBreath",
@@ -212,22 +212,23 @@
     "BlendMode": "Additive",
     "SimulationSpace": "World",
     "Rate": 0,
-    "Burst": 200,
+    "Burst": 300,
     "Shape": "Cone",
     "Angle": 45,
     "Radius": 0.1,
     "LocalOffset": { "X": 0.0, "Y": 1.0, "Z": 0.0 },
     "Particle": {
-      "Lifetime": [0.5, 1.0],
-      "Speed": [200, 1000],
-      "SizeStart": 1.0,
-      "SizeEnd": 4.0,
+      "Lifetime": [0.3, 1.5],
+      "Speed": [300, 500],
+      "SizeStart": 1.5,
+      "SizeEnd": 0.0,
       "ColorStart": "#FF4500FF",
-      "ColorEnd": "#FF000000",
-      "Gravity": -50,
-      "Drag": 1.0
+      "ColorEnd": "#FF200000",
+      "Gravity": 50,
+      "RandomVelocity": { "X": 5, "Y": 5, "Z": 5 },
+      "Drag": 0.3
     },
-    "EmissionRotation": { "X": 90.0, "Y": 45.0, "Z": 0.0 }
+    "FloorHeight": 0.0
   },
   {
     "Name": "ManaConcentration",
@@ -313,7 +314,7 @@
       "Drag": 1.0
     },
     "FloorHeight": 0.0,
-    "EmissionRotation": { "X": 90.0, "Y": 0.0, "Z": 0.0 }
+    "EmissionRotation": { "X": 0, "Y": 0.0, "Z": 0.0 }
   },
   {
     "Name": "IceShatterProjectile",
@@ -337,7 +338,7 @@
       "Drag": 5.0
     },
     "FloorHeight": 0.0,
-    "EmissionRotation": { "X": 90.0, "Y": 0.0, "Z": 0.0 }
+    "EmissionRotation": { "X": 0, "Y": 0.0, "Z": 0.0 }
   },
   {
     "Name": "IceShatterProjectile",

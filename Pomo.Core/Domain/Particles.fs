@@ -86,6 +86,20 @@ module Particles =
     BurstDone: bool ref
   }
 
+  [<Struct>]
+  type EffectOverrides = {
+    Rotation: Quaternion voption
+    Scale: float32 voption
+    Color: Color voption
+  }
+
+  module EffectOverrides =
+    let empty = {
+      Rotation = ValueNone
+      Scale = ValueNone
+      Color = ValueNone
+    }
+
   type ActiveEffect = {
     Id: string
     Emitters: ActiveEmitter list
@@ -94,6 +108,7 @@ module Particles =
     Scale: Vector3 ref
     IsAlive: bool ref
     Owner: Guid<EntityId> voption
+    Overrides: EffectOverrides
   }
 
   module Serialization =

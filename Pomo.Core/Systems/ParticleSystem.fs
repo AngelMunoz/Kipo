@@ -12,6 +12,7 @@ open Pomo.Core.Domain.Particles
 open Pomo.Core.Domain.Units
 open Pomo.Core.Environment
 open Pomo.Core.Systems.Systems
+
 module ParticleSystem =
 
   let updateParticle (dt: float32) (p: Particle) =
@@ -34,6 +35,7 @@ module ParticleSystem =
     (ownerVelocity: Vector3)
     (spawningEnabled: bool)
     (ownerRotation: Quaternion)
+    (overrides: EffectOverrides)
     =
     // Helper to spawn a single particle
     let spawnParticle() =
@@ -76,29 +78,41 @@ module ParticleSystem =
 
           struct (dir, Vector3.Zero)
         | EmitterShape.Cone(angle, radius) ->
-          let rad = MathHelper.ToRadians(angle)
-          let x = (rng.NextDouble() * 2.0 - 1.0) * Math.Sin(float rad)
-          let z = (rng.NextDouble() * 2.0 - 1.0) * Math.Sin(float rad)
-          // Base Cone points UP (Y)
+          // Use polar coordinates for uniform cone distribution
+          let halfAngleRad = MathHelper.ToRadians(angle / 2.0f)
+          // Random angle around the cone axis
+          let phi = rng.NextDouble() * 2.0 * Math.PI
+          // Random offset from center (sqrt for uniform disk distribution)
+          let r = Math.Sqrt(rng.NextDouble()) * Math.Sin(float halfAngleRad)
+          let x = r * Math.Cos(phi)
+          let z = r * Math.Sin(phi)
+          // Base Cone points UP (Y), with spread in XZ
           let dir = Vector3(float32 x, 1.0f, float32 z) |> Vector3.Normalize
           struct (dir, Vector3.Zero)
 
       // Apply Rotations
       let configRotEuler = emitter.Config.EmissionRotation
-      let configRot =
-          Quaternion.CreateFromYawPitchRoll(
-              MathHelper.ToRadians(configRotEuler.Y),
-              MathHelper.ToRadians(configRotEuler.X),
-              MathHelper.ToRadians(configRotEuler.Z)
-          )
 
-      let totalRot = ownerRotation * configRot
+      let configRot =
+        Quaternion.CreateFromYawPitchRoll(
+          MathHelper.ToRadians(configRotEuler.Y),
+          MathHelper.ToRadians(configRotEuler.X),
+          MathHelper.ToRadians(configRotEuler.Z)
+        )
+
+      let baseRot =
+        match overrides.Rotation with
+        | ValueSome r -> r
+        | ValueNone -> ownerRotation
+
+      let totalRot = baseRot * configRot
 
       let dir = Vector3.Transform(dirLocal, totalRot)
       let spawnOffset = Vector3.Transform(spawnOffsetLocal, totalRot)
 
       // Rotate LocalOffset by Owner Rotation (it stays attached to the mesh)
-      let localOffsetRotated = Vector3.Transform(emitter.Config.LocalOffset, ownerRotation)
+      let localOffsetRotated =
+        Vector3.Transform(emitter.Config.LocalOffset, ownerRotation)
 
       // Initial Velocity
       let baseVelocity = dir * speed
@@ -173,7 +187,13 @@ module ParticleSystem =
 
         // Apply Air Drag
         if emitter.Config.Particle.Drag > 0.0f then
-          let dragFactor = MathHelper.Clamp(1.0f - (emitter.Config.Particle.Drag * dt), 0.0f, 1.0f)
+          let dragFactor =
+            MathHelper.Clamp(
+              1.0f - (emitter.Config.Particle.Drag * dt),
+              0.0f,
+              1.0f
+            )
+
           finalVelX <- finalVelX * dragFactor
           finalVelZ <- finalVelZ * dragFactor
 
@@ -232,7 +252,8 @@ module ParticleSystem =
     let particleStore = stores.ParticleStore
 
     // Map Gameplay Effect ID -> Particle Effect ID
-    let activeEffectVisuals = System.Collections.Generic.Dictionary<Guid<EffectId>, string>()
+    let activeEffectVisuals =
+      System.Collections.Generic.Dictionary<Guid<EffectId>, string>()
 
     override this.Update(gameTime) =
       let dt = float32 gameTime.ElapsedGameTime.TotalSeconds
@@ -243,16 +264,18 @@ module ParticleSystem =
       let gameplayEffects = core.World.ActiveEffects |> AMap.force
 
       // --- Sync Gameplay Effects to Visuals ---
-      let currentFrameEffectIds = System.Collections.Generic.HashSet<Guid<EffectId>>()
+      let currentFrameEffectIds =
+        System.Collections.Generic.HashSet<Guid<EffectId>>()
 
-      gameplayEffects |> HashMap.iter (fun entityId effectList ->
+      gameplayEffects
+      |> HashMap.iter(fun entityId effectList ->
         for gameplayEffect in effectList do
           // Check if effect has visuals
           match gameplayEffect.SourceEffect.Visuals.VfxId with
           | ValueSome vfxId ->
             currentFrameEffectIds.Add(gameplayEffect.Id) |> ignore
 
-            if not (activeEffectVisuals.ContainsKey(gameplayEffect.Id)) then
+            if not(activeEffectVisuals.ContainsKey(gameplayEffect.Id)) then
               // Spawn new visual effect
               match particleStore.tryFind vfxId with
               | ValueSome emitterConfigs ->
@@ -267,7 +290,7 @@ module ParticleSystem =
                     BurstDone = ref false
                   })
 
-                let newEffect : ActiveEffect = {
+                let newEffect: ActiveEffect = {
                   Id = particleEffectId
                   Emitters = emitters
                   Position = ref Vector3.Zero
@@ -275,21 +298,23 @@ module ParticleSystem =
                   Scale = ref Vector3.One
                   IsAlive = ref true
                   Owner = ValueSome entityId
+                  Overrides = EffectOverrides.empty
                 }
 
                 effects.Add(newEffect)
                 activeEffectVisuals.Add(gameplayEffect.Id, particleEffectId)
               | ValueNone -> () // VfxId not found in ParticleStore
-          | ValueNone -> ()
-      )
+          | ValueNone -> ())
 
       // Cleanup expired effects
       let toRemove = ResizeArray<Guid<EffectId>>()
+
       for kvp in activeEffectVisuals do
-        if not (currentFrameEffectIds.Contains(kvp.Key)) then
+        if not(currentFrameEffectIds.Contains(kvp.Key)) then
           // Effect expired in gameplay, stop spawning visual
           let particleEffectId = kvp.Value
-          match effects |> Seq.tryFind (fun e -> e.Id = particleEffectId) with
+
+          match effects |> Seq.tryFind(fun e -> e.Id = particleEffectId) with
           | Some e -> e.IsAlive.Value <- false
           | None -> ()
 
@@ -323,7 +348,11 @@ module ParticleSystem =
             // Get rotation if available (Yaw)
             match rotations.TryFindV ownerId with
             | ValueSome rot ->
-                ownerRotation <- Quaternion.CreateFromAxisAngle(Vector3.Up, -rot) // Negative rot for standard math?
+              ownerRotation <-
+                Quaternion.CreateFromAxisAngle(
+                  Vector3.Up,
+                  -rot + MathHelper.PiOver2
+                ) // Negative rot for standard math?
             | ValueNone -> ()
 
           | ValueNone -> effect.IsAlive.Value <- false
@@ -341,6 +370,7 @@ module ParticleSystem =
             ownerVelocity
             shouldSpawn
             ownerRotation
+            effect.Overrides
 
           if emitter.Particles.Count > 0 then
             anyParticlesAlive <- true

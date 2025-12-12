@@ -373,12 +373,14 @@ module Combat =
       | ValueSome configs ->
         let emitters =
           configs
-          |> List.map(fun config -> ({
-            Config = config
-            Particles = ResizeArray()
-            Accumulator = ref 0.0f
-            BurstDone = ref false
-          } : Pomo.Core.Domain.Particles.ActiveEmitter))
+          |> List.map(fun config ->
+            ({
+              Config = config
+              Particles = ResizeArray()
+              Accumulator = ref 0.0f
+              BurstDone = ref false
+            }
+            : Pomo.Core.Domain.Particles.ActiveEmitter))
           |> ResizeArray
 
         let effect: Pomo.Core.Domain.Particles.ActiveEffect = {
@@ -389,6 +391,10 @@ module Combat =
           Scale = ref Vector3.One
           IsAlive = ref true
           Owner = ValueNone
+          Overrides = {
+            EffectOverrides.empty with
+                Rotation = ValueSome rotation
+          }
         }
 
         ctx.VisualEffects.Add(effect)
@@ -601,7 +607,19 @@ module Combat =
           // And direction (0, 1) means +Z.
           // We need to rotate 180 deg?
           // Let's assume standard mapping: Yaw = -angle.
-          let rotation = Quaternion.CreateFromAxisAngle(Vector3.Up, -angle)
+          // Yaw to face target: PI/2 - angle maps Logic direction to Particle space
+          // (Particle +Z = Logic South, so East requires +90deg yaw)
+          let yaw =
+            Quaternion.CreateFromAxisAngle(
+              Vector3.Up,
+              -angle + MathHelper.PiOver2
+            )
+
+          // Pitch to re-orient "Up" particles to "Forward"
+          let pitch =
+            Quaternion.CreateFromAxisAngle(Vector3.UnitX, MathHelper.PiOver2)
+
+          let rotation = yaw * pitch
 
           Visuals.spawnEffect ctx vfxId center rotation
         | ValueNone -> ()

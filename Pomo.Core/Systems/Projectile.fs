@@ -161,6 +161,10 @@ module Projectile =
           Scale = ref Vector3.One
           IsAlive = ref true
           Owner = owner
+          Overrides = {
+            EffectOverrides.empty with
+                Rotation = ValueSome rotation
+          }
         }
 
         core.World.VisualEffects.Add(effect)
@@ -231,7 +235,12 @@ module Projectile =
 
             if not hasEffect then
               match snapshot.Positions |> HashMap.tryFindV projectileId with
-              | ValueSome pos -> spawnEffect vfxId pos Quaternion.Identity (ValueSome projectileId)
+              | ValueSome pos ->
+                spawnEffect
+                  vfxId
+                  pos
+                  Quaternion.Identity
+                  (ValueSome projectileId)
               | ValueNone -> ()
           | ValueNone -> ()
 
@@ -244,17 +253,32 @@ module Projectile =
                 match
                   snapshot.Positions |> HashMap.tryFindV impact.TargetId
                 with
-                | ValueSome targetPos -> 
-                    // Calculate Rotation
-                    let rotation =
-                        match snapshot.Positions |> HashMap.tryFindV impact.ProjectileId with
-                        | ValueSome projPos ->
-                            let dir = Vector2.Normalize(targetPos - projPos)
-                            let angle = MathF.Atan2(dir.Y, dir.X)
-                            Quaternion.CreateFromAxisAngle(Vector3.Up, -angle)
-                        | ValueNone -> Quaternion.Identity
+                | ValueSome targetPos ->
+                  // Calculate Rotation
+                  let rotation =
+                    match
+                      snapshot.Positions |> HashMap.tryFindV impact.ProjectileId
+                    with
+                    | ValueSome projPos ->
+                      let dir = Vector2.Normalize(targetPos - projPos)
+                      let angle = MathF.Atan2(dir.Y, dir.X)
 
-                    spawnEffect vfxId targetPos rotation ValueNone
+                      let yaw =
+                        Quaternion.CreateFromAxisAngle(
+                          Vector3.Up,
+                          -angle + MathHelper.PiOver2
+                        )
+
+                      let pitch =
+                        Quaternion.CreateFromAxisAngle(
+                          Vector3.UnitX,
+                          MathHelper.PiOver2
+                        )
+
+                      yaw * pitch
+                    | ValueNone -> Quaternion.Identity
+
+                  spawnEffect vfxId targetPos rotation ValueNone
                 | ValueNone -> ()
               | ValueNone -> ()
             | _ -> ()
