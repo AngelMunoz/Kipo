@@ -112,6 +112,7 @@ module Skill =
     DamageSource: DamageSource
     Stacking: StackingRule
     Duration: Duration
+    Visuals: VisualManifest
     Modifiers: EffectModifier[]
   }
 
@@ -203,6 +204,8 @@ module Skill =
     ElementFormula: ElementFormula voption
     Effects: Effect[]
     Origin: CastOrigin
+    CastVisuals: VisualManifest
+    ImpactVisuals: VisualManifest
   }
 
   [<Struct>]
@@ -471,6 +474,8 @@ module Skill =
           handler ex
 
 
+    open Pomo.Core.Domain.Core.Serialization
+
     module Formula =
       /// Examples
       /// "AP * 0.5 + 10"
@@ -692,6 +697,9 @@ module Skill =
           and! duration =
             Required.Property.get ("Duration", Duration.decoder) json
 
+          and! visuals =
+            VOptional.Property.get ("Visuals", VisualManifest.decoder) json
+
           and! modifiers =
             Required.Property.array ("Modifiers", EffectModifier.decoder) json
 
@@ -701,6 +709,10 @@ module Skill =
             DamageSource = damageSource
             Stacking = stacking
             Duration = duration
+            Visuals =
+              match visuals with
+              | ValueSome v -> v
+              | ValueNone -> VisualManifest.empty
             Modifiers = modifiers
           }
         }
@@ -1041,6 +1053,21 @@ module Skill =
           and! origin =
             Required.Property.get ("Origin", CastOrigin.decoder) json
 
+          and! castVisuals =
+            VOptional.Property.get ("CastVisuals", VisualManifest.decoder) json
+
+          and! impactVisuals =
+            VOptional.Property.get
+              ("ImpactVisuals", VisualManifest.decoder)
+              json
+
+          let cooldown = cooldownOpt |> ValueOption.map TimeSpan.FromSeconds
+
+          let castingTime =
+            castingTimeOpt |> ValueOption.map TimeSpan.FromSeconds
+
+          let range = rangeOpt
+
           return {
             Id = UMX.tag id
             Name = name
@@ -1048,16 +1075,24 @@ module Skill =
             Intent = intent
             DamageSource = damageSource
             Cost = cost
-            Cooldown = cooldownOpt |> ValueOption.map TimeSpan.FromSeconds
-            CastingTime = castingTimeOpt |> ValueOption.map TimeSpan.FromSeconds
+            Cooldown = cooldown
+            CastingTime = castingTime
             Targeting = targeting
-            Area = area
-            Range = rangeOpt
+            Range = range
             Delivery = delivery
+            Area = area
             Formula = formula
             ElementFormula = elementFormula
             Effects = effects
             Origin = origin
+            CastVisuals =
+              match castVisuals with
+              | ValueSome v -> v
+              | ValueNone -> VisualManifest.empty
+            ImpactVisuals =
+              match impactVisuals with
+              | ValueSome v -> v
+              | ValueNone -> VisualManifest.empty
           }
         }
 

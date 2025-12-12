@@ -9,6 +9,7 @@ open Pomo.Core.Domain
 open Pomo.Core.Domain.Units
 open Pomo.Core.Domain.Events
 open Pomo.Core.Domain.Projectile
+open Pomo.Core.Domain.Particles
 open Pomo.Core.Systems.Systems
 
 module Projectile =
@@ -132,6 +133,37 @@ module Projectile =
 
     let (Core core) = env.CoreServices
     let (Gameplay gameplay) = env.GameplayServices
+    let (Stores stores) = env.StoreServices
+
+    let spawnEffect
+      (vfxId: string)
+      (pos: Vector2)
+      (owner: Guid<EntityId> voption)
+      =
+      match stores.ParticleStore.tryFind vfxId with
+      | ValueSome configs ->
+        let emitters =
+          configs
+          |> List.map(fun config -> {
+            Config = config
+            Particles = ResizeArray()
+            Accumulator = ref 0.0f
+            BurstDone = ref false
+          })
+          |> ResizeArray
+
+        let effect = {
+          Id = System.Guid.NewGuid().ToString() // temp ID
+          Emitters = emitters |> Seq.toList
+          Position = ref(Vector3(pos.X, 0.0f, pos.Y))
+          Rotation = ref Quaternion.Identity
+          Scale = ref Vector3.One
+          IsAlive = ref true
+          Owner = owner
+        }
+
+        core.World.VisualEffects.Add(effect)
+      | ValueNone -> ()
 
     override this.Update _ =
       let liveEntities = gameplay.Projections.LiveEntities |> ASet.force
@@ -186,6 +218,35 @@ module Projectile =
 
           sysEvents.AddRange evs
           stateEvents.AddRange states
+
+          // Visuals Logic
+          // 1. Flight Visuals (Projectile itself)
+          match projectile.Info.Visuals.VfxId with
+          | ValueSome vfxId ->
+            // Check if we already have an effect for this projectile
+            let hasEffect =
+              core.World.VisualEffects
+              |> Seq.exists(fun e -> e.Owner = ValueSome projectileId)
+
+            if not hasEffect then
+              match snapshot.Positions |> HashMap.tryFindV projectileId with
+              | ValueSome pos -> spawnEffect vfxId pos (ValueSome projectileId)
+              | ValueNone -> ()
+          | ValueNone -> ()
+
+          // 2. Impact Visuals
+          for impact in evs do
+            match stores.SkillStore.tryFind impact.SkillId with
+            | ValueSome(Skill.Active skill) ->
+              match skill.ImpactVisuals.VfxId with
+              | ValueSome vfxId ->
+                match
+                  snapshot.Positions |> HashMap.tryFindV impact.TargetId
+                with
+                | ValueSome targetPos -> spawnEffect vfxId targetPos ValueNone
+                | ValueNone -> ()
+              | ValueNone -> ()
+            | _ -> ()
 
       sysEvents |> Seq.iter core.EventBus.Publish
       stateEvents |> Seq.iter core.EventBus.Publish

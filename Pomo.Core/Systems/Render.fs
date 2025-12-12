@@ -264,6 +264,25 @@ module Render =
     let texture = new Texture2D(game.GraphicsDevice, 1, 1)
     texture.SetData [| Color.White |]
 
+    let billboardBatch = new BillboardBatch(game.GraphicsDevice)
+
+    let textureCache =
+      System.Collections.Generic.Dictionary<string, Texture2D voption>()
+
+    let getTexture(id: string) =
+      match textureCache.TryGetValue id with
+      | true, cached -> cached
+      | false, _ ->
+        try
+          let loaded = game.Content.Load<Texture2D>(id)
+          let result = ValueSome loaded
+          textureCache.[id] <- result
+          result
+        with _ ->
+          let result = ValueNone
+          textureCache.[id] <- result
+          result
+
     // Load Models
     // The store returns Rigs (HashMap<string, RigNode>)
     // We need to extract all unique ModelAsset names from all nodes in all Rigs
@@ -404,6 +423,106 @@ module Render =
                       drawModel camera model finalWorld)
 
                 | ValueNone -> () // No rig, can't draw
+
+              // Particle Pass
+              game.GraphicsDevice.DepthStencilState <-
+                DepthStencilState.DepthRead
+
+              game.GraphicsDevice.RasterizerState <- RasterizerState.CullNone
+
+              let viewInv = Matrix.Invert(camera.View)
+              let camRight = viewInv.Right
+              let camUp = viewInv.Up
+
+              let particlesToDraw =
+                world.VisualEffects
+                |> Seq.filter(fun e -> e.IsAlive.Value)
+                |> Seq.collect(fun e ->
+                  e.Emitters
+                  |> Seq.filter(fun em -> em.Particles.Count > 0)
+                  |> Seq.collect(fun em ->
+                    em.Particles |> Seq.map(fun p -> em.Config, p)))
+                |> Seq.groupBy(fun (config, _) ->
+                  config.Texture, config.BlendMode)
+
+              // Check if any particles (Debug)
+              // if Seq.isEmpty particlesToDraw then
+              //   Console.WriteLine "No particles to draw"
+
+              for (textureId, blendMode), group in particlesToDraw do
+                match getTexture textureId with
+                | ValueSome tex ->
+                  match blendMode with
+                  | Particles.BlendMode.AlphaBlend ->
+                    game.GraphicsDevice.BlendState <- BlendState.AlphaBlend
+                  | Particles.BlendMode.Additive ->
+                    game.GraphicsDevice.BlendState <- BlendState.Additive
+
+                  billboardBatch.Begin(camera.View, camera.Projection, tex)
+
+                  for _, p in group do
+                    // Transform Logic Position (X, Z, Y-Up) to Render Space
+                    let logicPos = Vector2(p.Position.X, p.Position.Z)
+
+                    let baseRenderPos =
+                      RenderMath.LogicToRender logicPos pixelsPerUnit
+
+                    let altitude = p.Position.Y / pixelsPerUnit.Y
+
+                    let finalPos =
+                      Vector3(
+                        baseRenderPos.X,
+                        baseRenderPos.Y + altitude,
+                        baseRenderPos.Z
+                      )
+
+                    // Scale Size: Use ModelScale for consistency with entity rendering
+                    let size = p.Size * Core.Constants.Entity.ModelScale
+
+                    billboardBatch.Draw(
+                      finalPos,
+                      size,
+                      p.Color,
+                      camRight,
+                      camUp
+                    )
+
+                  billboardBatch.End()
+                | ValueNone ->
+                  // DEBUG FALLBACK: Draw with white texture
+                  // Console.WriteLine($"Fallback texture for {textureId}")
+
+                  // Use Additive for fallback
+                  game.GraphicsDevice.BlendState <- BlendState.Additive
+                  billboardBatch.Begin(camera.View, camera.Projection, texture)
+
+                  for _, p in group do
+                    // APPLY TRANSFORM HERE TOO
+                    let logicPos = Vector2(p.Position.X, p.Position.Z)
+
+                    let baseRenderPos =
+                      RenderMath.LogicToRender logicPos pixelsPerUnit
+
+                    let altitude = p.Position.Y / pixelsPerUnit.Y
+
+                    let finalPos =
+                      Vector3(
+                        baseRenderPos.X,
+                        baseRenderPos.Y + altitude,
+                        baseRenderPos.Z
+                      )
+
+                    let size = p.Size * Core.Constants.Entity.ModelScale
+
+                    billboardBatch.Draw(
+                      finalPos,
+                      size,
+                      p.Color,
+                      camRight,
+                      camUp
+                    )
+
+                  billboardBatch.End()
 
               // 2D Pass (UI / Debug)
               // Restore states for SpriteBatch if needed

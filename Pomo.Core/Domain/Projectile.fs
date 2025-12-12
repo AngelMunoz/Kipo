@@ -26,6 +26,7 @@ module Projectile =
     Speed: float32
     Collision: CollisionMode
     Variations: ExtraVariations voption
+    Visuals: VisualManifest
   }
 
   [<Struct>]
@@ -41,6 +42,7 @@ module Projectile =
     open System.Text.Json.Serialization
     open JDeck
     open JDeck.Decode
+    open Pomo.Core.Domain.Core.Serialization
 
     module CollisionMode =
       let decoder: Decoder<CollisionMode> =
@@ -99,9 +101,16 @@ module Projectile =
           and! kind =
             VOptional.Property.get ("Kind", ProjectileKind.decoder) json
 
+          and! visuals =
+            VOptional.Property.get ("Visuals", VisualManifest.decoder) json
+
           return {
             Speed = float32 speed
             Collision = collision
             Variations = kind
+            Visuals =
+              match visuals with
+              | ValueSome v -> v
+              | ValueNone -> VisualManifest.empty
           }
         }

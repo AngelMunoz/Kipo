@@ -31,8 +31,10 @@
     "Delivery": {
       "Type": "Projectile",
       "Speed": 100.0,
-      "CollisionMode": "IgnoreTerrain"
+      "CollisionMode": "IgnoreTerrain",
+      "Visuals": { "Vfx": "FireballProjectile" }
     },
+    "ImpactVisuals": { "Vfx": "FireballImpact" },
     "ElementFormula": {
       "Element": "Fire",
       "Formula": "(MA * 1.0) + (FireA * 1500)"
@@ -101,6 +103,7 @@
         "Stacking": { "Type": "RefreshDuration" },
         "Duration": { "Type": "Timed", "Seconds": 30.0 },
         "DamageSource": "Magical",
+        "Visuals": { "Vfx": "HealingSparkles" },
         "Modifiers": [
           {
             "Type": "StaticMod",
@@ -344,7 +347,7 @@
       "Type": "Projectile",
       "Speed": 150.0,
       "CollisionMode": "IgnoreTerrain",
-      "Visual": "Dagger"
+      "Visuals": { "Model": "Dagger" }
     },
     "Formula": "AP * 1.2",
     "Origin": "Caster",

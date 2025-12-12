@@ -1,0 +1,38 @@
+[
+  {
+    "Name": "FireballProjectile",
+    "Texture": "Particles/jellyfish0-masks/32",
+    "BlendMode": "Additive",
+    "Rate": 30,
+    "Shape": "Point",
+    "LocalOffset": { "X": 0.0, "Y": 0.5, "Z": 0.0 },
+    "Particle": {
+      "Lifetime": [0.5, 1.0],
+      "Speed": [0.5, 1.5],
+      "SizeStart": 0.5,
+      "SizeEnd": 0.0,
+      "ColorStart": "#FF6400FF",
+      "ColorEnd": "#32323200",
+      "Gravity": 0.0
+    }
+  },
+  {
+    "Name": "FireballImpact",
+    "Texture": "Particles/jellyfish0-masks/32",
+    "BlendMode": "Additive",
+    "Rate": 0,
+    "Burst": 20,
+    "Shape": "Sphere",
+    "Radius": 1.0,
+    "LocalOffset": { "X": 0.0, "Y": 0.5, "Z": 0.0 },
+    "Particle": {
+      "Lifetime": [0.3, 0.6],
+      "Speed": [2.0, 4.0],
+      "SizeStart": 0.8,
+      "SizeEnd": 0.0,
+      "ColorStart": "#FFC864FF",
+      "ColorEnd": "#C8320000",
+      "Gravity": 0.0
+    }
+  }
+]

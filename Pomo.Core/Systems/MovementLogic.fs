@@ -22,8 +22,9 @@ module MovementLogic =
     (mtv: Vector2)
     (eventBus: EventBus)
     =
-    let newPos = currentPos + mtv
-    eventBus.Publish(Physics(PositionChanged struct (entityId, newPos)))
+    // The Collision System already handles position correction (separation).
+    // Attempting to correct it again here causes double-correction and violent jitter.
+    // We only need to return the MTV so that movement systems can adjust velocity (sliding).
     mtv
 
   let notifyArrived (entityId: Guid<EntityId>) (eventBus: EventBus) =
