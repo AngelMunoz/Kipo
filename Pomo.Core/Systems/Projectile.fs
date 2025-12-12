@@ -138,6 +138,7 @@ module Projectile =
     let spawnEffect
       (vfxId: string)
       (pos: Vector2)
+      (rotation: Quaternion)
       (owner: Guid<EntityId> voption)
       =
       match stores.ParticleStore.tryFind vfxId with
@@ -156,7 +157,7 @@ module Projectile =
           Id = System.Guid.NewGuid().ToString() // temp ID
           Emitters = emitters |> Seq.toList
           Position = ref(Vector3(pos.X, 0.0f, pos.Y))
-          Rotation = ref Quaternion.Identity
+          Rotation = ref rotation
           Scale = ref Vector3.One
           IsAlive = ref true
           Owner = owner
@@ -230,7 +231,7 @@ module Projectile =
 
             if not hasEffect then
               match snapshot.Positions |> HashMap.tryFindV projectileId with
-              | ValueSome pos -> spawnEffect vfxId pos (ValueSome projectileId)
+              | ValueSome pos -> spawnEffect vfxId pos Quaternion.Identity (ValueSome projectileId)
               | ValueNone -> ()
           | ValueNone -> ()
 
@@ -243,7 +244,17 @@ module Projectile =
                 match
                   snapshot.Positions |> HashMap.tryFindV impact.TargetId
                 with
-                | ValueSome targetPos -> spawnEffect vfxId targetPos ValueNone
+                | ValueSome targetPos -> 
+                    // Calculate Rotation
+                    let rotation =
+                        match snapshot.Positions |> HashMap.tryFindV impact.ProjectileId with
+                        | ValueSome projPos ->
+                            let dir = Vector2.Normalize(targetPos - projPos)
+                            let angle = MathF.Atan2(dir.Y, dir.X)
+                            Quaternion.CreateFromAxisAngle(Vector3.Up, -angle)
+                        | ValueNone -> Quaternion.Identity
+
+                    spawnEffect vfxId targetPos rotation ValueNone
                 | ValueNone -> ()
               | ValueNone -> ()
             | _ -> ()

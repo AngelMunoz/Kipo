@@ -106,7 +106,7 @@
         "Stacking": { "Type": "RefreshDuration" },
         "Duration": { "Type": "Timed", "Seconds": 30.0 },
         "DamageSource": "Magical",
-        "Visuals": { "Vfx": "HealingSparkles" },
+        "Visuals": { "Vfx": "HollowDarkness" },
         "Modifiers": [
           {
             "Type": "StaticMod",
@@ -140,6 +140,7 @@
         "Stacking": { "Type": "RefreshDuration" },
         "Duration": { "Type": "Timed", "Seconds": 30.0 },
         "DamageSource": "Magical",
+        "Visuals": { "Vfx": "ManaConcentration" },
         "Modifiers": [
           {
             "Type": "StaticMod",
@@ -196,6 +197,7 @@
       "MaxTargets": 5
     },
     "Delivery": { "Type": "Instant" },
+    "ImpactVisuals": { "Vfx": "BoulderImpact" },
     "ElementFormula": {
       "Element": "Earth",
       "Formula": "(MA * 1.2) + (EarthA * 2000)"
@@ -247,6 +249,7 @@
       "MaxTargets": 10
     },
     "Delivery": { "Type": "Instant" },
+    "ImpactVisuals": { "Vfx": "FireBreath" },
     "ElementFormula": {
       "Element": "Fire",
       "Formula": "MA * 1.5"
@@ -296,8 +299,10 @@
     "Delivery": {
       "Type": "Projectile",
       "Speed": 100.0,
-      "CollisionMode": "IgnoreTerrain"
+      "CollisionMode": "IgnoreTerrain",
+      "ImpactVisuals": { "Model": "IceShard", "Vfx": "IceShatterProjectile" }
     },
+    "ImpactVisuals": { "Vfx": "IceShatter" },
     "ElementFormula": {
       "Element": "Water",
       "Formula": "MA * 1.2"
