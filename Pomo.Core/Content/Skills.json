@@ -300,7 +300,7 @@
       "Type": "Projectile",
       "Speed": 100.0,
       "CollisionMode": "IgnoreTerrain",
-      "ImpactVisuals": { "Model": "IceShard", "Vfx": "IceShatterProjectile" }
+      "Visuals": { "Model": "IceShard", "Vfx": "IceShatterProjectile" }
     },
     "ImpactVisuals": { "Vfx": "IceShatter" },
     "ElementFormula": {

@@ -10,6 +10,7 @@ open Pomo.Core.Domain.Units
 open Pomo.Core.Domain.Events
 open Pomo.Core.Domain.Projectile
 open Pomo.Core.Domain.Particles
+open Pomo.Core.Domain.Skill
 open Pomo.Core.Systems.Systems
 
 module Projectile =
@@ -140,6 +141,7 @@ module Projectile =
       (pos: Vector2)
       (rotation: Quaternion)
       (owner: Guid<EntityId> voption)
+      (area: SkillArea voption)
       =
       match stores.ParticleStore.tryFind vfxId with
       | ValueSome configs ->
@@ -164,6 +166,7 @@ module Projectile =
           Overrides = {
             EffectOverrides.empty with
                 Rotation = ValueSome rotation
+                Area = area
           }
         }
 
@@ -241,6 +244,7 @@ module Projectile =
                   pos
                   Quaternion.Identity
                   (ValueSome projectileId)
+                  ValueNone // No skill area for flight visuals
               | ValueNone -> ()
           | ValueNone -> ()
 
@@ -278,7 +282,12 @@ module Projectile =
                       yaw * pitch
                     | ValueNone -> Quaternion.Identity
 
-                  spawnEffect vfxId targetPos rotation ValueNone
+                  spawnEffect
+                    vfxId
+                    targetPos
+                    rotation
+                    ValueNone
+                    (ValueSome skill.Area)
                 | ValueNone -> ()
               | ValueNone -> ()
             | _ -> ()
