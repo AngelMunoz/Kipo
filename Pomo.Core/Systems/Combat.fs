@@ -368,6 +368,7 @@ module Combat =
       (vfxId: string)
       (pos: Vector2)
       (rotation: Quaternion)
+      (area: SkillArea)
       =
       match ctx.ParticleStore.tryFind vfxId with
       | ValueSome configs ->
@@ -394,6 +395,7 @@ module Combat =
           Overrides = {
             EffectOverrides.empty with
                 Rotation = ValueSome rotation
+                Area = ValueSome area
           }
         }
 
@@ -621,7 +623,7 @@ module Combat =
 
           let rotation = yaw * pitch
 
-          Visuals.spawnEffect ctx vfxId center rotation
+          Visuals.spawnEffect ctx vfxId center rotation activeSkill.Area
         | ValueNone -> ()
 
         let targets =

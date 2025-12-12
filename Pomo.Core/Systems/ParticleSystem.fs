@@ -9,6 +9,7 @@ open FSharp.UMX
 open Pomo.Core
 open Pomo.Core.Domain
 open Pomo.Core.Domain.Particles
+open Pomo.Core.Domain.Skill
 open Pomo.Core.Domain.Units
 open Pomo.Core.Environment
 open Pomo.Core.Systems.Systems
@@ -50,7 +51,8 @@ module ParticleSystem =
         min + (float32(rng.NextDouble()) * (max - min))
 
       // Direction and spawn offset based on shape (Local Space)
-      let struct (dirLocal, spawnOffsetLocal) =
+      // Returns: (direction, spawnOffset, optionalSpeedOverride)
+      let struct (dirLocal, spawnOffsetLocal, speedOverride) =
         match emitter.Config.Shape with
         | EmitterShape.Point ->
           // Uniform sphere direction
@@ -60,24 +62,48 @@ module ParticleSystem =
           let x = sinPhi * Math.Cos(theta)
           let y = cosPhi
           let z = sinPhi * Math.Sin(theta)
-          struct (Vector3(float32 x, float32 y, float32 z), Vector3.Zero)
-        | EmitterShape.Sphere r ->
-          let mutable dir = Vector3.Zero
+          let dir = Vector3(float32 x, float32 y, float32 z)
+          struct (dir, Vector3.Zero, ValueNone)
+        | EmitterShape.Sphere radius ->
+          let mutable dir = Vector3.UnitY
           let mutable valid = false
 
           while not valid do
-            let x = rng.NextDouble() * 2.0 - 1.0
-            let y = rng.NextDouble() * 2.0 - 1.0
-            let z = rng.NextDouble() * 2.0 - 1.0
-            let v = Vector3(float32 x, float32 y, float32 z)
+            let v =
+              Vector3(
+                float32(rng.NextDouble() * 2.0 - 1.0),
+                float32(rng.NextDouble() * 2.0 - 1.0),
+                float32(rng.NextDouble() * 2.0 - 1.0)
+              )
+
             let lenSq = v.LengthSquared()
 
             if lenSq > 0.001f && lenSq <= 1.0f then
               dir <- Vector3.Normalize(v)
               valid <- true
 
-          struct (dir, Vector3.Zero)
-        | EmitterShape.Cone(angle, radius) ->
+          struct (dir, Vector3.Zero, ValueNone)
+        | EmitterShape.Cone(configAngle, radius) ->
+          // Check for skill-driven angle override
+          let angle, lengthOpt =
+            match overrides.Area with
+            | ValueSome(SkillArea.Cone(skillAngle, skillLength, _)) ->
+              skillAngle, ValueSome skillLength
+            | ValueSome(SkillArea.AdaptiveCone(skillLength, _)) ->
+              configAngle, ValueSome skillLength // Use config angle for adaptive
+            | _ -> configAngle, ValueNone
+
+          // Calculate speed override from length if available
+          // Speed = Length / AverageLifetime to ensure particles reach the end
+          let speedOvr =
+            match lengthOpt with
+            | ValueSome len ->
+              let struct (minLife, maxLife) = config.Lifetime
+              let avgLifetime = (minLife + maxLife) / 2.0f
+              // Multiply by 1.2 to ensure particles reach slightly beyond
+              ValueSome(len / avgLifetime * 1.2f)
+            | ValueNone -> ValueNone
+
           // Use polar coordinates for uniform cone distribution
           let halfAngleRad = MathHelper.ToRadians(angle / 2.0f)
           // Random angle around the cone axis
@@ -88,7 +114,13 @@ module ParticleSystem =
           let z = r * Math.Sin(phi)
           // Base Cone points UP (Y), with spread in XZ
           let dir = Vector3(float32 x, 1.0f, float32 z) |> Vector3.Normalize
-          struct (dir, Vector3.Zero)
+          struct (dir, Vector3.Zero, speedOvr)
+
+      // Use speed override if available, otherwise config speed
+      let finalSpeed =
+        match speedOverride with
+        | ValueSome s -> s * (0.5f + float32(rng.NextDouble()) * 1.0f) // Add 50-150% variation
+        | ValueNone -> speed
 
       // Apply Rotations
       let configRotEuler = emitter.Config.EmissionRotation
@@ -115,7 +147,7 @@ module ParticleSystem =
         Vector3.Transform(emitter.Config.LocalOffset, ownerRotation)
 
       // Initial Velocity
-      let baseVelocity = dir * speed
+      let baseVelocity = dir * finalSpeed
 
       // Inherit Velocity
       let inheritedVelocity = ownerVelocity * emitter.Config.InheritVelocity
@@ -290,7 +322,7 @@ module ParticleSystem =
                     BurstDone = ref false
                   })
 
-                let newEffect: ActiveEffect = {
+                let newEffect: Particles.ActiveEffect = {
                   Id = particleEffectId
                   Emitters = emitters
                   Position = ref Vector3.Zero

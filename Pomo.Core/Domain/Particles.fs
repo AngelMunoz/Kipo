@@ -5,6 +5,7 @@ open Microsoft.Xna.Framework
 open Microsoft.Xna.Framework.Graphics
 open FSharp.UMX
 open Pomo.Core.Domain.Units
+open Pomo.Core.Domain.Skill
 
 module Particles =
 
@@ -91,6 +92,7 @@ module Particles =
     Rotation: Quaternion voption
     Scale: float32 voption
     Color: Color voption
+    Area: SkillArea voption
   }
 
   module EffectOverrides =
@@ -98,6 +100,7 @@ module Particles =
       Rotation = ValueNone
       Scale = ValueNone
       Color = ValueNone
+      Area = ValueNone
     }
 
   type ActiveEffect = {
