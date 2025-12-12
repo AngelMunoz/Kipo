@@ -148,9 +148,40 @@ module ParticleSystem =
         // Update kinematics (Gravity)
         let newVelY = p.Velocity.Y - (emitter.Config.Particle.Gravity * dt)
 
+        let mutable finalPos = p.Position
+        let mutable finalVelY = newVelY
+        let mutable finalVelX = p.Velocity.X
+        let mutable finalVelZ = p.Velocity.Z
+
+        // Apply Air Drag
+        if emitter.Config.Particle.Drag > 0.0f then
+          let dragFactor = MathHelper.Clamp(1.0f - (emitter.Config.Particle.Drag * dt), 0.0f, 1.0f)
+          finalVelX <- finalVelX * dragFactor
+          finalVelZ <- finalVelZ * dragFactor
+
+        // Floor Collision
+        // Check if Simulation Space affects this logic?
+        // Ideally floor is at Y=0 relative to World.
+        // If Local Space, Y is relative to Owner. Owner is usually at Y=0 World (if grounded).
+        // So treating Y=0 (or FloorHeight) as floor usually works for grounded emitters.
+        // For flying emitters, local space floor might be weird, but let's stick to simple floor logic.
+
+        // Get effective floor height from config (default 0.0)
+        let floorY = emitter.Config.FloorHeight
+
+        if finalPos.Y < floorY then
+          finalPos <- Vector3(finalPos.X, floorY, finalPos.Z)
+          finalVelY <- 0.0f // Stop falling
+          
+          // Apply Ground Friction (Stop sliding)
+          // Hardcoded strong friction for now
+          finalVelX <- finalVelX * 0.1f
+          finalVelZ <- finalVelZ * 0.1f
+
         let p = {
           p with
-              Velocity = Vector3(p.Velocity.X, newVelY, p.Velocity.Z)
+              Position = finalPos
+              Velocity = Vector3(finalVelX, finalVelY, finalVelZ)
         }
 
         // Update props (Lerp)

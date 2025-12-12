@@ -1,22 +1,41 @@
 [
   {
     "Name": "FireballProjectile",
-    "Texture": "Particles/jellyfish0-masks/42",
+    "Texture": "Particles/jellyfish0-masks/15",
     "BlendMode": "Additive",
     "SimulationSpace": "World",
-    "Rate": 80,
-    "Shape": "Cone",
-    "Angle": 25,
+    "Rate": 150,
+    "Shape": "Sphere",
     "Radius": 0.5,
-    "LocalOffset": { "X": 0.0, "Y": 0.5, "Z": 0.0 },
+    "LocalOffset": { "X": 0, "Y": 0.0, "Z": 0.0 },
     "Particle": {
-      "Lifetime": [0.4, 0.8],
-      "Speed": [0.3, 0.8],
-      "SizeStart": 2,
-      "SizeEnd": 0,
+      "Lifetime": [0.5, 1.0],
+      "Speed": [10, 30],
+      "SizeStart": 1.5,
+      "SizeEnd": 0.0,
+      "ColorStart": "#FF6400AA",
+      "ColorEnd": "#32323200",
+      "Gravity": -10,
+      "Drag": 0.0
+    }
+  },
+  {
+    "Name": "FireballProjectile",
+    "Texture": "Particles/jellyfish0-masks/15",
+    "BlendMode": "Additive",
+    "SimulationSpace": "Local",
+    "Rate": 200,
+    "Shape": "Point",
+    "LocalOffset": { "X": 0, "Y": 0.0, "Z": 0.0 },
+    "Particle": {
+      "Lifetime": [0.1, 1],
+      "Speed": [10, 40],
+      "SizeStart": 1.5,
+      "SizeEnd": 1.1,
       "ColorStart": "#FF6400FF",
       "ColorEnd": "#32323200",
-      "Gravity": -0.3
+      "Gravity": -3,
+      "Drag": 5
     }
   },
   {
@@ -25,19 +44,21 @@
     "BlendMode": "Additive",
     "SimulationSpace": "World",
     "Rate": 0,
-    "Burst": 100,
-    "Shape": "Sphere",
-    "Radius": 0.5,
-    "LocalOffset": { "X": 0.0, "Y": 0.5, "Z": 0.0 },
+    "Burst": 300,
+    "Shape": "Cone",
+    "Angle": 15,
+    "Radius": 0.2,
+    "LocalOffset": { "X": 0.0, "Y": 0.0, "Z": 0.0 },
     "Particle": {
-      "Lifetime": [5, 0.5],
-      "Speed": [10, 1.0],
-      "SizeStart": 1.0,
-      "SizeEnd": 10.0,
+      "Lifetime": [1, 8],
+      "Speed": [0.1, 400],
+      "SizeStart": 0.5,
+      "SizeEnd": 0.0,
       "ColorStart": "#FFD880FF",
       "ColorEnd": "#FF400000",
-      "Gravity": -600,
-      "RandomVelocity": { "X": 0.5, "Y": 0.5, "Z": 0.5 }
+      "Gravity": 1000,
+      "RandomVelocity": { "X": 10, "Y": 15, "Z": 15 },
+      "Drag": 2.0
     }
   }
 ]

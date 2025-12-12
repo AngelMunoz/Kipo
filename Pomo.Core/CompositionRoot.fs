@@ -389,7 +389,7 @@ module CompositionRoot =
             DrawOrder = Render.Layer.Debug
           )
 
-        // mapDependentComponents.Add(debugRender)
+        mapDependentComponents.Add(debugRender)
 
         spawnEntitiesForMap mapDef playerId scenarioId targetSpawn
 

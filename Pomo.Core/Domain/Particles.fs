@@ -34,6 +34,7 @@ module Particles =
     ColorEnd: Color
     Gravity: float32
     RandomVelocity: Vector3
+    Drag: float32
   }
 
   type EmitterConfig = {
@@ -47,6 +48,7 @@ module Particles =
     Shape: EmitterShape
     LocalOffset: Vector3
     Particle: ParticleConfig
+    FloorHeight: float32
   }
 
   // Runtime Types
@@ -249,6 +251,8 @@ module Particles =
           let! randomVelocity =
             VOptional.Property.get ("RandomVelocity", Helper.vec3FromDict) json
 
+          let! drag = VOptional.Property.get ("Drag", Required.float) json
+
           return {
             Lifetime = lifetime
             Speed = speed
@@ -264,6 +268,10 @@ module Particles =
               match randomVelocity with
               | ValueSome v -> v
               | ValueNone -> Vector3.Zero
+            Drag =
+              match drag with
+              | ValueSome v -> float32 v
+              | ValueNone -> 0.0f
           }
         }
 
@@ -297,6 +305,9 @@ module Particles =
           let! particle =
             Required.Property.get ("Particle", ParticleConfigCodec.decoder) json
 
+          let! floorHeight =
+            VOptional.Property.get ("FloorHeight", Required.float) json
+
           return {
             Name = name
             Texture = texture
@@ -320,5 +331,9 @@ module Particles =
               | ValueSome v -> v
               | ValueNone -> Vector3.Zero
             Particle = particle
+            FloorHeight =
+              match floorHeight with
+              | ValueSome v -> float32 v
+              | ValueNone -> 0.0f
           }
         }

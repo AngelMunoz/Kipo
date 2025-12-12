@@ -493,15 +493,14 @@ module Render =
                     let baseRenderPos =
                       RenderMath.LogicToRender logicPos pixelsPerUnit
 
-                    // Fix for Verticality: Use PPU.X for altitude but DOUBLE it (scales like Depth).
-                    // This counteracts the visual flattening.
-                    let altitude = (pWorldPos.Y / pixelsPerUnit.X) * 2.0f
+                    // Fix for Verticality: Simulate isometric height by shifting Z (Screen Y) and Y (Depth).
+                    let altitude = (pWorldPos.Y / pixelsPerUnit.Y) * 2.0f
 
                     let finalPos =
                       Vector3(
                         baseRenderPos.X,
                         baseRenderPos.Y + altitude,
-                        baseRenderPos.Z
+                        baseRenderPos.Z - altitude
                       )
 
                     // Scale Size: Use ModelScale for consistency with entity rendering
@@ -539,15 +538,14 @@ module Render =
                     let baseRenderPos =
                       RenderMath.LogicToRender logicPos pixelsPerUnit
 
-                    // Fix for Verticality: Use PPU.X for altitude but DOUBLE it (scales like Depth).
-                    // This counteracts the visual flattening.
-                    let altitude = (pWorldPos.Y / pixelsPerUnit.X) * 2.0f
+                    // Fix for Verticality: Simulate isometric height by shifting Z (Screen Y) and Y (Depth).
+                    let altitude = (pWorldPos.Y / pixelsPerUnit.Y) * 2.0f
 
                     let finalPos =
                       Vector3(
                         baseRenderPos.X,
                         baseRenderPos.Y + altitude,
-                        baseRenderPos.Z
+                        baseRenderPos.Z - altitude
                       )
 
                     let size = p.Size * Core.Constants.Entity.ModelScale
