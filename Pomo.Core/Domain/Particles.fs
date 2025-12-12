@@ -49,6 +49,7 @@ module Particles =
     LocalOffset: Vector3
     Particle: ParticleConfig
     FloorHeight: float32
+    EmissionRotation: Vector3
   }
 
   // Runtime Types
@@ -308,6 +309,11 @@ module Particles =
           let! floorHeight =
             VOptional.Property.get ("FloorHeight", Required.float) json
 
+          let! emissionRotation =
+            VOptional.Property.get
+              ("EmissionRotation", Helper.vec3FromDict)
+              json
+
           return {
             Name = name
             Texture = texture
@@ -335,5 +341,9 @@ module Particles =
               match floorHeight with
               | ValueSome v -> float32 v
               | ValueNone -> 0.0f
+            EmissionRotation =
+              match emissionRotation with
+              | ValueSome v -> v
+              | ValueNone -> Vector3.Zero
           }
         }

@@ -58,8 +58,10 @@
     "Delivery": {
       "Type": "Projectile",
       "Speed": 150.0,
-      "CollisionMode": "IgnoreTerrain"
+      "CollisionMode": "IgnoreTerrain",
+      "Visuals": { "Vfx": "HellfireProjectile" }
     },
+    "ImpactVisuals": { "Vfx": "HellfireImpact" },
     "ElementFormula": {
       "Element": "Dark",
       "Formula": "(MA * 2.0) + (DarkA * 3000)"
@@ -73,6 +75,7 @@
         "Stacking": { "Type": "RefreshDuration" },
         "Duration": { "Type": "Loop", "Interval": 1.0, "Duration": 8.0 },
         "DamageSource": "Magical",
+        "Visuals": { "Vfx": "HellBurn" },
         "Modifiers": [
           {
             "Type": "AbilityDamageMod",
@@ -171,6 +174,7 @@
         "DamageSource": "Physical",
         "Stacking": { "Type": "RefreshDuration" },
         "Duration": { "Type": "Timed", "Seconds": 2.0 },
+        "Visuals": { "Vfx": "Stunned" },
         "Modifiers": []
       }
     ]
@@ -347,7 +351,7 @@
       "Type": "Projectile",
       "Speed": 150.0,
       "CollisionMode": "IgnoreTerrain",
-      "Visuals": { "Model": "Dagger" }
+      "Visuals": { "Model": "Dagger", "Vfx": "FanOfKnivesWind" }
     },
     "Formula": "AP * 1.2",
     "Origin": "Caster",
