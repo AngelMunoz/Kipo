@@ -95,6 +95,7 @@ type BillboardBatch(graphicsDevice: GraphicsDevice) =
     (
       position: Vector3,
       size: float32,
+      rotation: float32,
       color: Color,
       camRight: Vector3,
       camUp: Vector3
@@ -102,8 +103,17 @@ type BillboardBatch(graphicsDevice: GraphicsDevice) =
     ensureCapacity(1)
 
     let halfSize = size * 0.5f
-    let w = camRight * halfSize
-    let h = camUp * halfSize
+
+    // Apply rotation
+    let cos = MathF.Cos(rotation)
+    let sin = MathF.Sin(rotation)
+
+    // Rotated basis vectors
+    let rotRight = (camRight * cos) + (camUp * sin)
+    let rotUp = (camUp * cos) - (camRight * sin)
+
+    let w = rotRight * halfSize
+    let h = rotUp * halfSize
 
     // Quad vertices relative to center position
     // TopLeft

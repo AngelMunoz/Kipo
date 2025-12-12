@@ -48,10 +48,11 @@ let private JsonSerializerOptions =
   |> Codec.useDecoder ModelConfig.decoder
   |> Codec.useDecoder AnimationClip.decoder
   |> Codec.useDecoder VisualManifest.decoder
-  |> Codec.useDecoder Particles.Serialization.BlendMode.decoder
-  |> Codec.useDecoder Particles.Serialization.EmitterShape.decoder
-  |> Codec.useDecoder Particles.Serialization.ParticleConfig.decoder
-  |> Codec.useDecoder Particles.Serialization.EmitterConfig.decoder
+  |> Codec.useDecoder Particles.Serialization.BlendModeCodec.decoder
+  |> Codec.useDecoder Particles.Serialization.SimulationSpaceCodec.decoder
+  |> Codec.useDecoder Particles.Serialization.EmitterShapeCodec.decoder
+  |> Codec.useDecoder Particles.Serialization.ParticleConfigCodec.decoder
+  |> Codec.useDecoder Particles.Serialization.EmitterConfigCodec.decoder
 
 
 type JDeckDeserializer =

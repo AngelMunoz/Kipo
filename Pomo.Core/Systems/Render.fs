@@ -424,9 +424,8 @@ module Render =
 
                 | ValueNone -> () // No rig, can't draw
 
-              // Particle Pass
-              game.GraphicsDevice.DepthStencilState <-
-                DepthStencilState.DepthRead
+              // Particle Pass - Render on top (no depth test)
+              game.GraphicsDevice.DepthStencilState <- DepthStencilState.None
 
               game.GraphicsDevice.RasterizerState <- RasterizerState.CullNone
 
@@ -438,11 +437,27 @@ module Render =
                 world.VisualEffects
                 |> Seq.filter(fun e -> e.IsAlive.Value)
                 |> Seq.collect(fun e ->
+                  // Fix for Jitter: If Local Space, we MUST use the Interpolated Position from the Snapshot
+                  // matching the Owner. Otherwise, particles lag behind the rendered entity.
+                  let effectPos =
+                    match e.Owner with
+                    | ValueSome ownerId ->
+                      match snapshot.Positions.TryFindV ownerId with
+                      | ValueSome interpPos ->
+                        // Map Entity (X, Y) to Particle Space (X, 0, Z or whatever logic uses)
+                        // Particle System uses: X, Z(Depth), Y(Altitude) logic?
+                        // No, ParticleSystem uses Vector3(X, Y_Altitude, Z_Depth).
+                        // Entity Pos is Vector2(X, Y_Depth).
+                        // So we map Entity.Y -> Particle.Z
+                        Vector3(interpPos.X, 0.0f, interpPos.Y)
+                      | ValueNone -> e.Position.Value // Fallback to logic ticks
+                    | ValueNone -> e.Position.Value
+
                   e.Emitters
                   |> Seq.filter(fun em -> em.Particles.Count > 0)
                   |> Seq.collect(fun em ->
-                    em.Particles |> Seq.map(fun p -> em.Config, p)))
-                |> Seq.groupBy(fun (config, _) ->
+                    em.Particles |> Seq.map(fun p -> em.Config, p, effectPos)))
+                |> Seq.groupBy(fun (config, _, _) ->
                   config.Texture, config.BlendMode)
 
               // Check if any particles (Debug)
@@ -460,14 +475,24 @@ module Render =
 
                   billboardBatch.Begin(camera.View, camera.Projection, tex)
 
-                  for _, p in group do
+                  for config, p, effectPos in group do
+                    // Determine world position based on Simulation Space
+                    let pWorldPos =
+                      match config.SimulationSpace with
+                      | Particles.SimulationSpace.World -> p.Position
+                      | Particles.SimulationSpace.Local ->
+                        // If Local, p.Position is relative. Add Effect Position.
+                        // Effect Pos: X = WorldX, Y = Altitude (0), Z = WorldY (Depth)
+                        // Particle: X, Y(Alt), Z
+                        p.Position + effectPos
+
                     // Transform Logic Position (X, Z, Y-Up) to Render Space
-                    let logicPos = Vector2(p.Position.X, p.Position.Z)
+                    let logicPos = Vector2(pWorldPos.X, pWorldPos.Z)
 
                     let baseRenderPos =
                       RenderMath.LogicToRender logicPos pixelsPerUnit
 
-                    let altitude = p.Position.Y / pixelsPerUnit.Y
+                    let altitude = pWorldPos.Y / pixelsPerUnit.Y
 
                     let finalPos =
                       Vector3(
@@ -482,6 +507,7 @@ module Render =
                     billboardBatch.Draw(
                       finalPos,
                       size,
+                      p.Rotation,
                       p.Color,
                       camRight,
                       camUp
@@ -496,14 +522,21 @@ module Render =
                   game.GraphicsDevice.BlendState <- BlendState.Additive
                   billboardBatch.Begin(camera.View, camera.Projection, texture)
 
-                  for _, p in group do
+                  for config, p, effectPos in group do
+                    // Determine world position based on Simulation Space
+                    let pWorldPos =
+                      match config.SimulationSpace with
+                      | Particles.SimulationSpace.World -> p.Position
+                      | Particles.SimulationSpace.Local ->
+                        p.Position + effectPos
+
                     // APPLY TRANSFORM HERE TOO
-                    let logicPos = Vector2(p.Position.X, p.Position.Z)
+                    let logicPos = Vector2(pWorldPos.X, pWorldPos.Z)
 
                     let baseRenderPos =
                       RenderMath.LogicToRender logicPos pixelsPerUnit
 
-                    let altitude = p.Position.Y / pixelsPerUnit.Y
+                    let altitude = pWorldPos.Y / pixelsPerUnit.Y
 
                     let finalPos =
                       Vector3(
@@ -517,6 +550,7 @@ module Render =
                     billboardBatch.Draw(
                       finalPos,
                       size,
+                      p.Rotation,
                       p.Color,
                       camRight,
                       camUp

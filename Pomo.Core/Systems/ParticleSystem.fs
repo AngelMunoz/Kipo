@@ -27,6 +27,7 @@ module ParticleSystem =
     (rng: Random)
     (emitter: ActiveEmitter)
     (worldPos: Vector3)
+    (ownerVelocity: Vector3)
     (spawningEnabled: bool)
     =
     // Helper to spawn a single particle
@@ -44,37 +45,69 @@ module ParticleSystem =
       // Direction and spawn offset based on shape
       let struct (dir, spawnOffset) =
         match emitter.Config.Shape with
-        | Point ->
-          // Random direction, spawn at center
+        | EmitterShape.Point ->
+          // Uniform sphere direction using correct sampling
+          // theta: azimuthal angle [0, 2π]
+          // cosPhi: uniform in [-1, 1] for uniform distribution
           let theta = rng.NextDouble() * 2.0 * Math.PI
-          let phi = rng.NextDouble() * Math.PI
-          let x = Math.Sin(phi) * Math.Cos(theta)
-          let y = Math.Cos(phi)
-          let z = Math.Sin(phi) * Math.Sin(theta)
+          let cosPhi = rng.NextDouble() * 2.0 - 1.0
+          let sinPhi = Math.Sqrt(1.0 - cosPhi * cosPhi)
+          let x = sinPhi * Math.Cos(theta)
+          let y = cosPhi
+          let z = sinPhi * Math.Sin(theta)
           struct (Vector3(float32 x, float32 y, float32 z), Vector3.Zero)
-        | Sphere r ->
-          // Spherical direction, spawn on sphere surface at radius
-          let theta = rng.NextDouble() * 2.0 * Math.PI
-          let phi = rng.NextDouble() * Math.PI
-          let x = Math.Sin(phi) * Math.Cos(theta)
-          let y = Math.Cos(phi)
-          let z = Math.Sin(phi) * Math.Sin(theta)
-          let dir = Vector3(float32 x, float32 y, float32 z)
-          // Spawn ON the sphere surface, move OUTWARD
-          struct (dir, dir * r)
-        | Cone(angle, radius) ->
+        | EmitterShape.Sphere r ->
+          // Rejection Sampling for perfect isotropic distribution
+          // avoiding any polar bias from trigonometric functions
+          let mutable dir = Vector3.Zero
+          let mutable valid = false
+
+          while not valid do
+            let x = rng.NextDouble() * 2.0 - 1.0
+            let y = rng.NextDouble() * 2.0 - 1.0
+            let z = rng.NextDouble() * 2.0 - 1.0
+            let v = Vector3(float32 x, float32 y, float32 z)
+            let lenSq = v.LengthSquared()
+
+            if lenSq > 0.001f && lenSq <= 1.0f then
+              dir <- Vector3.Normalize(v)
+              valid <- true
+
+          // Start AT CENTER, move OUTWARD
+          struct (dir, Vector3.Zero)
+        | EmitterShape.Cone(angle, radius) ->
           let rad = MathHelper.ToRadians(angle)
           let x = (rng.NextDouble() * 2.0 - 1.0) * Math.Sin(float rad)
           let z = (rng.NextDouble() * 2.0 - 1.0) * Math.Sin(float rad)
           let dir = Vector3(float32 x, 1.0f, float32 z) |> Vector3.Normalize
           struct (dir, Vector3.Zero)
 
-      let velocity = dir * speed
+      // Initial Velocity
+      let baseVelocity = dir * speed
+
+      // Inherit Velocity
+      let inheritedVelocity = ownerVelocity * emitter.Config.InheritVelocity
+
+      // Random Velocity
+      let randomVel =
+        let rx = (rng.NextDouble() * 2.0 - 1.0) |> float32
+        let ry = (rng.NextDouble() * 2.0 - 1.0) |> float32
+        let rz = (rng.NextDouble() * 2.0 - 1.0) |> float32
+        config.RandomVelocity * Vector3(rx, ry, rz)
+
+      let velocity = baseVelocity + inheritedVelocity + randomVel
+
+      // Position logic based on Space
+      let finalSpawnPos =
+        match emitter.Config.SimulationSpace with
+        | World -> worldPos + emitter.Config.LocalOffset + spawnOffset
+        | Local -> emitter.Config.LocalOffset + spawnOffset
 
       let p = {
-        Position = worldPos + emitter.Config.LocalOffset + spawnOffset
+        Position = finalSpawnPos
         Velocity = velocity
         Size = config.SizeStart
+        Rotation = float32(rng.NextDouble() * 2.0 * Math.PI)
         Color = config.ColorStart
         Life = lifetime
         MaxLife = lifetime
@@ -116,8 +149,10 @@ module ParticleSystem =
         // Update kinematics (Gravity)
         let newVelY = p.Velocity.Y - (emitter.Config.Particle.Gravity * dt)
 
-        let p =
-          Particle.withVelocity (Vector3(p.Velocity.X, newVelY, p.Velocity.Z)) p
+        let p = {
+          p with
+              Velocity = Vector3(p.Velocity.X, newVelY, p.Velocity.Z)
+        }
 
         // Update props (Lerp)
         let t = 1.0f - (p.Life / p.MaxLife)
@@ -150,9 +185,13 @@ module ParticleSystem =
       let dt = float32 gameTime.ElapsedGameTime.TotalSeconds
       let effects = core.World.VisualEffects
       let positions = core.World.Positions |> AMap.force
+      let velocities = core.World.Velocities |> AMap.force
 
       for i = effects.Count - 1 downto 0 do
         let effect = effects.[i]
+
+        // Track Owner Velocity for inheritance
+        let mutable ownerVelocity = Vector3.Zero
 
         // Sync with owner
         match effect.Owner with
@@ -161,6 +200,12 @@ module ParticleSystem =
           | ValueSome pos ->
             // Map Entity (X, Y) to Particle (X, Z). Particle Y is Altitude (Up).
             effect.Position.Value <- Vector3(pos.X, 0.0f, pos.Y)
+
+            // Get velocity if available
+            match velocities.TryFindV ownerId with
+            | ValueSome vel -> ownerVelocity <- Vector3(vel.X, 0.0f, vel.Y)
+            | ValueNone -> ()
+
           | ValueNone -> effect.IsAlive.Value <- false
         | ValueNone -> ()
 
@@ -173,6 +218,7 @@ module ParticleSystem =
             core.World.Rng
             emitter
             effect.Position.Value
+            ownerVelocity
             shouldSpawn
 
           if emitter.Particles.Count > 0 then

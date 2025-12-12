@@ -20,6 +20,11 @@ module Particles =
     | Cone of angle: float32 * radius: float32
 
   [<Struct>]
+  type SimulationSpace =
+    | World
+    | Local
+
+  [<Struct>]
   type ParticleConfig = {
     Lifetime: struct (float32 * float32)
     Speed: struct (float32 * float32)
@@ -28,12 +33,15 @@ module Particles =
     ColorStart: Color
     ColorEnd: Color
     Gravity: float32
+    RandomVelocity: Vector3
   }
 
   type EmitterConfig = {
     Name: string
     Texture: string
     BlendMode: BlendMode
+    SimulationSpace: SimulationSpace
+    InheritVelocity: float32
     Rate: int
     Burst: int
     Shape: EmitterShape
@@ -48,6 +56,7 @@ module Particles =
     Position: Vector3
     Velocity: Vector3
     Size: float32
+    Rotation: float32
     Color: Color
     Life: float32
     MaxLife: float32
@@ -90,7 +99,7 @@ module Particles =
     open JDeck.Decode
     open System.Globalization
 
-    module BlendMode =
+    module BlendModeCodec =
       let decoder: Decoder<BlendMode> =
         fun json -> decode {
           let! str = Required.string json
@@ -101,6 +110,23 @@ module Particles =
           | _ ->
             return!
               DecodeError.ofError(json.Clone(), $"Unknown BlendMode: {str}")
+              |> Error
+        }
+
+    module SimulationSpaceCodec =
+      let decoder: Decoder<SimulationSpace> =
+        fun json -> decode {
+          let! str = Required.string json
+
+          match str.ToLowerInvariant() with
+          | "world" -> return World
+          | "local" -> return Local
+          | _ ->
+            return!
+              DecodeError.ofError(
+                json.Clone(),
+                $"Unknown SimulationSpace: {str}"
+              )
               |> Error
         }
 
@@ -153,7 +179,7 @@ module Particles =
           | Error e -> return! DecodeError.ofError(json.Clone(), e) |> Error
         }
 
-    module EmitterShape =
+    module EmitterShapeCodec =
       let decoder: Decoder<EmitterShape> =
         fun json -> decode {
           // If shape is just a string "Point"
@@ -192,7 +218,7 @@ module Particles =
                 |> Error
         }
 
-    module ParticleConfig =
+    module ParticleConfigCodec =
       let rangeDecoder: Decoder<struct (float32 * float32)> =
         fun json -> decode {
           let! arr = Decode.array (fun _ json -> Required.float json) json
@@ -221,6 +247,9 @@ module Particles =
 
           let! gravity = VOptional.Property.get ("Gravity", Required.float) json
 
+          let! randomVelocity =
+            VOptional.Property.get ("RandomVelocity", Helper.vec3FromDict) json
+
           return {
             Lifetime = lifetime
             Speed = speed
@@ -232,10 +261,14 @@ module Particles =
               match gravity with
               | ValueSome v -> float32 v
               | ValueNone -> 0.0f
+            RandomVelocity =
+              match randomVelocity with
+              | ValueSome v -> v
+              | ValueNone -> Vector3.Zero
           }
         }
 
-    module EmitterConfig =
+    module EmitterConfigCodec =
 
       let decoder: Decoder<EmitterConfig> =
         fun json -> decode {
@@ -243,24 +276,40 @@ module Particles =
           let! texture = Required.Property.get ("Texture", Required.string) json
 
           let! blendMode =
-            Required.Property.get ("BlendMode", BlendMode.decoder) json
+            Required.Property.get ("BlendMode", BlendModeCodec.decoder) json
+
+          let! simulationSpace =
+            VOptional.Property.get
+              ("SimulationSpace", SimulationSpaceCodec.decoder)
+              json
+
+          let! inheritVelocity =
+            VOptional.Property.get ("InheritVelocity", Required.float) json
 
           let! rate = Required.Property.get ("Rate", Required.int) json
           let! burst = VOptional.Property.get ("Burst", Required.int) json
 
           // Decode shape from the SAME json object
-          let! shape = EmitterShape.decoder json
+          let! shape = EmitterShapeCodec.decoder json
 
           let! localOffset =
             VOptional.Property.get ("LocalOffset", Helper.vec3FromDict) json
 
           let! particle =
-            Required.Property.get ("Particle", ParticleConfig.decoder) json
+            Required.Property.get ("Particle", ParticleConfigCodec.decoder) json
 
           return {
             Name = name
             Texture = texture
             BlendMode = blendMode
+            SimulationSpace =
+              match simulationSpace with
+              | ValueSome s -> s
+              | ValueNone -> World
+            InheritVelocity =
+              match inheritVelocity with
+              | ValueSome v -> float32 v
+              | ValueNone -> 0.0f
             Rate = rate
             Burst =
               match burst with
