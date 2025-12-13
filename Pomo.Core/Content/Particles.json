@@ -358,5 +358,27 @@
       "Drag": 0.5
     },
     "FloorHeight": 0.0
+  },
+  {
+    "Name": "ManaBeamImpact",
+    "Texture": "Particles/jellyfish0-masks/15",
+    "BlendMode": "Additive",
+    "SimulationSpace": "World",
+    "Rate": 0,
+    "Burst": 100,
+    "Shape": "Sphere",
+    "Radius": 1.0,
+    "LocalOffset": { "X": 0.0, "Y": 0.0, "Z": 0.0 },
+    "Particle": {
+      "Lifetime": [0.3, 0.8],
+      "Speed": [20, 80],
+      "SizeStart": 1.0,
+      "SizeEnd": 0.0,
+      "ColorStart": "#0088FFFF",
+      "ColorEnd": "#0088FF00",
+      "Gravity": -50,
+      "Drag": 1.0
+    },
+    "FloorHeight": 0.0
   }
 ]

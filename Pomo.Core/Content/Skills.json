@@ -287,6 +287,7 @@
     "Delivery": { "Type": "Instant" },
     "Formula": "MA * 2.0",
     "Origin": "Caster",
+    "ImpactVisuals": { "Vfx": "ManaBeamImpact" },
     "Effects": []
   },
   "11": {

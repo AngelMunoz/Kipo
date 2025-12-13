@@ -64,25 +64,87 @@ module ParticleSystem =
           let z = sinPhi * Math.Sin(theta)
           let dir = Vector3(float32 x, float32 y, float32 z)
           struct (dir, Vector3.Zero, ValueNone)
-        | EmitterShape.Sphere radius ->
-          let mutable dir = Vector3.UnitY
-          let mutable valid = false
+        | EmitterShape.Sphere configRadius ->
+          // Check for skill-driven area override
+          match overrides.Area with
+          | ValueSome(SkillArea.Circle(skillRadius, _)) ->
+            // Circle: spawn uniformly across disk
+            // Random direction
+            let mutable dir = Vector3.UnitY
+            let mutable valid = false
 
-          while not valid do
-            let v =
+            while not valid do
+              let v =
+                Vector3(
+                  float32(rng.NextDouble() * 2.0 - 1.0),
+                  float32(rng.NextDouble() * 2.0 - 1.0),
+                  float32(rng.NextDouble() * 2.0 - 1.0)
+                )
+
+              let lenSq = v.LengthSquared()
+
+              if lenSq > 0.001f && lenSq <= 1.0f then
+                dir <- Vector3.Normalize(v)
+                valid <- true
+
+            // Spawn offset: uniform disk distribution
+            let spawnDist = float32(Math.Sqrt(rng.NextDouble())) * skillRadius
+            let spawnAngle = float32(rng.NextDouble() * 2.0 * Math.PI)
+
+            let spawnOffset =
               Vector3(
-                float32(rng.NextDouble() * 2.0 - 1.0),
-                float32(rng.NextDouble() * 2.0 - 1.0),
-                float32(rng.NextDouble() * 2.0 - 1.0)
+                spawnDist * MathF.Cos(spawnAngle),
+                0.0f,
+                spawnDist * MathF.Sin(spawnAngle)
               )
 
-            let lenSq = v.LengthSquared()
+            struct (dir, spawnOffset, ValueNone)
 
-            if lenSq > 0.001f && lenSq <= 1.0f then
-              dir <- Vector3.Normalize(v)
-              valid <- true
+          | ValueSome(SkillArea.Line(width, length, _)) ->
+            // Line/Rectangle: spawn uniformly across the rectangular area
+            // Direction is upward (will be rotated by effect rotation)
+            let dir = Vector3.UnitY
 
-          struct (dir, Vector3.Zero, ValueNone)
+            // Random position along length (0 to length) and width (-width/2 to width/2)
+            let alongLength = float32(rng.NextDouble()) * length
+            let acrossWidth = float32(rng.NextDouble() - 0.5) * width
+
+            // Spawn along the forward direction (Z in local space before rotation)
+            // Width is X, Length is Z
+            let spawnOffset = Vector3(acrossWidth, 0.0f, alongLength)
+
+            struct (dir, spawnOffset, ValueNone)
+
+          | _ ->
+            // Default: use config radius
+            let mutable dir = Vector3.UnitY
+            let mutable valid = false
+
+            while not valid do
+              let v =
+                Vector3(
+                  float32(rng.NextDouble() * 2.0 - 1.0),
+                  float32(rng.NextDouble() * 2.0 - 1.0),
+                  float32(rng.NextDouble() * 2.0 - 1.0)
+                )
+
+              let lenSq = v.LengthSquared()
+
+              if lenSq > 0.001f && lenSq <= 1.0f then
+                dir <- Vector3.Normalize(v)
+                valid <- true
+
+            let spawnDist = float32(Math.Sqrt(rng.NextDouble())) * configRadius
+            let spawnAngle = float32(rng.NextDouble() * 2.0 * Math.PI)
+
+            let spawnOffset =
+              Vector3(
+                spawnDist * MathF.Cos(spawnAngle),
+                0.0f,
+                spawnDist * MathF.Sin(spawnAngle)
+              )
+
+            struct (dir, spawnOffset, ValueNone)
         | EmitterShape.Cone(configAngle, radius) ->
           // Check for skill-driven angle override
           let angle, lengthOpt =
