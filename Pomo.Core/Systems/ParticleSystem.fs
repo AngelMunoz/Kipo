@@ -109,9 +109,9 @@ module ParticleSystem =
             let alongLength = float32(rng.NextDouble()) * length
             let acrossWidth = float32(rng.NextDouble() - 0.5) * width
 
-            // Spawn along the forward direction (Z in local space before rotation)
-            // Width is X, Length is Z
-            let spawnOffset = Vector3(acrossWidth, 0.0f, alongLength)
+            // Spawn offset in local space: Y is forward (will be rotated to face direction)
+            // X is width, Y is length (same as cone - Y gets rotated to Z by pitch)
+            let spawnOffset = Vector3(acrossWidth, alongLength, 0.0f)
 
             struct (dir, spawnOffset, ValueNone)
 
@@ -145,38 +145,60 @@ module ParticleSystem =
               )
 
             struct (dir, spawnOffset, ValueNone)
-        | EmitterShape.Cone(configAngle, radius) ->
-          // Check for skill-driven angle override
-          let angle, lengthOpt =
+        | EmitterShape.Cone(configAngle, configRadius) ->
+          // Check for skill-driven area override
+          let angle, length =
             match overrides.Area with
             | ValueSome(SkillArea.Cone(skillAngle, skillLength, _)) ->
-              skillAngle, ValueSome skillLength
+              skillAngle, skillLength
             | ValueSome(SkillArea.AdaptiveCone(skillLength, _)) ->
-              configAngle, ValueSome skillLength // Use config angle for adaptive
-            | _ -> configAngle, ValueNone
+              configAngle, skillLength
+            | _ -> configAngle, configRadius * 10.0f // Default length from config
 
-          // Calculate speed override from length if available
-          // Speed = Length / AverageLifetime to ensure particles reach the end
-          let speedOvr =
-            match lengthOpt with
-            | ValueSome len ->
-              let struct (minLife, maxLife) = config.Lifetime
-              let avgLifetime = (minLife + maxLife) / 2.0f
-              // Multiply by 1.2 to ensure particles reach slightly beyond
-              ValueSome(len / avgLifetime * 1.2f)
-            | ValueNone -> ValueNone
+          // For cone shape: spawn particles distributed across the cone area
+          // Random distance from origin (sqrt for uniform area distribution)
+          let distFromOrigin = float32(Math.Sqrt(rng.NextDouble())) * length
 
-          // Use polar coordinates for uniform cone distribution
+          // Random angle within the cone (uniform distribution)
           let halfAngleRad = MathHelper.ToRadians(angle / 2.0f)
-          // Random angle around the cone axis
-          let phi = rng.NextDouble() * 2.0 * Math.PI
-          // Random offset from center (sqrt for uniform disk distribution)
-          let r = Math.Sqrt(rng.NextDouble()) * Math.Sin(float halfAngleRad)
-          let x = r * Math.Cos(phi)
-          let z = r * Math.Sin(phi)
-          // Base Cone points UP (Y), with spread in XZ
-          let dir = Vector3(float32 x, 1.0f, float32 z) |> Vector3.Normalize
-          struct (dir, Vector3.Zero, speedOvr)
+          // Random angle from center axis (sqrt for uniform cone distribution)
+          let coneAngle = float32(Math.Sqrt(rng.NextDouble())) * halfAngleRad
+          // Random rotation around the cone axis
+          let rotAroundAxis = float32(rng.NextDouble() * 2.0 * Math.PI)
+
+          // Calculate spawn offset in local space (cone points UP/Y)
+          // Then rotated by effect rotation to point in direction
+          let xOffset =
+            distFromOrigin * MathF.Sin(coneAngle) * MathF.Cos(rotAroundAxis)
+
+          let zOffset =
+            distFromOrigin * MathF.Sin(coneAngle) * MathF.Sin(rotAroundAxis)
+
+          let yOffset = distFromOrigin * MathF.Cos(coneAngle)
+
+          // Spawn offset - particle spawns at this position in local space
+          // Y is forward (will be rotated to face direction)
+          let spawnOffset = Vector3(xOffset, yOffset, zOffset)
+
+          // Direction: random spherical for explosion effect at spawn point
+          let mutable dir = Vector3.UnitY
+          let mutable valid = false
+
+          while not valid do
+            let v =
+              Vector3(
+                float32(rng.NextDouble() * 2.0 - 1.0),
+                float32(rng.NextDouble() * 2.0 - 1.0),
+                float32(rng.NextDouble() * 2.0 - 1.0)
+              )
+
+            let lenSq = v.LengthSquared()
+
+            if lenSq > 0.001f && lenSq <= 1.0f then
+              dir <- Vector3.Normalize(v)
+              valid <- true
+
+          struct (dir, spawnOffset, ValueNone)
 
       // Use speed override if available, otherwise config speed
       let finalSpeed =

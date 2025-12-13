@@ -218,15 +218,15 @@
     "Radius": 0.1,
     "LocalOffset": { "X": 0.0, "Y": 1.0, "Z": 0.0 },
     "Particle": {
-      "Lifetime": [0.3, 1.5],
-      "Speed": [300, 500],
+      "Lifetime": [0.5, 1.5],
+      "Speed": [10, 40],
       "SizeStart": 1.5,
       "SizeEnd": 0.0,
       "ColorStart": "#FF4500FF",
       "ColorEnd": "#FF200000",
-      "Gravity": 50,
+      "Gravity": 200,
       "RandomVelocity": { "X": 5, "Y": 5, "Z": 5 },
-      "Drag": 0.3
+      "Drag": 2.0
     },
     "FloorHeight": 0.0
   },
@@ -304,14 +304,14 @@
     "Radius": 0.5,
     "LocalOffset": { "X": 0.0, "Y": 0.0, "Z": 0.0 },
     "Particle": {
-      "Lifetime": [0.3, 1.0],
-      "Speed": [100, 300],
+      "Lifetime": [0.5, 1.2],
+      "Speed": [10, 30],
       "SizeStart": 1.0,
       "SizeEnd": 0.0,
       "ColorStart": "#00FFFFFF",
       "ColorEnd": "#00FFFF00",
-      "Gravity": 500,
-      "Drag": 1.0
+      "Gravity": 300,
+      "Drag": 2.0
     },
     "FloorHeight": 0.0,
     "EmissionRotation": { "X": 0, "Y": 0.0, "Z": 0.0 }
