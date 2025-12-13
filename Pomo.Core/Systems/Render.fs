@@ -331,6 +331,7 @@ module Render =
           let entityScenarios = world.EntityScenario |> AMap.force
           let scenarios = world.Scenarios |> AMap.force
           let currentPoses = world.Poses |> AMap.force
+          let liveProjectiles = world.LiveProjectiles |> AMap.force
 
           match entityScenarios |> HashMap.tryFindV playerId with
           | ValueSome scenarioId ->
@@ -372,7 +373,25 @@ module Render =
                     |> HashMap.tryFind id
                     |> Option.defaultValue HashMap.empty
 
-                  let renderPos = RenderMath.LogicToRender pos pixelsPerUnit
+                  // Calculate altitude offset for descending projectiles
+                  let altitude, isDescending =
+                    match liveProjectiles |> HashMap.tryFindV id with
+                    | ValueSome proj ->
+                      match proj.Info.Variations with
+                      | ValueSome(Projectile.Descending(currentAltitude, _)) ->
+                        currentAltitude / pixelsPerUnit.Y, true
+                      | _ -> 0.0f, false
+                    | ValueNone -> 0.0f, false
+
+                  // Apply altitude to render position (shifts up on screen via Z)
+                  let baseRenderPos = RenderMath.LogicToRender pos pixelsPerUnit
+
+                  let renderPos =
+                    Vector3(
+                      baseRenderPos.X,
+                      baseRenderPos.Y + altitude, // Depth sorting
+                      baseRenderPos.Z - altitude // Screen-space up (north = up on screen)
+                    )
 
                   // Calculate Base Transform (Position + Facing)
                   // Note: We apply squish and scale here for the root,
@@ -389,11 +408,20 @@ module Render =
                   // Calculate Entity World Transform (Location in game world)
                   let entityBaseMatrix =
                     // Check if projectile to apply special tilt
-                    match configId with
-                    | ValueSome "Projectile" ->
-                      // Projectiles often don't have "animations" in the rig sense yet,
-                      // but if they do (like spinning), the Rig "Root" handles it.
-                      // The "Base" matrix positions it in the world.
+                    match configId, isDescending with
+                    | _, true ->
+                      // Descending projectiles: tilt to point downward (falling from sky)
+                      // No horizontal tilt (0), just straight down orientation
+                      RenderMath.GetTiltedEntityWorldMatrix
+                        renderPos
+                        0.0f // No horizontal facing - falling straight down
+                        0.0f // No X tilt - model points down naturally with camera
+                        0.0f // No spin for falling objects
+                        MathHelper.PiOver4
+                        squishFactor
+                        Core.Constants.Entity.ModelScale
+                    | ValueSome "Projectile", false ->
+                      // Regular projectiles: tilt to fly horizontally
                       RenderMath.GetTiltedEntityWorldMatrix
                         renderPos
                         facing
@@ -402,9 +430,19 @@ module Render =
                         MathHelper.PiOver4
                         squishFactor
                         Core.Constants.Entity.ModelScale
+                    | ValueSome "Barrel_B", false ->
+                      // Barrel projectiles: same as regular tilted projectiles
+                      RenderMath.GetTiltedEntityWorldMatrix
+                        renderPos
+                        facing
+                        MathHelper.PiOver2
+                        0.0f
+                        MathHelper.PiOver4
+                        squishFactor
+                        Core.Constants.Entity.ModelScale
                     | _ ->
                       RenderMath.GetEntityWorldMatrix
-                        renderPos
+                        (RenderMath.LogicToRender pos pixelsPerUnit)
                         facing
                         MathHelper.PiOver4
                         squishFactor

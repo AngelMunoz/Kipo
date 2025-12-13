@@ -563,94 +563,99 @@ module DebugRender =
       |> FSharp.Control.Reactive.Observable.subscribe(fun intent ->
         match skillStore.tryFind intent.SkillId with
         | ValueSome(Active skill) ->
-          let entityScenarios = projections.EntityScenarios |> AMap.force
+          // Only show debug area for Instant delivery skills, not Projectile
+          match skill.Delivery with
+          | Delivery.Instant ->
+            let entityScenarios = projections.EntityScenarios |> AMap.force
 
-          match entityScenarios |> HashMap.tryFindV intent.Caster with
-          | ValueSome scenarioId ->
-            let positions =
-              projections.ComputeMovementSnapshot(scenarioId).Positions
+            match entityScenarios |> HashMap.tryFindV intent.Caster with
+            | ValueSome scenarioId ->
+              let positions =
+                projections.ComputeMovementSnapshot(scenarioId).Positions
 
-            let casterPos =
-              positions
-              |> HashMap.tryFind intent.Caster
-              |> Option.defaultValue Vector2.Zero
-
-            let targetPos =
-              match intent.Target with
-              | SystemCommunications.TargetPosition pos -> pos
-              | SystemCommunications.TargetDirection pos -> pos
-              | SystemCommunications.TargetEntity id ->
+              let casterPos =
                 positions
-                |> HashMap.tryFind id
-                |> Option.defaultValue casterPos
-              | _ -> casterPos
+                |> HashMap.tryFind intent.Caster
+                |> Option.defaultValue Vector2.Zero
 
-            let color = Color.Orange
+              let targetPos =
+                match intent.Target with
+                | SystemCommunications.TargetPosition pos -> pos
+                | SystemCommunications.TargetDirection pos -> pos
+                | SystemCommunications.TargetEntity id ->
+                  positions
+                  |> HashMap.tryFind id
+                  |> Option.defaultValue casterPos
+                | _ -> casterPos
 
-            let command =
-              match skill.Area with
-              | Cone(angle, length, _) ->
-                let direction =
-                  if
-                    Vector2.DistanceSquared(casterPos, targetPos) > 0.001f
-                  then
-                    Vector2.Normalize(targetPos - casterPos)
-                  else
-                    Vector2.UnitX
+              let color = Color.Orange
 
-                Some(DrawCone(casterPos, direction, angle, length, color))
-              | Line(width, length, _) ->
-                let direction =
-                  if
-                    Vector2.DistanceSquared(casterPos, targetPos) > 0.001f
-                  then
-                    Vector2.Normalize(targetPos - casterPos)
-                  else
-                    Vector2.UnitX
+              let command =
+                match skill.Area with
+                | Cone(angle, length, _) ->
+                  let direction =
+                    if
+                      Vector2.DistanceSquared(casterPos, targetPos) > 0.001f
+                    then
+                      Vector2.Normalize(targetPos - casterPos)
+                    else
+                      Vector2.UnitX
 
-                let endPoint = casterPos + direction * length
-                Some(DrawLineShape(casterPos, endPoint, width, color))
-              | Circle(radius, _) -> Some(DrawCircle(casterPos, radius, color))
-              | AdaptiveCone(length, _) -> // length and maxTargets remain
-                let direction =
-                  if
-                    Vector2.DistanceSquared(casterPos, targetPos) > 0.001f
-                  then
-                    Vector2.Normalize(targetPos - casterPos)
-                  else
-                    Vector2.UnitX
+                  Some(DrawCone(casterPos, direction, angle, length, color))
+                | Line(width, length, _) ->
+                  let direction =
+                    if
+                      Vector2.DistanceSquared(casterPos, targetPos) > 0.001f
+                    then
+                      Vector2.Normalize(targetPos - casterPos)
+                    else
+                      Vector2.UnitX
 
-                let referenceForward = Vector2.UnitY // Assuming caster's forward
+                  let endPoint = casterPos + direction * length
+                  Some(DrawLineShape(casterPos, endPoint, width, color))
+                | Circle(radius, _) ->
+                  Some(DrawCircle(targetPos, radius, color))
+                | AdaptiveCone(length, _) ->
+                  let direction =
+                    if
+                      Vector2.DistanceSquared(casterPos, targetPos) > 0.001f
+                    then
+                      Vector2.Normalize(targetPos - casterPos)
+                    else
+                      Vector2.UnitX
 
-                let angleFromForwardRad =
-                  MathF.Acos(Vector2.Dot(referenceForward, direction))
+                  let referenceForward = Vector2.UnitY
 
-                let angleFromForwardDeg =
-                  MathHelper.ToDegrees(angleFromForwardRad)
+                  let angleFromForwardRad =
+                    MathF.Acos(Vector2.Dot(referenceForward, direction))
 
-                let apertureAngle =
-                  if angleFromForwardDeg <= 90.0f then
-                    30.0f + (angleFromForwardDeg / 90.0f) * 150.0f
-                  else
-                    180.0f
+                  let angleFromForwardDeg =
+                    MathHelper.ToDegrees(angleFromForwardRad)
 
-                Some(
-                  DrawCone(
-                    casterPos,
-                    direction,
-                    apertureAngle,
-                    length, // Use skill's full length
-                    color
+                  let apertureAngle =
+                    if angleFromForwardDeg <= 90.0f then
+                      30.0f + (angleFromForwardDeg / 90.0f) * 150.0f
+                    else
+                      180.0f
+
+                  Some(
+                    DrawCone(
+                      casterPos,
+                      direction,
+                      apertureAngle,
+                      length,
+                      color
+                    )
                   )
-                )
-              | _ -> None
+                | _ -> None
 
-            match command with
-            | Some cmd ->
-              transientCommands.Add
-                struct (cmd, Core.Constants.Debug.TransientCommandDuration)
-            | None -> ()
-          | ValueNone -> ()
+              match command with
+              | Some cmd ->
+                transientCommands.Add
+                  struct (cmd, Core.Constants.Debug.TransientCommandDuration)
+              | None -> ()
+            | ValueNone -> ()
+          | Delivery.Projectile _ -> () // Don't show debug area for projectile skills on cast
         | _ -> ())
       |> subscriptions.Add
 
@@ -670,10 +675,7 @@ module DebugRender =
               |> HashMap.tryFind impact.CasterId
               |> Option.defaultValue Vector2.Zero
 
-            let impactPos =
-              positions
-              |> HashMap.tryFind impact.TargetId
-              |> Option.defaultValue Vector2.Zero
+            let impactPos = impact.ImpactPosition
 
             let color = Color.Red
 

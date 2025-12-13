@@ -32,5 +32,13 @@
     "AnimationBindings": {
       "Spin": ["Projectile_Spin"]
     }
+  },
+  "Barrel_B": {
+    "Rig": {
+      "Root": { "Model": "Barrel_B" }
+    },
+    "AnimationBindings": {
+      "Spin": ["Projectile_Spin"]
+    }
   }
 }

@@ -196,7 +196,17 @@
       "Radius": 68.0,
       "MaxTargets": 5
     },
-    "Delivery": { "Type": "Instant" },
+    "Delivery": {
+      "Type": "Projectile",
+      "Speed": 150.0,
+      "CollisionMode": "IgnoreTerrain",
+      "Kind": {
+        "Type": "Descending",
+        "StartAltitude": 200.0,
+        "FallSpeed": 300.0
+      },
+      "Visuals": { "Model": "Barrel_B" }
+    },
     "ImpactVisuals": { "Vfx": "BoulderImpact" },
     "ElementFormula": {
       "Element": "Earth",

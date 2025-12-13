@@ -522,7 +522,7 @@ module Combat =
 
           let liveProjectile: Projectile.LiveProjectile = {
             Caster = casterId
-            Target = targetId
+            Target = Projectile.EntityTarget targetId
             SkillId = skillId
             Info = projectileInfo
           }
@@ -532,19 +532,15 @@ module Combat =
               struct (projectileId, liveProjectile, ValueNone)
           )
       else
-        // Fallback to single target logic (Standard Homing Projectile)
-        let targetEntity =
-          match target with
-          | SystemCommunications.TargetEntity te -> Some te
-          | _ -> None
-
-        match targetEntity with
-        | Some targetId ->
+        // Fallback to single target logic
+        match target with
+        | SystemCommunications.TargetEntity targetId ->
+          // Standard Homing Projectile - targets an entity
           let projectileId = Guid.NewGuid() |> UMX.tag<EntityId>
 
           let liveProjectile: Projectile.LiveProjectile = {
             Caster = casterId
-            Target = targetId
+            Target = Projectile.EntityTarget targetId
             SkillId = skillId
             Info = projectileInfo
           }
@@ -553,7 +549,23 @@ module Combat =
             StateChangeEvent.CreateProjectile
               struct (projectileId, liveProjectile, ValueNone)
           )
-        | None -> ()
+        | SystemCommunications.TargetPosition targetPos ->
+          // Position-targeted projectile (e.g., falling boulder)
+          let projectileId = Guid.NewGuid() |> UMX.tag<EntityId>
+
+          let liveProjectile: Projectile.LiveProjectile = {
+            Caster = casterId
+            Target = Projectile.PositionTarget targetPos
+            SkillId = skillId
+            Info = projectileInfo
+          }
+
+          // Start projectile at caster position
+          ctx.EventBus.Publish(
+            StateChangeEvent.CreateProjectile
+              struct (projectileId, liveProjectile, ValueNone)
+          )
+        | _ -> ()
 
     let handleInstantDelivery
       (ctx: WorldContext)
@@ -724,123 +736,119 @@ module Combat =
       =
       match ctx.SkillStore.tryFind impact.SkillId with
       | ValueSome(Active skill) ->
-        let impactPosition =
-          ctx.EntityContext.Positions.TryFindV impact.TargetId
+        let center = impact.ImpactPosition
 
-        match impactPosition with
-        | ValueNone -> () // Impacted entity has no position, should not happen
-        | ValueSome center ->
-          let targets =
-            match skill.Area with
-            | Point -> IndexList.single impact.TargetId
-            | Circle(radius, maxTargets) ->
-              Spatial.Search.findTargetsInCircle ctx.SearchContext {
-                CasterId = impact.CasterId
-                Circle = { Center = center; Radius = radius }
-                MaxTargets = maxTargets
+        let targets =
+          match skill.Area with
+          | Point ->
+            match impact.TargetEntity with
+            | ValueSome targetId -> IndexList.single targetId
+            | ValueNone -> IndexList.empty
+          | Circle(radius, maxTargets) ->
+            Spatial.Search.findTargetsInCircle ctx.SearchContext {
+              CasterId = impact.CasterId
+              Circle = { Center = center; Radius = radius }
+              MaxTargets = maxTargets
+            }
+          | Cone(angle, length, maxTargets) ->
+            let casterPos =
+              Targeting.getPosition ctx.EntityContext impact.CasterId
+
+            let direction = Vector2.Normalize(center - casterPos)
+
+            Spatial.Search.findTargetsInCone ctx.SearchContext {
+              CasterId = impact.CasterId
+              Cone = {
+                Origin = center
+                Direction = direction
+                AngleDegrees = angle
+                Length = length
               }
-            | Cone(angle, length, maxTargets) ->
-              // For projectile impact, direction is from caster to impact point
-              let casterPos =
-                Targeting.getPosition ctx.EntityContext impact.CasterId
+              MaxTargets = maxTargets
+            }
+          | Line(width, length, maxTargets) ->
+            let casterPos =
+              Targeting.getPosition ctx.EntityContext impact.CasterId
 
-              let direction = Vector2.Normalize(center - casterPos)
+            let direction = Vector2.Normalize(center - casterPos)
+            let endPoint = center + direction * length
 
-              Spatial.Search.findTargetsInCone ctx.SearchContext {
-                CasterId = impact.CasterId
-                Cone = {
-                  Origin = center
-                  Direction = direction
-                  AngleDegrees = angle
-                  Length = length
-                }
-                MaxTargets = maxTargets
+            Spatial.Search.findTargetsInLine ctx.SearchContext {
+              CasterId = impact.CasterId
+              Line = {
+                Start = center
+                End = endPoint
+                Width = width
               }
-            | Line(width, length, maxTargets) ->
-              // For projectile impact, line is along the trajectory
-              let casterPos =
-                Targeting.getPosition ctx.EntityContext impact.CasterId
+              MaxTargets = maxTargets
+            }
+          | MultiPoint _ ->
+            match impact.TargetEntity with
+            | ValueSome targetId -> IndexList.single targetId
+            | ValueNone -> IndexList.empty
+          | AdaptiveCone _ ->
+            match impact.TargetEntity with
+            | ValueSome targetId -> IndexList.single targetId
+            | ValueNone -> IndexList.empty
 
-              let direction = Vector2.Normalize(center - casterPos)
-              let endPoint = center + direction * length
+        for targetId in targets do
+          let result =
+            Execution.applySkillDamage ctx impact.CasterId targetId skill
 
-              Spatial.Search.findTargetsInLine ctx.SearchContext {
-                CasterId = impact.CasterId
-                Line = {
-                  Start = center
-                  End = endPoint
-                  Width = width
-                }
-                MaxTargets = maxTargets
+          let targetPos = Targeting.getPosition ctx.EntityContext targetId
+
+          if result.IsEvaded then
+            ctx.EventBus.Publish(
+              {
+                Message = "Miss"
+                Position = targetPos
               }
-            | MultiPoint _ ->
-              // This shouldn't happen. MultiPoint is for firing multiple projectiles,
-              // not for the area of a single projectile impact.
-              IndexList.single impact.TargetId
-            | AdaptiveCone _ ->
-              // This shouldn't happen. AdaptiveCone is gets calculated from selected targets/positions
-              // then generates projectiles for each target/position. impacts should just deal damage to the
-              // target/position. not creating new cones/projectiles.
-              IndexList.single impact.TargetId
+              : SystemCommunications.ShowNotification
+            )
+          else
+            ctx.EventBus.Publish(
+              {
+                Target = targetId
+                Amount = result.Amount
+              }
+              : SystemCommunications.DamageDealt
+            )
 
-          for targetId in targets do
-            let result =
-              Execution.applySkillDamage ctx impact.CasterId targetId skill
+            let baseMessage = $"-{result.Amount}"
 
-            let targetPos = Targeting.getPosition ctx.EntityContext targetId
+            let debugText =
+              match impact.RemainingJumps with
+              | ValueSome jumps -> $" ({jumps} left)"
+              | ValueNone -> ""
 
-            if result.IsEvaded then
+            let finalMessage = baseMessage + debugText
+
+            ctx.EventBus.Publish(
+              {
+                Message = finalMessage
+                Position = targetPos
+              }
+              : SystemCommunications.ShowNotification
+            )
+
+            if result.IsCritical then
               ctx.EventBus.Publish(
                 {
-                  Message = "Miss"
+                  Message = "Crit!"
                   Position = targetPos
                 }
                 : SystemCommunications.ShowNotification
               )
-            else
+
+            for effect in skill.Effects do
               ctx.EventBus.Publish(
                 {
-                  Target = targetId
-                  Amount = result.Amount
+                  SourceEntity = impact.CasterId
+                  TargetEntity = targetId
+                  Effect = effect
                 }
-                : SystemCommunications.DamageDealt
+                : SystemCommunications.EffectApplicationIntent
               )
-
-              let baseMessage = $"-{result.Amount}"
-
-              let debugText =
-                match impact.RemainingJumps with
-                | ValueSome jumps -> $" ({jumps} left)"
-                | ValueNone -> ""
-
-              let finalMessage = baseMessage + debugText
-
-              ctx.EventBus.Publish(
-                {
-                  Message = finalMessage
-                  Position = targetPos
-                }
-                : SystemCommunications.ShowNotification
-              )
-
-              if result.IsCritical then
-                ctx.EventBus.Publish(
-                  {
-                    Message = "Crit!"
-                    Position = targetPos
-                  }
-                  : SystemCommunications.ShowNotification
-                )
-
-              for effect in skill.Effects do
-                ctx.EventBus.Publish(
-                  {
-                    SourceEntity = impact.CasterId
-                    TargetEntity = targetId
-                    Effect = effect
-                  }
-                  : SystemCommunications.EffectApplicationIntent
-                )
       | _ -> () // Skill not found
 
 
