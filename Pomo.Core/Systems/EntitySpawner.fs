@@ -122,7 +122,7 @@ module EntitySpawnerLogic =
       UseSlot1, Core.SlotProcessing.Skill %7 // Summon Boulder
       UseSlot2, Core.SlotProcessing.Skill %8 // Catchy Song
       UseSlot3, Core.SlotProcessing.Skill %3
-      UseSlot4, Core.SlotProcessing.Skill %6
+      UseSlot4, Core.SlotProcessing.Skill %2
       UseSlot5, Core.SlotProcessing.Skill %4
       UseSlot6, Core.SlotProcessing.Skill %5
     ]

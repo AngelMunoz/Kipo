@@ -264,6 +264,25 @@ module Render =
     let texture = new Texture2D(game.GraphicsDevice, 1, 1)
     texture.SetData [| Color.White |]
 
+    let billboardBatch = new BillboardBatch(game.GraphicsDevice)
+
+    let textureCache =
+      System.Collections.Generic.Dictionary<string, Texture2D voption>()
+
+    let getTexture(id: string) =
+      match textureCache.TryGetValue id with
+      | true, cached -> cached
+      | false, _ ->
+        try
+          let loaded = game.Content.Load<Texture2D>(id)
+          let result = ValueSome loaded
+          textureCache.[id] <- result
+          result
+        with _ ->
+          let result = ValueNone
+          textureCache.[id] <- result
+          result
+
     // Load Models
     // The store returns Rigs (HashMap<string, RigNode>)
     // We need to extract all unique ModelAsset names from all nodes in all Rigs
@@ -312,6 +331,7 @@ module Render =
           let entityScenarios = world.EntityScenario |> AMap.force
           let scenarios = world.Scenarios |> AMap.force
           let currentPoses = world.Poses |> AMap.force
+          let liveProjectiles = world.LiveProjectiles |> AMap.force
 
           match entityScenarios |> HashMap.tryFindV playerId with
           | ValueSome scenarioId ->
@@ -353,7 +373,28 @@ module Render =
                     |> HashMap.tryFind id
                     |> Option.defaultValue HashMap.empty
 
-                  let renderPos = RenderMath.LogicToRender pos pixelsPerUnit
+                  // Calculate altitude for descending projectiles
+                  let altitude =
+                    match liveProjectiles |> HashMap.tryFindV id with
+                    | ValueSome proj ->
+                      match proj.Info.Variations with
+                      | ValueSome(Projectile.Descending(currentAltitude, _)) ->
+                        currentAltitude / pixelsPerUnit.Y
+                      | _ -> 0.0f
+                    | ValueNone -> 0.0f
+
+                  // Check if this is a projectile (for rendering style)
+                  let isProjectile = liveProjectiles |> HashMap.containsKey id
+
+                  // Apply altitude to render position (shifts up on screen via Z)
+                  let baseRenderPos = RenderMath.LogicToRender pos pixelsPerUnit
+
+                  let renderPos =
+                    Vector3(
+                      baseRenderPos.X,
+                      baseRenderPos.Y + altitude, // Depth sorting
+                      baseRenderPos.Z - altitude // Screen-space up (north = up on screen)
+                    )
 
                   // Calculate Base Transform (Position + Facing)
                   // Note: We apply squish and scale here for the root,
@@ -369,23 +410,35 @@ module Render =
 
                   // Calculate Entity World Transform (Location in game world)
                   let entityBaseMatrix =
-                    // Check if projectile to apply special tilt
-                    match configId with
-                    | ValueSome "Projectile" ->
-                      // Projectiles often don't have "animations" in the rig sense yet,
-                      // but if they do (like spinning), the Rig "Root" handles it.
-                      // The "Base" matrix positions it in the world.
+                    if isProjectile then
+                      // Projectile: calculate tilt dynamically from trajectory
+                      // Tilt angle based on altitude: falling straight down = Pi/2
+                      // Horizontal flight = Pi/2 (tilted to fly forward)
+                      // For arcing: would use atan2(altitude, horizontalDistance)
+                      let tilt =
+                        if altitude > 0.0f then
+                          // Falling from sky: tilt to point downward
+                          // tilt of 0 with no facing makes it point down in camera view
+                          0.0f
+                        else
+                          // Horizontal flight: tilt to fly forward
+                          MathHelper.PiOver2
+
+                      let projectileFacing =
+                        if altitude > 0.0f then 0.0f else facing
+
                       RenderMath.GetTiltedEntityWorldMatrix
                         renderPos
-                        facing
-                        MathHelper.PiOver2
-                        0.0f // Spin handled by animation system now!
+                        projectileFacing
+                        tilt
+                        0.0f // Spin handled by animation system
                         MathHelper.PiOver4
                         squishFactor
                         Core.Constants.Entity.ModelScale
-                    | _ ->
+                    else
+                      // Regular entity rendering
                       RenderMath.GetEntityWorldMatrix
-                        renderPos
+                        (RenderMath.LogicToRender pos pixelsPerUnit)
                         facing
                         MathHelper.PiOver4
                         squishFactor
@@ -404,6 +457,143 @@ module Render =
                       drawModel camera model finalWorld)
 
                 | ValueNone -> () // No rig, can't draw
+
+              // Particle Pass - Render on top (no depth test)
+              game.GraphicsDevice.DepthStencilState <- DepthStencilState.None
+
+              game.GraphicsDevice.RasterizerState <- RasterizerState.CullNone
+
+              let viewInv = Matrix.Invert(camera.View)
+              let camRight = viewInv.Right
+              let camUp = viewInv.Up
+
+              let particlesToDraw =
+                world.VisualEffects
+                |> Seq.filter(fun e -> e.IsAlive.Value)
+                |> Seq.collect(fun e ->
+                  // Fix for Jitter: If Local Space, we MUST use the Interpolated Position from the Snapshot
+                  // matching the Owner. Otherwise, particles lag behind the rendered entity.
+                  let effectPos =
+                    match e.Owner with
+                    | ValueSome ownerId ->
+                      match snapshot.Positions.TryFindV ownerId with
+                      | ValueSome interpPos ->
+                        // Map Entity (X, Y) to Particle Space (X, 0, Z or whatever logic uses)
+                        // Particle System uses: X, Z(Depth), Y(Altitude) logic?
+                        // No, ParticleSystem uses Vector3(X, Y_Altitude, Z_Depth).
+                        // Entity Pos is Vector2(X, Y_Depth).
+                        // So we map Entity.Y -> Particle.Z
+                        Vector3(interpPos.X, 0.0f, interpPos.Y)
+                      | ValueNone -> e.Position.Value // Fallback to logic ticks
+                    | ValueNone -> e.Position.Value
+
+                  e.Emitters
+                  |> Seq.filter(fun em -> em.Particles.Count > 0)
+                  |> Seq.collect(fun em ->
+                    em.Particles |> Seq.map(fun p -> em.Config, p, effectPos)))
+                |> Seq.groupBy(fun (config, _, _) ->
+                  config.Texture, config.BlendMode)
+
+              // Check if any particles (Debug)
+              // if Seq.isEmpty particlesToDraw then
+              //   Console.WriteLine "No particles to draw"
+
+              for (textureId, blendMode), group in particlesToDraw do
+                match getTexture textureId with
+                | ValueSome tex ->
+                  match blendMode with
+                  | Particles.BlendMode.AlphaBlend ->
+                    game.GraphicsDevice.BlendState <- BlendState.AlphaBlend
+                  | Particles.BlendMode.Additive ->
+                    game.GraphicsDevice.BlendState <- BlendState.Additive
+
+                  billboardBatch.Begin(camera.View, camera.Projection, tex)
+
+                  for config, p, effectPos in group do
+                    // Determine world position based on Simulation Space
+                    let pWorldPos =
+                      match config.SimulationSpace with
+                      | Particles.SimulationSpace.World -> p.Position
+                      | Particles.SimulationSpace.Local ->
+                        // If Local, p.Position is relative. Add Effect Position.
+                        // Effect Pos: X = WorldX, Y = Altitude (0), Z = WorldY (Depth)
+                        // Particle: X, Y(Alt), Z
+                        p.Position + effectPos
+
+                    // Transform Logic Position (X, Z, Y-Up) to Render Space
+                    // Transform Logic Position (X, Z, Y-Up) to Render Space
+                    let logicPos = Vector2(pWorldPos.X, pWorldPos.Z)
+
+                    let baseRenderPos =
+                      RenderMath.LogicToRender logicPos pixelsPerUnit
+
+                    // Fix for Verticality: Simulate isometric height by shifting Z (Screen Y) and Y (Depth).
+                    let altitude = (pWorldPos.Y / pixelsPerUnit.Y) * 2.0f
+
+                    let finalPos =
+                      Vector3(
+                        baseRenderPos.X,
+                        baseRenderPos.Y + altitude,
+                        baseRenderPos.Z - altitude
+                      )
+
+                    // Scale Size: Use ModelScale for consistency with entity rendering
+                    let size = p.Size * Core.Constants.Entity.ModelScale
+
+                    billboardBatch.Draw(
+                      finalPos,
+                      size,
+                      0.0f, // Rotation removed per user request
+                      p.Color,
+                      camRight,
+                      camUp
+                    )
+
+                  billboardBatch.End()
+                | ValueNone ->
+                  // DEBUG FALLBACK: Draw with white texture
+                  // Console.WriteLine($"Fallback texture for {textureId}")
+
+                  // Use Additive for fallback
+                  game.GraphicsDevice.BlendState <- BlendState.Additive
+                  billboardBatch.Begin(camera.View, camera.Projection, texture)
+
+                  for config, p, effectPos in group do
+                    // Determine world position based on Simulation Space
+                    let pWorldPos =
+                      match config.SimulationSpace with
+                      | Particles.SimulationSpace.World -> p.Position
+                      | Particles.SimulationSpace.Local ->
+                        p.Position + effectPos
+
+                    // APPLY TRANSFORM HERE TOO
+                    let logicPos = Vector2(pWorldPos.X, pWorldPos.Z)
+
+                    let baseRenderPos =
+                      RenderMath.LogicToRender logicPos pixelsPerUnit
+
+                    // Fix for Verticality: Simulate isometric height by shifting Z (Screen Y) and Y (Depth).
+                    let altitude = (pWorldPos.Y / pixelsPerUnit.Y) * 2.0f
+
+                    let finalPos =
+                      Vector3(
+                        baseRenderPos.X,
+                        baseRenderPos.Y + altitude,
+                        baseRenderPos.Z - altitude
+                      )
+
+                    let size = p.Size * Core.Constants.Entity.ModelScale
+
+                    billboardBatch.Draw(
+                      finalPos,
+                      size,
+                      0.0f, // Rotation removed per user request
+                      p.Color,
+                      camRight,
+                      camUp
+                    )
+
+                  billboardBatch.End()
 
               // 2D Pass (UI / Debug)
               // Restore states for SpriteBatch if needed

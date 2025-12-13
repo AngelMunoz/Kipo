@@ -166,6 +166,22 @@ module Core =
     | Skill of skillId: int<Units.SkillId>
     | Item of itemInstanceId: Guid<Units.ItemInstanceId>
 
+  [<Struct>]
+  type VisualManifest = {
+    ModelId: string voption
+    VfxId: string voption
+    AnimationId: string voption
+    AttachmentPoint: string voption
+  }
+
+  module VisualManifest =
+    let empty = {
+      ModelId = ValueNone
+      VfxId = ValueNone
+      AnimationId = ValueNone
+      AttachmentPoint = ValueNone
+    }
+
   type CoreEventListener =
 
     abstract member StartListening: unit -> IDisposable
@@ -281,4 +297,25 @@ module Core =
                 $"Unknown StatModifier type: {modifierType}"
               )
               |> Error
+        }
+
+    module VisualManifest =
+      let decoder: Decoder<VisualManifest> =
+        fun json -> decode {
+          let! modelId = VOptional.Property.get ("Model", Required.string) json
+
+          and! vfxId = VOptional.Property.get ("Vfx", Required.string) json
+
+          and! animationId =
+            VOptional.Property.get ("Animation", Required.string) json
+
+          and! attachmentPoint =
+            VOptional.Property.get ("Attachment", Required.string) json
+
+          return {
+            ModelId = modelId
+            VfxId = vfxId
+            AnimationId = animationId
+            AttachmentPoint = attachmentPoint
+          }
         }

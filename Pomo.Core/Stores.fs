@@ -13,6 +13,7 @@ open Pomo.Core.Domain.Skill
 open Pomo.Core.Domain.Item
 open Pomo.Core.Domain.AI
 open Pomo.Core.Domain.Animation
+open Pomo.Core.Domain.Particles
 open Pomo.Core.Serialization
 
 module JsonFileLoader =
@@ -106,6 +107,26 @@ module JsonFileLoader =
     with ex ->
       Error $"Failed to load file '{filePath}': {ex.Message}"
 
+  let readParticles (deserializer: JDeckDeserializer) (filePath: string) =
+    try
+      let json =
+        Path.Combine(AppContext.BaseDirectory, filePath) |> File.ReadAllBytes
+
+      match deserializer.Deserialize<EmitterConfig list> json with
+      | Ok result ->
+        let mutable newMap = HashMap.empty<string, EmitterConfig list>
+
+        // Group by Name
+        let grouped = result |> List.groupBy(fun config -> config.Name)
+
+        for (name, configs) in grouped do
+          newMap <- HashMap.add name configs newMap
+
+        Ok newMap
+      | Error decodeError -> Error $"Deserialization error: {decodeError}"
+    with ex ->
+      Error $"Failed to load file '{filePath}': {ex.Message}"
+
 
 module Stores =
   open Pomo.Core.Domain.Units
@@ -142,6 +163,11 @@ module Stores =
     abstract member find: clipId: string -> AnimationClip
     abstract member tryFind: clipId: string -> AnimationClip voption
     abstract member all: unit -> seq<AnimationClip>
+
+  type ParticleStore =
+    abstract member find: effectId: string -> EmitterConfig list
+    abstract member tryFind: effectId: string -> EmitterConfig list voption
+    abstract member all: unit -> seq<string * EmitterConfig list>
 
 
   module Skill =
@@ -247,3 +273,19 @@ module Stores =
             member _.all() = animMap |> HashMap.toValueSeq
         }
       | Error errMsg -> failwith $"Failed to create AnimationStore: {errMsg}"
+
+  module Particle =
+    let create
+      (loader: string -> Result<HashMap<string, EmitterConfig list>, string>)
+      =
+      match loader "Content/Particles.json" with
+      | Ok particleMap ->
+        { new ParticleStore with
+            member _.find(effectId: string) = HashMap.find effectId particleMap
+
+            member _.tryFind(effectId: string) =
+              HashMap.tryFindV effectId particleMap
+
+            member _.all() = particleMap |> HashMap.toSeq
+        }
+      | Error errMsg -> failwith $"Failed to create ParticleStore: {errMsg}"
