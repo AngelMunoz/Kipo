@@ -32,6 +32,7 @@ module Projectile =
     Collision: CollisionMode
     Variations: ExtraVariations voption
     Visuals: VisualManifest
+    TerrainImpactVisuals: VisualManifest voption
   }
 
   [<Struct>]
@@ -117,6 +118,11 @@ module Projectile =
           and! visuals =
             VOptional.Property.get ("Visuals", VisualManifest.decoder) json
 
+          and! terrainImpactVisuals =
+            VOptional.Property.get
+              ("TerrainImpactVisuals", VisualManifest.decoder)
+              json
+
           return {
             Speed = float32 speed
             Collision = collision
@@ -125,5 +131,6 @@ module Projectile =
               match visuals with
               | ValueSome v -> v
               | ValueNone -> VisualManifest.empty
+            TerrainImpactVisuals = terrainImpactVisuals
           }
         }

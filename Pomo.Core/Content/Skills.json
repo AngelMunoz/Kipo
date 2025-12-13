@@ -366,7 +366,7 @@
     "Delivery": {
       "Type": "Projectile",
       "Speed": 150.0,
-      "CollisionMode": "IgnoreTerrain",
+      "CollisionMode": "BlockedByTerrain",
       "Visuals": { "Model": "Dagger", "Vfx": "FanOfKnivesWind" }
     },
     "Formula": "AP * 1.2",
