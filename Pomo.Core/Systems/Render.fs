@@ -373,15 +373,18 @@ module Render =
                     |> HashMap.tryFind id
                     |> Option.defaultValue HashMap.empty
 
-                  // Calculate altitude offset for descending projectiles
-                  let altitude, isDescending =
+                  // Calculate altitude for descending projectiles
+                  let altitude =
                     match liveProjectiles |> HashMap.tryFindV id with
                     | ValueSome proj ->
                       match proj.Info.Variations with
                       | ValueSome(Projectile.Descending(currentAltitude, _)) ->
-                        currentAltitude / pixelsPerUnit.Y, true
-                      | _ -> 0.0f, false
-                    | ValueNone -> 0.0f, false
+                        currentAltitude / pixelsPerUnit.Y
+                      | _ -> 0.0f
+                    | ValueNone -> 0.0f
+
+                  // Check if this is a projectile (for rendering style)
+                  let isProjectile = liveProjectiles |> HashMap.containsKey id
 
                   // Apply altitude to render position (shifts up on screen via Z)
                   let baseRenderPos = RenderMath.LogicToRender pos pixelsPerUnit
@@ -407,40 +410,33 @@ module Render =
 
                   // Calculate Entity World Transform (Location in game world)
                   let entityBaseMatrix =
-                    // Check if projectile to apply special tilt
-                    match configId, isDescending with
-                    | _, true ->
-                      // Descending projectiles: tilt to point downward (falling from sky)
-                      // No horizontal tilt (0), just straight down orientation
+                    if isProjectile then
+                      // Projectile: calculate tilt dynamically from trajectory
+                      // Tilt angle based on altitude: falling straight down = Pi/2
+                      // Horizontal flight = Pi/2 (tilted to fly forward)
+                      // For arcing: would use atan2(altitude, horizontalDistance)
+                      let tilt =
+                        if altitude > 0.0f then
+                          // Falling from sky: tilt to point downward
+                          // tilt of 0 with no facing makes it point down in camera view
+                          0.0f
+                        else
+                          // Horizontal flight: tilt to fly forward
+                          MathHelper.PiOver2
+
+                      let projectileFacing =
+                        if altitude > 0.0f then 0.0f else facing
+
                       RenderMath.GetTiltedEntityWorldMatrix
                         renderPos
-                        0.0f // No horizontal facing - falling straight down
-                        0.0f // No X tilt - model points down naturally with camera
-                        0.0f // No spin for falling objects
+                        projectileFacing
+                        tilt
+                        0.0f // Spin handled by animation system
                         MathHelper.PiOver4
                         squishFactor
                         Core.Constants.Entity.ModelScale
-                    | ValueSome "Projectile", false ->
-                      // Regular projectiles: tilt to fly horizontally
-                      RenderMath.GetTiltedEntityWorldMatrix
-                        renderPos
-                        facing
-                        MathHelper.PiOver2
-                        0.0f // Spin handled by animation system now!
-                        MathHelper.PiOver4
-                        squishFactor
-                        Core.Constants.Entity.ModelScale
-                    | ValueSome "Barrel_B", false ->
-                      // Barrel projectiles: same as regular tilted projectiles
-                      RenderMath.GetTiltedEntityWorldMatrix
-                        renderPos
-                        facing
-                        MathHelper.PiOver2
-                        0.0f
-                        MathHelper.PiOver4
-                        squishFactor
-                        Core.Constants.Entity.ModelScale
-                    | _ ->
+                    else
+                      // Regular entity rendering
                       RenderMath.GetEntityWorldMatrix
                         (RenderMath.LogicToRender pos pixelsPerUnit)
                         facing
