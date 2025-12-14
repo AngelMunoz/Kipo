@@ -16,16 +16,6 @@ module MovementLogic =
     | Moving of velocity: Vector2
     | WaypointReached of remainingPath: Vector2 list
 
-  let resolveCollision
-    (entityId: Guid<EntityId>)
-    (currentPos: Vector2)
-    (mtv: Vector2)
-    (eventBus: EventBus)
-    =
-    let newPos = currentPos + mtv
-    eventBus.Publish(Physics(PositionChanged struct (entityId, newPos)))
-    mtv
-
   let notifyArrived (entityId: Guid<EntityId>) (eventBus: EventBus) =
     eventBus.Publish(Physics(VelocityChanged struct (entityId, Vector2.Zero)))
     eventBus.Publish(Physics(MovementStateChanged struct (entityId, Idle)))

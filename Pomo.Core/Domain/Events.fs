@@ -132,7 +132,8 @@ module SystemCommunications =
   type ProjectileImpacted = {
     ProjectileId: Guid<EntityId>
     CasterId: Guid<EntityId>
-    TargetId: Guid<EntityId>
+    ImpactPosition: Vector2
+    TargetEntity: Guid<EntityId> voption
     SkillId: int<SkillId>
     RemainingJumps: int voption
   }

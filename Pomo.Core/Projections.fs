@@ -275,8 +275,9 @@ module Projections =
     abstract ComputeMovementSnapshot: Guid<ScenarioId> -> MovementSnapshot
 
     /// Helper to query a snapshot (pure function, no longer adaptive)
+    /// liveEntities filters to only include valid combat targets (excludes projectiles, dead entities)
     abstract GetNearbyEntitiesSnapshot:
-      MovementSnapshot * Vector2 * float32 ->
+      MovementSnapshot * HashSet<Guid<EntityId>> * Vector2 * float32 ->
         IndexList<struct (Guid<EntityId> * Vector2)>
 
 
@@ -369,7 +370,9 @@ module Projections =
             entityScenarios
             scenarioId
 
-        member _.GetNearbyEntitiesSnapshot(snapshot, center, radius) =
+        member _.GetNearbyEntitiesSnapshot
+          (snapshot, liveEntities, center, radius)
+          =
           let cells =
             Spatial.getCellsInRadius
               Constants.Collision.GridCellSize
@@ -385,8 +388,12 @@ module Projections =
 
           potentialTargets
           |> IndexList.choose(fun entityId ->
-            match snapshot.Positions |> HashMap.tryFindV entityId with
-            | ValueSome pos when Vector2.Distance(pos, center) <= radius ->
-              Some struct (entityId, pos)
-            | _ -> None)
+            // Filter out non-live entities (projectiles, dead entities, etc.)
+            if not(liveEntities.Contains entityId) then
+              None
+            else
+              match snapshot.Positions |> HashMap.tryFindV entityId with
+              | ValueSome pos when Vector2.Distance(pos, center) <= radius ->
+                Some struct (entityId, pos)
+              | _ -> None)
     }

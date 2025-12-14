@@ -10,6 +10,7 @@ open Pomo.Core.EventBus
 open Pomo.Core.Domain
 open Pomo.Core.Domain.Units
 open Pomo.Core.Domain.World
+open Pomo.Core.Domain.Particles
 open Pomo.Core.Domain.Events
 open Pomo.Core.Domain.Skill
 open Pomo.Core.Systems
@@ -34,11 +35,13 @@ module Combat =
     EntityContext: EntityContext
     SearchContext: Spatial.Search.SearchContext
     SkillStore: Stores.SkillStore
+    ParticleStore: Stores.ParticleStore
+    VisualEffects: ResizeArray<Particles.ActiveEffect>
   }
 
   module private Targeting =
 
-    let getPosition (ctx: EntityContext) (entityId: Guid<EntityId>) =
+    let inline getPosition (ctx: EntityContext) (entityId: Guid<EntityId>) =
       ctx.Positions
       |> HashMap.tryFindV entityId
       |> ValueOption.defaultValue Vector2.Zero
@@ -359,6 +362,46 @@ module Combat =
       | ValueNone -> ()
 
 
+  module private Visuals =
+    let spawnEffect
+      (ctx: WorldContext)
+      (vfxId: string)
+      (pos: Vector2)
+      (rotation: Quaternion)
+      (area: SkillArea)
+      =
+      match ctx.ParticleStore.tryFind vfxId with
+      | ValueSome configs ->
+        let emitters =
+          configs
+          |> List.map(fun config ->
+            ({
+              Config = config
+              Particles = ResizeArray()
+              Accumulator = ref 0.0f
+              BurstDone = ref false
+            }
+            : Pomo.Core.Domain.Particles.ActiveEmitter))
+          |> ResizeArray
+
+        let effect: Pomo.Core.Domain.Particles.ActiveEffect = {
+          Id = System.Guid.NewGuid().ToString()
+          Emitters = emitters |> Seq.toList
+          Position = ref(Vector3(pos.X, 0.0f, pos.Y))
+          Rotation = ref rotation
+          Scale = ref Vector3.One
+          IsAlive = ref true
+          Owner = ValueNone
+          Overrides = {
+            EffectOverrides.empty with
+                Rotation = ValueSome rotation
+                Area = ValueSome area
+          }
+        }
+
+        ctx.VisualEffects.Add(effect)
+      | ValueNone -> ()
+
   module private Handlers =
 
     let handleEffectResourceIntent
@@ -404,27 +447,26 @@ module Combat =
         ctx.EntityContext.DerivedStats.TryFindV intent.TargetEntity
       with
       | ValueSome attackerStats, ValueSome defenderStats ->
-        let totalDamageFromModifiers =
-          intent.Effect.Modifiers
-          |> Array.choose(fun m ->
-            match m with
-            | AbilityDamageMod(mathExpr, element) ->
-              Some(
-                DamageCalculator.calculateEffectDamage
+        let mutable totalDamage = 0
+
+        for m in intent.Effect.Modifiers do
+          match m with
+          | AbilityDamageMod(mathExpr, element) ->
+            totalDamage <-
+              totalDamage
+              + DamageCalculator.calculateEffectDamage
                   attackerStats
                   defenderStats
                   mathExpr
                   intent.Effect.DamageSource
                   element
-              )
-            | _ -> None)
-          |> Array.sum
+          | _ -> ()
 
-        if totalDamageFromModifiers > 0 then
+        if totalDamage > 0 then
           ctx.EventBus.Publish(
             {
               Target = intent.TargetEntity
-              Amount = totalDamageFromModifiers
+              Amount = totalDamage
             }
             : SystemCommunications.DamageDealt
           )
@@ -434,7 +476,7 @@ module Combat =
 
           ctx.EventBus.Publish(
             {
-              Message = $"-{totalDamageFromModifiers}"
+              Message = $"-{totalDamage}"
               Position = targetPos
             }
             : SystemCommunications.ShowNotification
@@ -479,7 +521,7 @@ module Combat =
 
           let liveProjectile: Projectile.LiveProjectile = {
             Caster = casterId
-            Target = targetId
+            Target = Projectile.EntityTarget targetId
             SkillId = skillId
             Info = projectileInfo
           }
@@ -489,19 +531,15 @@ module Combat =
               struct (projectileId, liveProjectile, ValueNone)
           )
       else
-        // Fallback to single target logic (Standard Homing Projectile)
-        let targetEntity =
-          match target with
-          | SystemCommunications.TargetEntity te -> Some te
-          | _ -> None
-
-        match targetEntity with
-        | Some targetId ->
+        // Fallback to single target logic
+        match target with
+        | SystemCommunications.TargetEntity targetId ->
+          // Standard Homing Projectile - targets an entity
           let projectileId = Guid.NewGuid() |> UMX.tag<EntityId>
 
           let liveProjectile: Projectile.LiveProjectile = {
             Caster = casterId
-            Target = targetId
+            Target = Projectile.EntityTarget targetId
             SkillId = skillId
             Info = projectileInfo
           }
@@ -510,7 +548,23 @@ module Combat =
             StateChangeEvent.CreateProjectile
               struct (projectileId, liveProjectile, ValueNone)
           )
-        | None -> ()
+        | SystemCommunications.TargetPosition targetPos ->
+          // Position-targeted projectile (e.g., falling boulder)
+          let projectileId = Guid.NewGuid() |> UMX.tag<EntityId>
+
+          let liveProjectile: Projectile.LiveProjectile = {
+            Caster = casterId
+            Target = Projectile.PositionTarget targetPos
+            SkillId = skillId
+            Info = projectileInfo
+          }
+
+          // Start projectile at caster position
+          ctx.EventBus.Publish(
+            StateChangeEvent.CreateProjectile
+              struct (projectileId, liveProjectile, ValueNone)
+          )
+        | _ -> ()
 
     let handleInstantDelivery
       (ctx: WorldContext)
@@ -532,6 +586,57 @@ module Combat =
       match targetCenter with
       | ValueNone -> () // No center to apply AoE
       | ValueSome center ->
+        // Spawn Visuals
+        match activeSkill.ImpactVisuals.VfxId with
+        | ValueSome vfxId ->
+          // Calculate Rotation based on target direction
+          // Center is caster pos usually for cones.
+          let casterPos = Targeting.getPosition ctx.EntityContext casterId
+
+          let direction =
+            match target with
+            | SystemCommunications.TargetDirection pos ->
+              Vector2.Normalize(pos - casterPos)
+            | SystemCommunications.TargetPosition pos ->
+              Vector2.Normalize(pos - casterPos)
+            | SystemCommunications.TargetEntity targetId ->
+              let tPos = Targeting.getPosition ctx.EntityContext targetId
+              Vector2.Normalize(tPos - casterPos)
+            | _ -> Vector2.UnitY // Default Forward?
+
+          // Convert 2D direction (Top Down Y=Depth) to 3D Rotation (Yaw)
+          // X -> X, Y -> Z.
+          // Angle is atan2(Y, X).
+          // Quaternion Yaw is around Y-axis.
+          // In standard Math, 0 is X+.
+          // In our game, 0 Yaw is usually -Z?
+          // Let's use atan2(Y, X) and rotate around Up.
+          let angle = MathF.Atan2(direction.Y, direction.X)
+          // Adjust for coordinate system mismatch?
+          // If Y+ is "Down/Depth", and X+ is "Right".
+          // MathF.Atan2(1, 0) = PI/2 (Down).
+          // Our Rotation should align the Cone (Forward) to this.
+          // If Cone Forward is -Z (0,0,-1).
+          // And direction (0, 1) means +Z.
+          // We need to rotate 180 deg?
+          // Let's assume standard mapping: Yaw = -angle.
+          // Yaw to face target: PI/2 - angle maps Logic direction to Particle space
+          // (Particle +Z = Logic South, so East requires +90deg yaw)
+          let yaw =
+            Quaternion.CreateFromAxisAngle(
+              Vector3.Up,
+              -angle + MathHelper.PiOver2
+            )
+
+          // Pitch to re-orient "Up" particles to "Forward"
+          let pitch =
+            Quaternion.CreateFromAxisAngle(Vector3.UnitX, MathHelper.PiOver2)
+
+          let rotation = yaw * pitch
+
+          Visuals.spawnEffect ctx vfxId center rotation activeSkill.Area
+        | ValueNone -> ()
+
         let targets =
           match activeSkill.Area with
           | Point ->
@@ -630,123 +735,119 @@ module Combat =
       =
       match ctx.SkillStore.tryFind impact.SkillId with
       | ValueSome(Active skill) ->
-        let impactPosition =
-          ctx.EntityContext.Positions.TryFindV impact.TargetId
+        let center = impact.ImpactPosition
 
-        match impactPosition with
-        | ValueNone -> () // Impacted entity has no position, should not happen
-        | ValueSome center ->
-          let targets =
-            match skill.Area with
-            | Point -> IndexList.single impact.TargetId
-            | Circle(radius, maxTargets) ->
-              Spatial.Search.findTargetsInCircle ctx.SearchContext {
-                CasterId = impact.CasterId
-                Circle = { Center = center; Radius = radius }
-                MaxTargets = maxTargets
+        let targets =
+          match skill.Area with
+          | Point ->
+            match impact.TargetEntity with
+            | ValueSome targetId -> IndexList.single targetId
+            | ValueNone -> IndexList.empty
+          | Circle(radius, maxTargets) ->
+            Spatial.Search.findTargetsInCircle ctx.SearchContext {
+              CasterId = impact.CasterId
+              Circle = { Center = center; Radius = radius }
+              MaxTargets = maxTargets
+            }
+          | Cone(angle, length, maxTargets) ->
+            let casterPos =
+              Targeting.getPosition ctx.EntityContext impact.CasterId
+
+            let direction = Vector2.Normalize(center - casterPos)
+
+            Spatial.Search.findTargetsInCone ctx.SearchContext {
+              CasterId = impact.CasterId
+              Cone = {
+                Origin = center
+                Direction = direction
+                AngleDegrees = angle
+                Length = length
               }
-            | Cone(angle, length, maxTargets) ->
-              // For projectile impact, direction is from caster to impact point
-              let casterPos =
-                Targeting.getPosition ctx.EntityContext impact.CasterId
+              MaxTargets = maxTargets
+            }
+          | Line(width, length, maxTargets) ->
+            let casterPos =
+              Targeting.getPosition ctx.EntityContext impact.CasterId
 
-              let direction = Vector2.Normalize(center - casterPos)
+            let direction = Vector2.Normalize(center - casterPos)
+            let endPoint = center + direction * length
 
-              Spatial.Search.findTargetsInCone ctx.SearchContext {
-                CasterId = impact.CasterId
-                Cone = {
-                  Origin = center
-                  Direction = direction
-                  AngleDegrees = angle
-                  Length = length
-                }
-                MaxTargets = maxTargets
+            Spatial.Search.findTargetsInLine ctx.SearchContext {
+              CasterId = impact.CasterId
+              Line = {
+                Start = center
+                End = endPoint
+                Width = width
               }
-            | Line(width, length, maxTargets) ->
-              // For projectile impact, line is along the trajectory
-              let casterPos =
-                Targeting.getPosition ctx.EntityContext impact.CasterId
+              MaxTargets = maxTargets
+            }
+          | MultiPoint _ ->
+            match impact.TargetEntity with
+            | ValueSome targetId -> IndexList.single targetId
+            | ValueNone -> IndexList.empty
+          | AdaptiveCone _ ->
+            match impact.TargetEntity with
+            | ValueSome targetId -> IndexList.single targetId
+            | ValueNone -> IndexList.empty
 
-              let direction = Vector2.Normalize(center - casterPos)
-              let endPoint = center + direction * length
+        for targetId in targets do
+          let result =
+            Execution.applySkillDamage ctx impact.CasterId targetId skill
 
-              Spatial.Search.findTargetsInLine ctx.SearchContext {
-                CasterId = impact.CasterId
-                Line = {
-                  Start = center
-                  End = endPoint
-                  Width = width
-                }
-                MaxTargets = maxTargets
+          let targetPos = Targeting.getPosition ctx.EntityContext targetId
+
+          if result.IsEvaded then
+            ctx.EventBus.Publish(
+              {
+                Message = "Miss"
+                Position = targetPos
               }
-            | MultiPoint _ ->
-              // This shouldn't happen. MultiPoint is for firing multiple projectiles,
-              // not for the area of a single projectile impact.
-              IndexList.single impact.TargetId
-            | AdaptiveCone _ ->
-              // This shouldn't happen. AdaptiveCone is gets calculated from selected targets/positions
-              // then generates projectiles for each target/position. impacts should just deal damage to the
-              // target/position. not creating new cones/projectiles.
-              IndexList.single impact.TargetId
+              : SystemCommunications.ShowNotification
+            )
+          else
+            ctx.EventBus.Publish(
+              {
+                Target = targetId
+                Amount = result.Amount
+              }
+              : SystemCommunications.DamageDealt
+            )
 
-          for targetId in targets do
-            let result =
-              Execution.applySkillDamage ctx impact.CasterId targetId skill
+            let baseMessage = $"-{result.Amount}"
 
-            let targetPos = Targeting.getPosition ctx.EntityContext targetId
+            let debugText =
+              match impact.RemainingJumps with
+              | ValueSome jumps -> $" ({jumps} left)"
+              | ValueNone -> ""
 
-            if result.IsEvaded then
+            let finalMessage = baseMessage + debugText
+
+            ctx.EventBus.Publish(
+              {
+                Message = finalMessage
+                Position = targetPos
+              }
+              : SystemCommunications.ShowNotification
+            )
+
+            if result.IsCritical then
               ctx.EventBus.Publish(
                 {
-                  Message = "Miss"
+                  Message = "Crit!"
                   Position = targetPos
                 }
                 : SystemCommunications.ShowNotification
               )
-            else
+
+            for effect in skill.Effects do
               ctx.EventBus.Publish(
                 {
-                  Target = targetId
-                  Amount = result.Amount
+                  SourceEntity = impact.CasterId
+                  TargetEntity = targetId
+                  Effect = effect
                 }
-                : SystemCommunications.DamageDealt
+                : SystemCommunications.EffectApplicationIntent
               )
-
-              let baseMessage = $"-{result.Amount}"
-
-              let debugText =
-                match impact.RemainingJumps with
-                | ValueSome jumps -> $" ({jumps} left)"
-                | ValueNone -> ""
-
-              let finalMessage = baseMessage + debugText
-
-              ctx.EventBus.Publish(
-                {
-                  Message = finalMessage
-                  Position = targetPos
-                }
-                : SystemCommunications.ShowNotification
-              )
-
-              if result.IsCritical then
-                ctx.EventBus.Publish(
-                  {
-                    Message = "Crit!"
-                    Position = targetPos
-                  }
-                  : SystemCommunications.ShowNotification
-                )
-
-              for effect in skill.Effects do
-                ctx.EventBus.Publish(
-                  {
-                    SourceEntity = impact.CasterId
-                    TargetEntity = targetId
-                    Effect = effect
-                  }
-                  : SystemCommunications.EffectApplicationIntent
-                )
       | _ -> () // Skill not found
 
 
@@ -774,6 +875,7 @@ module Combat =
       // is done in the subscription callbacks
       let inline createCtx(entityId: Guid<EntityId>) =
         let entityScenarios = gameplay.Projections.EntityScenarios |> AMap.force
+        let liveEntities = gameplay.Projections.LiveEntities |> ASet.force
 
         match entityScenarios |> HashMap.tryFindV entityId with
         | ValueSome scenarioId ->
@@ -783,6 +885,7 @@ module Combat =
           let getNearbyEntities center radius =
             gameplay.Projections.GetNearbyEntitiesSnapshot(
               snapshot,
+              liveEntities,
               center,
               radius
             )
@@ -805,6 +908,8 @@ module Combat =
             SearchContext = searchCtx
             EntityContext = entityContext
             SkillStore = skillStore
+            ParticleStore = stores.ParticleStore
+            VisualEffects = core.World.VisualEffects
           }
         | ValueNone -> ValueNone
 

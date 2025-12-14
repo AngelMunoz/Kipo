@@ -1,6 +1,7 @@
 namespace Pomo.Core.Domain
 
 open System
+open Microsoft.Xna.Framework
 open FSharp.UMX
 open Pomo.Core.Domain.Units
 open Pomo.Core.Domain.Core
@@ -16,22 +17,28 @@ module Projectile =
 
   [<Struct>]
   type ExtraVariations =
-    // e.g. chained to another target
     | Chained of jumpsLeft: int * maxRange: float32
-    // e.g. blocked by terrain, bounces instead of disapearing
     | Bouncing of bouncesLeft: int
+    | Descending of currentAltitude: float32 * fallSpeed: float32
+
+  [<Struct>]
+  type ProjectileTarget =
+    | EntityTarget of entity: Guid<EntityId>
+    | PositionTarget of position: Vector2
 
   [<Struct>]
   type ProjectileInfo = {
     Speed: float32
     Collision: CollisionMode
     Variations: ExtraVariations voption
+    Visuals: VisualManifest
+    TerrainImpactVisuals: VisualManifest voption
   }
 
   [<Struct>]
   type LiveProjectile = {
     Caster: Guid<EntityId>
-    Target: Guid<EntityId>
+    Target: ProjectileTarget
     SkillId: int<SkillId>
     Info: ProjectileInfo
   }
@@ -41,6 +48,7 @@ module Projectile =
     open System.Text.Json.Serialization
     open JDeck
     open JDeck.Decode
+    open Pomo.Core.Domain.Core.Serialization
 
     module CollisionMode =
       let decoder: Decoder<CollisionMode> =
@@ -78,6 +86,14 @@ module Projectile =
               Required.Property.get ("BouncesLeft", Required.int) json
 
             return Bouncing(bouncesLeft)
+          | "descending" ->
+            let! startAltitude =
+              Required.Property.get ("StartAltitude", Required.float) json
+
+            and! fallSpeed =
+              Required.Property.get ("FallSpeed", Required.float) json
+
+            return Descending(float32 startAltitude, float32 fallSpeed)
           | _ ->
             return!
               DecodeError.ofError(
@@ -99,9 +115,22 @@ module Projectile =
           and! kind =
             VOptional.Property.get ("Kind", ProjectileKind.decoder) json
 
+          and! visuals =
+            VOptional.Property.get ("Visuals", VisualManifest.decoder) json
+
+          and! terrainImpactVisuals =
+            VOptional.Property.get
+              ("TerrainImpactVisuals", VisualManifest.decoder)
+              json
+
           return {
             Speed = float32 speed
             Collision = collision
             Variations = kind
+            Visuals =
+              match visuals with
+              | ValueSome v -> v
+              | ValueNone -> VisualManifest.empty
+            TerrainImpactVisuals = terrainImpactVisuals
           }
         }

@@ -31,8 +31,10 @@
     "Delivery": {
       "Type": "Projectile",
       "Speed": 100.0,
-      "CollisionMode": "IgnoreTerrain"
+      "CollisionMode": "IgnoreTerrain",
+      "Visuals": { "Vfx": "FireballProjectile" }
     },
+    "ImpactVisuals": { "Vfx": "FireballImpact" },
     "ElementFormula": {
       "Element": "Fire",
       "Formula": "(MA * 1.0) + (FireA * 1500)"
@@ -56,8 +58,10 @@
     "Delivery": {
       "Type": "Projectile",
       "Speed": 150.0,
-      "CollisionMode": "IgnoreTerrain"
+      "CollisionMode": "IgnoreTerrain",
+      "Visuals": { "Vfx": "HellfireProjectile" }
     },
+    "ImpactVisuals": { "Vfx": "HellfireImpact" },
     "ElementFormula": {
       "Element": "Dark",
       "Formula": "(MA * 2.0) + (DarkA * 3000)"
@@ -71,6 +75,7 @@
         "Stacking": { "Type": "RefreshDuration" },
         "Duration": { "Type": "Loop", "Interval": 1.0, "Duration": 8.0 },
         "DamageSource": "Magical",
+        "Visuals": { "Vfx": "HellBurn" },
         "Modifiers": [
           {
             "Type": "AbilityDamageMod",
@@ -101,6 +106,7 @@
         "Stacking": { "Type": "RefreshDuration" },
         "Duration": { "Type": "Timed", "Seconds": 30.0 },
         "DamageSource": "Magical",
+        "Visuals": { "Vfx": "HollowDarkness" },
         "Modifiers": [
           {
             "Type": "StaticMod",
@@ -134,6 +140,7 @@
         "Stacking": { "Type": "RefreshDuration" },
         "Duration": { "Type": "Timed", "Seconds": 30.0 },
         "DamageSource": "Magical",
+        "Visuals": { "Vfx": "ManaConcentration" },
         "Modifiers": [
           {
             "Type": "StaticMod",
@@ -168,6 +175,7 @@
         "DamageSource": "Physical",
         "Stacking": { "Type": "RefreshDuration" },
         "Duration": { "Type": "Timed", "Seconds": 2.0 },
+        "Visuals": { "Vfx": "Stunned" },
         "Modifiers": []
       }
     ]
@@ -188,7 +196,18 @@
       "Radius": 68.0,
       "MaxTargets": 5
     },
-    "Delivery": { "Type": "Instant" },
+    "Delivery": {
+      "Type": "Projectile",
+      "Speed": 150.0,
+      "CollisionMode": "IgnoreTerrain",
+      "Kind": {
+        "Type": "Descending",
+        "StartAltitude": 200.0,
+        "FallSpeed": 300.0
+      },
+      "Visuals": { "Model": "Barrel_B" }
+    },
+    "ImpactVisuals": { "Vfx": "BoulderImpact" },
     "ElementFormula": {
       "Element": "Earth",
       "Formula": "(MA * 1.2) + (EarthA * 2000)"
@@ -240,6 +259,7 @@
       "MaxTargets": 10
     },
     "Delivery": { "Type": "Instant" },
+    "ImpactVisuals": { "Vfx": "FireBreath" },
     "ElementFormula": {
       "Element": "Fire",
       "Formula": "MA * 1.5"
@@ -267,6 +287,7 @@
     "Delivery": { "Type": "Instant" },
     "Formula": "MA * 2.0",
     "Origin": "Caster",
+    "ImpactVisuals": { "Vfx": "ManaBeamImpact" },
     "Effects": []
   },
   "11": {
@@ -289,8 +310,10 @@
     "Delivery": {
       "Type": "Projectile",
       "Speed": 100.0,
-      "CollisionMode": "IgnoreTerrain"
+      "CollisionMode": "IgnoreTerrain",
+      "Visuals": { "Model": "IceShard", "Vfx": "IceShatterProjectile" }
     },
+    "ImpactVisuals": { "Vfx": "IceShatter" },
     "ElementFormula": {
       "Element": "Water",
       "Formula": "MA * 1.2"
@@ -343,8 +366,8 @@
     "Delivery": {
       "Type": "Projectile",
       "Speed": 150.0,
-      "CollisionMode": "IgnoreTerrain",
-      "Visual": "Dagger"
+      "CollisionMode": "BlockedByTerrain",
+      "Visuals": { "Model": "Dagger", "Vfx": "FanOfKnivesWind" }
     },
     "Formula": "AP * 1.2",
     "Origin": "Caster",

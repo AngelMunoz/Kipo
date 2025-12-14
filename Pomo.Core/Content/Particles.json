@@ -1,0 +1,378 @@
+[
+  {
+    "Name": "FireballProjectile",
+    "Texture": "Particles/jellyfish0-masks/15",
+    "BlendMode": "Additive",
+    "SimulationSpace": "World",
+    "Rate": 150,
+    "Shape": "Sphere",
+    "Radius": 0.5,
+    "LocalOffset": { "X": 0, "Y": 0.0, "Z": 0.0 },
+    "Particle": {
+      "Lifetime": [0.5, 1.0],
+      "Speed": [10, 30],
+      "SizeStart": 1.5,
+      "SizeEnd": 0.0,
+      "ColorStart": "#FF6400AA",
+      "ColorEnd": "#32323200",
+      "Gravity": -10,
+      "Drag": 0.0
+    }
+  },
+  {
+    "Name": "FireballProjectile",
+    "Texture": "Particles/jellyfish0-masks/15",
+    "BlendMode": "Additive",
+    "SimulationSpace": "Local",
+    "Rate": 300,
+    "Shape": "Point",
+    "LocalOffset": { "X": 0, "Y": 0.0, "Z": 0.0 },
+    "Particle": {
+      "Lifetime": [0.1, 1],
+      "Speed": [10, 40],
+      "SizeStart": 1.0,
+      "SizeEnd": 1.5,
+      "ColorStart": "#FF6400FF",
+      "ColorEnd": "#32323200",
+      "Gravity": -3,
+      "Drag": 0
+    }
+  },
+  {
+    "Name": "FireballImpact",
+    "Texture": "Particles/jellyfish0-masks/43",
+    "BlendMode": "Additive",
+    "SimulationSpace": "World",
+    "Rate": 0,
+    "Burst": 300,
+    "Shape": "Cone",
+    "Angle": 15,
+    "Radius": 0.2,
+    "LocalOffset": { "X": 0.0, "Y": 0.0, "Z": 0.0 },
+    "Particle": {
+      "Lifetime": [1, 5],
+      "Speed": [0.1, 400],
+      "SizeStart": 0.5,
+      "SizeEnd": 0.0,
+      "ColorStart": "#FFD880FF",
+      "ColorEnd": "#FF400000",
+      "Gravity": 1000,
+      "RandomVelocity": { "X": 10, "Y": 15, "Z": 15 },
+      "Drag": 2.0
+    }
+  },
+  {
+    "Name": "HellfireProjectile",
+    "Texture": "Particles/jellyfish0-masks/43",
+    "BlendMode": "AlphaBlend",
+    "SimulationSpace": "World",
+    "Rate": 150,
+    "Shape": "Sphere",
+    "Radius": 0.5,
+    "LocalOffset": { "X": 0, "Y": 0.0, "Z": 0.0 },
+    "Particle": {
+      "Lifetime": [0.5, 1.0],
+      "Speed": [10, 30],
+      "SizeStart": 1.5,
+      "SizeEnd": 0.0,
+      "ColorStart": "#300030FF",
+      "ColorEnd": "#00000000",
+      "Gravity": -10,
+      "Drag": 0.0
+    }
+  },
+  {
+    "Name": "HellfireProjectile",
+    "Texture": "Particles/jellyfish0-masks/15",
+    "BlendMode": "AlphaBlend",
+    "SimulationSpace": "Local",
+    "Rate": 300,
+    "Shape": "Point",
+    "LocalOffset": { "X": 0, "Y": 0.0, "Z": 0.0 },
+    "Particle": {
+      "Lifetime": [0.1, 1],
+      "Speed": [10, 40],
+      "SizeStart": 1.0,
+      "SizeEnd": 1.5,
+      "ColorStart": "#4B0082FF",
+      "ColorEnd": "#00000000",
+      "Gravity": -3,
+      "Drag": 2
+    }
+  },
+  {
+    "Name": "HellfireImpact",
+    "Texture": "Particles/jellyfish0-masks/43",
+    "BlendMode": "AlphaBlend",
+    "SimulationSpace": "World",
+    "Rate": 0,
+    "Burst": 300,
+    "Shape": "Cone",
+    "Angle": 15,
+    "Radius": 0.2,
+    "LocalOffset": { "X": 0.0, "Y": 0.0, "Z": 0.0 },
+    "Particle": {
+      "Lifetime": [1, 5],
+      "Speed": [0.1, 400],
+      "SizeStart": 0.7,
+      "SizeEnd": 0.0,
+      "ColorStart": "#300030FF",
+      "ColorEnd": "#00000000",
+      "Gravity": 1000,
+      "RandomVelocity": { "X": 10, "Y": 15, "Z": 15 },
+      "Drag": 2.0
+    },
+    "FloorHeight": 0.0
+  },
+  {
+    "Name": "HellBurn",
+    "Texture": "Particles/jellyfish0-masks/43",
+    "BlendMode": "AlphaBlend",
+    "SimulationSpace": "Local",
+    "Rate": 75,
+    "Shape": "Sphere",
+    "Radius": 0.5,
+    "LocalOffset": { "X": 0.0, "Y": 0.5, "Z": 0.0 },
+    "Particle": {
+      "Lifetime": [0.5, 1.0],
+      "Speed": [10, 50],
+      "SizeStart": 1.5,
+      "SizeEnd": 0.0,
+      "ColorStart": "#300030FF",
+      "ColorEnd": "#00000000",
+      "Gravity": -50,
+      "Drag": 0.0
+    }
+  },
+  {
+    "Name": "HealingSparkles",
+    "Texture": "Particles/jellyfish0-masks/15",
+    "BlendMode": "Additive",
+    "SimulationSpace": "Local",
+    "Rate": 20,
+    "Shape": "Sphere",
+    "Radius": 1.0,
+    "LocalOffset": { "X": 0.0, "Y": 1.0, "Z": 0.0 },
+    "Particle": {
+      "Lifetime": [1.0, 2.0],
+      "Speed": [10, 30],
+      "SizeStart": 0.5,
+      "SizeEnd": 0.0,
+      "ColorStart": "#00FF00FF",
+      "ColorEnd": "#00FF0000",
+      "Gravity": -20,
+      "Drag": 0.0
+    }
+  },
+  {
+    "Name": "Stunned",
+    "Texture": "Particles/jellyfish0-masks/15",
+    "BlendMode": "Additive",
+    "SimulationSpace": "Local",
+    "Rate": 10,
+    "Shape": "Sphere",
+    "Radius": 0.5,
+    "LocalOffset": { "X": 0.0, "Y": 2.0, "Z": 0.0 },
+    "Particle": {
+      "Lifetime": [0.5, 1.0],
+      "Speed": [5, 10],
+      "SizeStart": 0.8,
+      "SizeEnd": 0.0,
+      "ColorStart": "#FFFF00FF",
+      "ColorEnd": "#FFFF0000",
+      "Gravity": 0,
+      "Drag": 0.0
+    }
+  },
+  {
+    "Name": "FanOfKnivesWind",
+    "Texture": "Particles/jellyfish0-masks/5",
+    "BlendMode": "Additive",
+    "SimulationSpace": "World",
+    "Rate": 100,
+    "Shape": "Point",
+    "Radius": 0.5,
+    "LocalOffset": { "X": 0.0, "Y": 0.0, "Z": 0.0 },
+    "Particle": {
+      "Lifetime": [0.3, 0.5],
+      "Speed": [10, 30],
+      "SizeStart": 1.0,
+      "SizeEnd": 1.4,
+      "ColorStart": "#FFFFFF88",
+      "ColorEnd": "#FFFFFF00",
+      "Gravity": 0,
+      "Drag": 1.5
+    }
+  },
+  {
+    "Name": "FireBreath",
+    "Texture": "Particles/jellyfish0-masks/43",
+    "BlendMode": "Additive",
+    "SimulationSpace": "World",
+    "Rate": 0,
+    "Burst": 500,
+    "Shape": "Cone",
+    "Angle": 45,
+    "Radius": 0.5,
+    "EmissionMode": "Outward",
+    "LocalOffset": { "X": 0.0, "Y": 1.0, "Z": 0.0 },
+    "Particle": {
+      "Lifetime": [0.6, 1.0],
+      "Speed": [220, 320],
+      "SizeStart": 2.0,
+      "SizeEnd": 0.0,
+      "ColorStart": "#FF4500FF",
+      "ColorEnd": "#FF200000",
+      "Gravity": 0,
+      "Drag": 0.5
+    }
+  },
+  {
+    "Name": "ManaConcentration",
+    "Texture": "Particles/jellyfish0-masks/15",
+    "BlendMode": "Additive",
+    "SimulationSpace": "Local",
+    "Rate": 30,
+    "Shape": "Sphere",
+    "Radius": 1.0,
+    "LocalOffset": { "X": 0.0, "Y": 1.0, "Z": 0.0 },
+    "Particle": {
+      "Lifetime": [1.0, 2.0],
+      "Speed": [5, 10],
+      "SizeStart": 1.0,
+      "SizeEnd": 0.0,
+      "ColorStart": "#0000FFFF",
+      "ColorEnd": "#0000FF00",
+      "Gravity": -10,
+      "Drag": 0.0
+    }
+  },
+  {
+    "Name": "HollowDarkness",
+    "Texture": "Particles/jellyfish0-masks/43",
+    "BlendMode": "AlphaBlend",
+    "SimulationSpace": "Local",
+    "Rate": 30,
+    "Shape": "Sphere",
+    "Radius": 1.0,
+    "LocalOffset": { "X": 0.0, "Y": 1.0, "Z": 0.0 },
+    "Particle": {
+      "Lifetime": [1.0, 2.0],
+      "Speed": [5, 10],
+      "SizeStart": 1.0,
+      "SizeEnd": 0.0,
+      "ColorStart": "#300030FF",
+      "ColorEnd": "#00000000",
+      "Gravity": -10,
+      "Drag": 0.0
+    }
+  },
+  {
+    "Name": "BoulderImpact",
+    "Texture": "Particles/jellyfish0-masks/40",
+    "BlendMode": "AlphaBlend",
+    "SimulationSpace": "World",
+    "Rate": 0,
+    "Burst": 300,
+    "Shape": "Sphere",
+    "Radius": 1.0,
+    "LocalOffset": { "X": 0.0, "Y": 0.0, "Z": 0.0 },
+    "Particle": {
+      "Lifetime": [0.5, 1.0],
+      "Speed": [50, 300],
+      "SizeStart": 2.5,
+      "SizeEnd": 0.2,
+      "ColorStart": "#17120FFF",
+      "ColorEnd": "#654D3B00",
+      "Gravity": 500,
+      "Drag": 4.0
+    }
+  },
+  {
+    "Name": "IceShatter",
+    "Texture": "Particles/jellyfish0-masks/15",
+    "BlendMode": "Additive",
+    "SimulationSpace": "World",
+    "Rate": 0,
+    "Burst": 300,
+    "Shape": "Cone",
+    "Angle": 45,
+    "Radius": 0.5,
+    "EmissionMode": "Outward",
+    "LocalOffset": { "X": 0.0, "Y": 0.0, "Z": 0.0 },
+    "Particle": {
+      "Lifetime": [0.4, 0.7],
+      "Speed": [200, 300],
+      "SizeStart": 0.0,
+      "SizeEnd": 1.5,
+      "ColorStart": "#00FFFFFF",
+      "ColorEnd": "#00FFFF00",
+      "Gravity": 0,
+      "Drag": 0.5
+    },
+    "FloorHeight": 0.0,
+    "EmissionRotation": { "X": 0, "Y": 0.0, "Z": 0.0 }
+  },
+  {
+    "Name": "IceShatterProjectile",
+    "Texture": "Particles/jellyfish0-masks/18",
+    "BlendMode": "Additive",
+    "SimulationSpace": "World",
+    "Rate": 200,
+    "Burst": 0,
+    "Shape": "Point",
+    "LocalOffset": { "X": 0.0, "Y": 0.0, "Z": 0.0 },
+    "Particle": {
+      "Lifetime": [0.3, 0.8],
+      "Speed": [20, 60],
+      "SizeStart": 0.8,
+      "SizeEnd": 0.0,
+      "ColorStart": "#00FFFFFF",
+      "ColorEnd": "#00FFFF00",
+      "Gravity": 100,
+      "Drag": 1.0
+    }
+  },
+  {
+    "Name": "IceShatterProjectile",
+    "Texture": "Particles/jellyfish0-masks/18",
+    "BlendMode": "Additive",
+    "SimulationSpace": "Local",
+    "Rate": 150,
+    "Burst": 0,
+    "Shape": "Sphere",
+    "Radius": 0.3,
+    "LocalOffset": { "X": 0.0, "Y": 0.0, "Z": 0.0 },
+    "Particle": {
+      "Lifetime": [0.3, 0.6],
+      "Speed": [10, 30],
+      "SizeStart": 0.5,
+      "SizeEnd": 0.0,
+      "ColorStart": "#00FFFFFF",
+      "ColorEnd": "#00FFFF00",
+      "Gravity": 0,
+      "Drag": 0.5
+    }
+  },
+  {
+    "Name": "ManaBeamImpact",
+    "Texture": "Particles/jellyfish0-masks/15",
+    "BlendMode": "Additive",
+    "SimulationSpace": "World",
+    "Rate": 0,
+    "Burst": 350,
+    "Shape": "Sphere",
+    "Radius": 1.0,
+    "LocalOffset": { "X": 0.0, "Y": 0.0, "Z": 0.0 },
+    "Particle": {
+      "Lifetime": [0.3, 0.8],
+      "Speed": [20, 80],
+      "SizeStart": 1.0,
+      "SizeEnd": 0.0,
+      "ColorStart": "#0088FFFF",
+      "ColorEnd": "#0088FF00",
+      "Gravity": -50,
+      "Drag": 1.0
+    }
+  }
+]

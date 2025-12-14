@@ -89,6 +89,100 @@ module DebugRender =
     ShowInventory: bool
   }
 
+  /// Context for drawing primitives.
+  [<Struct>]
+  type DrawToolsContext = {
+    SpriteBatch: SpriteBatch
+    Pixel: Texture2D
+    Font: SpriteFont
+  }
+
+  /// Context for skill area visualization.
+  [<Struct>]
+  type SkillAreaContext = {
+    CasterPosition: Vector2
+    TargetPosition: Vector2
+    Color: Color
+  }
+
+  /// Helper functions for creating skill area debug draw commands.
+  module private SkillAreaDraw =
+
+    let private computeDirection (from: Vector2) (toward: Vector2) =
+      if Vector2.DistanceSquared(from, toward) > 0.001f then
+        Vector2.Normalize(toward - from)
+      else
+        Vector2.UnitX
+
+    let private computeAdaptiveAperture(direction: Vector2) =
+      let referenceForward = Vector2.UnitY
+
+      let angleFromForwardRad =
+        MathF.Acos(Vector2.Dot(referenceForward, direction))
+
+      let angleFromForwardDeg = MathHelper.ToDegrees(angleFromForwardRad)
+
+      if angleFromForwardDeg <= 90.0f then
+        30.0f + (angleFromForwardDeg / 90.0f) * 150.0f
+      else
+        180.0f
+
+    let inline forCone
+      (ctx: SkillAreaContext)
+      (angle: float32)
+      (length: float32)
+      =
+      let direction = computeDirection ctx.CasterPosition ctx.TargetPosition
+      DrawCone(ctx.CasterPosition, direction, angle, length, ctx.Color)
+
+    let inline forLine
+      (ctx: SkillAreaContext)
+      (width: float32)
+      (length: float32)
+      =
+      let direction = computeDirection ctx.CasterPosition ctx.TargetPosition
+      let endPoint = ctx.CasterPosition + direction * length
+      DrawLineShape(ctx.CasterPosition, endPoint, width, ctx.Color)
+
+    let inline forCircle (ctx: SkillAreaContext) (radius: float32) =
+      DrawCircle(ctx.TargetPosition, radius, ctx.Color)
+
+    let inline forAdaptiveCone (ctx: SkillAreaContext) (length: float32) =
+      let direction = computeDirection ctx.CasterPosition ctx.TargetPosition
+      let apertureAngle = computeAdaptiveAperture direction
+      DrawCone(ctx.CasterPosition, direction, apertureAngle, length, ctx.Color)
+
+    /// Creates a debug draw command for a skill area, if applicable.
+    let createCommand
+      (area: SkillArea)
+      (ctx: SkillAreaContext)
+      : DebugDrawCommand option =
+      match area with
+      | Cone(angle, length, _) -> Some(forCone ctx angle length)
+      | Line(width, length, _) -> Some(forLine ctx width length)
+      | Circle(radius, _) -> Some(forCircle ctx radius)
+      | AdaptiveCone(length, _) -> Some(forAdaptiveCone ctx length)
+      | _ -> None
+
+    /// Creates a debug draw command for projectile impact areas.
+    let createImpactCommand
+      (area: SkillArea)
+      (impactPos: Vector2)
+      (casterPos: Vector2)
+      (color: Color)
+      : DebugDrawCommand option =
+      match area with
+      | Cone(angle, length, _) ->
+        let direction = computeDirection casterPos impactPos
+        Some(DrawCone(impactPos, direction, angle, length, color))
+      | Line(width, length, _) ->
+        let direction = computeDirection casterPos impactPos
+        let endPoint = impactPos + direction * length
+        Some(DrawLineShape(impactPos, endPoint, width, color))
+      | Circle(radius, _) -> Some(DrawCircle(impactPos, radius, color))
+      | AdaptiveCone _ -> None // Do not draw cone on impact for AdaptiveCone
+      | _ -> None
+
   let private generateActiveEffectCommands(ctx: DebugEntityContext) =
     ctx.Positions
     |> HashMap.fold
@@ -427,6 +521,201 @@ module DebugRender =
 
       drawLine sb pixel p1 p2 color
 
+  /// Context for command execution with all needed drawing resources.
+  [<Struct>]
+  type CommandContext = {
+    SpriteBatch: SpriteBatch
+    Pixel: Texture2D
+    Font: SpriteFont
+    TotalGameTime: TimeSpan
+  }
+
+  /// Helper functions for executing debug draw commands.
+  module private CommandExecution =
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // Shape Drawing Commands (shared between main loop and transient loop)
+    // ─────────────────────────────────────────────────────────────────────────
+
+    let inline executeCone
+      (ctx: inref<CommandContext>)
+      (origin: inref<Vector2>)
+      (direction: inref<Vector2>)
+      (angle: float32)
+      (length: float32)
+      (color: Color)
+      =
+      drawCone ctx.SpriteBatch ctx.Pixel origin direction angle length color
+
+    let inline executeLineShape
+      (ctx: inref<CommandContext>)
+      (start: inref<Vector2>)
+      (end': inref<Vector2>)
+      (width: float32)
+      (color: Color)
+      =
+      drawLineShape ctx.SpriteBatch ctx.Pixel start end' width color
+
+    let inline executeCircle
+      (ctx: inref<CommandContext>)
+      (center: inref<Vector2>)
+      (radius: float32)
+      (color: Color)
+      =
+      drawCircle ctx.SpriteBatch ctx.Pixel center radius color
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // Map Object and Entity Bounds Drawing
+    // ─────────────────────────────────────────────────────────────────────────
+
+    let executeMapObject
+      (ctx: inref<CommandContext>)
+      (shape: CollisionShape voption)
+      (position: inref<Vector2>)
+      (width: float32)
+      (height: float32)
+      (rotation: float32)
+      (color: Color)
+      =
+      match shape with
+      | ValueSome(ClosedPolygon pts) ->
+        drawPolygon ctx.SpriteBatch ctx.Pixel pts position rotation color
+      | ValueSome(OpenPolyline pts) ->
+        let radians = MathHelper.ToRadians(rotation)
+        let count = pts.Count
+
+        for i in 0 .. count - 2 do
+          let p1 = rotate pts.[i] radians + position
+          let p2 = rotate pts.[i + 1] radians + position
+          drawLine ctx.SpriteBatch ctx.Pixel p1 p2 color
+      | ValueSome(Map.CollisionShape.Circle radius) ->
+        drawCircle ctx.SpriteBatch ctx.Pixel position radius color
+      | ValueSome(Map.CollisionShape.EllipseShape(ew, eh)) ->
+        drawEllipse ctx.SpriteBatch ctx.Pixel position ew eh rotation color
+      | ValueSome(Map.CollisionShape.RectangleShape(rw, rh)) ->
+        let pts =
+          IndexList.ofList [
+            Vector2.Zero
+            Vector2(rw, 0.0f)
+            Vector2(rw, rh)
+            Vector2(0.0f, rh)
+          ]
+
+        drawPolygon ctx.SpriteBatch ctx.Pixel pts position rotation color
+      | ValueNone ->
+        if width > 0.0f && height > 0.0f then
+          let pts =
+            IndexList.ofList [
+              Vector2.Zero
+              Vector2(width, 0.0f)
+              Vector2(width, height)
+              Vector2(0.0f, height)
+            ]
+
+          drawPolygon ctx.SpriteBatch ctx.Pixel pts position rotation color
+
+    let executeEntityBounds
+      (ctx: inref<CommandContext>)
+      (position: inref<Vector2>)
+      =
+      match Spatial.getEntityCollisionShape position with
+      | Map.CollisionShape.Circle radius ->
+        drawCircle ctx.SpriteBatch ctx.Pixel position radius Color.Cyan
+      | Map.CollisionShape.ClosedPolygon poly ->
+        drawPolygon ctx.SpriteBatch ctx.Pixel poly position 0.0f Color.Cyan
+      | _ -> () // FIXME: Handle other collision shapes
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // Spatial Grid Drawing
+    // ─────────────────────────────────────────────────────────────────────────
+
+    let executeSpatialGrid
+      (ctx: inref<CommandContext>)
+      (grid: HashMap<GridCell, IndexList<Guid<EntityId>>>)
+      =
+      for (cell, entities) in grid |> HashMap.toSeq do
+        let cellSize = Core.Constants.Collision.GridCellSize
+        let x = float32 cell.X * cellSize
+        let y = float32 cell.Y * cellSize
+
+        let color = if entities.Count > 0 then Color.Red else Color.Gray * 0.5f
+
+        // Draw cell boundary
+        drawLine
+          ctx.SpriteBatch
+          ctx.Pixel
+          (Vector2(x, y))
+          (Vector2(x + cellSize, y))
+          color
+
+        drawLine
+          ctx.SpriteBatch
+          ctx.Pixel
+          (Vector2(x + cellSize, y))
+          (Vector2(x + cellSize, y + cellSize))
+          color
+
+        drawLine
+          ctx.SpriteBatch
+          ctx.Pixel
+          (Vector2(x + cellSize, y + cellSize))
+          (Vector2(x, y + cellSize))
+          color
+
+        drawLine
+          ctx.SpriteBatch
+          ctx.Pixel
+          (Vector2(x, y + cellSize))
+          (Vector2(x, y))
+          color
+
+        if entities.Count > 0 then
+          let text = $"{entities.Count}"
+          let textPos = Vector2(x + 5.0f, y + 5.0f)
+          ctx.SpriteBatch.DrawString(ctx.Font, text, textPos, Color.White)
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // Transient Command Execution (for shape commands only)
+    // ─────────────────────────────────────────────────────────────────────────
+
+    let executeTransientCommand
+      (ctx: inref<CommandContext>)
+      (cmd: DebugDrawCommand)
+      =
+      match cmd with
+      | DrawCone(origin, direction, angle, length, color) ->
+        executeCone &ctx &origin &direction angle length color
+      | DrawLineShape(start, end', width, color) ->
+        executeLineShape &ctx &start &end' width color
+      | DrawCircle(center, radius, color) ->
+        executeCircle &ctx &center radius color
+      | _ -> ()
+
+  module private Culling =
+    /// Counts how many entities are visible within the camera's viewport.
+    let countVisibleEntities
+      (positions: HashMap<Guid<EntityId>, Vector2>)
+      (camera: Camera)
+      =
+      // Calculate visible bounds in world space from camera view
+      let viewWidth = float32 camera.Viewport.Width / camera.Zoom
+      let viewHeight = float32 camera.Viewport.Height / camera.Zoom
+      let halfWidth = viewWidth / 2.0f
+      let halfHeight = viewHeight / 2.0f
+
+      let minX = camera.Position.X - halfWidth
+      let maxX = camera.Position.X + halfWidth
+      let minY = camera.Position.Y - halfHeight
+      let maxY = camera.Position.Y + halfHeight
+
+      let mutable count = 0
+
+      for pos in positions |> HashMap.toValueArray do
+        if pos.X >= minX && pos.X <= maxX && pos.Y >= minY && pos.Y <= maxY then
+          count <- count + 1
+
+      count
+
   open Pomo.Core.Environment
   open Pomo.Core.Environment.Patterns
 
@@ -460,14 +749,17 @@ module DebugRender =
     let mutable pixel: Texture2D voption = ValueNone
     let mutable hudFont = Unchecked.defaultof<_>
 
+    let mutable pixel: Texture2D voption = ValueNone
+    let mutable hudFont = Unchecked.defaultof<_>
+
+    let mutable wasF11Down = false // Latch for toggle key
+
     let showStats = cval false
     let showInventory = cval false
 
     let transientCommands = ResizeArray<struct (DebugDrawCommand * TimeSpan)>()
     let skillStore = stores.SkillStore
     let subscriptions = new System.Reactive.Disposables.CompositeDisposable()
-
-
 
     let getRemainingDuration (totalGameTime: TimeSpan) (effect: ActiveEffect) =
       match effect.SourceEffect.Duration with
@@ -548,7 +840,7 @@ module DebugRender =
       playerActionStates
       |> AVal.map(fun s -> s |> HashMap.tryFindV ToggleInventory)
 
-    override _.Initialize() : unit =
+    override this.Initialize() : unit =
       base.Initialize()
       hudFont <- game.Content.Load<SpriteFont>("Fonts/Hud")
 
@@ -561,101 +853,63 @@ module DebugRender =
 
       eventBus.GetObservableFor<SystemCommunications.AbilityIntent>()
       |> FSharp.Control.Reactive.Observable.subscribe(fun intent ->
+        if not this.Visible then
+          ()
+        else
+
         match skillStore.tryFind intent.SkillId with
         | ValueSome(Active skill) ->
-          let entityScenarios = projections.EntityScenarios |> AMap.force
+          // Only show debug area for Instant delivery skills, not Projectile
+          match skill.Delivery with
+          | Delivery.Instant ->
+            let entityScenarios = projections.EntityScenarios |> AMap.force
 
-          match entityScenarios |> HashMap.tryFindV intent.Caster with
-          | ValueSome scenarioId ->
-            let positions =
-              projections.ComputeMovementSnapshot(scenarioId).Positions
+            match entityScenarios |> HashMap.tryFindV intent.Caster with
+            | ValueSome scenarioId ->
+              let positions =
+                projections.ComputeMovementSnapshot(scenarioId).Positions
 
-            let casterPos =
-              positions
-              |> HashMap.tryFind intent.Caster
-              |> Option.defaultValue Vector2.Zero
-
-            let targetPos =
-              match intent.Target with
-              | SystemCommunications.TargetPosition pos -> pos
-              | SystemCommunications.TargetDirection pos -> pos
-              | SystemCommunications.TargetEntity id ->
+              let casterPos =
                 positions
-                |> HashMap.tryFind id
-                |> Option.defaultValue casterPos
-              | _ -> casterPos
+                |> HashMap.tryFind intent.Caster
+                |> Option.defaultValue Vector2.Zero
 
-            let color = Color.Orange
+              let targetPos =
+                match intent.Target with
+                | SystemCommunications.TargetPosition pos -> pos
+                | SystemCommunications.TargetDirection pos -> pos
+                | SystemCommunications.TargetEntity id ->
+                  positions
+                  |> HashMap.tryFind id
+                  |> Option.defaultValue casterPos
+                | _ -> casterPos
 
-            let command =
-              match skill.Area with
-              | Cone(angle, length, _) ->
-                let direction =
-                  if
-                    Vector2.DistanceSquared(casterPos, targetPos) > 0.001f
-                  then
-                    Vector2.Normalize(targetPos - casterPos)
-                  else
-                    Vector2.UnitX
+              let color = Color.Orange
 
-                Some(DrawCone(casterPos, direction, angle, length, color))
-              | Line(width, length, _) ->
-                let direction =
-                  if
-                    Vector2.DistanceSquared(casterPos, targetPos) > 0.001f
-                  then
-                    Vector2.Normalize(targetPos - casterPos)
-                  else
-                    Vector2.UnitX
+              let ctx: SkillAreaContext = {
+                CasterPosition = casterPos
+                TargetPosition = targetPos
+                Color = color
+              }
 
-                let endPoint = casterPos + direction * length
-                Some(DrawLineShape(casterPos, endPoint, width, color))
-              | Circle(radius, _) -> Some(DrawCircle(casterPos, radius, color))
-              | AdaptiveCone(length, _) -> // length and maxTargets remain
-                let direction =
-                  if
-                    Vector2.DistanceSquared(casterPos, targetPos) > 0.001f
-                  then
-                    Vector2.Normalize(targetPos - casterPos)
-                  else
-                    Vector2.UnitX
+              let command = SkillAreaDraw.createCommand skill.Area ctx
 
-                let referenceForward = Vector2.UnitY // Assuming caster's forward
-
-                let angleFromForwardRad =
-                  MathF.Acos(Vector2.Dot(referenceForward, direction))
-
-                let angleFromForwardDeg =
-                  MathHelper.ToDegrees(angleFromForwardRad)
-
-                let apertureAngle =
-                  if angleFromForwardDeg <= 90.0f then
-                    30.0f + (angleFromForwardDeg / 90.0f) * 150.0f
-                  else
-                    180.0f
-
-                Some(
-                  DrawCone(
-                    casterPos,
-                    direction,
-                    apertureAngle,
-                    length, // Use skill's full length
-                    color
-                  )
-                )
-              | _ -> None
-
-            match command with
-            | Some cmd ->
-              transientCommands.Add
-                struct (cmd, Core.Constants.Debug.TransientCommandDuration)
-            | None -> ()
-          | ValueNone -> ()
+              match command with
+              | Some cmd ->
+                transientCommands.Add
+                  struct (cmd, Core.Constants.Debug.TransientCommandDuration)
+              | None -> ()
+            | ValueNone -> ()
+          | Delivery.Projectile _ -> () // Don't show debug area for projectile skills on cast
         | _ -> ())
       |> subscriptions.Add
 
       eventBus.GetObservableFor<SystemCommunications.ProjectileImpacted>()
       |> FSharp.Control.Reactive.Observable.subscribe(fun impact ->
+        if not this.Visible then
+          ()
+        else
+
         match skillStore.tryFind impact.SkillId with
         | ValueSome(Active skill) ->
           let entityScenarios = projections.EntityScenarios |> AMap.force
@@ -670,39 +924,16 @@ module DebugRender =
               |> HashMap.tryFind impact.CasterId
               |> Option.defaultValue Vector2.Zero
 
-            let impactPos =
-              positions
-              |> HashMap.tryFind impact.TargetId
-              |> Option.defaultValue Vector2.Zero
+            let impactPos = impact.ImpactPosition
 
             let color = Color.Red
 
             let command =
-              match skill.Area with
-              | Cone(angle, length, _) ->
-                let direction =
-                  if
-                    Vector2.DistanceSquared(casterPos, impactPos) > 0.001f
-                  then
-                    Vector2.Normalize(impactPos - casterPos)
-                  else
-                    Vector2.UnitX
-
-                Some(DrawCone(impactPos, direction, angle, length, color))
-              | Line(width, length, _) ->
-                let direction =
-                  if
-                    Vector2.DistanceSquared(casterPos, impactPos) > 0.001f
-                  then
-                    Vector2.Normalize(impactPos - casterPos)
-                  else
-                    Vector2.UnitX
-
-                let endPoint = impactPos + direction * length
-                Some(DrawLineShape(impactPos, endPoint, width, color))
-              | AdaptiveCone _ -> None // Do not draw cone on impact for AdaptiveCone
-              | Circle(radius, _) -> Some(DrawCircle(impactPos, radius, color))
-              | _ -> None
+              SkillAreaDraw.createImpactCommand
+                skill.Area
+                impactPos
+                casterPos
+                color
 
             match command with
             | Some cmd ->
@@ -714,8 +945,7 @@ module DebugRender =
         | _ -> ())
       |> subscriptions.Add
 
-    override _.Update gameTime =
-      base.Update gameTime
+    override this.Update gameTime =
       let sheetToggled = toggleSheetState |> AVal.force
       let inventoryToggled = toggleInventoryState |> AVal.force
 
@@ -729,8 +959,38 @@ module DebugRender =
         transact(fun () -> showInventory.Value <- not showInventory.Value)
       | _ -> ()
 
+      // Toggle Debug Visibility
+      let kstate = Microsoft.Xna.Framework.Input.Keyboard.GetState()
+
+      if
+        kstate.IsKeyDown(Microsoft.Xna.Framework.Input.Keys.F11)
+        && not wasF11Down
+      then
+        this.Visible <- not this.Visible
+
+      wasF11Down <- kstate.IsKeyDown(Microsoft.Xna.Framework.Input.Keys.F11)
+
+      if not this.Visible then
+        transientCommands.Clear()
+        // Reset counters so they don't look stuck when re-enabled
+        frameCount <- 0
+        fps <- 0.0f
+        totalEntities <- 0
+        visibleEntities <- 0
+      else
+        // Prune expired transient commands (moved from Draw)
+        let activeTransient = ResizeArray()
+
+        for struct (cmd, duration) in transientCommands do
+          let newDuration = duration - gameTime.ElapsedGameTime
+
+          if newDuration > TimeSpan.Zero then
+            activeTransient.Add struct (cmd, newDuration)
+
+        transientCommands.Clear()
+        transientCommands.AddRange activeTransient
+
     override _.Draw gameTime =
-      base.Draw gameTime
 
       let sb = spriteBatch.Value
       let entityScenarios = projections.EntityScenarios |> AMap.force
@@ -767,18 +1027,6 @@ module DebugRender =
         let commandsToExecute = generateDebugCommands renderContext
 
         let totalGameTime = world.Time |> AVal.map _.TotalGameTime |> AVal.force
-
-        // Prune expired transient commands
-        let activeTransient = ResizeArray()
-
-        for struct (cmd, duration) in transientCommands do
-          let newDuration = duration - gameTime.ElapsedGameTime
-
-          if newDuration > TimeSpan.Zero then
-            activeTransient.Add struct (cmd, newDuration)
-
-        transientCommands.Clear()
-        transientCommands.AddRange activeTransient
 
         let mutable yOffsets = HashMap.empty<Guid<EntityId>, float32>
 
@@ -906,144 +1154,106 @@ module DebugRender =
             | DrawMapObject(shape, position, width, height, rotation, color) ->
               match pixel with
               | ValueSome px ->
-                match shape with
-                | ValueSome(ClosedPolygon pts) ->
-                  drawPolygon sb px pts position rotation color
-                | ValueSome(OpenPolyline pts) ->
-                  // Draw polyline (open chain, not closed)
-                  let radians = MathHelper.ToRadians(rotation)
-                  let count = pts.Count
+                let ctx = {
+                  SpriteBatch = sb
+                  Pixel = px
+                  Font = hudFont
+                  TotalGameTime = gameTime.TotalGameTime
+                }
 
-                  for i in 0 .. count - 2 do
-                    let p1 = rotate pts.[i] radians + position
-                    let p2 = rotate pts.[i + 1] radians + position
-                    drawLine sb px p1 p2 color
-                | ValueSome(Map.CollisionShape.Circle radius) ->
-                  drawCircle sb px position radius color
-                | ValueSome(Map.CollisionShape.EllipseShape(ew, eh)) ->
-                  drawEllipse sb px position ew eh rotation color
-                | ValueSome(Map.CollisionShape.RectangleShape(rw, rh)) ->
-                  let pts =
-                    IndexList.ofList [
-                      Vector2.Zero
-                      Vector2(rw, 0.0f)
-                      Vector2(rw, rh)
-                      Vector2(0.0f, rh)
-                    ]
-
-                  drawPolygon sb px pts position rotation color
-                | ValueNone ->
-                  // No shape, use width/height as rectangle if provided
-                  if width > 0.0f && height > 0.0f then
-                    let pts =
-                      IndexList.ofList [
-                        Vector2.Zero
-                        Vector2(width, 0.0f)
-                        Vector2(width, height)
-                        Vector2(0.0f, height)
-                      ]
-
-                    drawPolygon sb px pts position rotation color
+                CommandExecution.executeMapObject
+                  &ctx
+                  shape
+                  &position
+                  width
+                  height
+                  rotation
+                  color
               | ValueNone -> ()
 
             | DrawEntityBounds position ->
               match pixel with
               | ValueSome px ->
-                match Spatial.getEntityCollisionShape position with
-                | Map.CollisionShape.Circle radius ->
-                  drawCircle sb px position radius Color.Cyan
-                | Map.CollisionShape.ClosedPolygon poly ->
-                  drawPolygon sb px poly position 0.0f Color.Cyan
-                | _ -> () // FIXME: Handle other collision shapes (OpenPolyline, RectangleShape, EllipseShape)
+                let ctx = {
+                  SpriteBatch = sb
+                  Pixel = px
+                  Font = hudFont
+                  TotalGameTime = gameTime.TotalGameTime
+                }
+
+                CommandExecution.executeEntityBounds &ctx &position
               | ValueNone -> ()
 
             | DrawSpatialGrid grid ->
               match pixel with
               | ValueSome px ->
-                for (cell, entities) in grid |> HashMap.toSeq do
-                  let cellSize = Core.Constants.Collision.GridCellSize
-                  let x = float32 cell.X * cellSize
-                  let y = float32 cell.Y * cellSize
+                let ctx = {
+                  SpriteBatch = sb
+                  Pixel = px
+                  Font = hudFont
+                  TotalGameTime = gameTime.TotalGameTime
+                }
 
-                  let rect =
-                    Microsoft.Xna.Framework.Rectangle(
-                      int x,
-                      int y,
-                      int cellSize,
-                      int cellSize
-                    )
-
-                  let color =
-                    if entities.Count > 0 then Color.Red else Color.Gray * 0.5f
-
-                  drawLine
-                    sb
-                    px
-                    (Vector2(x, y))
-                    (Vector2(x + cellSize, y))
-                    color
-
-                  drawLine
-                    sb
-                    px
-                    (Vector2(x + cellSize, y))
-                    (Vector2(x + cellSize, y + cellSize))
-                    color
-
-                  drawLine
-                    sb
-                    px
-                    (Vector2(x + cellSize, y + cellSize))
-                    (Vector2(x, y + cellSize))
-                    color
-
-                  drawLine
-                    sb
-                    px
-                    (Vector2(x, y + cellSize))
-                    (Vector2(x, y))
-                    color
-
-                  if entities.Count > 0 then
-                    let text = $"{entities.Count}"
-                    let textPos = Vector2(x + 5.0f, y + 5.0f)
-                    sb.DrawString(hudFont, text, textPos, Color.White)
+                CommandExecution.executeSpatialGrid &ctx grid
               | ValueNone -> ()
 
             | DrawCone(origin, direction, angle, length, color) ->
               match pixel with
               | ValueSome px ->
-                drawCone sb px origin direction angle length color
+                let ctx = {
+                  SpriteBatch = sb
+                  Pixel = px
+                  Font = hudFont
+                  TotalGameTime = gameTime.TotalGameTime
+                }
+
+                CommandExecution.executeCone
+                  &ctx
+                  &origin
+                  &direction
+                  angle
+                  length
+                  color
               | ValueNone -> ()
 
             | DrawLineShape(start, end', width, color) ->
               match pixel with
-              | ValueSome px -> drawLineShape sb px start end' width color
+              | ValueSome px ->
+                let ctx = {
+                  SpriteBatch = sb
+                  Pixel = px
+                  Font = hudFont
+                  TotalGameTime = gameTime.TotalGameTime
+                }
+
+                CommandExecution.executeLineShape &ctx &start &end' width color
               | ValueNone -> ()
 
             | DrawCircle(center, radius, color) ->
               match pixel with
-              | ValueSome px -> drawCircle sb px center radius color
+              | ValueSome px ->
+                let ctx = {
+                  SpriteBatch = sb
+                  Pixel = px
+                  Font = hudFont
+                  TotalGameTime = gameTime.TotalGameTime
+                }
+
+                CommandExecution.executeCircle &ctx &center radius color
               | ValueNone -> ()
 
           for struct (cmd, _) in transientCommands do
-            match cmd with
-            | DrawCone(origin, direction, angle, length, color) ->
-              match pixel with
-              | ValueSome px ->
-                drawCone sb px origin direction angle length color
-              | ValueNone -> ()
+            match pixel with
+            | ValueSome px ->
+              let ctx = {
+                SpriteBatch = sb
+                Pixel = px
+                Font = hudFont
+                TotalGameTime = gameTime.TotalGameTime
+              }
 
-            | DrawLineShape(start, end', width, color) ->
-              match pixel with
-              | ValueSome px -> drawLineShape sb px start end' width color
-              | ValueNone -> ()
-
-            | DrawCircle(center, radius, color) ->
-              match pixel with
-              | ValueSome px -> drawCircle sb px center radius color
-              | ValueNone -> ()
-            | _ -> ()
+              CommandExecution.executeTransientCommand &ctx cmd
+            | ValueNone -> ()
 
           sb.End()
 
@@ -1060,6 +1270,19 @@ module DebugRender =
         // Count total entities for culling stats
         totalEntities <- snapshot.Positions.Count
 
+        // Calculate visible entities for culling stats (using first camera)
+        let visibleEntities =
+          match cameras |> Seq.tryHead with
+          | Some(struct (_, cam)) ->
+            Culling.countVisibleEntities snapshot.Positions cam
+          | None -> totalEntities
+
+        let cullingPct =
+          if totalEntities > 0 then
+            100.0f * (1.0f - (float32 visibleEntities / float32 totalEntities))
+          else
+            0.0f
+
         // Render performance stats overlay at top-left of screen
         let screenTransform = Matrix.Identity
         sb.Begin(transformMatrix = screenTransform)
@@ -1069,7 +1292,9 @@ module DebugRender =
             .StringBuilder()
             .AppendLine($"FPS: %.1f{fps}")
             .AppendLine($"Entities: {totalEntities}")
-            .AppendLine("Culling: 0% (TODO)")
+            .AppendLine(
+              $"Culling: %.1f{cullingPct}%% ({totalEntities - visibleEntities} culled)"
+            )
             .ToString()
 
         sb.DrawString(hudFont, statsText, Vector2(10.0f, 10.0f), Color.White)
