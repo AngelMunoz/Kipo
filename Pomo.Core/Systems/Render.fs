@@ -22,6 +22,10 @@ module Render =
   open Microsoft.Xna.Framework.Input
   open Pomo.Core.Environment
 
+  // ============================================================================
+  // DrawCommands (legacy 2D commands, kept for targeting indicator)
+  // ============================================================================
+
   type DrawCommand =
     | DrawPlayer of rect: Rectangle
     | DrawEnemy of rect: Rectangle
@@ -47,7 +51,6 @@ module Render =
       else
         let size = Core.Constants.Entity.Size
 
-        // Check if entity is within any camera's viewport (for split-screen)
         let entityRect =
           Rectangle(
             int(pos.X - size.X / 2.0f),
@@ -56,10 +59,8 @@ module Render =
             int size.Y
           )
 
-        // Add padding to prevent entities from popping in/out at viewport boundaries
-        let cullingPadding = 64.0f // Add 64 pixels of padding around viewport
+        let cullingPadding = 64.0f
 
-        // Get all camera viewports and check if entity is within any of them
         let isVisible =
           cameraService.GetAllCameras()
           |> Array.exists(fun struct (_, camera) ->
@@ -188,6 +189,199 @@ module Render =
       | ValueNone -> ()
     }
 
+  // ============================================================================
+  // Context Structs for Semantic Grouping
+  // ============================================================================
+
+  /// Context for computing an entity's render position and transform
+  [<Struct>]
+  type EntityRenderContext = {
+    EntityId: Guid<EntityId>
+    LogicPosition: Vector2
+    Facing: float32
+    PixelsPerUnit: Vector2
+    SquishFactor: float32
+  }
+
+  /// Context for rendering particles as camera-facing billboards
+  [<Struct>]
+  type ParticleRenderContext = {
+    CamRight: Vector3
+    CamUp: Vector3
+    PixelsPerUnit: Vector2
+    ModelScale: float32
+  }
+
+  /// Context for a scenario render pass (per-frame data)
+  [<Struct>]
+  type ScenarioRenderContext = {
+    PixelsPerUnit: Vector2
+    SquishFactor: float32
+    Snapshot: Projections.MovementSnapshot
+    EntityPoses: HashMap<Guid<EntityId>, HashMap<string, Matrix>>
+    LiveProjectiles: HashMap<Guid<EntityId>, LiveProjectile>
+  }
+
+  /// Lifetime resources for entity rendering (allocated once at creation)
+  type EntityRenderResources = {
+    Game: Game
+    Models: HashMap<string, Model>
+    ModelStore: ModelStore
+    NodeTransformsPool: System.Collections.Generic.Dictionary<string, Matrix>
+  }
+
+  /// Lifetime resources for particle rendering
+  type ParticleRenderResources = {
+    Game: Game
+    BillboardBatch: BillboardBatch
+    GetTexture: string -> Texture2D voption
+    FallbackTexture: Texture2D
+  }
+
+  /// Lifetime resources for UI rendering
+  type UIRenderResources = {
+    Game: Game
+    SpriteBatch: SpriteBatch
+    Texture: Texture2D
+    World: World.World
+    TargetingService: TargetingService
+    CameraService: CameraService
+    PlayerId: Guid<EntityId>
+  }
+
+  /// Combined frame context (camera + scenario)
+  [<Struct>]
+  type FrameRenderContext = {
+    Camera: Camera
+    Scenario: ScenarioRenderContext
+  }
+
+  // ============================================================================
+  // Pure Inline Helper Functions (Hot Path)
+  // ============================================================================
+
+  /// Computes altitude for descending projectiles. Returns 0 for grounded entities.
+  let inline computeProjectileAltitude
+    (liveProjectiles: HashMap<Guid<EntityId>, LiveProjectile>)
+    (entityId: Guid<EntityId>)
+    (pixelsPerUnitY: float32)
+    : float32 =
+    match liveProjectiles |> HashMap.tryFindV entityId with
+    | ValueSome proj ->
+      match proj.Info.Variations with
+      | ValueSome(Projectile.Descending(currentAltitude, _)) ->
+        currentAltitude / pixelsPerUnitY
+      | _ -> 0.0f
+    | ValueNone -> 0.0f
+
+  /// Applies isometric altitude offset to base render position
+  let inline logicToRenderWithAltitude
+    (logicPos: Vector2)
+    (altitude: float32)
+    (pixelsPerUnit: Vector2)
+    : Vector3 =
+    let basePos = RenderMath.LogicToRender logicPos pixelsPerUnit
+    Vector3(basePos.X, basePos.Y + altitude, basePos.Z - altitude)
+
+  /// Computes projectile tilt based on altitude (falling vs horizontal flight)
+  let inline computeProjectileTilt(altitude: float32) : float32 =
+    if altitude > 0.0f then 0.0f else MathHelper.PiOver2
+
+  /// Computes projectile facing (no facing while falling)
+  let inline computeProjectileFacing
+    (altitude: float32)
+    (facing: float32)
+    : float32 =
+    if altitude > 0.0f then 0.0f else facing
+
+  /// Computes the world matrix for a projectile entity
+  let inline computeProjectileWorldMatrix
+    (context: EntityRenderContext)
+    (altitude: float32)
+    : Matrix =
+    let renderPos =
+      logicToRenderWithAltitude
+        context.LogicPosition
+        altitude
+        context.PixelsPerUnit
+
+    let tilt = computeProjectileTilt altitude
+    let facing = computeProjectileFacing altitude context.Facing
+
+    RenderMath.GetTiltedEntityWorldMatrix
+      renderPos
+      facing
+      tilt
+      0.0f
+      MathHelper.PiOver4
+      context.SquishFactor
+      Core.Constants.Entity.ModelScale
+
+  /// Computes the world matrix for a regular entity
+  let inline computeEntityWorldMatrix(context: EntityRenderContext) : Matrix =
+    let renderPos =
+      RenderMath.LogicToRender context.LogicPosition context.PixelsPerUnit
+
+    RenderMath.GetEntityWorldMatrix
+      renderPos
+      context.Facing
+      MathHelper.PiOver4
+      context.SquishFactor
+      Core.Constants.Entity.ModelScale
+
+  /// Computes the base world matrix for an entity or projectile
+  let inline computeEntityBaseMatrix
+    (context: EntityRenderContext)
+    (altitude: float32)
+    (isProjectile: bool)
+    : Matrix =
+    if isProjectile then
+      computeProjectileWorldMatrix context altitude
+    else
+      computeEntityWorldMatrix context
+
+  /// Computes particle world position based on simulation space
+  let inline computeParticleWorldPosition
+    (config: Particles.EmitterConfig)
+    (particlePos: Vector3)
+    (effectPos: Vector3)
+    : Vector3 =
+    match config.SimulationSpace with
+    | Particles.SimulationSpace.World -> particlePos
+    | Particles.SimulationSpace.Local -> particlePos + effectPos
+
+  /// Transforms particle position to render space with altitude
+  let inline particleToRenderPosition
+    (pWorldPos: Vector3)
+    (pixelsPerUnit: Vector2)
+    : Vector3 =
+    let logicPos = Vector2(pWorldPos.X, pWorldPos.Z)
+    let baseRenderPos = RenderMath.LogicToRender logicPos pixelsPerUnit
+    let altitude = (pWorldPos.Y / pixelsPerUnit.Y) * 2.0f
+
+    Vector3(
+      baseRenderPos.X,
+      baseRenderPos.Y + altitude,
+      baseRenderPos.Z - altitude
+    )
+
+  /// Computes effect position from owner's interpolated position
+  let inline computeEffectPosition
+    (owner: Guid<EntityId> voption)
+    (positions: HashMap<Guid<EntityId>, Vector2>)
+    (fallbackPos: Vector3)
+    : Vector3 =
+    match owner with
+    | ValueSome ownerId ->
+      match positions |> HashMap.tryFindV ownerId with
+      | ValueSome interpPos -> Vector3(interpPos.X, 0.0f, interpPos.Y)
+      | ValueNone -> fallbackPos
+    | ValueNone -> fallbackPos
+
+  // ============================================================================
+  // Rig Hierarchy Functions
+  // ============================================================================
+
   [<TailCall>]
   let rec private collectPath
     (nodeTransforms: System.Collections.Generic.Dictionary<string, Matrix>)
@@ -214,6 +408,15 @@ module Render =
             pNode
             ((currentName, currentNode) :: path)
 
+  /// Gets animation matrix for a node, using ValueOption to avoid GC
+  let inline private getNodeAnimation
+    (entityPose: HashMap<string, Matrix>)
+    (nodeName: string)
+    : Matrix =
+    match entityPose |> HashMap.tryFindV nodeName with
+    | ValueSome m -> m
+    | ValueNone -> Matrix.Identity
+
   [<TailCall>]
   let rec private applyTransforms
     (entityPose: HashMap<string, Matrix>)
@@ -224,10 +427,7 @@ module Render =
     match nodes with
     | [] -> currentParentWorld
     | (name, node) :: rest ->
-      let localAnim =
-        entityPose
-        |> HashMap.tryFind name
-        |> Option.defaultValue Matrix.Identity
+      let localAnim = getNodeAnimation entityPose name
 
       let pivotTranslation = Matrix.CreateTranslation node.Pivot
       let inversePivotTranslation = Matrix.CreateTranslation -node.Pivot
@@ -242,6 +442,270 @@ module Render =
       let world = localWorld * currentParentWorld
       nodeTransforms.[name] <- world
       applyTransforms entityPose nodeTransforms struct (rest, world)
+
+  // ============================================================================
+  // Granular Render Functions
+  // ============================================================================
+
+  /// Draws a single model with lighting setup
+  let private drawModel (camera: Camera) (model: Model) (worldMatrix: Matrix) =
+    for mesh in model.Meshes do
+      for effect in mesh.Effects do
+        let effect = effect :?> BasicEffect
+        effect.EnableDefaultLighting()
+        effect.PreferPerPixelLighting <- true
+
+        effect.AmbientLightColor <- Vector3(0.2f, 0.2f, 0.2f)
+        effect.SpecularColor <- Vector3.Zero
+
+        effect.DirectionalLight0.Direction <- Vector3(-1.0f, -1.7f, 0.0f)
+        effect.DirectionalLight0.DiffuseColor <- Vector3(0.6f, 0.6f, 0.6f)
+        effect.DirectionalLight0.SpecularColor <- Vector3.Zero
+
+        effect.DirectionalLight1.Enabled <- false
+        effect.DirectionalLight2.Enabled <- false
+
+        effect.World <- worldMatrix
+        effect.View <- camera.View
+        effect.Projection <- camera.Projection
+
+      mesh.Draw()
+
+  /// Draws a single rig node's model
+  let inline private drawRigNode
+    (camera: Camera)
+    (models: HashMap<string, Model>)
+    (node: RigNode)
+    (finalWorld: Matrix)
+    =
+    models
+    |> HashMap.tryFindV node.ModelAsset
+    |> ValueOption.iter(fun model -> drawModel camera model finalWorld)
+
+  /// Renders an entire entity's rig hierarchy
+  let private renderEntityRig
+    (camera: Camera)
+    (res: EntityRenderResources)
+    (rigData: HashMap<string, RigNode>)
+    (entityPose: HashMap<string, Matrix>)
+    (entityBaseMatrix: Matrix)
+    =
+    res.NodeTransformsPool.Clear()
+
+    for nodeName, node in rigData do
+      let nodeLocalWorld =
+        collectPath res.NodeTransformsPool rigData nodeName node []
+        |> applyTransforms entityPose res.NodeTransformsPool
+
+      let finalWorld = nodeLocalWorld * entityBaseMatrix
+      drawRigNode camera res.Models node finalWorld
+
+  /// Gets entity pose or empty, using ValueOption
+  let inline private getEntityPose
+    (poses: HashMap<Guid<EntityId>, HashMap<string, Matrix>>)
+    (entityId: Guid<EntityId>)
+    : HashMap<string, Matrix> =
+    match poses |> HashMap.tryFindV entityId with
+    | ValueSome pose -> pose
+    | ValueNone -> HashMap.empty
+
+  /// Gets entity facing or default, using ValueOption
+  let inline private getEntityFacing
+    (rotations: HashMap<Guid<EntityId>, float32>)
+    (entityId: Guid<EntityId>)
+    : float32 =
+    match rotations |> HashMap.tryFindV entityId with
+    | ValueSome r -> r
+    | ValueNone -> 0.0f
+
+  /// Renders a single entity (handles both regular entities and projectiles)
+  let private renderSingleEntity
+    (res: EntityRenderResources)
+    (frame: FrameRenderContext)
+    (entityId: Guid<EntityId>)
+    (pos: Vector2)
+    =
+    let ctx = frame.Scenario
+    let configId = ctx.Snapshot.ModelConfigIds |> HashMap.tryFindV entityId
+
+    match configId with
+    | ValueNone -> ()
+    | ValueSome cfgId ->
+      match res.ModelStore.tryFind cfgId with
+      | ValueNone -> ()
+      | ValueSome config ->
+        let facing = getEntityFacing ctx.Snapshot.Rotations entityId
+        let entityPose = getEntityPose ctx.EntityPoses entityId
+        let isProjectile = ctx.LiveProjectiles |> HashMap.containsKey entityId
+
+        let altitude =
+          computeProjectileAltitude
+            ctx.LiveProjectiles
+            entityId
+            ctx.PixelsPerUnit.Y
+
+        let renderContext: EntityRenderContext = {
+          EntityId = entityId
+          LogicPosition = pos
+          Facing = facing
+          PixelsPerUnit = ctx.PixelsPerUnit
+          SquishFactor = ctx.SquishFactor
+        }
+
+        let entityBaseMatrix =
+          computeEntityBaseMatrix renderContext altitude isProjectile
+
+        renderEntityRig frame.Camera res config.Rig entityPose entityBaseMatrix
+
+  /// Renders all entities in the snapshot
+  let private renderAllEntities
+    (res: EntityRenderResources)
+    (frame: FrameRenderContext)
+    =
+    res.Game.GraphicsDevice.DepthStencilState <- DepthStencilState.Default
+    res.Game.GraphicsDevice.RasterizerState <- RasterizerState.CullNone
+
+    for entityId, pos in frame.Scenario.Snapshot.Positions do
+      renderSingleEntity res frame entityId pos
+
+  /// Draws a single particle billboard
+  let inline private drawParticleBillboard
+    (billboardBatch: BillboardBatch)
+    (ctx: ParticleRenderContext)
+    (config: Particles.EmitterConfig)
+    (particle: Particles.Particle)
+    (effectPos: Vector3)
+    =
+    let pWorldPos =
+      computeParticleWorldPosition config particle.Position effectPos
+
+    let finalPos = particleToRenderPosition pWorldPos ctx.PixelsPerUnit
+    let size = particle.Size * ctx.ModelScale
+
+    billboardBatch.Draw(
+      finalPos,
+      size,
+      0.0f,
+      particle.Color,
+      ctx.CamRight,
+      ctx.CamUp
+    )
+
+  /// Renders a group of particles with the same texture
+  let private renderParticleGroup
+    (billboardBatch: BillboardBatch)
+    (ctx: ParticleRenderContext)
+    (group: seq<Particles.EmitterConfig * Particles.Particle * Vector3>)
+    =
+    for config, particle, effectPos in group do
+      drawParticleBillboard billboardBatch ctx config particle effectPos
+
+  /// Sets blend state based on blend mode
+  let inline private setBlendState
+    (device: GraphicsDevice)
+    (blendMode: Particles.BlendMode)
+    =
+    match blendMode with
+    | Particles.BlendMode.AlphaBlend ->
+      device.BlendState <- BlendState.AlphaBlend
+    | Particles.BlendMode.Additive -> device.BlendState <- BlendState.Additive
+
+  /// Renders all particles
+  let private renderAllParticles
+    (res: ParticleRenderResources)
+    (world: World.World)
+    (frame: FrameRenderContext)
+    =
+    res.Game.GraphicsDevice.DepthStencilState <- DepthStencilState.None
+    res.Game.GraphicsDevice.RasterizerState <- RasterizerState.CullNone
+
+    let viewInv = Matrix.Invert(frame.Camera.View)
+
+    let ctx: ParticleRenderContext = {
+      CamRight = viewInv.Right
+      CamUp = viewInv.Up
+      PixelsPerUnit = frame.Scenario.PixelsPerUnit
+      ModelScale = Core.Constants.Entity.ModelScale
+    }
+
+    let particlesToDraw =
+      world.VisualEffects
+      |> Seq.filter(fun e -> e.IsAlive.Value)
+      |> Seq.collect(fun e ->
+        let effectPos =
+          computeEffectPosition
+            e.Owner
+            frame.Scenario.Snapshot.Positions
+            e.Position.Value
+
+        e.Emitters
+        |> Seq.filter(fun em -> em.Particles.Count > 0)
+        |> Seq.collect(fun em ->
+          em.Particles |> Seq.map(fun p -> em.Config, p, effectPos)))
+      |> Seq.groupBy(fun (config, _, _) -> config.Texture, config.BlendMode)
+
+    for (textureId, blendMode), group in particlesToDraw do
+      match res.GetTexture textureId with
+      | ValueSome tex ->
+        setBlendState res.Game.GraphicsDevice blendMode
+
+        res.BillboardBatch.Begin(
+          frame.Camera.View,
+          frame.Camera.Projection,
+          tex
+        )
+
+        renderParticleGroup res.BillboardBatch ctx group
+        res.BillboardBatch.End()
+      | ValueNone ->
+        res.Game.GraphicsDevice.BlendState <- BlendState.Additive
+
+        res.BillboardBatch.Begin(
+          frame.Camera.View,
+          frame.Camera.Projection,
+          res.FallbackTexture
+        )
+
+        renderParticleGroup res.BillboardBatch ctx group
+        res.BillboardBatch.End()
+
+  /// Renders targeting indicator UI overlay
+  let private renderTargetingIndicator
+    (res: UIRenderResources)
+    (camera: Camera)
+    =
+    res.Game.GraphicsDevice.DepthStencilState <- DepthStencilState.None
+
+    let mouseState = res.World.RawInputStates |> AMap.map' _.Mouse |> AMap.force
+
+    let targetingMode = res.TargetingService.TargetingMode |> AVal.force
+    let mouseState = HashMap.tryFindV res.PlayerId mouseState
+
+    let targetingCmds =
+      generateTargetingIndicatorCommands
+        targetingMode
+        mouseState
+        res.CameraService
+        res.PlayerId
+
+    match targetingCmds with
+    | ValueSome(DrawTargetingIndicator rect) ->
+      let transform =
+        RenderMath.GetSpriteBatchTransform
+          camera.Position
+          camera.Zoom
+          camera.Viewport.Width
+          camera.Viewport.Height
+
+      res.Game.GraphicsDevice.Viewport <- camera.Viewport
+      res.SpriteBatch.Begin(transformMatrix = transform)
+      res.SpriteBatch.Draw(res.Texture, rect, Color.Blue * 0.5f)
+      res.SpriteBatch.End()
+    | _ -> ()
+
+  // ============================================================================
+  // RenderService Factory
+  // ============================================================================
 
   type RenderService =
     abstract Draw: Camera -> unit
@@ -266,6 +730,7 @@ module Render =
 
     let billboardBatch = new BillboardBatch(game.GraphicsDevice)
 
+    // Texture cache
     let textureCache =
       System.Collections.Generic.Dictionary<string, Texture2D voption>()
 
@@ -283,9 +748,7 @@ module Render =
           textureCache.[id] <- result
           result
 
-    // Load Models
-    // The store returns Rigs (HashMap<string, RigNode>)
-    // We need to extract all unique ModelAsset names from all nodes in all Rigs
+    // Load Models (one-time at creation)
     let models =
       modelStore.all()
       |> Seq.collect(fun config ->
@@ -301,30 +764,34 @@ module Render =
           None)
       |> HashMap.ofSeq
 
-    let drawModel (camera: Camera) (model: Model) (worldMatrix: Matrix) =
-      for mesh in model.Meshes do
-        for effect in mesh.Effects do
-          let effect = effect :?> BasicEffect
-          effect.EnableDefaultLighting()
-          effect.PreferPerPixelLighting <- true
+    // Pooled dictionary for node transforms (reused across entities)
+    let nodeTransformsPool =
+      System.Collections.Generic.Dictionary<string, Matrix>()
 
-          // Lighting adjustments to match isometric background and remove "plastic" look
-          effect.AmbientLightColor <- Vector3(0.2f, 0.2f, 0.2f) // Darker to increase contrast
-          effect.SpecularColor <- Vector3.Zero // No shine at all
+    // Build lifetime resource contexts
+    let entityRes: EntityRenderResources = {
+      Game = game
+      Models = models
+      ModelStore = modelStore
+      NodeTransformsPool = nodeTransformsPool
+    }
 
-          effect.DirectionalLight0.Direction <- Vector3(-1.0f, -1.7f, 0.0f) // 60-degree elevation from Right, neutral Z
-          effect.DirectionalLight0.DiffuseColor <- Vector3(0.6f, 0.6f, 0.6f) // Less intense diffuse
-          effect.DirectionalLight0.SpecularColor <- Vector3.Zero // No specular from light
+    let particleRes: ParticleRenderResources = {
+      Game = game
+      BillboardBatch = billboardBatch
+      GetTexture = getTexture
+      FallbackTexture = texture
+    }
 
-          // Disable other default lights that might be causing excessive brightness/shine
-          effect.DirectionalLight1.Enabled <- false
-          effect.DirectionalLight2.Enabled <- false
-
-          effect.World <- worldMatrix
-          effect.View <- camera.View
-          effect.Projection <- camera.Projection
-
-        mesh.Draw()
+    let uiRes: UIRenderResources = {
+      Game = game
+      SpriteBatch = spriteBatch
+      Texture = texture
+      World = world
+      TargetingService = targetingService
+      CameraService = cameraService
+      PlayerId = playerId
+    }
 
     { new RenderService with
         member _.Draw(camera: Camera) =
@@ -334,8 +801,10 @@ module Render =
           let liveProjectiles = world.LiveProjectiles |> AMap.force
 
           match entityScenarios |> HashMap.tryFindV playerId with
+          | ValueNone -> ()
           | ValueSome scenarioId ->
             match scenarios |> HashMap.tryFindV scenarioId with
+            | ValueNone -> ()
             | ValueSome scenario ->
               let map = scenario.Map
 
@@ -343,292 +812,22 @@ module Render =
                 Vector2(float32 map.TileWidth, float32 map.TileHeight)
 
               let squishFactor = pixelsPerUnit.X / pixelsPerUnit.Y
-
               let snapshot = projections.ComputeMovementSnapshot scenarioId
 
-              // 3D Pass
-              game.GraphicsDevice.DepthStencilState <- DepthStencilState.Default
-              game.GraphicsDevice.RasterizerState <- RasterizerState.CullNone
+              // Build per-frame context
+              let frame: FrameRenderContext = {
+                Camera = camera
+                Scenario = {
+                  PixelsPerUnit = pixelsPerUnit
+                  SquishFactor = squishFactor
+                  Snapshot = snapshot
+                  EntityPoses = currentPoses
+                  LiveProjectiles = liveProjectiles
+                }
+              }
 
-              for id, pos in snapshot.Positions do
-                let configId = snapshot.ModelConfigIds |> HashMap.tryFindV id
-
-                // Standard Facing Rotation (Yaw)
-                let facing =
-                  snapshot.Rotations
-                  |> HashMap.tryFind id
-                  |> Option.defaultValue 0.0f
-
-                let modelConfig =
-                  match configId with
-                  | ValueSome id -> modelStore.tryFind id
-                  | ValueNone -> ValueNone
-
-                match modelConfig with
-                | ValueSome config ->
-                  let rigData = config.Rig
-
-                  let entityPose =
-                    currentPoses
-                    |> HashMap.tryFind id
-                    |> Option.defaultValue HashMap.empty
-
-                  // Calculate altitude for descending projectiles
-                  let altitude =
-                    match liveProjectiles |> HashMap.tryFindV id with
-                    | ValueSome proj ->
-                      match proj.Info.Variations with
-                      | ValueSome(Projectile.Descending(currentAltitude, _)) ->
-                        currentAltitude / pixelsPerUnit.Y
-                      | _ -> 0.0f
-                    | ValueNone -> 0.0f
-
-                  // Check if this is a projectile (for rendering style)
-                  let isProjectile = liveProjectiles |> HashMap.containsKey id
-
-                  // Apply altitude to render position (shifts up on screen via Z)
-                  let baseRenderPos = RenderMath.LogicToRender pos pixelsPerUnit
-
-                  let renderPos =
-                    Vector3(
-                      baseRenderPos.X,
-                      baseRenderPos.Y + altitude, // Depth sorting
-                      baseRenderPos.Z - altitude // Screen-space up (north = up on screen)
-                    )
-
-                  // Calculate Base Transform (Position + Facing)
-                  // Note: We apply squish and scale here for the root,
-                  // but child nodes should inherit appropriately.
-                  // RenderMath helpers combine everything, so we might need to decompose
-                  // if we want strict hierarchy.
-                  // For now, let's treat "Root" special or apply BaseTransform to all if parent is None.
-
-                  // Simplified Hierarchy Traversal
-                  // We need World Matrices for each node.
-                  let nodeTransforms =
-                    System.Collections.Generic.Dictionary<string, Matrix>()
-
-                  // Calculate Entity World Transform (Location in game world)
-                  let entityBaseMatrix =
-                    if isProjectile then
-                      // Projectile: calculate tilt dynamically from trajectory
-                      // Tilt angle based on altitude: falling straight down = Pi/2
-                      // Horizontal flight = Pi/2 (tilted to fly forward)
-                      // For arcing: would use atan2(altitude, horizontalDistance)
-                      let tilt =
-                        if altitude > 0.0f then
-                          // Falling from sky: tilt to point downward
-                          // tilt of 0 with no facing makes it point down in camera view
-                          0.0f
-                        else
-                          // Horizontal flight: tilt to fly forward
-                          MathHelper.PiOver2
-
-                      let projectileFacing =
-                        if altitude > 0.0f then 0.0f else facing
-
-                      RenderMath.GetTiltedEntityWorldMatrix
-                        renderPos
-                        projectileFacing
-                        tilt
-                        0.0f // Spin handled by animation system
-                        MathHelper.PiOver4
-                        squishFactor
-                        Core.Constants.Entity.ModelScale
-                    else
-                      // Regular entity rendering
-                      RenderMath.GetEntityWorldMatrix
-                        (RenderMath.LogicToRender pos pixelsPerUnit)
-                        facing
-                        MathHelper.PiOver4
-                        squishFactor
-                        Core.Constants.Entity.ModelScale
-
-                  for nodeName, node in rigData do
-                    let nodeLocalWorld =
-                      collectPath nodeTransforms rigData nodeName node []
-                      |> applyTransforms entityPose nodeTransforms
-
-                    let finalWorld = nodeLocalWorld * entityBaseMatrix
-
-                    models
-                    |> HashMap.tryFindV node.ModelAsset
-                    |> ValueOption.iter(fun model ->
-                      drawModel camera model finalWorld)
-
-                | ValueNone -> () // No rig, can't draw
-
-              // Particle Pass - Render on top (no depth test)
-              game.GraphicsDevice.DepthStencilState <- DepthStencilState.None
-
-              game.GraphicsDevice.RasterizerState <- RasterizerState.CullNone
-
-              let viewInv = Matrix.Invert(camera.View)
-              let camRight = viewInv.Right
-              let camUp = viewInv.Up
-
-              let particlesToDraw =
-                world.VisualEffects
-                |> Seq.filter(fun e -> e.IsAlive.Value)
-                |> Seq.collect(fun e ->
-                  // Fix for Jitter: If Local Space, we MUST use the Interpolated Position from the Snapshot
-                  // matching the Owner. Otherwise, particles lag behind the rendered entity.
-                  let effectPos =
-                    match e.Owner with
-                    | ValueSome ownerId ->
-                      match snapshot.Positions.TryFindV ownerId with
-                      | ValueSome interpPos ->
-                        // Map Entity (X, Y) to Particle Space (X, 0, Z or whatever logic uses)
-                        // Particle System uses: X, Z(Depth), Y(Altitude) logic?
-                        // No, ParticleSystem uses Vector3(X, Y_Altitude, Z_Depth).
-                        // Entity Pos is Vector2(X, Y_Depth).
-                        // So we map Entity.Y -> Particle.Z
-                        Vector3(interpPos.X, 0.0f, interpPos.Y)
-                      | ValueNone -> e.Position.Value // Fallback to logic ticks
-                    | ValueNone -> e.Position.Value
-
-                  e.Emitters
-                  |> Seq.filter(fun em -> em.Particles.Count > 0)
-                  |> Seq.collect(fun em ->
-                    em.Particles |> Seq.map(fun p -> em.Config, p, effectPos)))
-                |> Seq.groupBy(fun (config, _, _) ->
-                  config.Texture, config.BlendMode)
-
-              // Check if any particles (Debug)
-              // if Seq.isEmpty particlesToDraw then
-              //   Console.WriteLine "No particles to draw"
-
-              for (textureId, blendMode), group in particlesToDraw do
-                match getTexture textureId with
-                | ValueSome tex ->
-                  match blendMode with
-                  | Particles.BlendMode.AlphaBlend ->
-                    game.GraphicsDevice.BlendState <- BlendState.AlphaBlend
-                  | Particles.BlendMode.Additive ->
-                    game.GraphicsDevice.BlendState <- BlendState.Additive
-
-                  billboardBatch.Begin(camera.View, camera.Projection, tex)
-
-                  for config, p, effectPos in group do
-                    // Determine world position based on Simulation Space
-                    let pWorldPos =
-                      match config.SimulationSpace with
-                      | Particles.SimulationSpace.World -> p.Position
-                      | Particles.SimulationSpace.Local ->
-                        // If Local, p.Position is relative. Add Effect Position.
-                        // Effect Pos: X = WorldX, Y = Altitude (0), Z = WorldY (Depth)
-                        // Particle: X, Y(Alt), Z
-                        p.Position + effectPos
-
-                    // Transform Logic Position (X, Z, Y-Up) to Render Space
-                    // Transform Logic Position (X, Z, Y-Up) to Render Space
-                    let logicPos = Vector2(pWorldPos.X, pWorldPos.Z)
-
-                    let baseRenderPos =
-                      RenderMath.LogicToRender logicPos pixelsPerUnit
-
-                    // Fix for Verticality: Simulate isometric height by shifting Z (Screen Y) and Y (Depth).
-                    let altitude = (pWorldPos.Y / pixelsPerUnit.Y) * 2.0f
-
-                    let finalPos =
-                      Vector3(
-                        baseRenderPos.X,
-                        baseRenderPos.Y + altitude,
-                        baseRenderPos.Z - altitude
-                      )
-
-                    // Scale Size: Use ModelScale for consistency with entity rendering
-                    let size = p.Size * Core.Constants.Entity.ModelScale
-
-                    billboardBatch.Draw(
-                      finalPos,
-                      size,
-                      0.0f, // Rotation removed per user request
-                      p.Color,
-                      camRight,
-                      camUp
-                    )
-
-                  billboardBatch.End()
-                | ValueNone ->
-                  // DEBUG FALLBACK: Draw with white texture
-                  // Console.WriteLine($"Fallback texture for {textureId}")
-
-                  // Use Additive for fallback
-                  game.GraphicsDevice.BlendState <- BlendState.Additive
-                  billboardBatch.Begin(camera.View, camera.Projection, texture)
-
-                  for config, p, effectPos in group do
-                    // Determine world position based on Simulation Space
-                    let pWorldPos =
-                      match config.SimulationSpace with
-                      | Particles.SimulationSpace.World -> p.Position
-                      | Particles.SimulationSpace.Local ->
-                        p.Position + effectPos
-
-                    // APPLY TRANSFORM HERE TOO
-                    let logicPos = Vector2(pWorldPos.X, pWorldPos.Z)
-
-                    let baseRenderPos =
-                      RenderMath.LogicToRender logicPos pixelsPerUnit
-
-                    // Fix for Verticality: Simulate isometric height by shifting Z (Screen Y) and Y (Depth).
-                    let altitude = (pWorldPos.Y / pixelsPerUnit.Y) * 2.0f
-
-                    let finalPos =
-                      Vector3(
-                        baseRenderPos.X,
-                        baseRenderPos.Y + altitude,
-                        baseRenderPos.Z - altitude
-                      )
-
-                    let size = p.Size * Core.Constants.Entity.ModelScale
-
-                    billboardBatch.Draw(
-                      finalPos,
-                      size,
-                      0.0f, // Rotation removed per user request
-                      p.Color,
-                      camRight,
-                      camUp
-                    )
-
-                  billboardBatch.End()
-
-              // 2D Pass (UI / Debug)
-              // Restore states for SpriteBatch if needed
-              game.GraphicsDevice.DepthStencilState <- DepthStencilState.None
-
-              // ... (Keep existing 2D logic if needed for UI, or remove if fully 3D)
-              // For now, we'll keep the targeting indicator logic but remove the 2D entity sprites
-
-              let mouseState =
-                world.RawInputStates |> AMap.map' _.Mouse |> AMap.force
-
-              let targetingMode = targetingService.TargetingMode |> AVal.force
-              let mouseState = HashMap.tryFindV playerId mouseState
-
-              let targetingCmds =
-                generateTargetingIndicatorCommands
-                  targetingMode
-                  mouseState
-                  cameraService
-                  playerId
-
-              match targetingCmds with
-              | ValueSome(DrawTargetingIndicator rect) ->
-                let transform =
-                  RenderMath.GetSpriteBatchTransform
-                    camera.Position
-                    camera.Zoom
-                    camera.Viewport.Width
-                    camera.Viewport.Height
-
-                game.GraphicsDevice.Viewport <- camera.Viewport
-                spriteBatch.Begin(transformMatrix = transform)
-                spriteBatch.Draw(texture, rect, Color.Blue * 0.5f)
-                spriteBatch.End()
-              | _ -> ()
-            | ValueNone -> ()
-          | ValueNone -> ()
+              // === Render Passes (Orchestrator Style) ===
+              renderAllEntities entityRes frame
+              renderAllParticles particleRes world frame
+              renderTargetingIndicator uiRes camera
     }
