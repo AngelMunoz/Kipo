@@ -16,17 +16,6 @@ module MovementLogic =
     | Moving of velocity: Vector2
     | WaypointReached of remainingPath: Vector2 list
 
-  let resolveCollision
-    (entityId: Guid<EntityId>)
-    (currentPos: Vector2)
-    (mtv: Vector2)
-    (eventBus: EventBus)
-    =
-    // The Collision System already handles position correction (separation).
-    // Attempting to correct it again here causes double-correction and violent jitter.
-    // We only need to return the MTV so that movement systems can adjust velocity (sliding).
-    mtv
-
   let notifyArrived (entityId: Guid<EntityId>) (eventBus: EventBus) =
     eventBus.Publish(Physics(VelocityChanged struct (entityId, Vector2.Zero)))
     eventBus.Publish(Physics(MovementStateChanged struct (entityId, Idle)))

@@ -127,9 +127,7 @@ module PlayerMovement =
             |> HashMap.tryFind playerId
             |> Option.defaultValue Vector2.Zero
 
-          accumulatedMtv <-
-            accumulatedMtv
-            + MovementLogic.resolveCollision eId currentPos mtv core.EventBus
+          accumulatedMtv <- accumulatedMtv + mtv
         | _ -> ()
 
       let currentVelocity = velocity |> AVal.force

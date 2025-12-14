@@ -145,12 +145,10 @@ module UnitMovement =
 
             match snapshot.Positions.TryFindV eId with
             | ValueSome currentPos ->
-              let resolvedMtv =
-                MovementLogic.resolveCollision eId currentPos mtv core.EventBus
 
               match frameCollisions.TryGetValue eId with
-              | true, existing -> frameCollisions[eId] <- existing + resolvedMtv
-              | false, _ -> frameCollisions[eId] <- resolvedMtv
+              | true, existing -> frameCollisions[eId] <- existing + mtv
+              | false, _ -> frameCollisions[eId] <- mtv
             | ValueNone -> ()
           | ValueNone -> ()
         | _ -> ()

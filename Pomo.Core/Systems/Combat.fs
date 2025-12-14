@@ -41,7 +41,7 @@ module Combat =
 
   module private Targeting =
 
-    let getPosition (ctx: EntityContext) (entityId: Guid<EntityId>) =
+    let inline getPosition (ctx: EntityContext) (entityId: Guid<EntityId>) =
       ctx.Positions
       |> HashMap.tryFindV entityId
       |> ValueOption.defaultValue Vector2.Zero
@@ -447,27 +447,26 @@ module Combat =
         ctx.EntityContext.DerivedStats.TryFindV intent.TargetEntity
       with
       | ValueSome attackerStats, ValueSome defenderStats ->
-        let totalDamageFromModifiers =
-          intent.Effect.Modifiers
-          |> Array.choose(fun m ->
-            match m with
-            | AbilityDamageMod(mathExpr, element) ->
-              Some(
-                DamageCalculator.calculateEffectDamage
+        let mutable totalDamage = 0
+
+        for m in intent.Effect.Modifiers do
+          match m with
+          | AbilityDamageMod(mathExpr, element) ->
+            totalDamage <-
+              totalDamage
+              + DamageCalculator.calculateEffectDamage
                   attackerStats
                   defenderStats
                   mathExpr
                   intent.Effect.DamageSource
                   element
-              )
-            | _ -> None)
-          |> Array.sum
+          | _ -> ()
 
-        if totalDamageFromModifiers > 0 then
+        if totalDamage > 0 then
           ctx.EventBus.Publish(
             {
               Target = intent.TargetEntity
-              Amount = totalDamageFromModifiers
+              Amount = totalDamage
             }
             : SystemCommunications.DamageDealt
           )
@@ -477,7 +476,7 @@ module Combat =
 
           ctx.EventBus.Publish(
             {
-              Message = $"-{totalDamageFromModifiers}"
+              Message = $"-{totalDamage}"
               Position = targetPos
             }
             : SystemCommunications.ShowNotification
