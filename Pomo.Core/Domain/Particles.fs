@@ -19,6 +19,7 @@ module Particles =
     | Point
     | Sphere of radius: float32
     | Cone of angle: float32 * radius: float32
+    | Line of width: float32 * length: float32
 
   [<Struct>]
   type SimulationSpace =
@@ -259,6 +260,13 @@ module Particles =
                 | ValueNone -> 0.0f
 
               return Cone(float32 angle, r)
+            | "line" ->
+              let! width = Required.Property.get ("Width", Required.float) json
+
+              let! length =
+                Required.Property.get ("Length", Required.float) json
+
+              return Line(float32 width, float32 length)
             | _ ->
               return!
                 DecodeError.ofError(json.Clone(), $"Unknown Shape: {type'}")

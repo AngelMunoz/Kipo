@@ -256,6 +256,16 @@ module ParticleSystem =
 
           spawnConeShape rng angle length effectiveMode
 
+        | EmitterShape.Line(configWidth, configLength) ->
+          // Check for skill-driven area override
+          let width, length =
+            match overrides.Area with
+            | ValueSome(SkillArea.Line(skillWidth, skillLength, _)) ->
+              skillWidth, skillLength
+            | _ -> configWidth, configLength
+
+          spawnLineShape rng width length
+
       let dirLocal = spawnResult.Direction
       let spawnOffsetLocal = spawnResult.SpawnOffset
       let speedOverride = spawnResult.SpeedOverride
