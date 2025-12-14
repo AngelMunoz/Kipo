@@ -14,17 +14,35 @@ open Pomo.Core.Domain.Skill
 open Pomo.Core.Systems.Systems
 
 module Projectile =
+
+  /// World state needed for projectile processing lookups.
+  [<Struct>]
+  type WorldContext = {
+    Rng: Random
+    Positions: HashMap<Guid<EntityId>, Vector2>
+    LiveEntities: HashSet<Guid<EntityId>>
+  }
+
+  /// A projectile being processed with its resolved positions.
+  [<Struct>]
+  type ProjectileContext = {
+    Id: Guid<EntityId>
+    Projectile: LiveProjectile
+    Position: Vector2
+    TargetPosition: Vector2
+    TargetEntity: Guid<EntityId> voption
+  }
+
   let private findNextChainTarget
-    (positions: HashMap<Guid<EntityId>, Vector2>)
-    (liveEntities: HashSet<Guid<EntityId>>)
+    (world: WorldContext)
     (casterId: Guid<EntityId>)
     (currentTargetId: Guid<EntityId>)
     (originPos: Vector2)
     (maxRange: float32)
     =
-    positions
+    world.Positions
     |> HashMap.filter(fun id _ ->
-      liveEntities.Contains id && id <> casterId && id <> currentTargetId)
+      world.LiveEntities.Contains id && id <> casterId && id <> currentTargetId)
     |> HashMap.chooseV(fun _ pos ->
       let distance = Vector2.DistanceSquared(originPos, pos)
 
@@ -34,19 +52,153 @@ module Projectile =
         ValueNone)
     |> HashMap.toArrayV
 
-  let processProjectile
-    (rng: Random)
+  /// Creates an impact event record for when a projectile reaches its target.
+  let inline private makeImpact
+    (ctx: ProjectileContext)
+    remainingJumps
+    : SystemCommunications.ProjectileImpacted =
+    {
+      ProjectileId = ctx.Id
+      CasterId = ctx.Projectile.Caster
+      ImpactPosition = ctx.TargetPosition
+      TargetEntity = ctx.TargetEntity
+      SkillId = ctx.Projectile.SkillId
+      RemainingJumps = remainingJumps
+    }
+
+  /// Processes a descending (falling from sky) projectile.
+  let private processDescendingProjectile
     (dt: float32)
-    (positions: HashMap<Guid<EntityId>, Vector2>)
-    (liveEntities: HashSet<Guid<EntityId>>)
+    (ctx: ProjectileContext)
+    (currentAltitude: float32)
+    (fallSpeed: float32)
+    =
+    let commEvents = ResizeArray()
+    let stateEvents = ResizeArray()
+    let newAltitude = currentAltitude - (fallSpeed * dt)
+
+    if newAltitude <= 0.0f then
+      commEvents.Add(makeImpact ctx ValueNone)
+      stateEvents.Add(EntityLifecycle(Removed ctx.Id))
+    else
+      let updatedProjectile: LiveProjectile = {
+        ctx.Projectile with
+            Info = {
+              ctx.Projectile.Info with
+                  Variations = ValueSome(Descending(newAltitude, fallSpeed))
+            }
+      }
+
+      stateEvents.Add(EntityLifecycle(Removed ctx.Id))
+
+      stateEvents.Add(
+        CreateProjectile
+          struct (ctx.Id, updatedProjectile, ValueSome ctx.Position)
+      )
+
+    struct (commEvents |> IndexList.ofSeq, stateEvents |> IndexList.ofSeq)
+
+  /// Helper to spawn a chain projectile to the next target.
+  let private spawnChainProjectile
+    (world: WorldContext)
+    (ctx: ProjectileContext)
+    (currentTargetId: Guid<EntityId>)
+    (jumpsLeft: int)
+    (maxRange: float32)
+    =
+    let nextTargets =
+      findNextChainTarget
+        world
+        ctx.Projectile.Caster
+        currentTargetId
+        ctx.TargetPosition
+        maxRange
+
+    if nextTargets.Length > 0 then
+      let index = world.Rng.Next(0, nextTargets.Length)
+      let struct (newTargetId, _) = nextTargets[index]
+      let newProjectileId = Guid.NewGuid() |> UMX.tag<EntityId>
+
+      let newLiveProjectile: LiveProjectile = {
+        ctx.Projectile with
+            Target = EntityTarget newTargetId
+            Info = {
+              ctx.Projectile.Info with
+                  Variations = ValueSome(Chained(jumpsLeft - 1, maxRange))
+            }
+      }
+
+      ValueSome(
+        CreateProjectile
+          struct (newProjectileId,
+                  newLiveProjectile,
+                  ValueSome ctx.TargetPosition)
+      )
+    else
+      ValueNone
+
+  /// Handles the impact of a horizontal/chained projectile.
+  let private handleHorizontalImpact
+    (world: WorldContext)
+    (ctx: ProjectileContext)
+    =
+    let commEvents = ResizeArray()
+    let stateEvents = ResizeArray()
+
+    let remainingJumps =
+      match ctx.Projectile.Info.Variations with
+      | ValueSome(Chained(jumpsLeft, _)) -> ValueSome jumpsLeft
+      | _ -> ValueNone
+
+    commEvents.Add(makeImpact ctx remainingJumps)
+    stateEvents.Add(EntityLifecycle(Removed ctx.Id))
+
+    // Handle chaining to next target
+    match ctx.Projectile.Info.Variations, ctx.TargetEntity with
+    | ValueSome(Chained(jumpsLeft, maxRange)), ValueSome currentTargetId when
+      jumpsLeft >= 0
+      ->
+      match
+        spawnChainProjectile world ctx currentTargetId jumpsLeft maxRange
+      with
+      | ValueSome event -> stateEvents.Add event
+      | ValueNone -> ()
+    | _ -> ()
+
+    struct (commEvents |> IndexList.ofSeq, stateEvents |> IndexList.ofSeq)
+
+  /// Handles the in-flight movement of a horizontal projectile.
+  let private handleHorizontalFlight(ctx: ProjectileContext) =
+    let direction = Vector2.Normalize(ctx.TargetPosition - ctx.Position)
+    let velocity = direction * ctx.Projectile.Info.Speed
+
+    struct (IndexList.empty,
+            IndexList.single(Physics(VelocityChanged struct (ctx.Id, velocity))))
+
+  /// Processes a horizontal (standard) or chained projectile.
+  let private processHorizontalProjectile
+    (world: WorldContext)
+    (ctx: ProjectileContext)
+    =
+    let distance = Vector2.Distance(ctx.Position, ctx.TargetPosition)
+    let threshold = 4.0f
+
+    if distance < threshold then
+      handleHorizontalImpact world ctx
+    else
+      handleHorizontalFlight ctx
+
+  let processProjectile
+    (world: WorldContext)
+    (dt: float32)
     (projectileId: Guid<EntityId>)
     (projectile: Projectile.LiveProjectile)
     =
-    let projPos = positions.TryFindV projectileId
+    let projPos = world.Positions.TryFindV projectileId
 
     let targetPos =
       match projectile.Target with
-      | EntityTarget entityId -> positions.TryFindV entityId
+      | EntityTarget entityId -> world.Positions.TryFindV entityId
       | PositionTarget pos -> ValueSome pos
 
     let targetEntity =
@@ -54,133 +206,28 @@ module Projectile =
       | EntityTarget entityId -> ValueSome entityId
       | PositionTarget _ -> ValueNone
 
-    let commEvents = ResizeArray()
-    let stateEvents = ResizeArray()
+    // Guard: bail early if positions are missing
+    match projPos, targetPos with
+    | ValueNone, _
+    | _, ValueNone ->
+      struct (IndexList.empty,
+              IndexList.single(EntityLifecycle(Removed projectileId)))
 
-    let inline addComms event = commEvents.Add event
-    let inline addState event = stateEvents.Add event
+    | ValueSome projPos, ValueSome targetPos ->
+      let ctx: ProjectileContext = {
+        Id = projectileId
+        Projectile = projectile
+        Position = projPos
+        TargetPosition = targetPos
+        TargetEntity = targetEntity
+      }
 
-    // Handle Descending projectiles (falling from sky)
-    match projectile.Info.Variations with
-    | ValueSome(Descending(currentAltitude, fallSpeed)) ->
-      match projPos, targetPos with
-      | ValueSome projPos, ValueSome targetPos ->
-        let newAltitude = currentAltitude - (fallSpeed * dt)
-
-        if newAltitude <= 0.0f then
-          // Impact!
-          let impact: SystemCommunications.ProjectileImpacted = {
-            ProjectileId = projectileId
-            CasterId = projectile.Caster
-            ImpactPosition = targetPos
-            TargetEntity = targetEntity
-            SkillId = projectile.SkillId
-            RemainingJumps = ValueNone
-          }
-
-          addComms impact
-          addState <| EntityLifecycle(Removed projectileId)
-        else
-          // Update altitude by recreating projectile with new variation
-          let updatedProjectile: LiveProjectile = {
-            projectile with
-                Info = {
-                  projectile.Info with
-                      Variations = ValueSome(Descending(newAltitude, fallSpeed))
-                }
-          }
-
-          addState <| EntityLifecycle(Removed projectileId)
-
-          addState
-          <| CreateProjectile
-            struct (projectileId, updatedProjectile, ValueSome projPos)
-
-        struct (commEvents |> IndexList.ofSeq, stateEvents |> IndexList.ofSeq)
-      | _ ->
-        struct (IndexList.empty,
-                IndexList.single(EntityLifecycle(Removed projectileId)))
-
-    // Handle horizontal projectiles (existing behavior)
-    | _ ->
-      match projPos, targetPos with
-      | ValueSome projPos, ValueSome targetPos ->
-        let distance = Vector2.Distance(projPos, targetPos)
-        let threshold = 4.0f
-
-        if distance < threshold then
-          let remainingJumps =
-            match projectile.Info.Variations with
-            | ValueSome(Chained(jumpsLeft, _)) -> ValueSome jumpsLeft
-            | _ -> ValueNone
-
-          let impact: SystemCommunications.ProjectileImpacted = {
-            ProjectileId = projectileId
-            CasterId = projectile.Caster
-            ImpactPosition = targetPos
-            TargetEntity = targetEntity
-            SkillId = projectile.SkillId
-            RemainingJumps = remainingJumps
-          }
-
-          addComms impact
-          addState <| EntityLifecycle(Removed projectileId)
-
-          match projectile.Info.Variations with
-          | ValueSome(Chained(jumpsLeft, maxRange)) when jumpsLeft >= 0 ->
-            match targetEntity with
-            | ValueSome currentTargetId ->
-              let nextTargets =
-                findNextChainTarget
-                  positions
-                  liveEntities
-                  projectile.Caster
-                  currentTargetId
-                  targetPos
-                  maxRange
-
-              if nextTargets.Length > 0 then
-                let index = rng.Next(0, nextTargets.Length)
-                let struct (newTargetId, _) = nextTargets[index]
-
-                let newProjectileId = Guid.NewGuid() |> UMX.tag<EntityId>
-
-                let newLiveProjectile: LiveProjectile = {
-                  projectile with
-                      Target = EntityTarget newTargetId
-                      Info = {
-                        projectile.Info with
-                            Variations =
-                              ValueSome(Chained(jumpsLeft - 1, maxRange))
-                      }
-                }
-
-                do
-                  addState
-                  <| CreateProjectile
-                    struct (newProjectileId,
-                            newLiveProjectile,
-                            ValueSome targetPos)
-            | ValueNone -> ()
-          | _ -> ()
-
-          struct (commEvents |> IndexList.ofSeq, stateEvents |> IndexList.ofSeq)
-        else
-          let direction = Vector2.Normalize(targetPos - projPos)
-          let velocity = direction * projectile.Info.Speed
-
-          addState <| Physics(VelocityChanged struct (projectileId, velocity))
-
-          struct (commEvents |> IndexList.ofSeq, stateEvents |> IndexList.ofSeq)
-
-      | ValueSome _, ValueNone
-      | ValueNone, ValueSome _
-      | ValueNone, ValueNone ->
-        struct (IndexList.empty,
-                IndexList.single(EntityLifecycle(Removed projectileId)))
+      match projectile.Info.Variations with
+      | ValueSome(Descending(currentAltitude, fallSpeed)) ->
+        processDescendingProjectile dt ctx currentAltitude fallSpeed
+      | _ -> processHorizontalProjectile world ctx
 
   open Pomo.Core.Environment
-  open Pomo.Core.Environment.Patterns
   open Pomo.Core.Domain.Animation
 
   type ProjectileSystem(game: Game, env: PomoEnvironment) =
@@ -227,8 +274,12 @@ module Projectile =
         core.World.VisualEffects.Add(effect)
       | ValueNone -> ()
 
-    override this.Update gameTime =
-      let dt = float32 gameTime.ElapsedGameTime.TotalSeconds
+    override _.Update _ =
+      let dt =
+        core.World.Time
+        |> AVal.map(_.Delta.TotalSeconds >> float32)
+        |> AVal.force
+
       let liveEntities = gameplay.Projections.LiveEntities |> ASet.force
       let liveProjectiles = core.World.LiveProjectiles |> AMap.force
       let entityScenarios = core.World.EntityScenario |> AMap.force
@@ -246,10 +297,16 @@ module Projectile =
       let sysEvents = ResizeArray()
       let stateEvents = ResizeArray()
 
-      for (scenarioId, projectiles) in projectilesByScenario do
+      for scenarioId, projectiles in projectilesByScenario do
         let snapshot = gameplay.Projections.ComputeMovementSnapshot(scenarioId)
 
-        for (_, (projectileId, projectile)) in projectiles do
+        let worldCtx = {
+          Rng = core.World.Rng
+          Positions = snapshot.Positions
+          LiveEntities = liveEntities
+        }
+
+        for _, (projectileId, projectile) in projectiles do
           // Ensure projectile has a default spinning animation if none is set.
           // We publish an ActiveAnimationsChanged event so the StateUpdate handler
           // will attach the animations to the world (consistent with other systems).
@@ -272,13 +329,7 @@ module Projectile =
           | ValueSome _ -> ()
 
           let struct (evs, states) =
-            processProjectile
-              core.World.Rng
-              dt
-              snapshot.Positions
-              liveEntities
-              projectileId
-              projectile
+            processProjectile worldCtx dt projectileId projectile
 
           sysEvents.AddRange evs
           stateEvents.AddRange states
