@@ -210,21 +210,21 @@
     "BlendMode": "Additive",
     "SimulationSpace": "World",
     "Rate": 0,
-    "Burst": 350,
+    "Burst": 500,
     "Shape": "Cone",
     "Angle": 45,
-    "Radius": 0.1,
+    "Radius": 0.5,
+    "EmissionMode": "Outward",
     "LocalOffset": { "X": 0.0, "Y": 1.0, "Z": 0.0 },
     "Particle": {
-      "Lifetime": [0.5, 1.5],
-      "Speed": [10, 40],
-      "SizeStart": 1.5,
+      "Lifetime": [0.6, 1.0],
+      "Speed": [220, 320],
+      "SizeStart": 2.0,
       "SizeEnd": 0.0,
       "ColorStart": "#FF4500FF",
       "ColorEnd": "#FF200000",
-      "Gravity": 300,
-      "RandomVelocity": { "X": 5, "Y": 15, "Z": 15 },
-      "Drag": 2.0
+      "Gravity": 0,
+      "Drag": 0.5
     }
   },
   {
@@ -298,16 +298,17 @@
     "Shape": "Cone",
     "Angle": 45,
     "Radius": 0.5,
+    "EmissionMode": "Outward",
     "LocalOffset": { "X": 0.0, "Y": 0.0, "Z": 0.0 },
     "Particle": {
-      "Lifetime": [0.5, 1.2],
-      "Speed": [10, 30],
+      "Lifetime": [0.4, 0.7],
+      "Speed": [200, 300],
       "SizeStart": 0.0,
       "SizeEnd": 1.5,
       "ColorStart": "#00FFFFFF",
       "ColorEnd": "#00FFFF00",
-      "Gravity": 300,
-      "Drag": 2.0
+      "Gravity": 0,
+      "Drag": 0.5
     },
     "FloorHeight": 0.0,
     "EmissionRotation": { "X": 0, "Y": 0.0, "Z": 0.0 }

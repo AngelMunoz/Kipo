@@ -56,6 +56,55 @@ module ParticleSystem =
       spawnDist * MathF.Sin(spawnAngle)
     )
 
+  // ============================================================================
+  // EmissionMode Helpers
+  // ============================================================================
+
+  /// Compute spawn distance based on emission mode
+  let inline computeSpawnDistance
+    (mode: EmissionMode)
+    (length: float32)
+    (rng: Random)
+    : float32 =
+    match mode with
+    | Uniform -> float32(Math.Sqrt(rng.NextDouble())) * length
+    // Distance factor for Outward mode: near origin (0-85%)
+    | Outward -> float32(rng.NextDouble() * 0.85) * length
+    // Distance factor for Inward mode: near edge (85-100%)
+    | Inward -> length * (0.85f + float32(rng.NextDouble() * 0.15))
+    // Distance factor for EdgeOnly mode: at edge (95-100%)
+    | EdgeOnly -> length * (0.95f + float32(rng.NextDouble() * 0.05))
+
+  /// Direction for Outward mode: normalize spawn offset
+  let inline emissionDirectionOutward(spawnOffset: Vector3) =
+    if spawnOffset.LengthSquared() > 0.001f then
+      Vector3.Normalize spawnOffset
+    else
+      Vector3.UnitY
+
+  /// Direction for Inward mode: negative of normalized spawn offset
+  let inline emissionDirectionInward(spawnOffset: Vector3) =
+    if spawnOffset.LengthSquared() > 0.001f then
+      -Vector3.Normalize spawnOffset
+    else
+      -Vector3.UnitY
+
+  /// Compute particle direction based on emission mode and spawn offset
+  let inline computeEmissionDirection
+    (mode: EmissionMode)
+    (spawnOffset: Vector3)
+    (rng: Random)
+    : Vector3 =
+    match mode with
+    | Uniform -> randomSphereDirection rng
+    | Outward -> emissionDirectionOutward spawnOffset
+    | Inward -> emissionDirectionInward spawnOffset
+    | EdgeOnly -> randomSphereDirection rng // Scatter at edges
+
+  // ============================================================================
+  // Shape Spawn Functions
+  // ============================================================================
+
   /// Spawn logic for Point shape
   let inline spawnPointShape(rng: Random) =
     let theta = rng.NextDouble() * 2.0 * Math.PI
@@ -72,10 +121,14 @@ module ParticleSystem =
       SpeedOverride = ValueNone
     }
 
-  /// Spawn logic for Sphere/Circle shape
-  let inline spawnSphereShape (rng: Random) (radius: float32) =
-    let dir = randomSphereDirection rng
+  /// Spawn logic for Sphere/Circle shape with EmissionMode
+  let inline spawnSphereShape
+    (rng: Random)
+    (radius: float32)
+    (mode: EmissionMode)
+    =
     let spawnOffset = randomDiskOffset rng radius
+    let dir = computeEmissionDirection mode spawnOffset rng
 
     {
       Direction = dir
@@ -96,12 +149,19 @@ module ParticleSystem =
       SpeedOverride = ValueNone
     }
 
-  /// Spawn logic for Cone shape
-  let inline spawnConeShape (rng: Random) (angle: float32) (length: float32) =
-    let distFromOrigin = float32(Math.Sqrt(rng.NextDouble())) * length
+  /// Spawn logic for Cone shape with EmissionMode
+  let inline spawnConeShape
+    (rng: Random)
+    (angle: float32)
+    (length: float32)
+    (mode: EmissionMode)
+    =
     let halfAngleRad = MathHelper.ToRadians(angle / 2.0f)
     let coneAngle = float32(Math.Sqrt(rng.NextDouble())) * halfAngleRad
     let rotAroundAxis = float32(rng.NextDouble() * 2.0 * Math.PI)
+
+    // Spawn distance determines WHERE particle starts
+    let distFromOrigin = computeSpawnDistance mode length rng
 
     let xOffset =
       distFromOrigin * MathF.Sin(coneAngle) * MathF.Cos(rotAroundAxis)
@@ -112,13 +172,27 @@ module ParticleSystem =
     let yOffset = distFromOrigin * MathF.Cos(coneAngle)
 
     let spawnOffset = Vector3(xOffset, yOffset, zOffset)
-    let dir = randomSphereDirection rng
+
+    // For Outward mode, compute direction using FULL length so particles
+    // spread to fill the entire cone, not just the spawn region
+    let dir =
+      match mode with
+      | Outward ->
+        // Compute target point at full cone length with same angle
+        let targetX = length * MathF.Sin(coneAngle) * MathF.Cos(rotAroundAxis)
+        let targetZ = length * MathF.Sin(coneAngle) * MathF.Sin(rotAroundAxis)
+        let targetY = length * MathF.Cos(coneAngle)
+        let targetOffset = Vector3(targetX, targetY, targetZ)
+        emissionDirectionOutward targetOffset
+      | _ -> computeEmissionDirection mode spawnOffset rng
 
     {
       Direction = dir
       SpawnOffset = spawnOffset
       SpeedOverride = ValueNone
     }
+
+
 
   let updateParticle (dt: float32) (p: Particle) =
     let p = Particle.withLife (p.Life - dt) p
@@ -152,6 +226,12 @@ module ParticleSystem =
         min + (float32(rng.NextDouble()) * (max - min))
 
       // Direction and spawn offset based on shape (Local Space)
+      // Resolve effective EmissionMode: override takes precedence over config
+      let effectiveMode =
+        match overrides.EmissionMode with
+        | ValueSome m -> m
+        | ValueNone -> emitter.Config.EmissionMode
+
       let spawnResult =
         match emitter.Config.Shape with
         | EmitterShape.Point -> spawnPointShape rng
@@ -159,10 +239,10 @@ module ParticleSystem =
           // Check for skill-driven area override
           match overrides.Area with
           | ValueSome(SkillArea.Circle(skillRadius, _)) ->
-            spawnSphereShape rng skillRadius
+            spawnSphereShape rng skillRadius effectiveMode
           | ValueSome(SkillArea.Line(width, length, _)) ->
             spawnLineShape rng width length
-          | _ -> spawnSphereShape rng configRadius
+          | _ -> spawnSphereShape rng configRadius effectiveMode
 
         | EmitterShape.Cone(configAngle, configRadius) ->
           // Check for skill-driven area override
@@ -174,7 +254,7 @@ module ParticleSystem =
               configAngle, skillLength
             | _ -> configAngle, configRadius * 10.0f
 
-          spawnConeShape rng angle length
+          spawnConeShape rng angle length effectiveMode
 
       let dirLocal = spawnResult.Direction
       let spawnOffsetLocal = spawnResult.SpawnOffset

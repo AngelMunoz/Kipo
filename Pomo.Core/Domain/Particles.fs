@@ -25,6 +25,14 @@ module Particles =
     | World
     | Local
 
+  /// Controls how particles spawn and flow within shaped areas
+  [<Struct>]
+  type EmissionMode =
+    | Uniform // Fill area instantly (current behavior)
+    | Outward // Projection: spawn at origin, flow outward
+    | Inward // Convergence: spawn at edge, flow inward
+    | EdgeOnly // Ring: spawn only at outer edge
+
   [<Struct>]
   type ParticleConfig = {
     Lifetime: struct (float32 * float32)
@@ -51,6 +59,7 @@ module Particles =
     Particle: ParticleConfig
     FloorHeight: float32
     EmissionRotation: Vector3
+    EmissionMode: EmissionMode
   }
 
   // Runtime Types
@@ -93,6 +102,7 @@ module Particles =
     Scale: float32 voption
     Color: Color voption
     Area: SkillArea voption
+    EmissionMode: EmissionMode voption
   }
 
   module EffectOverrides =
@@ -101,6 +111,7 @@ module Particles =
       Scale = ValueNone
       Color = ValueNone
       Area = ValueNone
+      EmissionMode = ValueNone
     }
 
   type ActiveEffect = {
@@ -147,6 +158,22 @@ module Particles =
                 json.Clone(),
                 $"Unknown SimulationSpace: {str}"
               )
+              |> Error
+        }
+
+    module EmissionModeCodec =
+      let decoder: Decoder<EmissionMode> =
+        fun json -> decode {
+          let! str = Required.string json
+
+          match str.ToLowerInvariant() with
+          | "uniform" -> return Uniform
+          | "outward" -> return Outward
+          | "inward" -> return Inward
+          | "edgeonly" -> return EdgeOnly
+          | _ ->
+            return!
+              DecodeError.ofError(json.Clone(), $"Unknown EmissionMode: {str}")
               |> Error
         }
 
@@ -332,6 +359,11 @@ module Particles =
               ("EmissionRotation", Helper.vec3FromDict)
               json
 
+          let! emissionMode =
+            VOptional.Property.get
+              ("EmissionMode", EmissionModeCodec.decoder)
+              json
+
           return {
             Name = name
             Texture = texture
@@ -363,5 +395,9 @@ module Particles =
               match emissionRotation with
               | ValueSome v -> v
               | ValueNone -> Vector3.Zero
+            EmissionMode =
+              match emissionMode with
+              | ValueSome m -> m
+              | ValueNone -> Uniform
           }
         }
