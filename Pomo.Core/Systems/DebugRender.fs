@@ -761,8 +761,6 @@ module DebugRender =
     let skillStore = stores.SkillStore
     let subscriptions = new System.Reactive.Disposables.CompositeDisposable()
 
-
-
     let getRemainingDuration (totalGameTime: TimeSpan) (effect: ActiveEffect) =
       match effect.SourceEffect.Duration with
       | Duration.Timed totalDuration ->
@@ -948,7 +946,6 @@ module DebugRender =
       |> subscriptions.Add
 
     override this.Update gameTime =
-      base.Update gameTime
       let sheetToggled = toggleSheetState |> AVal.force
       let inventoryToggled = toggleInventoryState |> AVal.force
 
@@ -994,7 +991,6 @@ module DebugRender =
         transientCommands.AddRange activeTransient
 
     override _.Draw gameTime =
-      base.Draw gameTime
 
       let sb = spriteBatch.Value
       let entityScenarios = projections.EntityScenarios |> AMap.force
@@ -1027,8 +1023,6 @@ module DebugRender =
           ShowStats = showStats.Value
           ShowInventory = showInventory.Value
         }
-
-        let commandsToExecute = generateDebugCommands renderContext
 
         let commandsToExecute = generateDebugCommands renderContext
 
