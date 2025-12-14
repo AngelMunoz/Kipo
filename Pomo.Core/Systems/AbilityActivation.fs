@@ -374,10 +374,13 @@ module AbilityActivation =
               let entityScenarios =
                 gameplay.Projections.EntityScenarios |> AMap.force
 
+              let liveEntities = gameplay.Projections.LiveEntities |> ASet.force
+
               match entityScenarios |> HashMap.tryFindV playerId with
               | ValueSome scenarioId ->
                 gameplay.Projections.GetNearbyEntitiesSnapshot(
                   gameplay.Projections.ComputeMovementSnapshot(scenarioId),
+                  liveEntities,
                   v2,
                   radius
                 )

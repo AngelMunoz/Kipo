@@ -875,6 +875,7 @@ module Combat =
       // is done in the subscription callbacks
       let inline createCtx(entityId: Guid<EntityId>) =
         let entityScenarios = gameplay.Projections.EntityScenarios |> AMap.force
+        let liveEntities = gameplay.Projections.LiveEntities |> ASet.force
 
         match entityScenarios |> HashMap.tryFindV entityId with
         | ValueSome scenarioId ->
@@ -884,6 +885,7 @@ module Combat =
           let getNearbyEntities center radius =
             gameplay.Projections.GetNearbyEntitiesSnapshot(
               snapshot,
+              liveEntities,
               center,
               radius
             )
