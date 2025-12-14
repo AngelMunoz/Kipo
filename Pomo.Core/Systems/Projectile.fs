@@ -229,6 +229,146 @@ module Projectile =
 
   open Pomo.Core.Environment
   open Pomo.Core.Domain.Animation
+  open Pomo.Core.EventBus
+
+  /// Context for visual effect spawning operations
+  [<Struct>]
+  type VisualEffectContext = {
+    ParticleStore: Pomo.Core.Stores.ParticleStore
+    SkillStore: Pomo.Core.Stores.SkillStore
+    VisualEffects: ResizeArray<Particles.ActiveEffect>
+    Positions: HashMap<Guid<EntityId>, Vector2>
+    EffectOwners: System.Collections.Generic.HashSet<Guid<EntityId>>
+  }
+
+  /// Calculates rotation quaternion for impact visuals based on projectile direction
+  let inline calculateImpactRotation
+    (positions: HashMap<Guid<EntityId>, Vector2>)
+    (projectileId: Guid<EntityId>)
+    (targetPos: Vector2)
+    =
+    match positions |> HashMap.tryFindV projectileId with
+    | ValueSome projPos when projPos <> targetPos ->
+      let dir = Vector2.Normalize(targetPos - projPos)
+      let angle = MathF.Atan2(dir.Y, dir.X)
+
+      let yaw =
+        Quaternion.CreateFromAxisAngle(Vector3.Up, -angle + MathHelper.PiOver2)
+
+      let pitch =
+        Quaternion.CreateFromAxisAngle(Vector3.UnitX, MathHelper.PiOver2)
+
+      yaw * pitch
+    | _ -> Quaternion.Identity
+
+  let inline spawnEffect
+    (particleStore: Pomo.Core.Stores.ParticleStore)
+    (visualEffects: ResizeArray<Particles.ActiveEffect>)
+    (vfxId: string)
+    (pos: Vector2)
+    (rotation: Quaternion)
+    (owner: Guid<EntityId> voption)
+    (area: SkillArea voption)
+    =
+    match particleStore.tryFind vfxId with
+    | ValueSome configs ->
+      let emitters =
+        configs
+        |> List.map(fun config -> {
+          Config = config
+          Particles = ResizeArray()
+          Accumulator = ref 0.0f
+          BurstDone = ref false
+        })
+        |> ResizeArray
+
+      let effect = {
+        Id = System.Guid.NewGuid().ToString()
+        Emitters = emitters |> Seq.toList
+        Position = ref(Vector3(pos.X, 0.0f, pos.Y))
+        Rotation = ref rotation
+        Scale = ref Vector3.One
+        IsAlive = ref true
+        Owner = owner
+        Overrides = {
+          EffectOverrides.empty with
+              Rotation = ValueSome rotation
+              Area = area
+        }
+      }
+
+      visualEffects.Add(effect)
+    | ValueNone -> ()
+
+  let inline ensureProjectileAnimation
+    (eventBus: EventBus)
+    (activeAnims: HashMap<Guid<EntityId>, IndexList<AnimationState>>)
+    (projectileId: Guid<EntityId>)
+    =
+    match activeAnims |> HashMap.tryFindV projectileId with
+    | ValueNone ->
+      let spinAnim: AnimationState = {
+        ClipId = "Projectile_Spin"
+        Time = TimeSpan.Zero
+        Speed = 1.0f
+      }
+
+      eventBus.Publish(
+        Animation(
+          ActiveAnimationsChanged
+            struct (projectileId, IndexList.single spinAnim)
+        )
+      )
+    | ValueSome _ -> ()
+
+  /// Spawns flight visuals for a projectile if not already present
+  let inline spawnFlightVisual
+    (ctx: VisualEffectContext)
+    (projectileId: Guid<EntityId>)
+    (projectile: LiveProjectile)
+    =
+    match projectile.Info.Visuals.VfxId with
+    | ValueSome vfxId ->
+      if not(ctx.EffectOwners.Contains projectileId) then
+        match ctx.Positions |> HashMap.tryFindV projectileId with
+        | ValueSome pos ->
+          spawnEffect
+            ctx.ParticleStore
+            ctx.VisualEffects
+            vfxId
+            pos
+            Quaternion.Identity
+            (ValueSome projectileId)
+            ValueNone
+        | ValueNone -> ()
+    | ValueNone -> ()
+
+  /// Spawns impact visuals for a projectile impact event
+  let inline spawnImpactVisual
+    (ctx: VisualEffectContext)
+    (impact: SystemCommunications.ProjectileImpacted)
+    =
+    match ctx.SkillStore.tryFind impact.SkillId with
+    | ValueSome(Skill.Active skill) ->
+      match skill.ImpactVisuals.VfxId with
+      | ValueSome vfxId ->
+        let rotation =
+          calculateImpactRotation
+            ctx.Positions
+            impact.ProjectileId
+            impact.ImpactPosition
+
+        spawnEffect
+          ctx.ParticleStore
+          ctx.VisualEffects
+          vfxId
+          impact.ImpactPosition
+          rotation
+          ValueNone
+          (ValueSome skill.Area)
+      | ValueNone -> ()
+    | _ -> ()
+
 
   type ProjectileSystem(game: Game, env: PomoEnvironment) =
     inherit GameSystem(game)
@@ -237,42 +377,8 @@ module Projectile =
     let (Gameplay gameplay) = env.GameplayServices
     let (Stores stores) = env.StoreServices
 
-    let spawnEffect
-      (vfxId: string)
-      (pos: Vector2)
-      (rotation: Quaternion)
-      (owner: Guid<EntityId> voption)
-      (area: SkillArea voption)
-      =
-      match stores.ParticleStore.tryFind vfxId with
-      | ValueSome configs ->
-        let emitters =
-          configs
-          |> List.map(fun config -> {
-            Config = config
-            Particles = ResizeArray()
-            Accumulator = ref 0.0f
-            BurstDone = ref false
-          })
-          |> ResizeArray
-
-        let effect = {
-          Id = System.Guid.NewGuid().ToString() // temp ID
-          Emitters = emitters |> Seq.toList
-          Position = ref(Vector3(pos.X, 0.0f, pos.Y))
-          Rotation = ref rotation
-          Scale = ref Vector3.One
-          IsAlive = ref true
-          Owner = owner
-          Overrides = {
-            EffectOverrides.empty with
-                Rotation = ValueSome rotation
-                Area = area
-          }
-        }
-
-        core.World.VisualEffects.Add(effect)
-      | ValueNone -> ()
+    // Track which projectiles already have visual effects (O(1) lookup)
+    let effectOwners = System.Collections.Generic.HashSet<Guid<EntityId>>()
 
     override _.Update _ =
       let dt =
@@ -283,6 +389,16 @@ module Projectile =
       let liveEntities = gameplay.Projections.LiveEntities |> ASet.force
       let liveProjectiles = core.World.LiveProjectiles |> AMap.force
       let entityScenarios = core.World.EntityScenario |> AMap.force
+      let activeAnims = core.World.ActiveAnimations |> AMap.force
+      let visualEffects = core.World.VisualEffects
+
+      // Rebuild effectOwners set each frame for accuracy
+      effectOwners.Clear()
+
+      for e in visualEffects do
+        match e.Owner with
+        | ValueSome ownerId -> effectOwners.Add(ownerId) |> ignore
+        | ValueNone -> ()
 
       // Group projectiles by scenario
       let projectilesByScenario =
@@ -306,94 +422,32 @@ module Projectile =
           LiveEntities = liveEntities
         }
 
+        // Create visual effect context once per scenario
+        let vfxCtx: VisualEffectContext = {
+          ParticleStore = stores.ParticleStore
+          SkillStore = stores.SkillStore
+          VisualEffects = visualEffects
+          Positions = snapshot.Positions
+          EffectOwners = effectOwners
+        }
+
         for _, (projectileId, projectile) in projectiles do
-          // Ensure projectile has a default spinning animation if none is set.
-          // We publish an ActiveAnimationsChanged event so the StateUpdate handler
-          // will attach the animations to the world (consistent with other systems).
-          let activeAnims = core.World.ActiveAnimations |> AMap.force
+          // 1. Ensure animation
+          ensureProjectileAnimation core.EventBus activeAnims projectileId
 
-          match activeAnims |> HashMap.tryFindV projectileId with
-          | ValueNone ->
-            let spinAnim: AnimationState = {
-              ClipId = "Projectile_Spin"
-              Time = TimeSpan.Zero
-              Speed = 1.0f
-            }
-
-            core.EventBus.Publish(
-              Animation(
-                ActiveAnimationsChanged
-                  struct (projectileId, IndexList.single spinAnim)
-              )
-            )
-          | ValueSome _ -> ()
-
+          // 2. Process projectile logic
           let struct (evs, states) =
             processProjectile worldCtx dt projectileId projectile
 
           sysEvents.AddRange evs
           stateEvents.AddRange states
 
-          // Visuals Logic
-          // 1. Flight Visuals (Projectile itself)
-          match projectile.Info.Visuals.VfxId with
-          | ValueSome vfxId ->
-            // Check if we already have an effect for this projectile
-            let hasEffect =
-              core.World.VisualEffects
-              |> Seq.exists(fun e -> e.Owner = ValueSome projectileId)
+          // 3. Flight visuals
+          spawnFlightVisual vfxCtx projectileId projectile
 
-            if not hasEffect then
-              match snapshot.Positions |> HashMap.tryFindV projectileId with
-              | ValueSome pos ->
-                spawnEffect
-                  vfxId
-                  pos
-                  Quaternion.Identity
-                  (ValueSome projectileId)
-                  ValueNone // No skill area for flight visuals
-              | ValueNone -> ()
-          | ValueNone -> ()
-
-          // 2. Impact Visuals
+          // 4. Impact visuals
           for impact in evs do
-            match stores.SkillStore.tryFind impact.SkillId with
-            | ValueSome(Skill.Active skill) ->
-              match skill.ImpactVisuals.VfxId with
-              | ValueSome vfxId ->
-                let targetPos = impact.ImpactPosition
-
-                let rotation =
-                  match
-                    snapshot.Positions |> HashMap.tryFindV impact.ProjectileId
-                  with
-                  | ValueSome projPos when projPos <> targetPos ->
-                    let dir = Vector2.Normalize(targetPos - projPos)
-                    let angle = MathF.Atan2(dir.Y, dir.X)
-
-                    let yaw =
-                      Quaternion.CreateFromAxisAngle(
-                        Vector3.Up,
-                        -angle + MathHelper.PiOver2
-                      )
-
-                    let pitch =
-                      Quaternion.CreateFromAxisAngle(
-                        Vector3.UnitX,
-                        MathHelper.PiOver2
-                      )
-
-                    yaw * pitch
-                  | _ -> Quaternion.Identity
-
-                spawnEffect
-                  vfxId
-                  targetPos
-                  rotation
-                  ValueNone
-                  (ValueSome skill.Area)
-              | ValueNone -> ()
-            | _ -> ()
+            spawnImpactVisual vfxCtx impact
 
       sysEvents |> Seq.iter core.EventBus.Publish
       stateEvents |> Seq.iter core.EventBus.Publish
