@@ -1,0 +1,26 @@
+{
+  "FireMage": {
+    "Name": "Fire Mage",
+    "ArchetypeId": 1,
+    "Family": "Magic",
+    "Skills": [2, 3],
+    "DecisionTree": "RangedCaster",
+    "Model": "HumanoidBase"
+  },
+  "IceMage": {
+    "Name": "Ice Mage",
+    "ArchetypeId": 1,
+    "Family": "Magic",
+    "Skills": [11],
+    "DecisionTree": "RangedCaster",
+    "Model": "HumanoidBase"
+  },
+  "ElementalCaster": {
+    "Name": "Elemental Caster",
+    "ArchetypeId": 1,
+    "Family": "Magic",
+    "Skills": [2, 9, 10],
+    "DecisionTree": "RangedCaster",
+    "Model": "HumanoidBase"
+  }
+}

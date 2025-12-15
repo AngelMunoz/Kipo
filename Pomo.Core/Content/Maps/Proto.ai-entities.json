@@ -1,0 +1,12 @@
+{
+  "magic_casters": {
+    "Entities": ["FireMage", "IceMage", "ElementalCaster"],
+    "Weights": [0.4, 0.3, 0.3],
+    "Overrides": {}
+  },
+  "fire_mages": {
+    "Entities": ["FireMage"],
+    "Weights": [1.0],
+    "Overrides": {}
+  }
+}

@@ -5,6 +5,7 @@ open FSharp.UMX
 open Microsoft.Xna.Framework
 open Pomo.Core.Domain.Core
 open Pomo.Core.Domain.Entity
+open Pomo.Core.Domain.Skill
 open Pomo.Core.Domain.Units
 open FSharp.Data.Adaptive
 
@@ -116,6 +117,38 @@ type AIController = {
   // Memory
   memories: HashMap<Guid<EntityId>, MemoryEntry>
 }
+
+type AIFamilyConfig = {
+  StatScaling: HashMap<string, float32>
+  SkillPool: int<SkillId>[]
+  PreferredIntent: SkillIntent
+  DecisionTree: string
+}
+
+type AIEntityDefinition = {
+  Key: string
+  Name: string
+  ArchetypeId: int<AiArchetypeId>
+  Family: Family
+  Skills: int<SkillId>[]
+  DecisionTree: string
+  Model: string
+  StatOverrides: BaseStats voption
+}
+
+[<Struct>]
+type MapEntityOverride = {
+  StatMultiplier: float32 voption
+  SkillRestrictions: int<SkillId>[] voption
+  ExtraSkills: int<SkillId>[] voption
+}
+
+type MapEntityGroup = {
+  Entities: string[]
+  Weights: float32[] voption
+  Overrides: HashMap<string, MapEntityOverride>
+}
+
 
 module Serialization =
   open JDeck
@@ -274,5 +307,115 @@ module Serialization =
           cuePriorities = cuePriorities
           decisionInterval = TimeSpan.FromSeconds decisionIntervalSeconds
           baseStats = baseStats
+        }
+      }
+
+  module AIFamilyConfig =
+    let decoder: Decoder<AIFamilyConfig> =
+      fun json -> decode {
+        let! skillPoolInts =
+          Required.Property.array ("SkillPool", Required.int) json
+
+        and! preferredIntentStr =
+          Required.Property.get ("PreferredIntent", Required.string) json
+
+        and! decisionTree =
+          Required.Property.get ("DecisionTree", Required.string) json
+
+        let preferredIntent =
+          match preferredIntentStr.ToLowerInvariant() with
+          | "offensive" -> SkillIntent.Offensive
+          | _ -> SkillIntent.Supportive
+
+        let skillPool = skillPoolInts |> Array.map UMX.tag<SkillId>
+
+        let statScaling = HashMap.empty<string, float32>
+
+        return {
+          StatScaling = statScaling
+          SkillPool = skillPool
+          PreferredIntent = preferredIntent
+          DecisionTree = decisionTree
+        }
+      }
+
+  module AIEntityDefinition =
+    let decoder(key: string) : Decoder<AIEntityDefinition> =
+      fun json -> decode {
+        let! name = Required.Property.get ("Name", Required.string) json
+
+        and! archetypeId =
+          Required.Property.get ("ArchetypeId", Required.int) json
+
+        and! familyStr = Required.Property.get ("Family", Required.string) json
+        and! skillInts = Required.Property.array ("Skills", Required.int) json
+
+        and! decisionTree =
+          Required.Property.get ("DecisionTree", Required.string) json
+
+        and! model = Required.Property.get ("Model", Required.string) json
+
+        and! statOverrides =
+          VOptional.Property.get
+            ("StatOverrides",
+             Pomo.Core.Domain.Entity.Serialization.BaseStats.decoder)
+            json
+
+        let family =
+          match familyStr with
+          | "Power" -> Family.Power
+          | "Magic" -> Family.Magic
+          | "Charm" -> Family.Charm
+          | "Sense" -> Family.Sense
+          | _ -> Family.Power
+
+        let skills = skillInts |> Array.map UMX.tag<SkillId>
+
+        return {
+          Key = key
+          Name = name
+          ArchetypeId = UMX.tag archetypeId
+          Family = family
+          Skills = skills
+          DecisionTree = decisionTree
+          Model = model
+          StatOverrides = statOverrides
+        }
+      }
+
+  module MapEntityOverride =
+    let decoder: Decoder<MapEntityOverride> =
+      fun json -> decode {
+        let! statMultiplierOpt =
+          VOptional.Property.get ("StatMultiplier", Required.float) json
+
+        and! skillRestrictionsOpt =
+          VOptional.Property.array ("SkillRestrictions", Required.int) json
+
+        and! extraSkillsOpt =
+          VOptional.Property.array ("ExtraSkills", Required.int) json
+
+        return {
+          StatMultiplier = statMultiplierOpt |> ValueOption.map float32
+          SkillRestrictions =
+            skillRestrictionsOpt |> ValueOption.map(Array.map UMX.tag<SkillId>)
+          ExtraSkills =
+            extraSkillsOpt |> ValueOption.map(Array.map UMX.tag<SkillId>)
+        }
+      }
+
+  module MapEntityGroup =
+    let decoder: Decoder<MapEntityGroup> =
+      fun json -> decode {
+        let! entities =
+          Required.Property.array ("Entities", Required.string) json
+
+        and! weightsOpt =
+          VOptional.Property.array ("Weights", Required.float) json
+
+        return {
+          Entities = entities
+          Weights = weightsOpt |> ValueOption.map(Array.map float32)
+          Overrides = HashMap.empty
         }
       }

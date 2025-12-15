@@ -1,0 +1,26 @@
+{
+  "Magic": {
+    "StatScaling": { "Magic": 1.5, "Sense": 1.2 },
+    "SkillPool": [2, 3, 9, 10],
+    "PreferredIntent": "Offensive",
+    "DecisionTree": "RangedCaster"
+  },
+  "Power": {
+    "StatScaling": { "Power": 1.5, "Charm": 0.8 },
+    "SkillPool": [1, 6, 12],
+    "PreferredIntent": "Offensive",
+    "DecisionTree": "MeleeAttacker"
+  },
+  "Charm": {
+    "StatScaling": { "Charm": 1.5, "Magic": 1.0 },
+    "SkillPool": [4, 5],
+    "PreferredIntent": "Supportive",
+    "DecisionTree": "SupportBuffer"
+  },
+  "Sense": {
+    "StatScaling": { "Sense": 1.5, "Power": 1.0 },
+    "SkillPool": [11, 13],
+    "PreferredIntent": "Offensive",
+    "DecisionTree": "TacticalRanged"
+  }
+}
