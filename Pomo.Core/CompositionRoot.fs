@@ -56,6 +56,11 @@ module CompositionRoot =
     let aiArchetypeStore =
       AIArchetype.create(JsonFileLoader.readAIArchetypes deserializer)
 
+    let aiFamilyStore =
+      AIFamily.create(JsonFileLoader.readAIFamilies deserializer)
+
+    let aiEntityStore = AIEntity.create(JsonFileLoader.readAIEntities)
+
     let mapStore =
       Map.create MapLoader.loadMap [
         "Content/Maps/Proto.xml"
@@ -76,6 +81,8 @@ module CompositionRoot =
           member _.ItemStore = itemStore
           member _.MapStore = mapStore
           member _.AIArchetypeStore = aiArchetypeStore
+          member _.AIFamilyStore = aiFamilyStore
+          member _.AIEntityStore = aiEntityStore
           member _.ModelStore = modelStore
           member _.AnimationStore = animationStore
           member _.ParticleStore = particleStore
@@ -217,132 +224,60 @@ module CompositionRoot =
 
       worldMapService.Initialize()
 
-      let getRandomPointInPolygon (poly: IndexList<Vector2>) (random: Random) =
-        if poly.IsEmpty then
-          Vector2.Zero
-        else
-          let minX = poly |> IndexList.map(fun v -> v.X) |> Seq.min
-          let maxX = poly |> IndexList.map(fun v -> v.X) |> Seq.max
-          let minY = poly |> IndexList.map(fun v -> v.Y) |> Seq.min
-          let maxY = poly |> IndexList.map(fun v -> v.Y) |> Seq.max
-
-          let isPointInPolygon(p: Vector2) =
-            let mutable inside = false
-            let count = poly.Count
-            let mutable j = count - 1
-
-            for i = 0 to count - 1 do
-              let pi = poly[i]
-              let pj = poly[j]
-
-              if
-                ((pi.Y > p.Y) <> (pj.Y > p.Y))
-                && (p.X < (pj.X - pi.X) * (p.Y - pi.Y) / (pj.Y - pi.Y) + pi.X)
-              then
-                inside <- not inside
-
-              j <- i
-
-            inside
-
-          let rec findPoint attempts =
-            if attempts <= 0 then
-              Vector2((minX + maxX) / 2.0f, (minY + maxY) / 2.0f)
-            else
-              let x = minX + float32(random.NextDouble()) * (maxX - minX)
-              let y = minY + float32(random.NextDouble()) * (maxY - minY)
-              let p = Vector2(x, y)
-              if isPointInPolygon p then p else findPoint(attempts - 1)
-
-          findPoint 20
-
       let spawnEntitiesForMap
         (mapDef: Map.MapDefinition)
         (spawnPlayerId: Guid<EntityId>)
         (scenarioId: Guid<ScenarioId>)
         (targetSpawn: string voption)
         =
-        let mutable playerSpawned = false
-        let mutable enemyCount = 0
+        let maxEnemies = MapSpawning.getMaxEnemies mapDef
 
-        let maxEnemies =
-          mapDef.Properties
-          |> HashMap.tryFind "MaxEnemyEntities"
-          |> Option.bind(fun v ->
-            match System.Int32.TryParse v with
-            | true, i -> Some i
-            | _ -> None)
-          |> Option.defaultValue 0
+        let mapEntityGroupStore =
+          MapSpawning.tryLoadMapEntityGroupStore mapDef.Key
 
-        let spawnCandidates =
-          mapDef.ObjectGroups
-          |> IndexList.collect(fun group ->
-            group.Objects
-            |> IndexList.choose(fun obj ->
-              match obj.Type with
-              | ValueSome MapObjectType.Spawn ->
-                let isPlayerSpawn =
-                  obj.Properties
-                  |> HashMap.tryFindV "PlayerSpawn"
-                  |> ValueOption.map(fun v -> v.ToLower() = "true")
-                  |> ValueOption.defaultValue false
+        let candidates = MapSpawning.extractSpawnCandidates mapDef scope.Random
 
-                let pos =
-                  match obj.CollisionShape with
-                  | ValueSome(ClosedPolygon points) when not points.IsEmpty ->
-                    let offset = getRandomPointInPolygon points scope.Random
-                    Vector2(obj.X + offset.X, obj.Y + offset.Y)
-                  | _ -> Vector2(obj.X, obj.Y)
-
-                Some(obj.Name, isPlayerSpawn, pos)
-              | _ -> None))
-
-        // Prioritize target spawn if provided, otherwise explicit player spawn, otherwise first spawn
-        let playerSpawnPos =
-          match targetSpawn with
-          | ValueSome targetName ->
-            spawnCandidates
-            |> Seq.tryFind(fun (name, _, _) -> name = targetName)
-            |> Option.map(fun (_, _, pos) -> pos)
-          | ValueNone -> None
-
-        let finalPlayerSpawnPos =
-          playerSpawnPos
-          |> Option.orElse(
-            spawnCandidates
-            |> Seq.tryFind(fun (_, isPlayer, _) -> isPlayer)
-            |> Option.map(fun (_, _, pos) -> pos)
-          )
-          |> Option.orElse(
-            spawnCandidates |> Seq.tryHead |> Option.map(fun (_, _, pos) -> pos)
-          )
-          |> Option.defaultValue Vector2.Zero
+        let playerPos =
+          MapSpawning.findPlayerSpawnPosition targetSpawn candidates
 
         // Spawn player
         let playerIntent: SystemCommunications.SpawnEntityIntent = {
           EntityId = spawnPlayerId
           ScenarioId = scenarioId
           Type = SystemCommunications.SpawnType.Player 0
-          Position = finalPlayerSpawnPos
+          Position = playerPos
         }
 
         eventBus.Publish playerIntent
-        playerSpawned <- true
 
         // Spawn enemies
-        let enemySpawnCandidates =
-          spawnCandidates |> Seq.filter(fun (_, isPlayer, _) -> not isPlayer)
+        let mutable enemyCount = 0
 
-        for (_, _, pos) in enemySpawnCandidates do
+        let enemyCandidates =
+          candidates |> Seq.filter(fun c -> not c.IsPlayerSpawn)
+
+        for candidate in enemyCandidates do
           if enemyCount < maxEnemies then
             let enemyId = Guid.NewGuid() |> UMX.tag
-            let archetypeId = if enemyCount % 2 = 0 then %1 else %2
+
+            let entityDefKey, archetypeId =
+              match candidate.EntityGroup with
+              | ValueSome groupName ->
+                MapSpawning.resolveEntityFromGroup
+                  scope.Random
+                  mapEntityGroupStore
+                  scope.Stores.AIEntityStore
+                  groupName
+              | ValueNone ->
+                let id = if enemyCount % 2 = 0 then %1 else %2
+                ValueNone, id
 
             let enemyIntent: SystemCommunications.SpawnEntityIntent = {
               EntityId = enemyId
               ScenarioId = scenarioId
-              Type = SystemCommunications.SpawnType.Enemy archetypeId
-              Position = pos
+              Type =
+                SystemCommunications.SpawnType.Enemy(archetypeId, entityDefKey)
+              Position = candidate.Position
             }
 
             eventBus.Publish enemyIntent

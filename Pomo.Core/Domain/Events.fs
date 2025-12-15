@@ -35,7 +35,7 @@ module SystemCommunications =
   [<RequireQualifiedAccess>]
   type SpawnType =
     | Player of playerIndex: int
-    | Enemy of archetypeId: int<AiArchetypeId>
+    | Enemy of archetypeId: int<AiArchetypeId> * entityDefinitionKey: string voption
 
   [<Struct>]
   type SpawnEntityIntent = {

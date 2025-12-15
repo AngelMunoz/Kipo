@@ -17,6 +17,87 @@ open Pomo.Core.EventBus
 open Pomo.Core.Domain.Spatial
 open Systems
 
+module SkillSelection =
+  /// Check if a skill is on cooldown
+  let isSkillReady
+    (skillId: int<SkillId>)
+    (cooldowns: HashMap<int<SkillId>, TimeSpan> voption)
+    (currentTime: TimeSpan)
+    =
+    match cooldowns with
+    | ValueNone -> true
+    | ValueSome cds ->
+      match cds |> HashMap.tryFindV skillId with
+      | ValueNone -> true
+      | ValueSome cooldownEnd -> currentTime >= cooldownEnd
+
+  /// Get the range of a skill
+  let getSkillRange(skill: Skill.Skill) =
+    match skill with
+    | Skill.Active active -> active.Range |> ValueOption.defaultValue 64.0f
+    | Skill.Passive _ -> 0.0f
+
+  /// Check if target is within skill range
+  let isTargetInRange
+    (casterPos: Vector2)
+    (targetPos: Vector2)
+    (skillRange: float32)
+    =
+    let distance = Vector2.Distance(casterPos, targetPos)
+    distance <= skillRange
+
+  /// Select the best skill to use given the context
+  let selectSkill
+    (skillIds: int<SkillId>[])
+    (skillStore: SkillStore)
+    (cooldowns: HashMap<int<SkillId>, TimeSpan> voption)
+    (currentTime: TimeSpan)
+    (casterPos: Vector2)
+    (targetPos: Vector2)
+    =
+    skillIds
+    |> Array.choose(fun skillId ->
+      match skillStore.tryFind skillId with
+      | ValueNone -> None
+      | ValueSome skill ->
+        let range = getSkillRange skill
+        let inRange = isTargetInRange casterPos targetPos range
+        let ready = isSkillReady skillId cooldowns currentTime
+        if inRange && ready then Some(skillId, skill) else None)
+    |> Array.tryHead
+
+  /// Create an AbilityIntent for the AI to cast a skill
+  let createAbilityIntent
+    (casterId: Guid<EntityId>)
+    (skillId: int<SkillId>)
+    (skill: Skill.Skill)
+    (targetEntityId: Guid<EntityId> voption)
+    (targetPos: Vector2)
+    : SystemCommunications.AbilityIntent =
+    let target =
+      match skill with
+      | Skill.Active active ->
+        match active.Targeting with
+        | Skill.Targeting.Self -> SystemCommunications.SkillTarget.TargetSelf
+        | Skill.Targeting.TargetEntity ->
+          match targetEntityId with
+          | ValueSome entityId ->
+            SystemCommunications.SkillTarget.TargetEntity entityId
+          | ValueNone ->
+            SystemCommunications.SkillTarget.TargetPosition targetPos
+        | Skill.Targeting.TargetPosition ->
+          SystemCommunications.SkillTarget.TargetPosition targetPos
+        | Skill.Targeting.TargetDirection ->
+          SystemCommunications.SkillTarget.TargetDirection targetPos
+      | Skill.Passive _ -> SystemCommunications.SkillTarget.TargetSelf
+
+    {
+      Caster = casterId
+      SkillId = skillId
+      Target = target
+    }
+
+
 module Perception =
   let inline distance (p1: Vector2) (p2: Vector2) = Vector2.Distance(p1, p2)
 
@@ -286,11 +367,44 @@ module AISystemLogic =
     (cue: PerceptionCue)
     (priority: CuePriority)
     (controller: AIController)
+    (controllerPos: Vector2)
     (skillStore: SkillStore)
+    (cooldowns: HashMap<int<SkillId>, TimeSpan> voption)
+    (currentTick: TimeSpan)
     =
-    let cmd = Decision.generateCommand cue priority controller skillStore
+    let movementCmd =
+      Decision.generateCommand cue priority controller skillStore
+
     let state = determineState priority.response cue
-    struct (cmd, true, controller.waypointIndex, state)
+
+    // Try to cast a skill when engaging or investigating (if in range)
+    let abilityIntent =
+      match priority.response with
+      | Engage
+      | Investigate ->
+        match
+          SkillSelection.selectSkill
+            controller.skills
+            skillStore
+            cooldowns
+            currentTick
+            controllerPos
+            cue.position
+        with
+        | Some(skillId, skill) ->
+          Some(
+            SkillSelection.createAbilityIntent
+              controller.controlledEntityId
+              skillId
+              skill
+              cue.sourceEntityId
+              cue.position
+          )
+        | None -> None
+      | _ -> None
+
+    struct (movementCmd, abilityIntent, true, controller.waypointIndex, state)
+
 
   let private getNavigateToSpawnCommand(controller: AIController) =
     ValueSome(
@@ -320,7 +434,7 @@ module AISystemLogic =
         : SystemCommunications.SetMovementTarget
       )
 
-    struct (cmd, true, nextIdx, Patrolling)
+    struct (cmd, None, true, nextIdx, Patrolling)
 
   let private handleAggressive
     (controller: AIController)
@@ -338,7 +452,7 @@ module AISystemLogic =
         : SystemCommunications.SetMovementTarget
       )
 
-    struct (cmd, true, controller.waypointIndex, Patrolling)
+    struct (cmd, None, true, controller.waypointIndex, Patrolling)
 
   let private handleNoCue
     (controller: AIController)
@@ -353,14 +467,18 @@ module AISystemLogic =
       // No waypoints behavior
       match archetype.behaviorType with
       | Patrol ->
-        struct (ValueNone, true, controller.waypointIndex, AIState.Idle)
+        struct (ValueNone, None, true, controller.waypointIndex, AIState.Idle)
       | Aggressive
       | Defensive
       | Supporter
       | Ambusher
       | Turret
       | Passive ->
-        struct (navigateSpawn, true, controller.waypointIndex, AIState.Idle)
+        struct (navigateSpawn,
+                None,
+                true,
+                controller.waypointIndex,
+                AIState.Idle)
 
     | ValueSome waypoints ->
       // Waypoints available behavior
@@ -371,9 +489,13 @@ module AISystemLogic =
       | Supporter
       | Ambusher
       | Passive ->
-        struct (navigateSpawn, true, controller.waypointIndex, AIState.Idle)
+        struct (navigateSpawn,
+                None,
+                true,
+                controller.waypointIndex,
+                AIState.Idle)
       | Turret ->
-        struct (ValueNone, true, controller.waypointIndex, AIState.Idle)
+        struct (ValueNone, None, true, controller.waypointIndex, AIState.Idle)
 
   let processAndGenerateCommands
     (controller: AIController)
@@ -382,6 +504,7 @@ module AISystemLogic =
     (factions: HashMap<Guid<EntityId>, Faction HashSet>)
     (spatialGrid: HashMap<GridCell, IndexList<Guid<EntityId>>>)
     (skillStore: SkillStore)
+    (cooldowns: HashMap<Guid<EntityId>, HashMap<int<SkillId>, TimeSpan>>)
     (currentTick: TimeSpan)
     =
     let controlledPosition =
@@ -405,16 +528,28 @@ module AISystemLogic =
 
       let timeSinceLastDecision = currentTick - controller.lastDecisionTime
 
-      let struct (command, shouldUpdateTime, newWaypointIndex, newState) =
+      let entityCooldowns =
+        cooldowns |> HashMap.tryFindV controller.controlledEntityId
+
+      let struct (command, abilityIntent, shouldUpdateTime, newWaypointIndex,
+                  newState) =
         if timeSinceLastDecision >= archetype.decisionInterval then
           let bestCue = Decision.selectBestCue cues archetype.cuePriorities
 
           match bestCue with
           | Some struct (cue, priority) ->
-            handleBestCue cue priority controller skillStore
+            handleBestCue
+              cue
+              priority
+              controller
+              pos
+              skillStore
+              entityCooldowns
+              currentTick
           | None -> handleNoCue controller archetype pos
         else
           struct (ValueNone,
+                  None,
                   false,
                   controller.waypointIndex,
                   controller.currentState)
@@ -431,9 +566,9 @@ module AISystemLogic =
                 controller.lastDecisionTime
       }
 
-      struct (updatedController, command)
+      struct (updatedController, command, abilityIntent)
 
-    | _ -> struct (controller, ValueNone)
+    | _ -> struct (controller, ValueNone, None)
 
 
 open Pomo.Core.Environment
@@ -475,6 +610,7 @@ type AISystem(game: Game, env: PomoEnvironment) =
     let controllers = core.World.AIControllers |> AMap.force
     let entityScenarios = core.World.EntityScenario |> AMap.force
     let factions = core.World.Factions |> AMap.force
+    let cooldowns = core.World.AbilityCooldowns |> AMap.force
     let currentTick = (core.World.Time |> AVal.force).TotalGameTime
 
     // Group controllers by scenario
@@ -498,7 +634,7 @@ type AISystem(game: Game, env: PomoEnvironment) =
           archetypeStore.tryFind controller.archetypeId
           |> ValueOption.defaultValue fallbackArchetype
 
-        let struct (updatedController, command) =
+        let struct (updatedController, command, abilityIntent) =
           AISystemLogic.processAndGenerateCommands
             controller
             archetype
@@ -506,11 +642,16 @@ type AISystem(game: Game, env: PomoEnvironment) =
             factions
             spatialGrid
             skillStore
+            cooldowns
             currentTick
 
         match command with
         | ValueSome cmd -> core.EventBus.Publish cmd
         | ValueNone -> ()
+
+        match abilityIntent with
+        | Some intent -> core.EventBus.Publish intent
+        | None -> ()
 
         if updatedController <> controller then
           core.EventBus.Publish(

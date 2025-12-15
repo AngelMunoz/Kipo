@@ -30,7 +30,7 @@
     "Area": "Point",
     "Delivery": {
       "Type": "Projectile",
-      "Speed": 100.0,
+      "Speed": 200.0,
       "CollisionMode": "IgnoreTerrain",
       "Visuals": { "Vfx": "FireballProjectile" }
     },
@@ -57,7 +57,7 @@
     "Area": "Point",
     "Delivery": {
       "Type": "Projectile",
-      "Speed": 150.0,
+      "Speed": 250.0,
       "CollisionMode": "IgnoreTerrain",
       "Visuals": { "Vfx": "HellfireProjectile" }
     },
@@ -198,7 +198,7 @@
     },
     "Delivery": {
       "Type": "Projectile",
-      "Speed": 150.0,
+      "Speed": 250.0,
       "CollisionMode": "IgnoreTerrain",
       "Kind": {
         "Type": "Descending",
@@ -229,7 +229,7 @@
     "Area": "Point",
     "Delivery": {
       "Type": "Projectile",
-      "Speed": 80.0,
+      "Speed": 180.0,
       "CollisionMode": "IgnoreTerrain",
       "Kind": {
         "Type": "Chained",
@@ -248,8 +248,8 @@
     "Description": "Exhales a cone of fire.",
     "Intent": "Offensive",
     "DamageSource": "Magical",
-    "Cost": { "Type": "MP", "Amount": 10 },
-    "Cooldown": 2.0,
+    "Cost": { "Type": "MP", "Amount": 3 },
+    "Cooldown": 2.5,
     "Targeting": "TargetDirection",
     "Range": [16, 12],
     "Area": {
@@ -297,7 +297,7 @@
     "Description": "Fires a shard that shatters into a cone on impact.",
     "Intent": "Offensive",
     "DamageSource": "Magical",
-    "Cost": { "Type": "MP", "Amount": 8 },
+    "Cost": { "Type": "MP", "Amount": 3 },
     "Cooldown": 2.0,
     "Targeting": "TargetEntity",
     "Range": [16, 16],
@@ -309,7 +309,7 @@
     },
     "Delivery": {
       "Type": "Projectile",
-      "Speed": 100.0,
+      "Speed": 200.0,
       "CollisionMode": "IgnoreTerrain",
       "Visuals": { "Model": "IceShard", "Vfx": "IceShatterProjectile" }
     },
@@ -340,7 +340,7 @@
     },
     "Delivery": {
       "Type": "Projectile",
-      "Speed": 200.0,
+      "Speed": 300.0,
       "CollisionMode": "IgnoreTerrain"
     },
     "Formula": "AP * 1.5",
@@ -354,8 +354,8 @@
     "Description": "Throws a fan of knives that spread out based on distance.",
     "Intent": "Offensive",
     "DamageSource": "Physical",
-    "Cost": { "Type": "MP", "Amount": 10 },
-    "Cooldown": 2.0,
+    "Cost": { "Type": "MP", "Amount": 3 },
+    "Cooldown": 1.5,
     "Targeting": "TargetPosition",
     "Range": [16, 20],
     "Area": {
@@ -365,7 +365,7 @@
     },
     "Delivery": {
       "Type": "Projectile",
-      "Speed": 150.0,
+      "Speed": 250.0,
       "CollisionMode": "BlockedByTerrain",
       "Visuals": { "Model": "Dagger", "Vfx": "FanOfKnivesWind" }
     },

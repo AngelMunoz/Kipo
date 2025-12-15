@@ -114,6 +114,9 @@ type AIController = {
   lastDecisionTime: TimeSpan
   currentTarget: Guid<EntityId> voption
 
+  // Skills (from AIEntityDefinition)
+  skills: int<SkillId>[]
+
   // Memory
   memories: HashMap<Guid<EntityId>, MemoryEntry>
 }

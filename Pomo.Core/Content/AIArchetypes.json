@@ -16,7 +16,7 @@
         "Response": "Engage"
       }
     ],
-    "DecisionInterval": 10,
+    "DecisionInterval": 0.75,
     "BaseStats": {
       "Power": 2,
       "Magic": 2,
@@ -47,7 +47,7 @@
         "Response": "Engage"
       }
     ],
-    "DecisionInterval": 10,
+    "DecisionInterval": 0.75,
     "BaseStats": {
       "Power": 5,
       "Magic": 2,

@@ -156,6 +156,7 @@ module EntitySpawnerLogic =
     (pending: PendingSpawn)
     (eventBus: EventBus)
     (aiArchetypeStore: AIArchetypeStore)
+    (aiEntityStore: AIEntityStore)
     =
     let entityId = pending.EntityId
     let pos = pending.Position
@@ -201,7 +202,7 @@ module EntitySpawnerLogic =
       configurePlayerLoadout(entityId, eventBus)
 
 
-    | SystemCommunications.SpawnType.Enemy archetypeId ->
+    | SystemCommunications.SpawnType.Enemy(archetypeId, entityDefKey) ->
       let archetype = aiArchetypeStore.find archetypeId
       let baseStats, resource = createEnemyStats archetype
       let factions = HashSet [ Faction.Enemy ]
@@ -226,6 +227,17 @@ module EntitySpawnerLogic =
       )
 
       // Initialize AI Controller
+      // Use entity definition key if provided, otherwise fallback to first entity
+      let aiEntity: AIEntityDefinition option =
+        match entityDefKey with
+        | ValueSome key -> aiEntityStore.tryFind key |> Option.ofValueOption
+        | ValueNone -> aiEntityStore.all() |> Seq.tryHead
+
+      let skills =
+        match aiEntity with
+        | Some entity -> entity.Skills
+        | None -> [||]
+
       let controller: AIController = {
         controlledEntityId = entityId
         archetypeId = archetypeId
@@ -253,6 +265,7 @@ module EntitySpawnerLogic =
         waypointIndex = 0
         lastDecisionTime = TimeSpan.Zero
         currentTarget = ValueNone
+        skills = skills
         memories = HashMap.empty
       }
 
@@ -327,7 +340,11 @@ module EntitySpawnerLogic =
 
         for pending in pendingSpawns do
           if currentTime >= pending.SpawnStartTime + pending.Duration then
-            finalizeSpawn pending core.EventBus stores.AIArchetypeStore
+            finalizeSpawn
+              pending
+              core.EventBus
+              stores.AIArchetypeStore
+              stores.AIEntityStore
 
             toRemove.Add(pending)
 
