@@ -153,6 +153,23 @@ type MapEntityGroup = {
   Overrides: HashMap<string, MapEntityOverride>
 }
 
+[<Struct>]
+type NodeResult =
+  | Running
+  | Success
+  | Failure
+
+type BehaviorNode =
+  | Sequence of children: BehaviorNode[]
+  | Selector of children: BehaviorNode[]
+  | Condition of name: string * parameters: HashMap<string, string>
+  | Action of name: string * parameters: HashMap<string, string>
+  | Inverter of child: BehaviorNode
+
+
+type DecisionTree = { Name: string; Root: BehaviorNode }
+
+
 
 module Serialization =
   open JDeck
@@ -427,4 +444,54 @@ module Serialization =
           Weights = weightsOpt |> ValueOption.map(Array.map float32)
           Overrides = HashMap.empty
         }
+      }
+
+  module BehaviorNodeDecoder =
+    /// Decode parameters map for conditions/actions
+    let paramsDecoder: Decoder<HashMap<string, string>> =
+      fun json -> decode {
+        let! paramsOpt = VOptional.Property.map ("Params", Required.string) json
+
+        return
+          paramsOpt
+          |> ValueOption.map HashMap.ofMap
+          |> ValueOption.defaultValue HashMap.empty
+      }
+
+    /// Recursive decoder for behavior tree nodes
+    let rec decoder: Decoder<BehaviorNode> =
+      fun json -> decode {
+        let! nodeType = Required.Property.get ("Type", Required.string) json
+
+        match nodeType with
+        | "Selector" ->
+          let! children = Required.Property.array ("Children", decoder) json
+          return Selector children
+        | "Sequence" ->
+          let! children = Required.Property.array ("Children", decoder) json
+          return Sequence children
+        | "Condition" ->
+          let! name = Required.Property.get ("Name", Required.string) json
+          let! parms = paramsDecoder json
+          return Condition(name, parms)
+        | "Action" ->
+          let! name = Required.Property.get ("Name", Required.string) json
+          let! parms = paramsDecoder json
+          return Action(name, parms)
+        | "Inverter" ->
+          let! child = Required.Property.get ("Child", decoder) json
+          return Inverter child
+        | other ->
+          return!
+            DecodeError.ofError(json.Clone(), $"Unknown node type: {other}")
+            |> Error
+      }
+
+  module DecisionTree =
+    let decoder(name: string) : Decoder<DecisionTree> =
+      fun json -> decode {
+        let! root =
+          Required.Property.get ("Root", BehaviorNodeDecoder.decoder) json
+
+        return { Name = name; Root = root }
       }

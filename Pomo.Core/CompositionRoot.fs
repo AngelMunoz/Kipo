@@ -61,6 +61,9 @@ module CompositionRoot =
 
     let aiEntityStore = AIEntity.create(JsonFileLoader.readAIEntities)
 
+    let decisionTreeStore =
+      DecisionTree.create(JsonFileLoader.readDecisionTrees)
+
     let mapStore =
       Map.create MapLoader.loadMap [
         "Content/Maps/Proto.xml"
@@ -83,6 +86,7 @@ module CompositionRoot =
           member _.AIArchetypeStore = aiArchetypeStore
           member _.AIFamilyStore = aiFamilyStore
           member _.AIEntityStore = aiEntityStore
+          member _.DecisionTreeStore = decisionTreeStore
           member _.ModelStore = modelStore
           member _.AnimationStore = animationStore
           member _.ParticleStore = particleStore

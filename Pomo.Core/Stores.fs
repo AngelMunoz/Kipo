@@ -184,6 +184,26 @@ module JsonFileLoader =
     with ex ->
       Error $"Failed to load file '{filePath}': {ex.Message}"
 
+  let readDecisionTrees(filePath: string) =
+    try
+      let json =
+        Path.Combine(AppContext.BaseDirectory, filePath) |> File.ReadAllBytes
+
+      let doc = JsonDocument.Parse(json)
+      let mutable newMap = HashMap.empty<string, AI.DecisionTree>
+
+      for prop in doc.RootElement.EnumerateObject() do
+        let name = prop.Name
+
+        match AI.Serialization.DecisionTree.decoder name prop.Value with
+        | Ok tree -> newMap <- HashMap.add name tree newMap
+        | Error err ->
+          failwith $"Failed to decode decision tree '{name}': {err}"
+
+      Ok newMap
+    with ex ->
+      Error $"Failed to load file '{filePath}': {ex.Message}"
+
 
 
 module Stores =
@@ -236,6 +256,11 @@ module Stores =
     abstract member find: key: string -> AI.AIEntityDefinition
     abstract member tryFind: key: string -> AI.AIEntityDefinition voption
     abstract member all: unit -> seq<AI.AIEntityDefinition>
+
+  type DecisionTreeStore =
+    abstract member find: name: string -> AI.DecisionTree
+    abstract member tryFind: name: string -> AI.DecisionTree voption
+    abstract member all: unit -> seq<AI.DecisionTree>
 
   type MapEntityGroupStore =
     abstract member find: groupKey: string -> AI.MapEntityGroup
@@ -406,3 +431,16 @@ module Stores =
         }
       | Error errMsg ->
         failwith $"Failed to create MapEntityGroupStore: {errMsg}"
+
+  module DecisionTree =
+    let create
+      (loader: string -> Result<HashMap<string, AI.DecisionTree>, string>)
+      =
+      match loader "Content/DecisionTrees.json" with
+      | Ok treeMap ->
+        { new DecisionTreeStore with
+            member _.find(name: string) = HashMap.find name treeMap
+            member _.tryFind(name: string) = HashMap.tryFindV name treeMap
+            member _.all() = treeMap |> HashMap.toValueSeq
+        }
+      | Error errMsg -> failwith $"Failed to create DecisionTreeStore: {errMsg}"
