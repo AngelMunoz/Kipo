@@ -375,7 +375,7 @@ module WaypointNavigation =
     (waypoints: Vector2[])
     =
     match behaviorType with
-    | Patrol ->
+    | BehaviorType.Patrol ->
       let currentIdx = controller.waypointIndex % waypoints.Length
       let targetWaypoint = waypoints[currentIdx]
       let dist = Vector2.Distance(currentPos, targetWaypoint)
@@ -387,21 +387,21 @@ module WaypointNavigation =
       else
         struct (targetWaypoint, currentIdx)
 
-    | Aggressive ->
+    | BehaviorType.Aggressive ->
       if Array.isEmpty waypoints then
         struct (controller.spawnPosition, controller.waypointIndex)
       else
         let targetWaypoint = waypoints |> Array.randomChoice
         struct (targetWaypoint, controller.waypointIndex)
-    | Defensive
-    | Supporter ->
+    | BehaviorType.Defensive
+    | BehaviorType.Supporter ->
       let targetWaypoint =
         waypoints
         |> Array.minBy(fun wp -> Vector2.Distance(controller.spawnPosition, wp))
 
       struct (targetWaypoint, controller.waypointIndex)
 
-    | Ambusher ->
+    | BehaviorType.Ambusher ->
       let targetWaypoint =
         if controller.waypointIndex = 0 then
           controller.spawnPosition
@@ -409,8 +409,9 @@ module WaypointNavigation =
           waypoints |> Array.randomChoice
 
       struct (targetWaypoint, controller.waypointIndex)
-    | Turret -> struct (controller.spawnPosition, controller.waypointIndex)
-    | Passive ->
+    | BehaviorType.Turret ->
+      struct (controller.spawnPosition, controller.waypointIndex)
+    | BehaviorType.Passive ->
       let targetWaypoint = waypoints |> Array.randomChoice
       struct (targetWaypoint, controller.waypointIndex)
 
@@ -429,47 +430,37 @@ module private BehaviorTreeExecution =
 
   // --- Condition Handlers ---
 
-  let inline getParam key (parms: HashMap<string, string>) defaultVal =
-    parms
-    |> HashMap.tryFindV key
-    |> ValueOption.map float32
-    |> ValueOption.defaultValue defaultVal
-
   let evaluateCondition
-    (name: string)
-    (parms: HashMap<string, string>)
+    (cond: ConditionKind)
     (ctx: TreeExecutionContext)
     : NodeResult =
-    match name with
-    | "HasTarget" -> if ctx.Target.EntityId.IsSome then Success else Failure
-    | "TargetInRange" ->
+    match cond with
+    | HasTarget -> if ctx.Target.EntityId.IsValueSome then Success else Failure
+    | TargetInRange rangeOpt ->
       match ctx.Target.Distance with
       | ValueSome dist ->
         let range =
-          getParam
-            "Range"
-            parms
+          rangeOpt
+          |> ValueOption.defaultValue
             ctx.Perception.Archetype.perceptionConfig.visualRange
 
         if dist <= range then Success else Failure
       | ValueNone -> Failure
-    | "TargetInMeleeRange" ->
+    | TargetInMeleeRange ->
       match ctx.Target.Distance with
       | ValueSome dist -> if dist <= 48.0f then Success else Failure
       | ValueNone -> Failure
-    | "TargetTooClose" ->
+    | TargetTooClose minDist ->
       match ctx.Target.Distance with
-      | ValueSome dist ->
-        let minDist = getParam "MinDistance" parms 48.0f
-        if dist < minDist then Success else Failure
+      | ValueSome dist -> if dist < minDist then Success else Failure
       | ValueNone -> Failure
-    | "SelfHealthBelow" ->
+    | SelfHealthBelow _threshold ->
       // TODO: Need health access - for now return Failure
       Failure
-    | "TargetHealthBelow" ->
+    | TargetHealthBelow _threshold ->
       // TODO: Need target health access - for now return Failure
       Failure
-    | "BeyondLeash" ->
+    | BeyondLeash ->
       let dist =
         Vector2.Distance(
           ctx.Perception.Entity.Position,
@@ -480,7 +471,7 @@ module private BehaviorTreeExecution =
         Success
       else
         Failure
-    | "SkillReady" ->
+    | SkillReady ->
       let hasReady =
         ctx.Ability.KnownSkills
         |> Array.exists(fun skillId ->
@@ -490,33 +481,16 @@ module private BehaviorTreeExecution =
             ctx.Perception.CurrentTick)
 
       if hasReady then Success else Failure
-    | "HasCue" -> if ctx.BestCue.IsSome then Success else Failure
-    | "CueResponseIs" ->
+    | HasCue -> if ctx.BestCue.IsSome then Success else Failure
+    | CueResponseIs expected ->
       match ctx.Response with
-      | ValueSome response ->
-        let expectedStr =
-          parms |> HashMap.tryFindV "Response" |> ValueOption.defaultValue ""
-
-        let expected =
-          match expectedStr with
-          | "Engage" -> ValueSome Engage
-          | "Investigate" -> ValueSome Investigate
-          | "Evade" -> ValueSome Evade
-          | "Flee" -> ValueSome Flee
-          | "Ignore" -> ValueSome Ignore
-          | _ -> ValueNone
-
-        match expected with
-        | ValueSome exp when exp = response -> Success
-        | _ -> Failure
-      | ValueNone -> Failure
-    | _ -> Failure
+      | ValueSome response when response = expected -> Success
+      | _ -> Failure
 
   // --- Action Handlers ---
 
   let executeAction
-    (name: string)
-    (_parms: HashMap<string, string>) // Cleaned unused parameter
+    (action: ActionKind)
     (ctx: TreeExecutionContext)
     : struct (NodeResult * AIOutput) =
 
@@ -532,8 +506,8 @@ module private BehaviorTreeExecution =
                 ctx.Perception.Controller.currentState
                 ctx.Perception.Controller.waypointIndex)
 
-    match name with
-    | "ChaseTarget" ->
+    match action with
+    | ChaseTarget ->
       match ctx.Target.Position with
       | ValueSome targetPos ->
         let command: SystemCommunications.SetMovementTarget = {
@@ -552,11 +526,11 @@ module private BehaviorTreeExecution =
         struct (Running, output)
       | ValueNone -> defaultFail
 
-    | "UseRangedAttack"
-    | "UseMeleeAttack"
-    | "UseHeal"
-    | "UseDebuff"
-    | "UseBuff" ->
+    | UseRangedAttack
+    | UseMeleeAttack
+    | UseHeal
+    | UseDebuff
+    | UseBuff ->
       match ctx.Target.Position, ctx.Target.EntityId with
       | ValueSome targetPos, targetIdOpt ->
         match
@@ -573,7 +547,7 @@ module private BehaviorTreeExecution =
               skillId
               skill
               targetIdOpt
-              targetPos // Passing Target Pos
+              targetPos
 
           let output = {
             Command = ValueNone
@@ -602,7 +576,7 @@ module private BehaviorTreeExecution =
           struct (Running, output)
       | _ -> defaultFail
 
-    | "Patrol" ->
+    | ActionKind.Patrol ->
       match ctx.Perception.Controller.absoluteWaypoints with
       | ValueSome waypoints when waypoints.Length > 0 ->
         let struct (targetWaypoint, nextIdx) =
@@ -628,7 +602,7 @@ module private BehaviorTreeExecution =
         struct (Running, output)
       | _ -> defaultSuccess
 
-    | "ReturnToSpawn" ->
+    | ReturnToSpawn ->
       let command: SystemCommunications.SetMovementTarget = {
         EntityId = ctx.Perception.Controller.controlledEntityId
         Target = ctx.Perception.Controller.spawnPosition
@@ -644,7 +618,7 @@ module private BehaviorTreeExecution =
 
       struct (Running, output)
 
-    | "Retreat" ->
+    | Retreat ->
       match ctx.Target.Position with
       | ValueSome targetPos ->
         let direction = ctx.Perception.Entity.Position - targetPos
@@ -673,9 +647,7 @@ module private BehaviorTreeExecution =
         struct (Running, output)
       | ValueNone -> defaultFail
 
-    | "Idle" -> defaultSuccess
-
-    | _ -> defaultFail
+    | ActionKind.Idle -> defaultSuccess
 
   // --- Tree Evaluator ---
 
@@ -820,14 +792,14 @@ module private BehaviorTreeExecution =
           else
             Evaluator.goSequence &node stack children
 
-        | Condition(name, parms) ->
-          let res = evaluateCondition name parms ctx
+        | Condition cond ->
+          let res = evaluateCondition cond ctx
           nodeRes <- res
           output <- if res = Success then successOut else failureOut
           descend <- false
 
-        | Action(name, parms) ->
-          let struct (res, out) = executeAction name parms ctx
+        | Action action ->
+          let struct (res, out) = executeAction action ctx
           nodeRes <- res
           output <- out
           descend <- false
@@ -1032,7 +1004,7 @@ module AISystemLogic =
     | _ ->
       // No waypoints or empty list
       match archetype.behaviorType with
-      | Patrol ->
+      | BehaviorType.Patrol ->
         // Patrol with no waypoints = Idle
         noOutput controller.currentState controller.waypointIndex
       | _ ->

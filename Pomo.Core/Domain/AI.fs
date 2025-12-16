@@ -161,11 +161,40 @@ type NodeResult =
   | Success
   | Failure
 
+/// Strongly typed condition variants for behavior tree evaluation.
+/// Parameters are embedded directly in the DU cases.
+[<Struct>]
+type ConditionKind =
+  | HasTarget
+  | TargetInRange of range: float32 voption
+  | TargetInMeleeRange
+  | TargetTooClose of minDistance: float32
+  | SelfHealthBelow of threshold: float32
+  | TargetHealthBelow of threshold: float32
+  | BeyondLeash
+  | SkillReady
+  | HasCue
+  | CueResponseIs of response: ResponseType
+
+/// Strongly typed action variants for behavior tree execution.
+[<Struct>]
+type ActionKind =
+  | ChaseTarget
+  | UseRangedAttack
+  | UseMeleeAttack
+  | UseHeal
+  | UseDebuff
+  | UseBuff
+  | Patrol
+  | ReturnToSpawn
+  | Retreat
+  | Idle
+
 type BehaviorNode =
   | Sequence of children: BehaviorNode[]
   | Selector of children: BehaviorNode[]
-  | Condition of name: string * parameters: HashMap<string, string>
-  | Action of name: string * parameters: HashMap<string, string>
+  | Condition of ConditionKind
+  | Action of ActionKind
   | Inverter of child: BehaviorNode
 
 
@@ -183,13 +212,13 @@ module Serialization =
         let! str = Required.string json
 
         match str with
-        | "Patrol" -> return Patrol
-        | "Aggressive" -> return Aggressive
-        | "Defensive" -> return Defensive
-        | "Supporter" -> return Supporter
-        | "Ambusher" -> return Ambusher
-        | "Turret" -> return Turret
-        | "Passive" -> return Passive
+        | "Patrol" -> return BehaviorType.Patrol
+        | "Aggressive" -> return BehaviorType.Aggressive
+        | "Defensive" -> return BehaviorType.Defensive
+        | "Supporter" -> return BehaviorType.Supporter
+        | "Ambusher" -> return BehaviorType.Ambusher
+        | "Turret" -> return BehaviorType.Turret
+        | "Passive" -> return BehaviorType.Passive
         | other ->
           return!
             DecodeError.ofError(json.Clone(), $"Unknown BehaviorType: {other}")
@@ -449,6 +478,18 @@ module Serialization =
       }
 
   module BehaviorNodeDecoder =
+    /// Decode optional float32 parameters
+    let inline private getFloatParam
+      (key: string)
+      (parms: HashMap<string, string>)
+      : float32 voption =
+      parms
+      |> HashMap.tryFindV key
+      |> ValueOption.bind(fun s ->
+        match System.Single.TryParse s with
+        | true, v -> ValueSome v
+        | _ -> ValueNone)
+
     /// Decode parameters map for conditions/actions
     let paramsDecoder: Decoder<HashMap<string, string>> =
       fun json -> decode {
@@ -458,6 +499,77 @@ module Serialization =
           paramsOpt
           |> ValueOption.map HashMap.ofMap
           |> ValueOption.defaultValue HashMap.empty
+      }
+
+    /// Decode a condition name + params into ConditionKind
+    let conditionDecoder: Decoder<ConditionKind> =
+      fun json -> decode {
+        let! name = Required.Property.get ("Name", Required.string) json
+        let! parms = paramsDecoder json
+
+        match name with
+        | "HasTarget" -> return HasTarget
+        | "TargetInRange" ->
+          let range = getFloatParam "Range" parms
+          return TargetInRange range
+        | "TargetInMeleeRange" -> return TargetInMeleeRange
+        | "TargetTooClose" ->
+          let minDist =
+            getFloatParam "MinDistance" parms |> ValueOption.defaultValue 48.0f
+
+          return TargetTooClose minDist
+        | "SelfHealthBelow" ->
+          let threshold =
+            getFloatParam "Threshold" parms |> ValueOption.defaultValue 0.3f
+
+          return SelfHealthBelow threshold
+        | "TargetHealthBelow" ->
+          let threshold =
+            getFloatParam "Threshold" parms |> ValueOption.defaultValue 0.3f
+
+          return TargetHealthBelow threshold
+        | "BeyondLeash" -> return BeyondLeash
+        | "SkillReady" -> return SkillReady
+        | "HasCue" -> return HasCue
+        | "CueResponseIs" ->
+          let responseStr =
+            parms |> HashMap.tryFindV "Response" |> ValueOption.defaultValue ""
+
+          let response =
+            match responseStr with
+            | "Engage" -> Engage
+            | "Investigate" -> Investigate
+            | "Evade" -> Evade
+            | "Flee" -> Flee
+            | _ -> Ignore
+
+          return CueResponseIs response
+        | other ->
+          return!
+            DecodeError.ofError(json.Clone(), $"Unknown condition: {other}")
+            |> Error
+      }
+
+    /// Decode an action name + params into ActionKind
+    let actionDecoder: Decoder<ActionKind> =
+      fun json -> decode {
+        let! name = Required.Property.get ("Name", Required.string) json
+
+        match name with
+        | "ChaseTarget" -> return ChaseTarget
+        | "UseRangedAttack" -> return UseRangedAttack
+        | "UseMeleeAttack" -> return UseMeleeAttack
+        | "UseHeal" -> return UseHeal
+        | "UseDebuff" -> return UseDebuff
+        | "UseBuff" -> return UseBuff
+        | "Patrol" -> return ActionKind.Patrol
+        | "ReturnToSpawn" -> return ReturnToSpawn
+        | "Retreat" -> return Retreat
+        | "Idle" -> return ActionKind.Idle
+        | other ->
+          return!
+            DecodeError.ofError(json.Clone(), $"Unknown action: {other}")
+            |> Error
       }
 
     /// Recursive decoder for behavior tree nodes
@@ -473,13 +585,11 @@ module Serialization =
           let! children = Required.Property.array ("Children", decoder) json
           return Sequence children
         | "Condition" ->
-          let! name = Required.Property.get ("Name", Required.string) json
-          let! parms = paramsDecoder json
-          return Condition(name, parms)
+          let! cond = conditionDecoder json
+          return Condition cond
         | "Action" ->
-          let! name = Required.Property.get ("Name", Required.string) json
-          let! parms = paramsDecoder json
-          return Action(name, parms)
+          let! action = actionDecoder json
+          return Action action
         | "Inverter" ->
           let! child = Required.Property.get ("Child", decoder) json
           return Inverter child
