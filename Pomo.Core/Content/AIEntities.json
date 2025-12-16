@@ -11,7 +11,7 @@
     "Name": "Ice Mage",
     "ArchetypeId": 1,
     "Family": "Magic",
-    "Skills": [11],
+    "Skills": [11, 20],
     "DecisionTree": "RangedCaster",
     "Model": "HumanoidBase"
   },
@@ -19,7 +19,7 @@
     "Name": "Elemental Caster",
     "ArchetypeId": 1,
     "Family": "Magic",
-    "Skills": [2, 9, 10],
+    "Skills": [14, 15, 20],
     "DecisionTree": "RangedCaster",
     "Model": "HumanoidBase"
   },
@@ -27,7 +27,7 @@
     "Name": "Warrior",
     "ArchetypeId": 1,
     "Family": "Power",
-    "Skills": [1],
+    "Skills": [1, 16, 21],
     "DecisionTree": "MeleeAttacker",
     "Model": "HumanoidBase"
   },
@@ -35,7 +35,7 @@
     "Name": "Berserker",
     "ArchetypeId": 1,
     "Family": "Power",
-    "Skills": [1, 6],
+    "Skills": [1, 6, 16, 21],
     "DecisionTree": "MeleeAttacker",
     "Model": "HumanoidBase"
   },
@@ -43,7 +43,7 @@
     "Name": "Bard",
     "ArchetypeId": 1,
     "Family": "Charm",
-    "Skills": [5],
+    "Skills": [5, 22, 23],
     "DecisionTree": "SupportBuffer",
     "Model": "HumanoidBase"
   },
@@ -51,7 +51,7 @@
     "Name": "Enchanter",
     "ArchetypeId": 1,
     "Family": "Charm",
-    "Skills": [4, 5],
+    "Skills": [4, 5, 22, 24],
     "DecisionTree": "SupportBuffer",
     "Model": "HumanoidBase"
   },
@@ -59,7 +59,7 @@
     "Name": "Sniper",
     "ArchetypeId": 2,
     "Family": "Sense",
-    "Skills": [13],
+    "Skills": [17, 19],
     "DecisionTree": "TacticalRanged",
     "Model": "HumanoidBase"
   },
@@ -67,7 +67,7 @@
     "Name": "Assassin",
     "ArchetypeId": 1,
     "Family": "Sense",
-    "Skills": [12],
+    "Skills": [12, 13],
     "DecisionTree": "TacticalRanged",
     "Model": "HumanoidBase"
   },

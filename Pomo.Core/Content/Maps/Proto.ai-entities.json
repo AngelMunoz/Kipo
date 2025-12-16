@@ -1,7 +1,7 @@
 {
   "magic_casters": {
     "Entities": ["FireMage", "IceMage", "ElementalCaster"],
-    "Weights": [0.4, 0.3, 0.3],
+    "Weights": [0.33, 0.33, 0.34],
     "Overrides": {}
   },
   "fire_mages": {
@@ -11,7 +11,7 @@
   },
   "melee_fighters": {
     "Entities": ["Warrior", "Berserker"],
-    "Weights": [0.6, 0.4],
+    "Weights": [0.5, 0.5],
     "Overrides": {}
   },
   "support_units": {
@@ -27,8 +27,6 @@
   "defense_towers": {
     "Entities": ["FireTower", "IceTower"],
     "Weights": [0.5, 0.5],
-    "Overrides": {
-      "FireTower": { "StatMultiplier": 1.2 }
-    }
+    "Overrides": {}
   }
 }
