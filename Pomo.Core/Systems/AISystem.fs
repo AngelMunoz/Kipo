@@ -127,21 +127,26 @@ module SkillSelection =
     (casterPos: Vector2)
     (targetPos: Vector2)
     : struct (int<SkillId> * Skill.Skill) voption =
-    abilityCtx.KnownSkills
-    |> Array.choose(fun skillId ->
-      match abilityCtx.SkillStore.tryFind skillId with
-      | ValueNone -> None
-      | ValueSome skill ->
-        let range = getSkillRange skill
-        let inRange = isTargetInRange casterPos targetPos range
-        let ready = isSkillReady skillId abilityCtx.Cooldowns currentTime
+    let skills = abilityCtx.KnownSkills
 
-        if inRange && ready then
-          Some(struct (skillId, skill))
-        else
-          None)
-    |> Array.tryHead
-    |> ValueOption.ofOption
+    let mutable res: struct (int<SkillId> * Skill.Skill) voption = ValueNone
+    let mutable i = 0
+
+    while i < skills.Length && res.IsNone do
+      let skillId = skills.[i]
+
+      if isSkillReady skillId abilityCtx.Cooldowns currentTime then
+        match abilityCtx.SkillStore.tryFind skillId with
+        | ValueSome skill ->
+          let range = getSkillRange skill
+
+          if isTargetInRange casterPos targetPos range then
+            res <- ValueSome(struct (skillId, skill))
+        | ValueNone -> ()
+
+      i <- i + 1
+
+    res
 
   /// Create an AbilityIntent for the AI to cast a skill
   let inline createAbilityIntent
@@ -211,52 +216,56 @@ module Perception =
   let gatherVisualCues
     (ctx: PerceptionContext)
     (world: WorldSnapshot)
-    (nearbyEntities: IndexList<Guid<EntityId>>)
+    (nearbyEntities: Guid<EntityId> seq)
     =
-    nearbyEntities
-    |> IndexList.choose(fun entityId ->
+    let cues = ResizeArray<PerceptionCue>()
+
+    for entityId in nearbyEntities do
       match world.Positions |> HashMap.tryFindV entityId with
       | ValueSome pos ->
         match world.Factions |> HashMap.tryFindV entityId with
         | ValueSome targetFactions ->
-          let dist = distance ctx.Entity.Position pos
-          let inRange = dist <= ctx.Archetype.perceptionConfig.visualRange
-
-          let inFov =
-            isInFieldOfView
-              ctx.Entity.Velocity
-              ctx.Entity.Position
-              pos
-              ctx.Archetype.perceptionConfig.fov
-
           let isHostile = isHostileFaction ctx.Entity.Factions targetFactions
 
-          if inRange && inFov && isHostile then
-            let strength =
-              if dist < ctx.Archetype.perceptionConfig.visualRange * 0.3f then
-                Overwhelming
-              elif
-                dist < ctx.Archetype.perceptionConfig.visualRange * 0.6f
-              then
-                Strong
-              elif
-                dist < ctx.Archetype.perceptionConfig.visualRange * 0.8f
-              then
-                Moderate
-              else
-                Weak
+          if isHostile then
+            let dist = distance ctx.Entity.Position pos
 
-            Some {
-              cueType = Visual
-              strength = strength
-              sourceEntityId = ValueSome entityId
-              position = pos
-              timestamp = ctx.CurrentTick
-            }
-          else
-            None
-        | ValueNone -> None
-      | ValueNone -> None)
+            if dist <= ctx.Archetype.perceptionConfig.visualRange then
+              let inFov =
+                isInFieldOfView
+                  ctx.Entity.Velocity
+                  ctx.Entity.Position
+                  pos
+                  ctx.Archetype.perceptionConfig.fov
+
+              if inFov then
+                let strength =
+                  if
+                    dist < ctx.Archetype.perceptionConfig.visualRange * 0.3f
+                  then
+                    Overwhelming
+                  elif
+                    dist < ctx.Archetype.perceptionConfig.visualRange * 0.6f
+                  then
+                    Strong
+                  elif
+                    dist < ctx.Archetype.perceptionConfig.visualRange * 0.8f
+                  then
+                    Moderate
+                  else
+                    Weak
+
+                cues.Add {
+                  cueType = Visual
+                  strength = strength
+                  sourceEntityId = ValueSome entityId
+                  position = pos
+                  timestamp = ctx.CurrentTick
+                }
+        | ValueNone -> ()
+      | ValueNone -> ()
+
+    cues.ToArray()
 
   let decayMemories(ctx: PerceptionContext) =
     ctx.Controller.memories
@@ -270,7 +279,6 @@ module Perception =
         distToSpawn <= ctx.Archetype.perceptionConfig.leashDistance
 
       if age < ctx.Archetype.perceptionConfig.memoryDuration && isLeashed then
-        // Decay confidence over time
         let decayFactor =
           1.0f
           - (float32 age.TotalSeconds
@@ -296,40 +304,46 @@ module Perception =
         ctx.Entity.Position
         ctx.Archetype.perceptionConfig.visualRange
 
-    let nearbyEntities =
-      cells
-      |> IndexList.collect(fun cell ->
+    let seen = System.Collections.Generic.HashSet<Guid<EntityId>>()
+
+    let nearbyEntities = seq {
+      for cell in cells do
         match world.SpatialGrid |> HashMap.tryFindV cell with
-        | ValueSome list -> list
-        | ValueNone -> IndexList.empty)
+        | ValueSome list ->
+          for entityId in list do
+            if seen.Add entityId then
+              yield entityId
+        | ValueNone -> ()
+    }
 
     let visualCues = gatherVisualCues ctx world nearbyEntities
 
     let decayedMemories = decayMemories ctx
 
     let updatedMemories =
-      visualCues
-      |> IndexList.fold
-        (fun (mem: HashMap<Guid<EntityId>, MemoryEntry>) (cue: PerceptionCue) ->
-          match cue.sourceEntityId with
-          | ValueSome entityId ->
-            let confidence =
-              match cue.strength with
-              | Weak -> 0.25f
-              | Moderate -> 0.5f
-              | Strong -> 0.75f
-              | Overwhelming -> 1.0f
+      let mutable mem = decayedMemories
 
-            let entry = {
-              entityId = entityId
-              lastSeenTick = ctx.CurrentTick
-              lastKnownPosition = cue.position
-              confidence = confidence
-            }
+      for cue in visualCues do
+        match cue.sourceEntityId with
+        | ValueSome entityId ->
+          let confidence =
+            match cue.strength with
+            | Weak -> 0.25f
+            | Moderate -> 0.5f
+            | Strong -> 0.75f
+            | Overwhelming -> 1.0f
 
-            mem.Add(entityId, entry)
-          | ValueNone -> mem)
-        decayedMemories
+          let entry = {
+            entityId = entityId
+            lastSeenTick = ctx.CurrentTick
+            lastKnownPosition = cue.position
+            confidence = confidence
+          }
+
+          mem <- mem.Add(entityId, entry)
+        | ValueNone -> ()
+
+      mem
 
     let memoryCues =
       updatedMemories
@@ -349,7 +363,7 @@ module Perception =
         })
       |> HashMap.toValueArray
 
-    let allCues = Array.concat [ visualCues.AsArray; memoryCues ]
+    let allCues = Array.concat [ visualCues; memoryCues ]
 
     struct (allCues, updatedMemories)
 
@@ -671,121 +685,158 @@ module private BehaviorTreeExecution =
     | SequenceFrame of struct (BehaviorNode[] * int)
     | InverterFrame
 
-  [<TailCall>]
-  let rec processNode
-    (node: BehaviorNode)
-    (stack: StackFrame list)
-    (ctx: TreeExecutionContext)
-    : struct (NodeResult * AIOutput) =
+  module private Evaluator =
+    let inline failureOutput(ctx: TreeExecutionContext) =
+      failureResult
+        ctx.Perception.Controller.currentState
+        ctx.Perception.Controller.waypointIndex
 
-    match node with
-    | Selector children ->
-      if children.Length = 0 then
-        processResult
-          Failure
-          (failureResult
-            ctx.Perception.Controller.currentState
-            ctx.Perception.Controller.waypointIndex)
-          stack
-          ctx
-      else
-        processNode children.[0] (SelectorFrame(children, 0) :: stack) ctx
+    let inline successOutput(ctx: TreeExecutionContext) =
+      noOutput
+        ctx.Perception.Controller.currentState
+        ctx.Perception.Controller.waypointIndex
 
-    | Sequence children ->
-      if children.Length = 0 then
-        processResult
-          Success
-          (noOutput
-            ctx.Perception.Controller.currentState
-            ctx.Perception.Controller.waypointIndex)
-          stack
-          ctx
-      else
-        processNode children.[0] (SequenceFrame(children, 0) :: stack) ctx
+    let inline setFailure
+      (nodeRes: byref<NodeResult>)
+      (output: byref<AIOutput>)
+      (descend: byref<bool>)
+      (failureOut: AIOutput)
+      =
+      nodeRes <- Failure
+      output <- failureOut
+      descend <- false
 
-    | Condition(name, parms) ->
-      let nodeRes = evaluateCondition name parms ctx
-      // Conditions don't produce output usually, just success/fail
-      let output =
-        match nodeRes with
-        | Success ->
-          noOutput
-            ctx.Perception.Controller.currentState
-            ctx.Perception.Controller.waypointIndex
-        | _ ->
-          failureResult
-            ctx.Perception.Controller.currentState
-            ctx.Perception.Controller.waypointIndex
+    let inline setSuccess
+      (nodeRes: byref<NodeResult>)
+      (output: byref<AIOutput>)
+      (descend: byref<bool>)
+      (successOut: AIOutput)
+      =
+      nodeRes <- Success
+      output <- successOut
+      descend <- false
 
-      processResult nodeRes output stack ctx
 
-    | Action(name, parms) ->
-      let struct (res, output) = executeAction name parms ctx
-      processResult res output stack ctx
+    let inline goSelector
+      (node: byref<BehaviorNode>)
+      (stack: System.Collections.Generic.Stack<StackFrame>)
+      (children: BehaviorNode[])
+      =
+      stack.Push(SelectorFrame(children, 0))
+      node <- children.[0]
 
-    | Inverter child -> processNode child (InverterFrame :: stack) ctx
+    let inline goSequence
+      (node: byref<BehaviorNode>)
+      (stack: System.Collections.Generic.Stack<StackFrame>)
+      (children: BehaviorNode[])
+      =
+      stack.Push(SequenceFrame(children, 0))
+      node <- children.[0]
 
-  and [<TailCall>] processResult
-    (nodeRes: NodeResult)
-    (output: AIOutput)
-    (stack: StackFrame list)
-    (ctx: TreeExecutionContext)
-    : struct (NodeResult * AIOutput) =
-    match stack with
-    | [] -> struct (nodeRes, output) // Stack empty, return final result
+    let inline goInverter
+      (node: byref<BehaviorNode>)
+      (stack: System.Collections.Generic.Stack<StackFrame>)
+      (child: BehaviorNode)
+      =
+      stack.Push InverterFrame
+      node <- child
 
-    | SelectorFrame(children, index) :: rest ->
-      if nodeRes = Success then
-        processResult nodeRes output rest ctx
-      else if nodeRes = Running then
-        processResult nodeRes output rest ctx
-      else
-        // Failure: Try next child
-        let nextIdx = index + 1
+    let inline invertResult res =
+      match res with
+      | Success -> Failure
+      | Failure -> Success
+      | Running -> Running
 
-        if nextIdx < children.Length then
-          processNode
-            children.[nextIdx]
-            (SelectorFrame(children, nextIdx) :: rest)
-            ctx
+    let inline backtrackToNextChild
+      (stack: System.Collections.Generic.Stack<StackFrame>)
+      (nodeRes: byref<NodeResult>)
+      (node: byref<BehaviorNode>)
+      (descend: byref<bool>)
+      (running: byref<bool>)
+      =
+      let mutable searching = true
+
+      while searching && running && not descend do
+        if stack.Count = 0 then
+          running <- false
+          searching <- false
         else
-          processResult nodeRes output rest ctx
+          match stack.Pop() with
+          | InverterFrame -> nodeRes <- invertResult nodeRes
 
-    | SequenceFrame(children, index) :: rest ->
-      if nodeRes = Failure then
-        processResult nodeRes output rest ctx
-      else if nodeRes = Running then
-        processResult nodeRes output rest ctx
-      else
-        // Success: Try next child
-        let nextIdx = index + 1
+          | SelectorFrame(children, index) ->
+            if nodeRes = Success || nodeRes = Running then
+              ()
+            else
+              let nextIdx = index + 1
 
-        if nextIdx < children.Length then
-          processNode
-            children.[nextIdx]
-            (SequenceFrame(children, nextIdx) :: rest)
-            ctx
-        else
-          processResult nodeRes output rest ctx
+              if nextIdx < children.Length then
+                stack.Push(SelectorFrame(children, nextIdx))
+                node <- children.[nextIdx]
+                descend <- true
+                searching <- false
 
-    | InverterFrame :: rest ->
-      let invertedStatus =
-        match nodeRes with
-        | Success -> Failure
-        | Failure -> Success
-        | Running -> Running
+          | SequenceFrame(children, index) ->
+            if nodeRes = Failure || nodeRes = Running then
+              ()
+            else
+              let nextIdx = index + 1
 
-      // Inverter usually keeps the output of the child if running, or discards?
-      // If child succeeded (so Inverter Fails), we essentially failed.
-      // If child failed (so Inverter Succeeds), we succeeded.
-      // For now, pass through output.
-      processResult invertedStatus output rest ctx
+              if nextIdx < children.Length then
+                stack.Push(SequenceFrame(children, nextIdx))
+                node <- children.[nextIdx]
+                descend <- true
+                searching <- false
 
-  let inline evaluate
+  let evaluate
     (rootNode: BehaviorNode)
     (ctx: TreeExecutionContext)
     : struct (NodeResult * AIOutput) =
-    processNode rootNode [] ctx
+    let stack = System.Collections.Generic.Stack<StackFrame>(16)
+
+    let failureOut = Evaluator.failureOutput ctx
+    let successOut = Evaluator.successOutput ctx
+
+    let mutable node = rootNode
+    let mutable nodeRes = Failure
+    let mutable output = failureOut
+
+    let mutable running = true
+    let mutable descend = true
+
+
+    while running do
+      while descend do
+        match node with
+        | Selector children ->
+          if children.Length = 0 then
+            Evaluator.setFailure &nodeRes &output &descend failureOut
+          else
+            Evaluator.goSelector &node stack children
+
+        | Sequence children ->
+          if children.Length = 0 then
+            Evaluator.setSuccess &nodeRes &output &descend successOut
+          else
+            Evaluator.goSequence &node stack children
+
+        | Condition(name, parms) ->
+          let res = evaluateCondition name parms ctx
+          nodeRes <- res
+          output <- if res = Success then successOut else failureOut
+          descend <- false
+
+        | Action(name, parms) ->
+          let struct (res, out) = executeAction name parms ctx
+          nodeRes <- res
+          output <- out
+          descend <- false
+        | Inverter child -> Evaluator.goInverter &node stack child
+
+      descend <- false
+      Evaluator.backtrackToNextChild stack &nodeRes &node &descend &running
+
+    struct (nodeRes, output)
 
 module Decision =
 
@@ -826,10 +877,10 @@ module Decision =
       match matchingPriority with
       | ValueSome mp ->
         match bestResult with
-        | ValueNone -> bestResult <- ValueSome(struct (cue, mp))
-        | ValueSome(struct (_, currentBestP)) ->
+        | ValueNone -> bestResult <- ValueSome struct (cue, mp)
+        | ValueSome struct (_, currentBestP) ->
           if mp.priority < currentBestP.priority then
-            bestResult <- ValueSome(struct (cue, mp))
+            bestResult <- ValueSome struct (cue, mp)
       | ValueNone -> ()
 
     bestResult
@@ -1072,9 +1123,6 @@ module AISystemLogic =
     let controller = ctx.Controller
     let archetype = ctx.Archetype
     let pos = ctx.Entity.Position
-
-    let struct (cues, updatedMemories) = Perception.gatherCues ctx world
-
     let timeSinceLastDecision = ctx.CurrentTick - controller.lastDecisionTime
 
     let entityCooldowns =
@@ -1086,9 +1134,12 @@ module AISystemLogic =
       KnownSkills = controller.skills
     }
 
-    let result =
-      if timeSinceLastDecision >= archetype.decisionInterval then
-        // Try to use behavior tree if available
+    if timeSinceLastDecision < archetype.decisionInterval then
+      struct (controller, ValueNone, ValueNone)
+    else
+      let struct (cues, updatedMemories) = Perception.gatherCues ctx world
+
+      let result =
         let treeOpt = decisionTreeStore.tryFind controller.decisionTree
 
         match treeOpt with
@@ -1101,34 +1152,28 @@ module AISystemLogic =
             updatedMemories
             abilityCtx
         | ValueNone ->
-          // Fallback to cue-based decision
           let bestCue = Decision.selectBestCue cues archetype.cuePriorities
 
           match bestCue with
           | ValueSome struct (cue, priority) ->
             handleBestCue cue priority ctx abilityCtx
           | ValueNone -> handleNoCue controller archetype pos
-      else
-        {
-          noOutput controller.currentState controller.waypointIndex with
-              ShouldUpdateTime = false
-        }
 
-    let updatedController = {
-      controller with
-          memories = updatedMemories
-          waypointIndex =
-            result.WaypointIndex
-            |> ValueOption.defaultValue controller.waypointIndex
-          currentState = result.NewState
-          lastDecisionTime =
-            if result.ShouldUpdateTime then
-              ctx.CurrentTick
-            else
-              controller.lastDecisionTime
-    }
+      let updatedController = {
+        controller with
+            memories = updatedMemories
+            waypointIndex =
+              result.WaypointIndex
+              |> ValueOption.defaultValue controller.waypointIndex
+            currentState = result.NewState
+            lastDecisionTime =
+              if result.ShouldUpdateTime then
+                ctx.CurrentTick
+              else
+                controller.lastDecisionTime
+      }
 
-    struct (updatedController, result.Command, result.Ability)
+      struct (updatedController, result.Command, result.Ability)
 
 
 open Pomo.Core.Environment
@@ -1187,16 +1232,7 @@ type AISystem(game: Game, env: PomoEnvironment) =
       |> Seq.groupBy fst
 
     for (scenarioId, group) in controllersByScenario do
-      let snapshot = gameplay.Projections.ComputeMovementSnapshot(scenarioId)
-      let positions = snapshot.Positions
-      let spatialGrid = snapshot.SpatialGrid
-
-      let world: AIContext.WorldSnapshot = {
-        Positions = positions
-        Velocities = velocities
-        Factions = factions
-        SpatialGrid = spatialGrid
-      }
+      let mutable worldOpt: AIContext.WorldSnapshot voption = ValueNone
 
       for (_, (controllerId, controller)) in group do
 
@@ -1204,50 +1240,77 @@ type AISystem(game: Game, env: PomoEnvironment) =
           archetypeStore.tryFind controller.archetypeId
           |> ValueOption.defaultValue fallbackArchetype
 
-        let posOpt = positions |> HashMap.tryFindV controller.controlledEntityId
-        let facOpt = factions |> HashMap.tryFindV controller.controlledEntityId
+        let timeSinceLastDecision = currentTick - controller.lastDecisionTime
 
-        match posOpt, facOpt with
-        | ValueSome pos, ValueSome facs ->
-          let vel =
-            velocities
-            |> HashMap.tryFindV controller.controlledEntityId
-            |> ValueOption.defaultValue Vector2.Zero
+        if timeSinceLastDecision >= archetype.decisionInterval then
 
-          let entityCtx: AIContext.EntityContext = {
-            EntityId = controller.controlledEntityId
-            Position = pos
-            Velocity = vel
-            Factions = facs
-          }
+          let world =
+            match worldOpt with
+            | ValueSome w -> w
+            | ValueNone ->
+              let snapshot =
+                gameplay.Projections.ComputeMovementSnapshot(scenarioId)
 
-          let ctx: AIContext.PerceptionContext = {
-            Controller = controller
-            Archetype = archetype
-            Entity = entityCtx
-            CurrentTick = currentTick
-          }
+              let positions = snapshot.Positions
+              let spatialGrid = snapshot.SpatialGrid
 
-          let struct (updatedController, command, abilityIntent) =
-            AISystemLogic.processAndGenerateCommands
-              ctx
-              world
-              skillStore
-              decisionTreeStore
-              cooldowns
+              let w: AIContext.WorldSnapshot = {
+                Positions = positions
+                Velocities = velocities
+                Factions = factions
+                SpatialGrid = spatialGrid
+              }
 
-          match command with
-          | ValueSome cmd -> core.EventBus.Publish cmd
-          | ValueNone -> ()
+              worldOpt <- ValueSome w
+              w
 
-          match abilityIntent with
-          | ValueSome intent -> core.EventBus.Publish intent
-          | ValueNone -> ()
+          let posOpt =
+            world.Positions |> HashMap.tryFindV controller.controlledEntityId
 
-          if updatedController <> controller then
-            core.EventBus.Publish(
-              StateChangeEvent.AI(
-                ControllerUpdated struct (controllerId, updatedController)
+          let facOpt =
+            factions |> HashMap.tryFindV controller.controlledEntityId
+
+          match posOpt, facOpt with
+          | ValueSome pos, ValueSome facs ->
+            let vel =
+              velocities
+              |> HashMap.tryFindV controller.controlledEntityId
+              |> ValueOption.defaultValue Vector2.Zero
+
+            let entityCtx: AIContext.EntityContext = {
+              EntityId = controller.controlledEntityId
+              Position = pos
+              Velocity = vel
+              Factions = facs
+            }
+
+            let ctx: AIContext.PerceptionContext = {
+              Controller = controller
+              Archetype = archetype
+              Entity = entityCtx
+              CurrentTick = currentTick
+            }
+
+            let struct (updatedController, command, abilityIntent) =
+              AISystemLogic.processAndGenerateCommands
+                ctx
+                world
+                skillStore
+                decisionTreeStore
+                cooldowns
+
+            match command with
+            | ValueSome cmd -> core.EventBus.Publish cmd
+            | ValueNone -> ()
+
+            match abilityIntent with
+            | ValueSome intent -> core.EventBus.Publish intent
+            | ValueNone -> ()
+
+            if updatedController <> controller then
+              core.EventBus.Publish(
+                StateChangeEvent.AI(
+                  ControllerUpdated struct (controllerId, updatedController)
+                )
               )
-            )
-        | _ -> ()
+          | _ -> ()
