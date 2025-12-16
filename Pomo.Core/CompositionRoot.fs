@@ -260,7 +260,7 @@ module CompositionRoot =
           if enemyCount < maxEnemies then
             let enemyId = Guid.NewGuid() |> UMX.tag
 
-            let entityDefKey, archetypeId =
+            let entityDefKey, archetypeId, mapOverride =
               match candidate.EntityGroup with
               | ValueSome groupName ->
                 MapSpawning.resolveEntityFromGroup
@@ -270,13 +270,17 @@ module CompositionRoot =
                   groupName
               | ValueNone ->
                 let id = if enemyCount % 2 = 0 then %1 else %2
-                ValueNone, id
+                ValueNone, id, ValueNone
 
             let enemyIntent: SystemCommunications.SpawnEntityIntent = {
               EntityId = enemyId
               ScenarioId = scenarioId
               Type =
-                SystemCommunications.SpawnType.Enemy(archetypeId, entityDefKey)
+                SystemCommunications.SpawnType.Enemy(
+                  archetypeId,
+                  entityDefKey,
+                  mapOverride
+                )
               Position = candidate.Position
             }
 

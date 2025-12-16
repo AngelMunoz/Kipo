@@ -147,25 +147,29 @@ module MapSpawning =
     )
     |> Option.defaultValue Vector2.Zero
 
-  /// Resolve entity definition and archetype from an entity group
+  /// Resolve entity definition, archetype, and map override from an entity group
   let resolveEntityFromGroup
     (random: Random)
     (groupStore: MapEntityGroupStore option)
     (entityStore: AIEntityStore)
     (groupName: string)
-    : (string voption * int<AiArchetypeId>) =
+    : (string voption * int<AiArchetypeId> * MapEntityOverride voption) =
     match groupStore with
     | Some store ->
       match store.tryFind groupName with
       | ValueSome group ->
         match selectEntityFromGroup random group with
         | Some entityKey ->
+          // Look up the map override for this entity
+          let mapOverride = group.Overrides |> HashMap.tryFindV entityKey
+
           match entityStore.tryFind entityKey with
-          | ValueSome entity -> ValueSome entityKey, entity.ArchetypeId
-          | ValueNone -> ValueNone, %1<AiArchetypeId>
-        | None -> ValueNone, %1<AiArchetypeId>
-      | ValueNone -> ValueNone, %1<AiArchetypeId>
-    | None -> ValueNone, %1<AiArchetypeId>
+          | ValueSome entity ->
+            ValueSome entityKey, entity.ArchetypeId, mapOverride
+          | ValueNone -> ValueNone, %1<AiArchetypeId>, ValueNone
+        | None -> ValueNone, %1<AiArchetypeId>, ValueNone
+      | ValueNone -> ValueNone, %1<AiArchetypeId>, ValueNone
+    | None -> ValueNone, %1<AiArchetypeId>, ValueNone
 
   /// Load map entity group store for a map (returns None if not found)
   let tryLoadMapEntityGroupStore(mapKey: string) : MapEntityGroupStore option =

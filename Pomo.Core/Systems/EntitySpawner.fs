@@ -204,7 +204,9 @@ module EntitySpawnerLogic =
       configurePlayerLoadout(entityId, eventBus)
 
 
-    | SystemCommunications.SpawnType.Enemy(archetypeId, entityDefKey) ->
+    | SystemCommunications.SpawnType.Enemy(archetypeId,
+                                           entityDefKey,
+                                           mapOverride) ->
       let archetype = aiArchetypeStore.find archetypeId
       let factions = HashSet [ Faction.Enemy ]
 
@@ -221,11 +223,10 @@ module EntitySpawnerLogic =
           let familyKey = e.Family.ToString()
           aiFamilyStore.tryFind familyKey |> Option.ofValueOption)
 
-      // Apply full override chain for stats
-      // Note: mapOverride would come from a future extension
+      // Apply full override chain for stats (including map override)
       let baseStats =
         archetype.baseStats
-        |> MapSpawning.resolveStats familyConfig aiEntity ValueNone
+        |> MapSpawning.resolveStats familyConfig aiEntity mapOverride
 
       let resource = {
         HP = baseStats.Charm
@@ -252,10 +253,10 @@ module EntitySpawnerLogic =
         )
       )
 
-      // Resolve skills (no map override for now)
+      // Resolve skills (with map override restrictions/extras)
       let skills =
         match aiEntity with
-        | Some entity -> MapSpawning.resolveSkills entity.Skills ValueNone
+        | Some entity -> MapSpawning.resolveSkills entity.Skills mapOverride
         | None -> [||]
 
       let controller: AIController = {
