@@ -5,6 +5,7 @@ open Microsoft.Xna.Framework
 open FSharp.UMX
 open FSharp.Data.Adaptive
 open Pomo.Core.Domain.Units
+open Pomo.Core.Domain.Entity
 open Pomo.Core.Domain.Map
 open Pomo.Core.Domain.AI
 open Pomo.Core.Domain.Events
@@ -188,3 +189,84 @@ module MapSpawning =
       | true, i -> Some i
       | _ -> None)
     |> Option.defaultValue 0
+
+  /// Apply family stat scaling to base stats
+  let applyFamilyScaling
+    (family: AIFamilyConfig option)
+    (baseStats: BaseStats)
+    : BaseStats =
+    match family with
+    | None -> baseStats
+    | Some fam ->
+      let getScale key =
+        fam.StatScaling |> HashMap.tryFind key |> Option.defaultValue 1.0f
+
+      {
+        Power = int(float32 baseStats.Power * getScale "Power")
+        Magic = int(float32 baseStats.Magic * getScale "Magic")
+        Sense = int(float32 baseStats.Sense * getScale "Sense")
+        Charm = int(float32 baseStats.Charm * getScale "Charm")
+      }
+
+  /// Apply entity stat overrides (replaces stats if present)
+  let applyEntityOverrides
+    (entityDef: AIEntityDefinition option)
+    (baseStats: BaseStats)
+    : BaseStats =
+    match entityDef with
+    | Some entity ->
+      match entity.StatOverrides with
+      | ValueSome overrides -> overrides
+      | ValueNone -> baseStats
+    | None -> baseStats
+
+  /// Apply map stat multiplier (global multiplier)
+  let applyMapMultiplier
+    (mapOverride: MapEntityOverride voption)
+    (baseStats: BaseStats)
+    : BaseStats =
+    match mapOverride with
+    | ValueSome o ->
+      match o.StatMultiplier with
+      | ValueSome mult -> {
+          Power = int(float32 baseStats.Power * mult)
+          Magic = int(float32 baseStats.Magic * mult)
+          Sense = int(float32 baseStats.Sense * mult)
+          Charm = int(float32 baseStats.Charm * mult)
+        }
+      | ValueNone -> baseStats
+    | ValueNone -> baseStats
+
+  /// Resolve final stats applying the full override chain:
+  /// Archetype → Family Scaling → Entity Overrides → Map Multiplier
+  let resolveStats
+    (family: AIFamilyConfig option)
+    (entityDef: AIEntityDefinition option)
+    (mapOverride: MapEntityOverride voption)
+    (archetypeStats: BaseStats)
+    : BaseStats =
+    archetypeStats
+    |> applyFamilyScaling family
+    |> applyEntityOverrides entityDef
+    |> applyMapMultiplier mapOverride
+
+  /// Resolve final skills with restrictions and extras from map override
+  let resolveSkills
+    (entitySkills: int<SkillId>[])
+    (mapOverride: MapEntityOverride voption)
+    : int<SkillId>[] =
+    match mapOverride with
+    | ValueNone -> entitySkills
+    | ValueSome o ->
+      // Apply restrictions (filter to only allowed skills)
+      let filtered =
+        match o.SkillRestrictions with
+        | ValueSome restrictions ->
+          let restrictSet = Set.ofArray restrictions
+          entitySkills |> Array.filter(fun s -> Set.contains s restrictSet)
+        | ValueNone -> entitySkills
+
+      // Add extra skills
+      match o.ExtraSkills with
+      | ValueSome extras -> Array.append filtered extras
+      | ValueNone -> filtered

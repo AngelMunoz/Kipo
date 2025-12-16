@@ -13,6 +13,7 @@ open Pomo.Core.Domain.Entity
 open Pomo.Core.Domain.AI
 open Pomo.Core.EventBus
 open Pomo.Core.Stores
+open Pomo.Core
 open Systems
 
 module EntitySpawnerLogic =
@@ -157,6 +158,7 @@ module EntitySpawnerLogic =
     (eventBus: EventBus)
     (aiArchetypeStore: AIArchetypeStore)
     (aiEntityStore: AIEntityStore)
+    (aiFamilyStore: AIFamilyStore)
     =
     let entityId = pending.EntityId
     let pos = pending.Position
@@ -204,8 +206,32 @@ module EntitySpawnerLogic =
 
     | SystemCommunications.SpawnType.Enemy(archetypeId, entityDefKey) ->
       let archetype = aiArchetypeStore.find archetypeId
-      let baseStats, resource = createEnemyStats archetype
       let factions = HashSet [ Faction.Enemy ]
+
+      // Look up entity definition
+      let aiEntity: AIEntityDefinition option =
+        match entityDefKey with
+        | ValueSome key -> aiEntityStore.tryFind key |> Option.ofValueOption
+        | ValueNone -> aiEntityStore.all() |> Seq.tryHead
+
+      // Look up family config from entity's family
+      let familyConfig: AIFamilyConfig option =
+        aiEntity
+        |> Option.bind(fun e ->
+          let familyKey = e.Family.ToString()
+          aiFamilyStore.tryFind familyKey |> Option.ofValueOption)
+
+      // Apply full override chain for stats
+      // Note: mapOverride would come from a future extension
+      let baseStats =
+        archetype.baseStats
+        |> MapSpawning.resolveStats familyConfig aiEntity ValueNone
+
+      let resource = {
+        HP = baseStats.Charm
+        MP = baseStats.Magic
+        Status = Status.Alive
+      }
 
       eventBus.Publish(
         StateChangeEvent.Combat(ResourcesChanged struct (entityId, resource))
@@ -226,16 +252,10 @@ module EntitySpawnerLogic =
         )
       )
 
-      // Initialize AI Controller
-      // Use entity definition key if provided, otherwise fallback to first entity
-      let aiEntity: AIEntityDefinition option =
-        match entityDefKey with
-        | ValueSome key -> aiEntityStore.tryFind key |> Option.ofValueOption
-        | ValueNone -> aiEntityStore.all() |> Seq.tryHead
-
+      // Resolve skills (no map override for now)
       let skills =
         match aiEntity with
-        | Some entity -> entity.Skills
+        | Some entity -> MapSpawning.resolveSkills entity.Skills ValueNone
         | None -> [||]
 
       let controller: AIController = {
@@ -345,6 +365,7 @@ module EntitySpawnerLogic =
               core.EventBus
               stores.AIArchetypeStore
               stores.AIEntityStore
+              stores.AIFamilyStore
 
             toRemove.Add(pending)
 
