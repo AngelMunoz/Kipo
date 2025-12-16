@@ -453,37 +453,37 @@
    </properties>
    <ellipse/>
   </object>
-  <object id="156" name="AI Spawn" type="Spawn" x="691.368" y="333.301" width="235.255" height="104.07" rotation="333.876">
+  <object id="156" name="Melee Fighters Spawn" type="Spawn" x="691.368" y="333.301" width="235.255" height="104.07" rotation="333.876">
    <properties>
-    <property name="EntityGroup" value="magic_casters"/>
+    <property name="EntityGroup" value="melee_fighters"/>
     <property name="MaxSpawns" type="int" value="2"/>
    </properties>
   </object>
-  <object id="159" name="AI Spawn" type="Spawn" x="119.856" y="9.93931" width="415.112" height="83.0223">
+  <object id="159" name="Magic Casters Spawn" type="Spawn" x="119.856" y="9.93931" width="415.112" height="83.0223">
    <properties>
     <property name="EntityGroup" value="magic_casters"/>
     <property name="MaxSpawns" type="int" value="3"/>
    </properties>
   </object>
-  <object id="160" name="AI Spawn" type="Spawn" x="509.747" y="194.097" width="358.382" height="135.922" rotation="330.727">
+  <object id="160" name="Ranged Attackers Spawn" type="Spawn" x="509.747" y="194.097" width="358.382" height="135.922" rotation="330.727">
    <properties>
-    <property name="EntityGroup" value="fire_mages"/>
+    <property name="EntityGroup" value="ranged_attackers"/>
     <property name="MaxSpawns" type="int" value="2"/>
    </properties>
   </object>
-  <object id="161" name="AI Spawn" type="Spawn" x="537.78" y="808.932" width="296.147" height="137.013" rotation="311.318">
+  <object id="161" name="Support Units Spawn" type="Spawn" x="537.78" y="808.932" width="296.147" height="137.013" rotation="311.318">
    <properties>
-    <property name="EntityGroup" value="magic_casters"/>
+    <property name="EntityGroup" value="support_units"/>
     <property name="MaxSpawns" type="int" value="2"/>
    </properties>
   </object>
-  <object id="162" name="AI Spawn" type="Spawn" x="271.485" y="790.041" width="235.255" height="104.07" rotation="324.6">
+  <object id="162" name="Defense Towers Spawn" type="Spawn" x="271.485" y="790.041" width="235.255" height="104.07" rotation="324.6">
    <properties>
-    <property name="EntityGroup" value="magic_casters"/>
+    <property name="EntityGroup" value="defense_towers"/>
     <property name="MaxSpawns" type="int" value="2"/>
    </properties>
   </object>
-  <object id="163" name="AI Spawn" type="Spawn" x="298.763" y="99.9776" width="115.764" height="183.585">
+  <object id="163" name="Fire Mages Spawn" type="Spawn" x="298.763" y="99.9776" width="115.764" height="183.585">
    <properties>
     <property name="EntityGroup" value="fire_mages"/>
     <property name="MaxSpawns" type="int" value="2"/>

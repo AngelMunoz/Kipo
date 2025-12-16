@@ -54,5 +54,30 @@
       "Sense": 10,
       "Charm": 100
     }
+  },
+  {
+    "Id": 3,
+    "Name": "Tower",
+    "BehaviorType": "Turret",
+    "PerceptionConfig": {
+      "VisualRange": [16.0, 12],
+      "Fov": 360.0,
+      "MemoryDuration": 3.0
+    },
+    "CuePriorities": [
+      {
+        "CueType": "Visual",
+        "MinStrength": "Weak",
+        "Priority": 10,
+        "Response": "Engage"
+      }
+    ],
+    "DecisionInterval": 0.5,
+    "BaseStats": {
+      "Power": 3,
+      "Magic": 5,
+      "Sense": 8,
+      "Charm": 300
+    }
   }
 ]

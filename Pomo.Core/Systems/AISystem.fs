@@ -151,14 +151,26 @@ module Perception =
         | _ -> None
       | ValueNone -> None)
 
+  /// Decay memories, with faster decay when entity is beyond leash distance from spawn
   let decayMemories
     (memories: HashMap<Guid<EntityId>, MemoryEntry>)
     (currentTick: TimeSpan)
     (memoryDuration: TimeSpan)
+    (currentPos: Vector2)
+    (spawnPos: Vector2)
+    (leashDistance: float32)
     : HashMap<Guid<EntityId>, MemoryEntry> =
+    let distFromSpawn = Vector2.Distance(currentPos, spawnPos)
+    // When beyond leash distance, memories decay 4x faster
+    let effectiveDuration =
+      if distFromSpawn > leashDistance then
+        TimeSpan.FromTicks(memoryDuration.Ticks / 4L)
+      else
+        memoryDuration
+
     memories
     |> HashMap.filter(fun _ entry ->
-      currentTick - entry.lastSeenTick < memoryDuration)
+      currentTick - entry.lastSeenTick < effectiveDuration)
 
   let gatherCues
     (controller: AIController)
@@ -198,6 +210,9 @@ module Perception =
         controller.memories
         currentTick
         archetype.perceptionConfig.memoryDuration
+        controllerEntityPos
+        controller.spawnPosition
+        archetype.perceptionConfig.leashDistance
 
     let updatedMemories =
       visualCues
@@ -592,6 +607,7 @@ type AISystem(game: Game, env: PomoEnvironment) =
       visualRange = 150.0f
       fov = 360.0f
       memoryDuration = TimeSpan.FromSeconds 5.0
+      leashDistance = 300.0f
     }
     cuePriorities = [||]
     decisionInterval = TimeSpan.FromSeconds 0.5

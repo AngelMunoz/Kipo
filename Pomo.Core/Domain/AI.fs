@@ -41,6 +41,7 @@ type PerceptionConfig = {
   visualRange: float32
   fov: float32 // Field of View in degrees
   memoryDuration: TimeSpan
+  leashDistance: float32
 }
 
 [<Struct>]
@@ -249,10 +250,15 @@ module Serialization =
         and! memoryDurationSeconds =
           Required.Property.get ("MemoryDuration", Required.float) json
 
+        and! leashDistance =
+          Optional.Property.get ("LeashDistance", Required.float) json
+          |> Result.map(Option.defaultValue 300.0)
+
         return {
           visualRange = float32 visualRange
           fov = float32 fov
           memoryDuration = TimeSpan.FromSeconds memoryDurationSeconds
+          leashDistance = float32 leashDistance
         }
       }
 

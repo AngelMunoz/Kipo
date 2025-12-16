@@ -8,5 +8,27 @@
     "Entities": ["FireMage"],
     "Weights": [1.0],
     "Overrides": {}
+  },
+  "melee_fighters": {
+    "Entities": ["Warrior", "Berserker"],
+    "Weights": [0.6, 0.4],
+    "Overrides": {}
+  },
+  "support_units": {
+    "Entities": ["Bard", "Enchanter"],
+    "Weights": [0.5, 0.5],
+    "Overrides": {}
+  },
+  "ranged_attackers": {
+    "Entities": ["Sniper", "Assassin"],
+    "Weights": [0.5, 0.5],
+    "Overrides": {}
+  },
+  "defense_towers": {
+    "Entities": ["FireTower", "IceTower"],
+    "Weights": [0.5, 0.5],
+    "Overrides": {
+      "FireTower": { "StatMultiplier": 1.2 }
+    }
   }
 }
