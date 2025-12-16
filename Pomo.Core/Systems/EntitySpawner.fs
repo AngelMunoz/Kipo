@@ -10,6 +10,7 @@ open Pomo.Core.Domain.Action
 open Pomo.Core.Domain.Units
 open Pomo.Core.Domain.Events
 open Pomo.Core.Domain.Entity
+open Pomo.Core.Domain.Skill
 open Pomo.Core.Domain.AI
 open Pomo.Core.EventBus
 open Pomo.Core.Stores
@@ -290,6 +291,10 @@ module EntitySpawnerLogic =
           aiEntity
           |> Option.map(fun e -> e.DecisionTree)
           |> Option.defaultValue "MeleeAttacker" // Default tree
+        preferredIntent =
+          familyConfig
+          |> Option.map(fun f -> f.PreferredIntent)
+          |> Option.defaultValue SkillIntent.Offensive // Default to offensive
         skills = skills
         memories = HashMap.empty
       }

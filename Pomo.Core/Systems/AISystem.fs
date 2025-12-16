@@ -112,9 +112,29 @@ module Perception =
     let targetIsEnemy = targetFactions.Contains Enemy
     isEnemy && (targetIsPlayer || targetIsAlly) || isAlly && targetIsEnemy
 
+  let isInFieldOfView
+    (facingDir: Vector2)
+    (controllerPos: Vector2)
+    (targetPos: Vector2)
+    (fovDegrees: float32)
+    =
+    if fovDegrees >= 360.0f then
+      true
+    elif facingDir.LengthSquared() < 0.001f then
+      true
+    else
+      let toTarget = Vector2.Normalize(targetPos - controllerPos)
+      let facing = Vector2.Normalize(facingDir)
+      let dot = Vector2.Dot(facing, toTarget)
+      let clampedDot = max -1.0f (min 1.0f dot)
+      let angleBetween = acos(clampedDot) * (180.0f / float32 System.Math.PI)
+      let halfFov = fovDegrees / 2.0f
+      angleBetween <= halfFov
+
   let gatherVisualCues
     (controllerPos: Vector2)
     (controllerFactions: Faction HashSet)
+    (controllerVelocity: Vector2)
     (config: PerceptionConfig)
     (positions: HashMap<Guid<EntityId>, Vector2>)
     (factions: HashMap<Guid<EntityId>, Faction HashSet>)
@@ -128,11 +148,14 @@ module Perception =
         match factions |> HashMap.tryFindV entityId with
         | ValueSome targetFactions ->
           let dist = distance controllerPos pos
+          let inRange = dist <= config.visualRange
 
-          if
-            dist <= config.visualRange
-            && isHostileFaction controllerFactions targetFactions
-          then
+          let inFov =
+            isInFieldOfView controllerVelocity controllerPos pos config.fov
+
+          let isHostile = isHostileFaction controllerFactions targetFactions
+
+          if inRange && inFov && isHostile then
             let strength =
               if dist < config.visualRange * 0.3f then Overwhelming
               elif dist < config.visualRange * 0.6f then Strong
@@ -179,6 +202,7 @@ module Perception =
     (factions: HashMap<Guid<EntityId>, Faction HashSet>)
     (spatialGrid: HashMap<GridCell, IndexList<Guid<EntityId>>>)
     (controllerEntityPos: Vector2)
+    (controllerEntityVelocity: Vector2)
     (controllerEntityFactions: Faction HashSet)
     (currentTick: TimeSpan)
     =
@@ -199,6 +223,7 @@ module Perception =
       gatherVisualCues
         controllerEntityPos
         controllerEntityFactions
+        controllerEntityVelocity
         archetype.perceptionConfig
         positions
         factions
@@ -260,6 +285,53 @@ module Perception =
 
     struct (allCues, updatedMemories)
 
+module WaypointNavigation =
+  let selectNextWaypoint
+    (behaviorType: BehaviorType)
+    (controller: AIController)
+    (currentPos: Vector2)
+    (waypoints: Vector2[])
+    =
+    match behaviorType with
+    | Patrol ->
+      let currentIdx = controller.waypointIndex % waypoints.Length
+      let targetWaypoint = waypoints[currentIdx]
+      let dist = Vector2.Distance(currentPos, targetWaypoint)
+      let hasReached = dist < Constants.AI.WaypointReachedThreshold
+
+      if hasReached then
+        let nextIdx = (controller.waypointIndex + 1) % waypoints.Length
+        struct (waypoints[nextIdx], nextIdx)
+      else
+        struct (targetWaypoint, currentIdx)
+
+    | Aggressive ->
+      if Array.isEmpty waypoints then
+        struct (controller.spawnPosition, controller.waypointIndex)
+      else
+        let targetWaypoint = waypoints |> Array.randomChoice
+        struct (targetWaypoint, controller.waypointIndex)
+    | Defensive
+    | Supporter ->
+      let targetWaypoint =
+        waypoints
+        |> Array.minBy(fun wp -> Vector2.Distance(controller.spawnPosition, wp))
+
+      struct (targetWaypoint, controller.waypointIndex)
+
+    | Ambusher ->
+      let targetWaypoint =
+        if controller.waypointIndex = 0 then
+          controller.spawnPosition
+        else
+          waypoints |> Array.randomChoice
+
+      struct (targetWaypoint, controller.waypointIndex)
+    | Turret -> struct (controller.spawnPosition, controller.waypointIndex)
+    | Passive ->
+      let targetWaypoint = waypoints |> Array.randomChoice
+      struct (targetWaypoint, controller.waypointIndex)
+
 /// Behavior tree execution module for data-driven AI decisions
 module BehaviorTreeExecution =
 
@@ -274,6 +346,8 @@ module BehaviorTreeExecution =
     skillStore: SkillStore
     cooldowns: HashMap<int<SkillId>, TimeSpan> voption
     currentTime: TimeSpan
+    bestCue: PerceptionCue voption
+    cueResponse: ResponseType voption
   }
 
   /// Result of action execution
@@ -332,13 +406,32 @@ module BehaviorTreeExecution =
       else
         Failure
     | "SkillReady" ->
-      // Check if any skill is ready
       let hasReady =
         ctx.controller.skills
         |> Array.exists(fun skillId ->
           SkillSelection.isSkillReady skillId ctx.cooldowns ctx.currentTime)
 
       if hasReady then Success else Failure
+    | "HasCue" -> if ctx.bestCue.IsSome then Success else Failure
+    | "CueResponseIs" ->
+      match ctx.cueResponse with
+      | ValueSome response ->
+        let expectedStr =
+          parms |> HashMap.tryFindV "Response" |> ValueOption.defaultValue ""
+
+        let expected =
+          match expectedStr with
+          | "Engage" -> ValueSome Engage
+          | "Investigate" -> ValueSome Investigate
+          | "Evade" -> ValueSome Evade
+          | "Flee" -> ValueSome Flee
+          | "Ignore" -> ValueSome Ignore
+          | _ -> ValueNone
+
+        match expected with
+        | ValueSome exp when exp = response -> Success
+        | _ -> Failure
+      | ValueNone -> Failure
     | _ -> Failure
 
   // --- Action Handlers ---
@@ -431,21 +524,16 @@ module BehaviorTreeExecution =
     | "Patrol" ->
       match ctx.controller.absoluteWaypoints with
       | ValueSome waypoints when waypoints.Length > 0 ->
-        let currentIdx = ctx.controller.waypointIndex % waypoints.Length
-        let waypointPos = waypoints.[currentIdx]
-        let dist = Vector2.Distance(ctx.entityPos, waypointPos)
-
-        // Check if reached waypoint (threshold of 16 units)
-        let (nextIdx, targetPos) =
-          if dist < 16.0f then
-            let next = (currentIdx + 1) % waypoints.Length
-            (next, waypoints.[next])
-          else
-            (currentIdx, waypointPos)
+        let struct (targetWaypoint, nextIdx) =
+          WaypointNavigation.selectNextWaypoint
+            ctx.archetype.behaviorType
+            ctx.controller
+            ctx.entityPos
+            waypoints
 
         let command: SystemCommunications.SetMovementTarget = {
           EntityId = ctx.controller.controlledEntityId
-          Target = targetPos
+          Target = targetWaypoint
         }
 
         {
@@ -854,7 +942,9 @@ module AISystemLogic =
     (controller: AIController)
     (archetype: AIArchetype)
     (entityPos: Vector2)
+    (positions: HashMap<Guid<EntityId>, Vector2>)
     (memories: HashMap<Guid<EntityId>, MemoryEntry>)
+    (cues: PerceptionCue[])
     (skillStore: SkillStore)
     (cooldowns: HashMap<int<SkillId>, TimeSpan> voption)
     (currentTime: TimeSpan)
@@ -868,12 +958,18 @@ module AISystemLogic =
               controller.waypointIndex,
               controller.currentState)
     | ValueSome behaviorTree ->
-      // Find closest target from memories
+      // Find closest target from memories, but use CURRENT position if available
       let targetOpt =
         memories
         |> HashMap.toSeq
         |> Seq.tryHead
-        |> Option.map(fun (id, entry) -> struct (id, entry.lastKnownPosition))
+        |> Option.map(fun (id, _entry) ->
+          // Prefer real-time position over stale memory position
+          let currentPos = positions |> HashMap.tryFindV id
+
+          match currentPos with
+          | ValueSome pos -> struct (id, pos)
+          | ValueNone -> struct (id, _entry.lastKnownPosition))
 
       let targetPos, targetId, targetDist =
         match targetOpt with
@@ -881,6 +977,15 @@ module AISystemLogic =
           let dist = Vector2.Distance(entityPos, pos)
           (ValueSome pos, ValueSome id, ValueSome dist)
         | None -> (ValueNone, ValueNone, ValueNone)
+
+      // Compute best cue using archetype's cuePriorities
+      let bestCueOpt = Decision.selectBestCue cues archetype.cuePriorities
+
+      let bestCue, cueResponse =
+        match bestCueOpt with
+        | Some struct (cue, priority) ->
+          (ValueSome cue, ValueSome priority.response)
+        | None -> (ValueNone, ValueNone)
 
       let ctx: BehaviorTreeExecution.ExecutionContext = {
         controller = controller
@@ -892,6 +997,8 @@ module AISystemLogic =
         skillStore = skillStore
         cooldowns = cooldowns
         currentTime = currentTime
+        bestCue = bestCue
+        cueResponse = cueResponse
       }
 
       let result = BehaviorTreeExecution.evaluate behaviorTree.Root ctx
@@ -910,6 +1017,7 @@ module AISystemLogic =
     (controller: AIController)
     (archetype: AIArchetype)
     (positions: HashMap<Guid<EntityId>, Vector2>)
+    (velocities: HashMap<Guid<EntityId>, Vector2>)
     (factions: HashMap<Guid<EntityId>, Faction HashSet>)
     (spatialGrid: HashMap<GridCell, IndexList<Guid<EntityId>>>)
     (skillStore: SkillStore)
@@ -919,6 +1027,11 @@ module AISystemLogic =
     =
     let controlledPosition =
       positions |> HashMap.tryFindV controller.controlledEntityId
+
+    let controlledVelocity =
+      velocities
+      |> HashMap.tryFindV controller.controlledEntityId
+      |> ValueOption.defaultValue Vector2.Zero
 
     let controlledFactions =
       factions |> HashMap.tryFindV controller.controlledEntityId
@@ -933,6 +1046,7 @@ module AISystemLogic =
           factions
           spatialGrid
           pos
+          controlledVelocity
           facs
           currentTick
 
@@ -954,7 +1068,9 @@ module AISystemLogic =
               controller
               archetype
               pos
+              positions
               updatedMemories
+              cues
               skillStore
               entityCooldowns
               currentTick
@@ -1037,6 +1153,7 @@ type AISystem(game: Game, env: PomoEnvironment) =
     // Snapshot all necessary data
     let controllers = core.World.AIControllers |> AMap.force
     let entityScenarios = core.World.EntityScenario |> AMap.force
+    let velocities = core.World.Velocities |> AMap.force
     let factions = core.World.Factions |> AMap.force
     let cooldowns = core.World.AbilityCooldowns |> AMap.force
     let currentTick = (core.World.Time |> AVal.force).TotalGameTime
@@ -1067,6 +1184,7 @@ type AISystem(game: Game, env: PomoEnvironment) =
             controller
             archetype
             positions
+            velocities
             factions
             spatialGrid
             skillStore

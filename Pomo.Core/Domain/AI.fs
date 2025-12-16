@@ -115,6 +115,7 @@ type AIController = {
   lastDecisionTime: TimeSpan
   currentTarget: Guid<EntityId> voption
   decisionTree: string // Name of the decision tree to use
+  preferredIntent: SkillIntent // From family config, used for skill selection
 
   // Skills (from AIEntityDefinition)
   skills: int<SkillId>[]
