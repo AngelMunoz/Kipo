@@ -29,6 +29,22 @@ module AIContext =
     SpatialGrid: HashMap<GridCell, IndexList<Guid<EntityId>>>
   }
 
+  /// Context for target-related data
+  [<Struct>]
+  type TargetContext = {
+    Position: Vector2 voption
+    EntityId: Guid<EntityId> voption
+    Distance: float32 voption
+  }
+
+  /// Context for ability-related dependencies
+  [<Struct>]
+  type AbilityContext = {
+    SkillStore: SkillStore
+    Cooldowns: HashMap<int<SkillId>, TimeSpan> voption
+    KnownSkills: int<SkillId>[]
+  }
+
   /// Context for a single entity being processed
   [<Struct>]
   type EntityContext = {
@@ -47,56 +63,31 @@ module AIContext =
     CurrentTick: TimeSpan
   }
 
-  /// Result of AI decision making
+  /// Unified result of AI decision making
   [<Struct>]
-  type DecisionResult = {
+  type AIOutput = {
     Command: SystemCommunications.SetMovementTarget voption
-    AbilityIntent: SystemCommunications.AbilityIntent voption
-    ShouldUpdateTime: bool
-    WaypointIndex: int
+    Ability: SystemCommunications.AbilityIntent voption
     NewState: AIState
+    WaypointIndex: int voption
+    ShouldUpdateTime: bool
   }
 
-  let inline failureResult
-    (state: AIState)
-    (waypointIndex: int)
-    : DecisionResult =
-    {
-      Command = ValueNone
-      AbilityIntent = ValueNone
-      ShouldUpdateTime = true
-      WaypointIndex = waypointIndex
-      NewState = state
-    }
+  let inline noOutput (state: AIState) (waypointIdx: int) = {
+    Command = ValueNone
+    Ability = ValueNone
+    NewState = state
+    WaypointIndex = ValueSome waypointIdx
+    ShouldUpdateTime = false
+  }
 
-  let inline idleResult(waypointIndex: int) : DecisionResult =
-    failureResult AIState.Idle waypointIndex
-
-  let inline commandResult
-    (cmd: SystemCommunications.SetMovementTarget)
-    (state: AIState)
-    (waypointIndex: int)
-    : DecisionResult =
-    {
-      Command = ValueSome cmd
-      AbilityIntent = ValueNone
-      ShouldUpdateTime = true
-      WaypointIndex = waypointIndex
-      NewState = state
-    }
-
-  let inline abilityResult
-    (intent: SystemCommunications.AbilityIntent)
-    (state: AIState)
-    (waypointIndex: int)
-    : DecisionResult =
-    {
-      Command = ValueNone
-      AbilityIntent = ValueSome intent
-      ShouldUpdateTime = true
-      WaypointIndex = waypointIndex
-      NewState = state
-    }
+  let inline failureResult (state: AIState) (waypointIdx: int) = {
+    Command = ValueNone
+    Ability = ValueNone
+    NewState = state
+    WaypointIndex = ValueSome waypointIdx
+    ShouldUpdateTime = true
+  }
 
 open AIContext
 
@@ -131,21 +122,19 @@ module SkillSelection =
 
   /// Select the best skill to use given the context
   let inline selectSkill
-    (skillIds: int<SkillId>[])
-    (skillStore: SkillStore)
-    (cooldowns: HashMap<int<SkillId>, TimeSpan> voption)
+    (abilityCtx: AbilityContext)
     (currentTime: TimeSpan)
     (casterPos: Vector2)
     (targetPos: Vector2)
     : struct (int<SkillId> * Skill.Skill) voption =
-    skillIds
+    abilityCtx.KnownSkills
     |> Array.choose(fun skillId ->
-      match skillStore.tryFind skillId with
+      match abilityCtx.SkillStore.tryFind skillId with
       | ValueNone -> None
       | ValueSome skill ->
         let range = getSkillRange skill
         let inRange = isTargetInRange casterPos targetPos range
-        let ready = isSkillReady skillId cooldowns currentTime
+        let ready = isSkillReady skillId abilityCtx.Cooldowns currentTime
 
         if inRange && ready then
           Some(struct (skillId, skill))
@@ -269,25 +258,24 @@ module Perception =
         | ValueNone -> None
       | ValueNone -> None)
 
-  let decayMemories
-    (memories: HashMap<Guid<EntityId>, MemoryEntry>)
-    (currentTick: TimeSpan)
-    (memoryDuration: TimeSpan)
-    (controllerPos: Vector2)
-    (spawnPos: Vector2)
-    (leashDistance: float32)
-    =
-    memories
+  let decayMemories(ctx: PerceptionContext) =
+    ctx.Controller.memories
     |> HashMap.chooseV(fun _ entry ->
-      let age = currentTick - entry.lastSeenTick
-      let distToSpawn = Vector2.Distance(controllerPos, spawnPos)
-      let isLeashed = distToSpawn <= leashDistance
+      let age = ctx.CurrentTick - entry.lastSeenTick
 
-      if age < memoryDuration && isLeashed then
+      let distToSpawn =
+        Vector2.Distance(ctx.Entity.Position, ctx.Controller.spawnPosition)
+
+      let isLeashed =
+        distToSpawn <= ctx.Archetype.perceptionConfig.leashDistance
+
+      if age < ctx.Archetype.perceptionConfig.memoryDuration && isLeashed then
         // Decay confidence over time
         let decayFactor =
           1.0f
-          - (float32 age.TotalSeconds / float32 memoryDuration.TotalSeconds)
+          - (float32 age.TotalSeconds
+             / float32
+                 ctx.Archetype.perceptionConfig.memoryDuration.TotalSeconds)
 
         let newConfidence = entry.confidence * decayFactor
 
@@ -317,14 +305,7 @@ module Perception =
 
     let visualCues = gatherVisualCues ctx world nearbyEntities
 
-    let decayedMemories =
-      decayMemories
-        ctx.Controller.memories
-        ctx.CurrentTick
-        ctx.Archetype.perceptionConfig.memoryDuration
-        ctx.Entity.Position
-        ctx.Controller.spawnPosition
-        ctx.Archetype.perceptionConfig.leashDistance
+    let decayedMemories = decayMemories ctx
 
     let updatedMemories =
       visualCues
@@ -423,27 +404,13 @@ module WaypointNavigation =
 module private BehaviorTreeExecution =
 
   /// Context passed to condition/action handlers during tree evaluation
-  type ExecutionContext = {
-    controller: AIController
-    archetype: AIArchetype
-    entityPos: Vector2
-    targetPos: Vector2 voption
-    targetId: Guid<EntityId> voption
-    targetDistance: float32 voption
-    skillStore: SkillStore
-    cooldowns: HashMap<int<SkillId>, TimeSpan> voption
-    currentTime: TimeSpan
-    bestCue: PerceptionCue voption
-    cueResponse: ResponseType voption
-  }
-
-  /// Result of action execution
-  type ActionResult = {
-    nodeResult: NodeResult
-    command: SystemCommunications.SetMovementTarget voption
-    abilityIntent: SystemCommunications.AbilityIntent voption
-    newState: AIState
-    waypointIndex: int voption
+  [<Struct>]
+  type TreeExecutionContext = {
+    Perception: PerceptionContext
+    Target: TargetContext
+    Ability: AbilityContext
+    BestCue: PerceptionCue voption
+    Response: ResponseType voption
   }
 
   // --- Condition Handlers ---
@@ -457,24 +424,27 @@ module private BehaviorTreeExecution =
   let evaluateCondition
     (name: string)
     (parms: HashMap<string, string>)
-    (ctx: ExecutionContext)
+    (ctx: TreeExecutionContext)
     : NodeResult =
     match name with
-    | "HasTarget" -> if ctx.targetId.IsSome then Success else Failure
+    | "HasTarget" -> if ctx.Target.EntityId.IsSome then Success else Failure
     | "TargetInRange" ->
-      match ctx.targetDistance with
+      match ctx.Target.Distance with
       | ValueSome dist ->
         let range =
-          getParam "Range" parms ctx.archetype.perceptionConfig.visualRange
+          getParam
+            "Range"
+            parms
+            ctx.Perception.Archetype.perceptionConfig.visualRange
 
         if dist <= range then Success else Failure
       | ValueNone -> Failure
     | "TargetInMeleeRange" ->
-      match ctx.targetDistance with
+      match ctx.Target.Distance with
       | ValueSome dist -> if dist <= 48.0f then Success else Failure
       | ValueNone -> Failure
     | "TargetTooClose" ->
-      match ctx.targetDistance with
+      match ctx.Target.Distance with
       | ValueSome dist ->
         let minDist = getParam "MinDistance" parms 48.0f
         if dist < minDist then Success else Failure
@@ -486,22 +456,29 @@ module private BehaviorTreeExecution =
       // TODO: Need target health access - for now return Failure
       Failure
     | "BeyondLeash" ->
-      let dist = Vector2.Distance(ctx.entityPos, ctx.controller.spawnPosition)
+      let dist =
+        Vector2.Distance(
+          ctx.Perception.Entity.Position,
+          ctx.Perception.Controller.spawnPosition
+        )
 
-      if dist > ctx.archetype.perceptionConfig.leashDistance then
+      if dist > ctx.Perception.Archetype.perceptionConfig.leashDistance then
         Success
       else
         Failure
     | "SkillReady" ->
       let hasReady =
-        ctx.controller.skills
+        ctx.Ability.KnownSkills
         |> Array.exists(fun skillId ->
-          SkillSelection.isSkillReady skillId ctx.cooldowns ctx.currentTime)
+          SkillSelection.isSkillReady
+            skillId
+            ctx.Ability.Cooldowns
+            ctx.Perception.CurrentTick)
 
       if hasReady then Success else Failure
-    | "HasCue" -> if ctx.bestCue.IsSome then Success else Failure
+    | "HasCue" -> if ctx.BestCue.IsSome then Success else Failure
     | "CueResponseIs" ->
-      match ctx.cueResponse with
+      match ctx.Response with
       | ValueSome response ->
         let expectedStr =
           parms |> HashMap.tryFindV "Response" |> ValueOption.defaultValue ""
@@ -525,137 +502,138 @@ module private BehaviorTreeExecution =
 
   let executeAction
     (name: string)
-    (parms: HashMap<string, string>)
-    (ctx: ExecutionContext)
-    : ActionResult =
+    (_parms: HashMap<string, string>) // Cleaned unused parameter
+    (ctx: TreeExecutionContext)
+    : struct (NodeResult * AIOutput) =
+
+    let defaultFail =
+      struct (Failure,
+              failureResult
+                ctx.Perception.Controller.currentState
+                ctx.Perception.Controller.waypointIndex)
+
+    let defaultSuccess =
+      struct (Success,
+              noOutput
+                ctx.Perception.Controller.currentState
+                ctx.Perception.Controller.waypointIndex)
+
     match name with
     | "ChaseTarget" ->
-      match ctx.targetPos with
+      match ctx.Target.Position with
       | ValueSome targetPos ->
         let command: SystemCommunications.SetMovementTarget = {
-          EntityId = ctx.controller.controlledEntityId
+          EntityId = ctx.Perception.Controller.controlledEntityId
           Target = targetPos
         }
 
-        {
-          nodeResult = Running
-          command = ValueSome command
-          abilityIntent = ValueNone
-          newState = Chasing
-          waypointIndex = ValueNone
+        let output = {
+          Command = ValueSome command
+          Ability = ValueNone
+          NewState = Chasing
+          WaypointIndex = ValueNone
+          ShouldUpdateTime = true
         }
-      | ValueNone ->
-          {
-            nodeResult = Failure
-            command = ValueNone
-            abilityIntent = ValueNone
-            newState = ctx.controller.currentState
-            waypointIndex = ValueNone
-          }
+
+        struct (Running, output)
+      | ValueNone -> defaultFail
 
     | "UseRangedAttack"
     | "UseMeleeAttack"
     | "UseHeal"
     | "UseDebuff"
     | "UseBuff" ->
-      match ctx.targetPos, ctx.targetId with
+      match ctx.Target.Position, ctx.Target.EntityId with
       | ValueSome targetPos, targetIdOpt ->
         match
           SkillSelection.selectSkill
-            ctx.controller.skills
-            ctx.skillStore
-            ctx.cooldowns
-            ctx.currentTime
-            ctx.entityPos
+            ctx.Ability
+            ctx.Perception.CurrentTick
+            ctx.Perception.Entity.Position
             targetPos
         with
         | ValueSome struct (skillId, skill) ->
           let intent =
             SkillSelection.createAbilityIntent
-              ctx.controller.controlledEntityId
+              ctx.Perception.Controller.controlledEntityId
               skillId
               skill
               targetIdOpt
-              targetPos
+              targetPos // Passing Target Pos
 
-          {
-            nodeResult = Success
-            command = ValueNone
-            abilityIntent = ValueSome intent
-            newState = Attacking
-            waypointIndex = ValueNone
+          let output = {
+            Command = ValueNone
+            Ability = ValueSome intent
+            NewState = Attacking
+            WaypointIndex = ValueNone
+            ShouldUpdateTime = true
           }
+
+          struct (Success, output)
         | ValueNone ->
+          // Fallback: move to target
           let command: SystemCommunications.SetMovementTarget = {
-            EntityId = ctx.controller.controlledEntityId
+            EntityId = ctx.Perception.Controller.controlledEntityId
             Target = targetPos
           }
 
-          {
-            nodeResult = Running
-            command = ValueSome command
-            abilityIntent = ValueNone
-            newState = Chasing
-            waypointIndex = ValueNone
-          }
-      | _ ->
-          {
-            nodeResult = Failure
-            command = ValueNone
-            abilityIntent = ValueNone
-            newState = ctx.controller.currentState
-            waypointIndex = ValueNone
+          let output = {
+            Command = ValueSome command
+            Ability = ValueNone
+            NewState = Chasing
+            WaypointIndex = ValueNone
+            ShouldUpdateTime = true
           }
 
+          struct (Running, output)
+      | _ -> defaultFail
+
     | "Patrol" ->
-      match ctx.controller.absoluteWaypoints with
+      match ctx.Perception.Controller.absoluteWaypoints with
       | ValueSome waypoints when waypoints.Length > 0 ->
         let struct (targetWaypoint, nextIdx) =
           WaypointNavigation.selectNextWaypoint
-            ctx.archetype.behaviorType
-            ctx.controller
-            ctx.entityPos
+            ctx.Perception.Archetype.behaviorType
+            ctx.Perception.Controller
+            ctx.Perception.Entity.Position
             waypoints
 
         let command: SystemCommunications.SetMovementTarget = {
-          EntityId = ctx.controller.controlledEntityId
+          EntityId = ctx.Perception.Controller.controlledEntityId
           Target = targetWaypoint
         }
 
-        {
-          nodeResult = Running
-          command = ValueSome command
-          abilityIntent = ValueNone
-          newState = Patrolling
-          waypointIndex = ValueSome nextIdx
+        let output = {
+          Command = ValueSome command
+          Ability = ValueNone
+          NewState = Patrolling
+          WaypointIndex = ValueSome nextIdx
+          ShouldUpdateTime = true
         }
-      | _ ->
-          {
-            nodeResult = Success
-            command = ValueNone
-            abilityIntent = ValueNone
-            newState = AIState.Idle
-            waypointIndex = ValueNone
-          }
+
+        struct (Running, output)
+      | _ -> defaultSuccess
 
     | "ReturnToSpawn" ->
       let command: SystemCommunications.SetMovementTarget = {
-        EntityId = ctx.controller.controlledEntityId
-        Target = ctx.controller.spawnPosition
+        EntityId = ctx.Perception.Controller.controlledEntityId
+        Target = ctx.Perception.Controller.spawnPosition
       }
 
-      {
-        nodeResult = Running
-        command = ValueSome command
-        abilityIntent = ValueNone
-        newState = Patrolling
-        waypointIndex = ValueNone
+      let output = {
+        Command = ValueSome command
+        Ability = ValueNone
+        NewState = Patrolling
+        WaypointIndex = ValueNone
+        ShouldUpdateTime = true
       }
+
+      struct (Running, output)
 
     | "Retreat" ->
-      match ctx.targetPos with
+      match ctx.Target.Position with
       | ValueSome targetPos ->
-        let direction = ctx.entityPos - targetPos
+        let direction = ctx.Perception.Entity.Position - targetPos
 
         let normalizedDir =
           if direction.LengthSquared() > 0.0f then
@@ -663,121 +641,104 @@ module private BehaviorTreeExecution =
           else
             Vector2.UnitY
 
-        let retreatPos = ctx.entityPos + normalizedDir * 100.0f
+        let retreatPos = ctx.Perception.Entity.Position + normalizedDir * 100.0f
 
         let command: SystemCommunications.SetMovementTarget = {
-          EntityId = ctx.controller.controlledEntityId
+          EntityId = ctx.Perception.Controller.controlledEntityId
           Target = retreatPos
         }
 
-        {
-          nodeResult = Running
-          command = ValueSome command
-          abilityIntent = ValueNone
-          newState = Chasing
-          waypointIndex = ValueNone
+        let output = {
+          Command = ValueSome command
+          Ability = ValueNone
+          NewState = Chasing
+          WaypointIndex = ValueNone
+          ShouldUpdateTime = true
         }
-      | ValueNone ->
-          {
-            nodeResult = Failure
-            command = ValueNone
-            abilityIntent = ValueNone
-            newState = ctx.controller.currentState
-            waypointIndex = ValueNone
-          }
 
-    | "Idle" -> {
-        nodeResult = Success
-        command = ValueNone
-        abilityIntent = ValueNone
-        newState = AIState.Idle
-        waypointIndex = ValueNone
-      }
+        struct (Running, output)
+      | ValueNone -> defaultFail
 
-    | _ ->
-        {
-          nodeResult = Failure
-          command = ValueNone
-          abilityIntent = ValueNone
-          newState = ctx.controller.currentState
-          waypointIndex = ValueNone
-        }
+    | "Idle" -> defaultSuccess
+
+    | _ -> defaultFail
 
   // --- Tree Evaluator ---
 
+  [<Struct>]
   type StackFrame =
-    | SelectorFrame of children: BehaviorNode[] * index: int
-    | SequenceFrame of children: BehaviorNode[] * index: int
+    | SelectorFrame of struct (BehaviorNode[] * int)
+    | SequenceFrame of struct (BehaviorNode[] * int)
     | InverterFrame
 
   [<TailCall>]
   let rec processNode
     (node: BehaviorNode)
     (stack: StackFrame list)
-    (ctx: ExecutionContext)
-    : ActionResult =
-
-    // Default result prototype for new results
-    let defaultResult = {
-      nodeResult = Failure
-      command = ValueNone
-      abilityIntent = ValueNone
-      newState = ctx.controller.currentState
-      waypointIndex = ValueNone
-    }
+    (ctx: TreeExecutionContext)
+    : struct (NodeResult * AIOutput) =
 
     match node with
     | Selector children ->
       if children.Length = 0 then
-        let res = {
-          defaultResult with
-              nodeResult = Failure
-        }
-
-        processResult res stack ctx
+        processResult
+          Failure
+          (failureResult
+            ctx.Perception.Controller.currentState
+            ctx.Perception.Controller.waypointIndex)
+          stack
+          ctx
       else
         processNode children.[0] (SelectorFrame(children, 0) :: stack) ctx
 
     | Sequence children ->
       if children.Length = 0 then
-        let res = {
-          defaultResult with
-              nodeResult = Success
-        }
-
-        processResult res stack ctx
+        processResult
+          Success
+          (noOutput
+            ctx.Perception.Controller.currentState
+            ctx.Perception.Controller.waypointIndex)
+          stack
+          ctx
       else
         processNode children.[0] (SequenceFrame(children, 0) :: stack) ctx
 
     | Condition(name, parms) ->
       let nodeRes = evaluateCondition name parms ctx
+      // Conditions don't produce output usually, just success/fail
+      let output =
+        match nodeRes with
+        | Success ->
+          noOutput
+            ctx.Perception.Controller.currentState
+            ctx.Perception.Controller.waypointIndex
+        | _ ->
+          failureResult
+            ctx.Perception.Controller.currentState
+            ctx.Perception.Controller.waypointIndex
 
-      let res = {
-        defaultResult with
-            nodeResult = nodeRes
-      }
-
-      processResult res stack ctx
+      processResult nodeRes output stack ctx
 
     | Action(name, parms) ->
-      let res = executeAction name parms ctx
-      processResult res stack ctx
+      let struct (res, output) = executeAction name parms ctx
+      processResult res output stack ctx
 
     | Inverter child -> processNode child (InverterFrame :: stack) ctx
 
   and [<TailCall>] processResult
-    (res: ActionResult)
+    (nodeRes: NodeResult)
+    (output: AIOutput)
     (stack: StackFrame list)
-    (ctx: ExecutionContext)
-    : ActionResult =
+    (ctx: TreeExecutionContext)
+    : struct (NodeResult * AIOutput) =
     match stack with
-    | [] -> res // Stack empty, return final result
+    | [] -> struct (nodeRes, output) // Stack empty, return final result
 
     | SelectorFrame(children, index) :: rest ->
-      if res.nodeResult = Success then
-        processResult res rest ctx
-      else if res.nodeResult = Running then
-        processResult res rest ctx
+      if nodeRes = Success then
+        processResult nodeRes output rest ctx
+      else if nodeRes = Running then
+        processResult nodeRes output rest ctx
       else
         // Failure: Try next child
         let nextIdx = index + 1
@@ -788,13 +749,13 @@ module private BehaviorTreeExecution =
             (SelectorFrame(children, nextIdx) :: rest)
             ctx
         else
-          processResult res rest ctx
+          processResult nodeRes output rest ctx
 
     | SequenceFrame(children, index) :: rest ->
-      if res.nodeResult = Failure then
-        processResult res rest ctx
-      else if res.nodeResult = Running then
-        processResult res rest ctx
+      if nodeRes = Failure then
+        processResult nodeRes output rest ctx
+      else if nodeRes = Running then
+        processResult nodeRes output rest ctx
       else
         // Success: Try next child
         let nextIdx = index + 1
@@ -805,23 +766,25 @@ module private BehaviorTreeExecution =
             (SequenceFrame(children, nextIdx) :: rest)
             ctx
         else
-          processResult res rest ctx
+          processResult nodeRes output rest ctx
 
     | InverterFrame :: rest ->
       let invertedStatus =
-        match res.nodeResult with
+        match nodeRes with
         | Success -> Failure
         | Failure -> Success
         | Running -> Running
 
-      let invertedRes = { res with nodeResult = invertedStatus }
-
-      processResult invertedRes rest ctx
+      // Inverter usually keeps the output of the child if running, or discards?
+      // If child succeeded (so Inverter Fails), we essentially failed.
+      // If child failed (so Inverter Succeeds), we succeeded.
+      // For now, pass through output.
+      processResult invertedStatus output rest ctx
 
   let inline evaluate
     (rootNode: BehaviorNode)
-    (ctx: ExecutionContext)
-    : ActionResult =
+    (ctx: TreeExecutionContext)
+    : struct (NodeResult * AIOutput) =
     processNode rootNode [] ctx
 
 module Decision =
@@ -829,7 +792,10 @@ module Decision =
   // Helper to find abilities - simplified for now as we don't have full AbilityStore access in the same way
   // We'll assume we can get available skills from the world or passed in services
 
-  let matchCueToPriority (cue: PerceptionCue) (priorities: CuePriority[]) =
+  let inline matchCueToPriority
+    (cue: PerceptionCue)
+    (priorities: CuePriority[])
+    =
     priorities
     |> Array.tryFind(fun p ->
       p.cueType = cue.cueType && cue.strength >= p.minStrength)
@@ -838,20 +804,41 @@ module Decision =
     (cues: PerceptionCue[])
     (priorities: CuePriority[])
     : struct (PerceptionCue * CuePriority) voption =
-    cues
-    |> Array.choose(fun cue ->
-      matchCueToPriority cue priorities
-      |> Option.map(fun priority -> struct (cue, priority)))
-    |> Array.sortBy(fun struct (_, priority) -> priority.priority)
-    |> Array.tryHead
-    |> ValueOption.ofOption
+    let mutable bestResult = ValueNone
+
+    // Scan all cues
+    for i = 0 to cues.Length - 1 do
+      let cue = cues.[i]
+      // Find matching priority for this cue
+      let mutable matchingPriority = ValueNone
+
+      for j = 0 to priorities.Length - 1 do
+        let p = priorities.[j]
+
+        if
+          matchingPriority.IsNone
+          && p.cueType = cue.cueType
+          && cue.strength >= p.minStrength
+        then
+          matchingPriority <- ValueSome p
+
+      // If we found a priority match, see if it's better than our current best
+      match matchingPriority with
+      | ValueSome mp ->
+        match bestResult with
+        | ValueNone -> bestResult <- ValueSome(struct (cue, mp))
+        | ValueSome(struct (_, currentBestP)) ->
+          if mp.priority < currentBestP.priority then
+            bestResult <- ValueSome(struct (cue, mp))
+      | ValueNone -> ()
+
+    bestResult
 
   // Simplified command generation
   let generateCommand
     (cue: PerceptionCue)
     (priority: CuePriority)
     (controller: AIController)
-    (skillStore: SkillStore) // Using SkillStore instead of AbilityStore
     =
     match priority.response with
     | Investigate ->
@@ -863,7 +850,6 @@ module Decision =
         : SystemCommunications.SetMovementTarget
       )
     | Engage ->
-      // For now, just move to target. We'll add ability usage later.
       ValueSome(
         {
           EntityId = controller.controlledEntityId
@@ -885,7 +871,6 @@ module Decision =
 
 module AISystemLogic =
 
-
   let private determineState (response: ResponseType) (cue: PerceptionCue) =
     match response with
     | Engage ->
@@ -904,11 +889,9 @@ module AISystemLogic =
     (cue: PerceptionCue)
     (priority: CuePriority)
     (ctx: PerceptionContext)
-    (skillStore: SkillStore)
-    (cooldowns: HashMap<int<SkillId>, TimeSpan> voption)
+    (abilityCtx: AbilityContext)
     =
-    let movementCmd =
-      Decision.generateCommand cue priority ctx.Controller skillStore
+    let movementCmd = Decision.generateCommand cue priority ctx.Controller
 
     let state = determineState priority.response cue
 
@@ -919,9 +902,7 @@ module AISystemLogic =
       | Investigate ->
         match
           SkillSelection.selectSkill
-            ctx.Controller.skills
-            skillStore
-            cooldowns
+            abilityCtx
             ctx.CurrentTick
             ctx.Entity.Position
             cue.position
@@ -938,12 +919,13 @@ module AISystemLogic =
         | ValueNone -> ValueNone
       | _ -> ValueNone
 
-    struct (movementCmd,
-            abilityIntent,
-            true,
-            ctx.Controller.waypointIndex,
-            state)
-
+    {
+      Command = movementCmd
+      Ability = abilityIntent
+      NewState = state
+      WaypointIndex = ValueSome ctx.Controller.waypointIndex
+      ShouldUpdateTime = true
+    }
 
   let private getNavigateToSpawnCommand(controller: AIController) =
     ValueSome(
@@ -959,7 +941,7 @@ module AISystemLogic =
     (controller: AIController)
     (archetype: AIArchetype)
     (currentPos: Vector2)
-    =
+    : AIOutput =
     let navigateSpawn = getNavigateToSpawnCommand controller
 
     match controller.absoluteWaypoints with
@@ -988,25 +970,29 @@ module AISystemLogic =
         | Passive -> AIState.Idle
         | _ -> Patrolling
 
-      struct (cmd, ValueNone, true, nextIdx, desiredState)
+      {
+        Command = cmd
+        Ability = ValueNone
+        NewState = desiredState
+        WaypointIndex = ValueSome nextIdx
+        ShouldUpdateTime = true
+      }
 
     | _ ->
       // No waypoints or empty list
       match archetype.behaviorType with
       | Patrol ->
         // Patrol with no waypoints = Idle
-        struct (ValueNone,
-                ValueNone,
-                true,
-                controller.waypointIndex,
-                AIState.Idle)
+        noOutput controller.currentState controller.waypointIndex
       | _ ->
-        // Others return to spawn
-        struct (navigateSpawn,
-                ValueNone,
-                true,
-                controller.waypointIndex,
-                AIState.Idle)
+          // Others return to spawn
+          {
+            Command = navigateSpawn
+            Ability = ValueNone
+            NewState = AIState.Idle
+            WaypointIndex = ValueSome controller.waypointIndex
+            ShouldUpdateTime = true
+          }
 
   /// Evaluate a behavior tree and return result in the standard tuple format
   let evaluateWithBehaviorTree
@@ -1015,17 +1001,12 @@ module AISystemLogic =
     (world: WorldSnapshot)
     (cues: PerceptionCue[])
     (updatedMemories: HashMap<Guid<EntityId>, MemoryEntry>)
-    (skillStore: SkillStore)
-    (cooldowns: HashMap<int<SkillId>, TimeSpan> voption)
-    =
+    (abilityCtx: AbilityContext)
+    : AIOutput =
     match tree with
     | ValueNone ->
       // No tree, use default idle behavior
-      struct (ValueNone,
-              ValueNone,
-              true,
-              ctx.Controller.waypointIndex,
-              ctx.Controller.currentState)
+      noOutput ctx.Controller.currentState ctx.Controller.waypointIndex
     | ValueSome behaviorTree ->
       // Find closest target from memories, but use CURRENT position if available
       let targetOpt =
@@ -1056,31 +1037,30 @@ module AISystemLogic =
           (ValueSome cue, ValueSome priority.response)
         | ValueNone -> (ValueNone, ValueNone)
 
-      let execCtx: BehaviorTreeExecution.ExecutionContext = {
-        controller = ctx.Controller
-        archetype = ctx.Archetype
-        entityPos = ctx.Entity.Position
-        targetPos = targetPos
-        targetId = targetId
-        targetDistance = targetDist
-        skillStore = skillStore
-        cooldowns = cooldowns
-        currentTime = ctx.CurrentTick
-        bestCue = bestCue
-        cueResponse = cueResponse
+      let execCtx: BehaviorTreeExecution.TreeExecutionContext = {
+        Perception = ctx
+        Target = {
+          Position = targetPos
+          EntityId = targetId
+          Distance = targetDist
+        }
+        Ability = abilityCtx
+        BestCue = bestCue
+        Response = cueResponse
       }
 
-      let result = BehaviorTreeExecution.evaluate behaviorTree.Root execCtx
+      let struct (_, output) =
+        BehaviorTreeExecution.evaluate behaviorTree.Root execCtx
 
+      // Ensure we preserve waypoint index if not set
       let newWaypointIdx =
-        result.waypointIndex
+        output.WaypointIndex
         |> ValueOption.defaultValue ctx.Controller.waypointIndex
 
-      struct (result.command,
-              result.abilityIntent,
-              true,
-              newWaypointIdx,
-              result.newState)
+      {
+        output with
+            WaypointIndex = ValueSome newWaypointIdx
+      }
 
   let processAndGenerateCommands
     (ctx: PerceptionContext)
@@ -1100,8 +1080,13 @@ module AISystemLogic =
     let entityCooldowns =
       cooldowns |> HashMap.tryFindV controller.controlledEntityId
 
-    let struct (command, abilityIntent, shouldUpdateTime, newWaypointIndex,
-                newState) =
+    let abilityCtx: AbilityContext = {
+      SkillStore = skillStore
+      Cooldowns = entityCooldowns
+      KnownSkills = controller.skills
+    }
+
+    let result =
       if timeSinceLastDecision >= archetype.decisionInterval then
         // Try to use behavior tree if available
         let treeOpt = decisionTreeStore.tryFind controller.decisionTree
@@ -1114,36 +1099,36 @@ module AISystemLogic =
             world
             cues
             updatedMemories
-            skillStore
-            entityCooldowns
+            abilityCtx
         | ValueNone ->
           // Fallback to cue-based decision
           let bestCue = Decision.selectBestCue cues archetype.cuePriorities
 
           match bestCue with
           | ValueSome struct (cue, priority) ->
-            handleBestCue cue priority ctx skillStore entityCooldowns
+            handleBestCue cue priority ctx abilityCtx
           | ValueNone -> handleNoCue controller archetype pos
       else
-        struct (ValueNone,
-                ValueNone,
-                false,
-                controller.waypointIndex,
-                controller.currentState)
+        {
+          noOutput controller.currentState controller.waypointIndex with
+              ShouldUpdateTime = false
+        }
 
     let updatedController = {
       controller with
           memories = updatedMemories
-          waypointIndex = newWaypointIndex
-          currentState = newState
+          waypointIndex =
+            result.WaypointIndex
+            |> ValueOption.defaultValue controller.waypointIndex
+          currentState = result.NewState
           lastDecisionTime =
-            if shouldUpdateTime then
+            if result.ShouldUpdateTime then
               ctx.CurrentTick
             else
               controller.lastDecisionTime
     }
 
-    struct (updatedController, command, abilityIntent)
+    struct (updatedController, result.Command, result.Ability)
 
 
 open Pomo.Core.Environment
