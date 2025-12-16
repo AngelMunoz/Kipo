@@ -50,8 +50,8 @@
     "Description": "Summons a devastating inferno that engulfs enemies in flames, dealing massive dark damage over time.\nThe dark attribute significantly amplifies its destructive power.",
     "Intent": "Offensive",
     "DamageSource": "Magical",
-    "Cost": { "Type": "MP", "Amount": 1 },
-    "Cooldown": 0.5,
+    "Cost": { "Type": "MP", "Amount": 25 },
+    "Cooldown": 5.0,
     "Targeting": "TargetEntity",
     "Range": [16, 16],
     "Area": "Point",
@@ -255,8 +255,8 @@
     "Area": {
       "Type": "Cone",
       "Angle": 45.0,
-      "Length": 208.0,
-      "MaxTargets": 10
+      "Length": 160.0,
+      "MaxTargets": 6
     },
     "Delivery": { "Type": "Instant" },
     "ImpactVisuals": { "Vfx": "FireBreath" },
@@ -281,8 +281,8 @@
     "Area": {
       "Type": "Line",
       "Width": 32.0,
-      "Length": 304.0,
-      "MaxTargets": 10
+      "Length": 192.0,
+      "MaxTargets": 6
     },
     "Delivery": { "Type": "Instant" },
     "Formula": "MA * 2.0",
@@ -335,8 +335,8 @@
     "Area": {
       "Type": "Line",
       "Width": 16.0,
-      "Length": 208.0,
-      "MaxTargets": 5
+      "Length": 160.0,
+      "MaxTargets": 4
     },
     "Delivery": {
       "Type": "Projectile",
@@ -354,14 +354,14 @@
     "Description": "Throws a fan of knives that spread out based on distance.",
     "Intent": "Offensive",
     "DamageSource": "Physical",
-    "Cost": { "Type": "MP", "Amount": 3 },
-    "Cooldown": 1.5,
+    "Cost": { "Type": "MP", "Amount": 8 },
+    "Cooldown": 4.0,
     "Targeting": "TargetPosition",
     "Range": [16, 20],
     "Area": {
       "Type": "AdaptiveCone",
-      "Length": 400.0,
-      "MaxTargets": 5
+      "Length": 256.0,
+      "MaxTargets": 4
     },
     "Delivery": {
       "Type": "Projectile",
@@ -380,8 +380,8 @@
     "Description": "Fires a bolt of pure light that burns enemies.",
     "Intent": "Offensive",
     "DamageSource": "Magical",
-    "Cost": { "Type": "MP", "Amount": 15 },
-    "Cooldown": 2.5,
+    "Cost": { "Type": "MP", "Amount": 12 },
+    "Cooldown": 3.5,
     "Targeting": "TargetEntity",
     "Range": [16, 14],
     "Area": "Point",
@@ -406,8 +406,8 @@
     "Description": "Launches a bolt of dark energy that drains life.",
     "Intent": "Offensive",
     "DamageSource": "Magical",
-    "Cost": { "Type": "MP", "Amount": 18 },
-    "Cooldown": 3.0,
+    "Cost": { "Type": "MP", "Amount": 15 },
+    "Cooldown": 4.5,
     "Targeting": "TargetEntity",
     "Range": [16, 12],
     "Area": "Point",
@@ -432,8 +432,8 @@
     "Description": "Spins rapidly, dealing physical damage to all nearby enemies.",
     "Intent": "Offensive",
     "DamageSource": "Physical",
-    "Cost": { "Type": "MP", "Amount": 20 },
-    "Cooldown": 4.0,
+    "Cost": { "Type": "MP", "Amount": 18 },
+    "Cooldown": 6.0,
     "Targeting": "Self",
     "Area": {
       "Type": "Circle",
@@ -441,6 +441,7 @@
       "MaxTargets": 8
     },
     "Delivery": { "Type": "Instant" },
+    "ImpactVisuals": { "Vfx": "WhirlwindSlash" },
     "Formula": "AP * 1.8",
     "Origin": "Caster",
     "Effects": []
@@ -452,8 +453,8 @@
     "Description": "A precise shot that slows the target.",
     "Intent": "Offensive",
     "DamageSource": "Physical",
-    "Cost": { "Type": "MP", "Amount": 10 },
-    "Cooldown": 5.0,
+    "Cost": { "Type": "MP", "Amount": 8 },
+    "Cooldown": 8.0,
     "Targeting": "TargetEntity",
     "Range": [16, 18],
     "Area": "Point",
@@ -476,7 +477,7 @@
             "Type": "StaticMod",
             "StatModifier": {
               "Type": "Multiplicative",
-              "Stat": "MoveSpeed",
+              "Stat": "MS",
               "Value": 0.5
             }
           }
@@ -557,17 +558,18 @@
     "Description": "Releases a crescent of compressed air that cuts through enemies.",
     "Intent": "Offensive",
     "DamageSource": "Magical",
-    "Cost": { "Type": "MP", "Amount": 12 },
-    "Cooldown": 2.0,
+    "Cost": { "Type": "MP", "Amount": 10 },
+    "Cooldown": 3.0,
     "Targeting": "TargetDirection",
     "Range": [16, 12],
     "Area": {
       "Type": "Cone",
-      "Angle": 30.0,
-      "Length": 180.0,
-      "MaxTargets": 6
+      "Angle": 35.0,
+      "Length": 144.0,
+      "MaxTargets": 5
     },
     "Delivery": { "Type": "Instant" },
+    "ImpactVisuals": { "Vfx": "WindSlash" },
     "ElementFormula": {
       "Element": "Air",
       "Formula": "(MA * 1.1) + (AirA * 1800)"
@@ -624,7 +626,7 @@
     "Effects": [
       {
         "Name": "Restored",
-        "Kind": "Heal",
+        "Kind": "ResourceOverTime",
         "Stacking": { "Type": "RefreshDuration" },
         "Duration": { "Type": "Instant" },
         "DamageSource": "Magical",
@@ -696,7 +698,7 @@
     "Effects": [
       {
         "Name": "Regenerating",
-        "Kind": "HealOverTime",
+        "Kind": "ResourceOverTime",
         "Stacking": { "Type": "RefreshDuration" },
         "Duration": { "Type": "Loop", "Interval": 2.0, "Duration": 16.0 },
         "DamageSource": "Magical",
