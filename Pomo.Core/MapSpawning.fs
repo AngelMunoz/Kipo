@@ -89,6 +89,7 @@ module MapSpawning =
   }
 
   /// Extract spawn candidates from a map definition
+  /// Respects MaxSpawns property to generate multiple candidates per spawn area
   let extractSpawnCandidates
     (mapDef: MapDefinition)
     (random: Random)
@@ -96,7 +97,7 @@ module MapSpawning =
     mapDef.ObjectGroups
     |> IndexList.collect(fun group ->
       group.Objects
-      |> IndexList.choose(fun obj ->
+      |> IndexList.collect(fun obj ->
         match obj.Type with
         | ValueSome MapObjectType.Spawn ->
           let isPlayerSpawn =
@@ -107,20 +108,36 @@ module MapSpawning =
 
           let entityGroup = obj.Properties |> HashMap.tryFindV "EntityGroup"
 
-          let pos =
+          // Get MaxSpawns from properties, default to 1
+          let maxSpawns =
+            obj.Properties
+            |> HashMap.tryFindV "MaxSpawns"
+            |> ValueOption.bind(fun v ->
+              match Int32.TryParse v with
+              | true, n -> ValueSome n
+              | _ -> ValueNone)
+            |> ValueOption.defaultValue 1
+
+          // Generate a position within the spawn area
+          let getRandomPosition() =
             match obj.CollisionShape with
             | ValueSome(ClosedPolygon points) when not points.IsEmpty ->
               let offset = getRandomPointInPolygon points random
               Vector2(obj.X + offset.X, obj.Y + offset.Y)
             | _ -> Vector2(obj.X, obj.Y)
 
-          Some {
-            Name = obj.Name
-            IsPlayerSpawn = isPlayerSpawn
-            EntityGroup = entityGroup
-            Position = pos
+          // Create candidates for each spawn slot
+          seq {
+            for _ in 1..maxSpawns do
+              yield {
+                Name = obj.Name
+                IsPlayerSpawn = isPlayerSpawn
+                EntityGroup = entityGroup
+                Position = getRandomPosition()
+              }
           }
-        | _ -> None))
+          |> IndexList.ofSeq
+        | _ -> IndexList.empty))
     |> IndexList.toSeq
 
   /// Determine the player spawn position from candidates

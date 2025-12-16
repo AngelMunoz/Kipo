@@ -105,20 +105,30 @@ module SkillSelection =
       | ValueNone -> true
       | ValueSome cooldownEnd -> currentTime >= cooldownEnd
 
-  /// Get the range of a skill
-  let inline getSkillRange(skill: Skill.Skill) =
+  /// Get the range of a skill (returns ValueNone for skills with no range restriction)
+  let inline getSkillRange(skill: Skill.Skill) : float32 voption =
     match skill with
-    | Skill.Active active -> active.Range |> ValueOption.defaultValue 64.0f
-    | Skill.Passive _ -> 0.0f
+    | Skill.Active active ->
+      match active.Targeting with
+      // Self-targeting skills have no range restriction
+      | Skill.Self -> ValueNone
+      // Direction-based skills originate from caster, no range check needed
+      | Skill.TargetDirection -> ValueNone
+      // For other targeting types, use the specified range
+      | _ -> active.Range
+    | Skill.Passive _ -> ValueNone
 
-  /// Check if target is within skill range
-  let inline isTargetInRange
+  /// Check if target is within skill range (or if skill has no range restriction)
+  let inline isSkillUsable
     (casterPos: Vector2)
     (targetPos: Vector2)
-    (skillRange: float32)
+    (skillRange: float32 voption)
     =
-    let distance = Vector2.Distance(casterPos, targetPos)
-    distance <= skillRange
+    match skillRange with
+    | ValueNone -> true // No range restriction, always usable
+    | ValueSome range ->
+      let distance = Vector2.Distance(casterPos, targetPos)
+      distance <= range
 
   /// Select the best skill to use given the context
   let inline selectSkill
@@ -140,7 +150,7 @@ module SkillSelection =
         | ValueSome skill ->
           let range = getSkillRange skill
 
-          if isTargetInRange casterPos targetPos range then
+          if isSkillUsable casterPos targetPos range then
             res <- ValueSome(struct (skillId, skill))
         | ValueNone -> ()
 

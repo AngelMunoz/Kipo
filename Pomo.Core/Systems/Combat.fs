@@ -711,38 +711,20 @@ module Combat =
       (target: SystemCommunications.SkillTarget)
       =
       match ctx.SkillStore.tryFind skillId with
-      | ValueSome(Skill.Active activeSkill) ->
-        let casterPos = Targeting.getPosition ctx.EntityContext casterId
-        let maxRange = activeSkill.Range |> ValueOption.defaultValue 64.0f
+      | ValueSome(Active activeSkill) ->
+        Execution.applyResourceCost ctx casterId activeSkill
+        Execution.applyCooldown ctx casterId skillId activeSkill
 
-        let targetPos =
-          match target with
-          | SystemCommunications.TargetEntity targetId ->
-            ctx.EntityContext.Positions.TryFindV targetId
-            |> ValueOption.defaultValue casterPos
-          | SystemCommunications.TargetPosition pos -> pos
-          | SystemCommunications.TargetDirection pos -> pos
-          | SystemCommunications.TargetSelf -> casterPos
-
-        let distance = Vector2.Distance(casterPos, targetPos)
-
-        if distance > maxRange then
-          ()
-        else
-          Execution.applyResourceCost ctx casterId activeSkill
-          Execution.applyCooldown ctx casterId skillId activeSkill
-
-          match activeSkill.Delivery with
-          | Delivery.Projectile projectileInfo ->
-            handleProjectileDelivery
-              ctx
-              casterId
-              skillId
-              target
-              activeSkill
-              projectileInfo
-          | Delivery.Instant ->
-            handleInstantDelivery ctx casterId target activeSkill
+        match activeSkill.Delivery with
+        | Projectile projectileInfo ->
+          handleProjectileDelivery
+            ctx
+            casterId
+            skillId
+            target
+            activeSkill
+            projectileInfo
+        | Instant -> handleInstantDelivery ctx casterId target activeSkill
       | _ -> ()
 
     let handleProjectileImpact
