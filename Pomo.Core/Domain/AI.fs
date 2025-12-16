@@ -114,6 +114,7 @@ type AIController = {
   // Decision Making
   lastDecisionTime: TimeSpan
   currentTarget: Guid<EntityId> voption
+  decisionTree: string // Name of the decision tree to use
 
   // Skills (from AIEntityDefinition)
   skills: int<SkillId>[]

@@ -286,6 +286,10 @@ module EntitySpawnerLogic =
         waypointIndex = 0
         lastDecisionTime = TimeSpan.Zero
         currentTarget = ValueNone
+        decisionTree =
+          aiEntity
+          |> Option.map(fun e -> e.DecisionTree)
+          |> Option.defaultValue "MeleeAttacker" // Default tree
         skills = skills
         memories = HashMap.empty
       }

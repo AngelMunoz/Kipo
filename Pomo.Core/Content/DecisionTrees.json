@@ -6,6 +6,13 @@
         {
           "Type": "Sequence",
           "Children": [
+            { "Type": "Condition", "Name": "BeyondLeash" },
+            { "Type": "Action", "Name": "ReturnToSpawn" }
+          ]
+        },
+        {
+          "Type": "Sequence",
+          "Children": [
             { "Type": "Condition", "Name": "HasTarget" },
             { "Type": "Condition", "Name": "TargetInRange" },
             { "Type": "Action", "Name": "UseRangedAttack" }
@@ -26,6 +33,13 @@
     "Root": {
       "Type": "Selector",
       "Children": [
+        {
+          "Type": "Sequence",
+          "Children": [
+            { "Type": "Condition", "Name": "BeyondLeash" },
+            { "Type": "Action", "Name": "ReturnToSpawn" }
+          ]
+        },
         {
           "Type": "Sequence",
           "Children": [
@@ -68,6 +82,13 @@
         {
           "Type": "Sequence",
           "Children": [
+            { "Type": "Condition", "Name": "BeyondLeash" },
+            { "Type": "Action", "Name": "ReturnToSpawn" }
+          ]
+        },
+        {
+          "Type": "Sequence",
+          "Children": [
             {
               "Type": "Condition",
               "Name": "SelfHealthBelow",
@@ -91,6 +112,13 @@
     "Root": {
       "Type": "Selector",
       "Children": [
+        {
+          "Type": "Sequence",
+          "Children": [
+            { "Type": "Condition", "Name": "BeyondLeash" },
+            { "Type": "Action", "Name": "ReturnToSpawn" }
+          ]
+        },
         {
           "Type": "Sequence",
           "Children": [
