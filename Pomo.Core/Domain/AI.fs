@@ -37,11 +37,17 @@ type CueStrength =
   | Overwhelming
 
 [<Struct>]
+type MovementType =
+  | Free
+  | Stationary
+  | Tethered of leashDistance: float32
+
+[<Struct>]
 type PerceptionConfig = {
   visualRange: float32
   fov: float32 // Field of View in degrees
   memoryDuration: TimeSpan
-  leashDistance: float32
+  movementType: MovementType
 }
 
 [<Struct>]
@@ -298,15 +304,32 @@ module Serialization =
         and! memoryDurationSeconds =
           Required.Property.get ("MemoryDuration", Required.float) json
 
-        and! leashDistance =
-          Optional.Property.get ("LeashDistance", Required.float) json
-          |> Result.map(Option.defaultValue 300.0)
+        and! movementType =
+          // Parse MovementType: "Free", "Stationary", or "Tethered" with LeashDistance
+          Optional.Property.get ("MovementType", Required.string) json
+          |> Result.bind(fun mvtOpt ->
+            match mvtOpt with
+            | Some mvt ->
+              match mvt.ToLowerInvariant() with
+              | "free" -> Ok Free
+              | "stationary" -> Ok Stationary
+              | "tethered" ->
+                Required.Property.get ("LeashDistance", Required.float) json
+                |> Result.map(fun dist -> Tethered(float32 dist))
+              | other ->
+                DecodeError.ofError(
+                  json.Clone(),
+                  $"Unknown MovementType: {other}"
+                )
+                |> Error
+            | None -> Ok Free // Default to Free if not specified
+          )
 
         return {
           visualRange = float32 visualRange
           fov = float32 fov
           memoryDuration = TimeSpan.FromSeconds memoryDurationSeconds
-          leashDistance = float32 leashDistance
+          movementType = movementType
         }
       }
 

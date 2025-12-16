@@ -286,7 +286,10 @@ module Perception =
         Vector2.Distance(ctx.Entity.Position, ctx.Controller.spawnPosition)
 
       let isLeashed =
-        distToSpawn <= ctx.Archetype.perceptionConfig.leashDistance
+        match ctx.Archetype.perceptionConfig.movementType with
+        | Free -> true // Free entities always in "leash" (no restriction)
+        | Stationary -> true // Stationary always at spawn
+        | Tethered dist -> distToSpawn <= dist
 
       if age < ctx.Archetype.perceptionConfig.memoryDuration && isLeashed then
         let decayFactor =
@@ -477,10 +480,10 @@ module private BehaviorTreeExecution =
           ctx.Perception.Controller.spawnPosition
         )
 
-      if dist > ctx.Perception.Archetype.perceptionConfig.leashDistance then
-        Success
-      else
-        Failure
+      match ctx.Perception.Archetype.perceptionConfig.movementType with
+      | Tethered leash -> if dist > leash then Success else Failure
+      | Free -> Failure // Free entities have no leash
+      | Stationary -> Failure // Stationary can't move, so never beyond
     | SkillReady ->
       let hasReady =
         ctx.Ability.KnownSkills
@@ -569,21 +572,25 @@ module private BehaviorTreeExecution =
 
           struct (Success, output)
         | ValueNone ->
-          // Fallback: move to target
-          let command: SystemCommunications.SetMovementTarget = {
-            EntityId = ctx.Perception.Controller.controlledEntityId
-            Target = targetPos
-          }
+          // Stationary entities never move - if they can't use a skill, they fail
+          match ctx.Perception.Archetype.perceptionConfig.movementType with
+          | Stationary -> defaultFail
+          | _ ->
+            // Fallback: move to target
+            let command: SystemCommunications.SetMovementTarget = {
+              EntityId = ctx.Perception.Controller.controlledEntityId
+              Target = targetPos
+            }
 
-          let output = {
-            Command = ValueSome command
-            Ability = ValueNone
-            NewState = Chasing
-            WaypointIndex = ValueNone
-            ShouldUpdateTime = true
-          }
+            let output = {
+              Command = ValueSome command
+              Ability = ValueNone
+              NewState = Chasing
+              WaypointIndex = ValueNone
+              ShouldUpdateTime = true
+            }
 
-          struct (Running, output)
+            struct (Running, output)
       | _ -> defaultFail
 
     | ActionKind.Patrol ->
@@ -657,7 +664,16 @@ module private BehaviorTreeExecution =
         struct (Running, output)
       | ValueNone -> defaultFail
 
-    | ActionKind.Idle -> defaultSuccess
+    | ActionKind.Idle ->
+      let output = {
+        Command = ValueNone
+        Ability = ValueNone
+        NewState = AIState.Idle
+        WaypointIndex = ValueNone
+        ShouldUpdateTime = false
+      }
+
+      struct (Success, output)
 
   // --- Tree Evaluator ---
 
@@ -1181,7 +1197,7 @@ type AISystem(game: Game, env: PomoEnvironment) =
       visualRange = 150.0f
       fov = 360.0f
       memoryDuration = TimeSpan.FromSeconds 5.0
-      leashDistance = 300.0f
+      movementType = Free
     }
     cuePriorities = [||]
     decisionInterval = TimeSpan.FromSeconds 0.5

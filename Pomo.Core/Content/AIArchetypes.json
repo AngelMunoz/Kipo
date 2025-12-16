@@ -6,7 +6,8 @@
     "PerceptionConfig": {
       "VisualRange": [16.0, 10],
       "Fov": 360.0,
-      "MemoryDuration": 5.0
+      "MemoryDuration": 5.0,
+      "MovementType": "Free"
     },
     "CuePriorities": [
       {
@@ -31,7 +32,9 @@
     "PerceptionConfig": {
       "VisualRange": [16.0, 13],
       "Fov": 180.0,
-      "MemoryDuration": 10.0
+      "MemoryDuration": 10.0,
+      "MovementType": "Tethered",
+      "LeashDistance": 300.0
     },
     "CuePriorities": [
       {
@@ -62,7 +65,8 @@
     "PerceptionConfig": {
       "VisualRange": [16.0, 12],
       "Fov": 360.0,
-      "MemoryDuration": 3.0
+      "MemoryDuration": 3.0,
+      "MovementType": "Stationary"
     },
     "CuePriorities": [
       {
