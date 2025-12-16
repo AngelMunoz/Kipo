@@ -1060,33 +1060,34 @@ module AISystemLogic =
       noOutput ctx.Controller.currentState ctx.Controller.waypointIndex
     | ValueSome behaviorTree ->
       // Find closest target from memories, but use CURRENT position if available
-      let targetOpt =
-        updatedMemories
-        |> HashMap.toSeq
-        |> Seq.tryHead
-        |> Option.map(fun (id, _entry) ->
+      let mutable targetResult: struct (Guid<EntityId> * Vector2) voption =
+        ValueNone
+
+      for id, entry in updatedMemories do
+        if targetResult.IsValueNone then
           // Prefer real-time position over stale memory position
-          let currentPos = world.Positions |> HashMap.tryFindV id
+          let pos =
+            match world.Positions |> HashMap.tryFindV id with
+            | ValueSome p -> p
+            | ValueNone -> entry.lastKnownPosition
 
-          match currentPos with
-          | ValueSome pos -> struct (id, pos)
-          | ValueNone -> struct (id, _entry.lastKnownPosition))
+          targetResult <- ValueSome struct (id, pos)
 
-      let targetPos, targetId, targetDist =
-        match targetOpt with
-        | Some struct (id, pos) ->
+      let struct (targetPos, targetId, targetDist) =
+        match targetResult with
+        | ValueSome struct (id, pos) ->
           let dist = Vector2.Distance(ctx.Entity.Position, pos)
-          (ValueSome pos, ValueSome id, ValueSome dist)
-        | None -> (ValueNone, ValueNone, ValueNone)
+          ValueSome pos, ValueSome id, ValueSome dist
+        | ValueNone -> ValueNone, ValueNone, ValueNone
 
       // Compute best cue using archetype's cuePriorities
       let bestCueOpt = Decision.selectBestCue cues ctx.Archetype.cuePriorities
 
-      let bestCue, cueResponse =
+      let struct (bestCue, cueResponse) =
         match bestCueOpt with
         | ValueSome struct (cue, priority) ->
-          (ValueSome cue, ValueSome priority.response)
-        | ValueNone -> (ValueNone, ValueNone)
+          ValueSome cue, ValueSome priority.response
+        | ValueNone -> ValueNone, ValueNone
 
       let execCtx: BehaviorTreeExecution.TreeExecutionContext = {
         Perception = ctx
@@ -1213,13 +1214,45 @@ type AISystem(game: Game, env: PomoEnvironment) =
   override val Kind = SystemKind.AI with get
 
   override _.Update _ =
-    // Snapshot all necessary data
+    // Snapshot controllers and scenarios (always needed)
     let controllers = core.World.AIControllers |> AMap.force
     let entityScenarios = core.World.EntityScenario |> AMap.force
-    let velocities = core.World.Velocities |> AMap.force
-    let factions = core.World.Factions |> AMap.force
-    let cooldowns = core.World.AbilityCooldowns |> AMap.force
     let currentTick = (core.World.Time |> AVal.force).TotalGameTime
+
+    // Lazily compute velocities/factions/cooldowns only when first accessed
+    let mutable velocitiesOpt: HashMap<Guid<EntityId>, Vector2> voption =
+      ValueNone
+
+    let mutable factionsOpt: HashMap<Guid<EntityId>, Faction HashSet> voption =
+      ValueNone
+
+    let mutable cooldownsOpt
+      : HashMap<Guid<EntityId>, HashMap<int<SkillId>, TimeSpan>> voption =
+      ValueNone
+
+    let getVelocities() =
+      match velocitiesOpt with
+      | ValueSome v -> v
+      | ValueNone ->
+        let v = core.World.Velocities |> AMap.force
+        velocitiesOpt <- ValueSome v
+        v
+
+    let getFactions() =
+      match factionsOpt with
+      | ValueSome f -> f
+      | ValueNone ->
+        let f = core.World.Factions |> AMap.force
+        factionsOpt <- ValueSome f
+        f
+
+    let getCooldowns() =
+      match cooldownsOpt with
+      | ValueSome c -> c
+      | ValueNone ->
+        let c = core.World.AbilityCooldowns |> AMap.force
+        cooldownsOpt <- ValueSome c
+        c
 
     // Group controllers by scenario
     let controllersByScenario =
@@ -1231,10 +1264,10 @@ type AISystem(game: Game, env: PomoEnvironment) =
         | ValueNone -> None)
       |> Seq.groupBy fst
 
-    for (scenarioId, group) in controllersByScenario do
+    for scenarioId, group in controllersByScenario do
       let mutable worldOpt: AIContext.WorldSnapshot voption = ValueNone
 
-      for (_, (controllerId, controller)) in group do
+      for _, (controllerId, controller) in group do
 
         let archetype =
           archetypeStore.tryFind controller.archetypeId
@@ -1249,15 +1282,15 @@ type AISystem(game: Game, env: PomoEnvironment) =
             | ValueSome w -> w
             | ValueNone ->
               let snapshot =
-                gameplay.Projections.ComputeMovementSnapshot(scenarioId)
+                gameplay.Projections.ComputeMovementSnapshot scenarioId
 
               let positions = snapshot.Positions
               let spatialGrid = snapshot.SpatialGrid
 
               let w: AIContext.WorldSnapshot = {
                 Positions = positions
-                Velocities = velocities
-                Factions = factions
+                Velocities = getVelocities()
+                Factions = getFactions()
                 SpatialGrid = spatialGrid
               }
 
@@ -1268,12 +1301,12 @@ type AISystem(game: Game, env: PomoEnvironment) =
             world.Positions |> HashMap.tryFindV controller.controlledEntityId
 
           let facOpt =
-            factions |> HashMap.tryFindV controller.controlledEntityId
+            getFactions() |> HashMap.tryFindV controller.controlledEntityId
 
           match posOpt, facOpt with
           | ValueSome pos, ValueSome facs ->
             let vel =
-              velocities
+              getVelocities()
               |> HashMap.tryFindV controller.controlledEntityId
               |> ValueOption.defaultValue Vector2.Zero
 
@@ -1297,7 +1330,7 @@ type AISystem(game: Game, env: PomoEnvironment) =
                 world
                 skillStore
                 decisionTreeStore
-                cooldowns
+                (getCooldowns())
 
             match command with
             | ValueSome cmd -> core.EventBus.Publish cmd
