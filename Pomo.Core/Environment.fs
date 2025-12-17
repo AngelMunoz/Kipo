@@ -36,6 +36,9 @@ module Environment =
     abstract ItemStore: ItemStore
     abstract MapStore: MapStore
     abstract AIArchetypeStore: AIArchetypeStore
+    abstract AIFamilyStore: AIFamilyStore
+    abstract AIEntityStore: AIEntityStore
+    abstract DecisionTreeStore: DecisionTreeStore
     abstract ModelStore: ModelStore
     abstract AnimationStore: AnimationStore
     abstract ParticleStore: ParticleStore

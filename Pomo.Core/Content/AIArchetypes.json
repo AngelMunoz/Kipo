@@ -6,7 +6,8 @@
     "PerceptionConfig": {
       "VisualRange": [16.0, 10],
       "Fov": 360.0,
-      "MemoryDuration": 5.0
+      "MemoryDuration": 5.0,
+      "MovementType": "Free"
     },
     "CuePriorities": [
       {
@@ -16,7 +17,7 @@
         "Response": "Engage"
       }
     ],
-    "DecisionInterval": 10,
+    "DecisionInterval": 0.75,
     "BaseStats": {
       "Power": 2,
       "Magic": 2,
@@ -31,7 +32,9 @@
     "PerceptionConfig": {
       "VisualRange": [16.0, 13],
       "Fov": 180.0,
-      "MemoryDuration": 10.0
+      "MemoryDuration": 10.0,
+      "MovementType": "Tethered",
+      "LeashDistance": 300.0
     },
     "CuePriorities": [
       {
@@ -47,12 +50,38 @@
         "Response": "Engage"
       }
     ],
-    "DecisionInterval": 10,
+    "DecisionInterval": 0.75,
     "BaseStats": {
       "Power": 5,
       "Magic": 2,
       "Sense": 10,
       "Charm": 100
+    }
+  },
+  {
+    "Id": 3,
+    "Name": "Tower",
+    "BehaviorType": "Turret",
+    "PerceptionConfig": {
+      "VisualRange": [16.0, 12],
+      "Fov": 360.0,
+      "MemoryDuration": 3.0,
+      "MovementType": "Stationary"
+    },
+    "CuePriorities": [
+      {
+        "CueType": "Visual",
+        "MinStrength": "Weak",
+        "Priority": 10,
+        "Response": "Engage"
+      }
+    ],
+    "DecisionInterval": 0.5,
+    "BaseStats": {
+      "Power": 3,
+      "Magic": 5,
+      "Sense": 8,
+      "Charm": 300
     }
   }
 ]

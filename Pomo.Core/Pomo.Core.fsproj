@@ -24,6 +24,7 @@
     <Compile Include="EventBus.fs" />
     <Compile Include="Serialization.fs" />
     <Compile Include="Stores.fs" />
+    <Compile Include="MapSpawning.fs" />
     <Compile Include="Projections.fs" />
     <Compile Include="Algorithms/Physics.fs" />
     <Compile Include="Algorithms/Pathfinding.fs" />
@@ -97,6 +98,18 @@
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
     <Content Include="Content/Particles.json">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+    <Content Include="Content/AIFamilies.json">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+    <Content Include="Content/AIEntities.json">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+    <Content Include="Content/DecisionTrees.json">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+    <Content Include="Content/Maps/Proto.ai-entities.json">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
   </ItemGroup>

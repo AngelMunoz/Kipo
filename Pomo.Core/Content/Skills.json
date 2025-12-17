@@ -30,7 +30,7 @@
     "Area": "Point",
     "Delivery": {
       "Type": "Projectile",
-      "Speed": 100.0,
+      "Speed": 200.0,
       "CollisionMode": "IgnoreTerrain",
       "Visuals": { "Vfx": "FireballProjectile" }
     },
@@ -50,14 +50,14 @@
     "Description": "Summons a devastating inferno that engulfs enemies in flames, dealing massive dark damage over time.\nThe dark attribute significantly amplifies its destructive power.",
     "Intent": "Offensive",
     "DamageSource": "Magical",
-    "Cost": { "Type": "MP", "Amount": 1 },
-    "Cooldown": 0.5,
+    "Cost": { "Type": "MP", "Amount": 25 },
+    "Cooldown": 5.0,
     "Targeting": "TargetEntity",
     "Range": [16, 16],
     "Area": "Point",
     "Delivery": {
       "Type": "Projectile",
-      "Speed": 150.0,
+      "Speed": 250.0,
       "CollisionMode": "IgnoreTerrain",
       "Visuals": { "Vfx": "HellfireProjectile" }
     },
@@ -198,7 +198,7 @@
     },
     "Delivery": {
       "Type": "Projectile",
-      "Speed": 150.0,
+      "Speed": 250.0,
       "CollisionMode": "IgnoreTerrain",
       "Kind": {
         "Type": "Descending",
@@ -229,7 +229,7 @@
     "Area": "Point",
     "Delivery": {
       "Type": "Projectile",
-      "Speed": 80.0,
+      "Speed": 180.0,
       "CollisionMode": "IgnoreTerrain",
       "Kind": {
         "Type": "Chained",
@@ -248,15 +248,15 @@
     "Description": "Exhales a cone of fire.",
     "Intent": "Offensive",
     "DamageSource": "Magical",
-    "Cost": { "Type": "MP", "Amount": 10 },
-    "Cooldown": 2.0,
+    "Cost": { "Type": "MP", "Amount": 3 },
+    "Cooldown": 2.5,
     "Targeting": "TargetDirection",
     "Range": [16, 12],
     "Area": {
       "Type": "Cone",
       "Angle": 45.0,
-      "Length": 208.0,
-      "MaxTargets": 10
+      "Length": 160.0,
+      "MaxTargets": 6
     },
     "Delivery": { "Type": "Instant" },
     "ImpactVisuals": { "Vfx": "FireBreath" },
@@ -281,8 +281,8 @@
     "Area": {
       "Type": "Line",
       "Width": 32.0,
-      "Length": 304.0,
-      "MaxTargets": 10
+      "Length": 192.0,
+      "MaxTargets": 6
     },
     "Delivery": { "Type": "Instant" },
     "Formula": "MA * 2.0",
@@ -297,7 +297,7 @@
     "Description": "Fires a shard that shatters into a cone on impact.",
     "Intent": "Offensive",
     "DamageSource": "Magical",
-    "Cost": { "Type": "MP", "Amount": 8 },
+    "Cost": { "Type": "MP", "Amount": 3 },
     "Cooldown": 2.0,
     "Targeting": "TargetEntity",
     "Range": [16, 16],
@@ -309,7 +309,7 @@
     },
     "Delivery": {
       "Type": "Projectile",
-      "Speed": 100.0,
+      "Speed": 200.0,
       "CollisionMode": "IgnoreTerrain",
       "Visuals": { "Model": "IceShard", "Vfx": "IceShatterProjectile" }
     },
@@ -335,12 +335,12 @@
     "Area": {
       "Type": "Line",
       "Width": 16.0,
-      "Length": 208.0,
-      "MaxTargets": 5
+      "Length": 160.0,
+      "MaxTargets": 4
     },
     "Delivery": {
       "Type": "Projectile",
-      "Speed": 200.0,
+      "Speed": 300.0,
       "CollisionMode": "IgnoreTerrain"
     },
     "Formula": "AP * 1.5",
@@ -354,23 +354,362 @@
     "Description": "Throws a fan of knives that spread out based on distance.",
     "Intent": "Offensive",
     "DamageSource": "Physical",
-    "Cost": { "Type": "MP", "Amount": 10 },
-    "Cooldown": 2.0,
+    "Cost": { "Type": "MP", "Amount": 8 },
+    "Cooldown": 4.0,
     "Targeting": "TargetPosition",
     "Range": [16, 20],
     "Area": {
       "Type": "AdaptiveCone",
-      "Length": 400.0,
-      "MaxTargets": 5
+      "Length": 256.0,
+      "MaxTargets": 4
     },
     "Delivery": {
       "Type": "Projectile",
-      "Speed": 150.0,
+      "Speed": 250.0,
       "CollisionMode": "BlockedByTerrain",
       "Visuals": { "Model": "Dagger", "Vfx": "FanOfKnivesWind" }
     },
     "Formula": "AP * 1.2",
     "Origin": "Caster",
     "Effects": []
+  },
+  "14": {
+    "Kind": "Active",
+    "Id": 14,
+    "Name": "Light Bolt",
+    "Description": "Fires a bolt of pure light that burns enemies.",
+    "Intent": "Offensive",
+    "DamageSource": "Magical",
+    "Cost": { "Type": "MP", "Amount": 12 },
+    "Cooldown": 3.5,
+    "Targeting": "TargetEntity",
+    "Range": [16, 14],
+    "Area": "Point",
+    "Delivery": {
+      "Type": "Projectile",
+      "Speed": 280.0,
+      "CollisionMode": "IgnoreTerrain",
+      "Visuals": { "Vfx": "LightBoltProjectile" }
+    },
+    "ImpactVisuals": { "Vfx": "LightBoltImpact" },
+    "ElementFormula": {
+      "Element": "Light",
+      "Formula": "(MA * 1.3) + (LightA * 2000)"
+    },
+    "Origin": "Caster",
+    "Effects": []
+  },
+  "15": {
+    "Kind": "Active",
+    "Id": 15,
+    "Name": "Shadow Strike",
+    "Description": "Launches a bolt of dark energy that drains life.",
+    "Intent": "Offensive",
+    "DamageSource": "Magical",
+    "Cost": { "Type": "MP", "Amount": 15 },
+    "Cooldown": 4.5,
+    "Targeting": "TargetEntity",
+    "Range": [16, 12],
+    "Area": "Point",
+    "Delivery": {
+      "Type": "Projectile",
+      "Speed": 220.0,
+      "CollisionMode": "IgnoreTerrain",
+      "Visuals": { "Vfx": "ShadowStrikeProjectile" }
+    },
+    "ImpactVisuals": { "Vfx": "ShadowStrikeImpact" },
+    "ElementFormula": {
+      "Element": "Dark",
+      "Formula": "(MA * 1.4) + (DarkA * 2500)"
+    },
+    "Origin": "Caster",
+    "Effects": []
+  },
+  "16": {
+    "Kind": "Active",
+    "Id": 16,
+    "Name": "Whirlwind",
+    "Description": "Spins rapidly, dealing physical damage to all nearby enemies.",
+    "Intent": "Offensive",
+    "DamageSource": "Physical",
+    "Cost": { "Type": "MP", "Amount": 18 },
+    "Cooldown": 6.0,
+    "Targeting": "Self",
+    "Area": {
+      "Type": "Circle",
+      "Radius": 64.0,
+      "MaxTargets": 8
+    },
+    "Delivery": { "Type": "Instant" },
+    "ImpactVisuals": { "Vfx": "WhirlwindSlash" },
+    "Formula": "AP * 1.8",
+    "Origin": "Caster",
+    "Effects": []
+  },
+  "17": {
+    "Kind": "Active",
+    "Id": 17,
+    "Name": "Crippling Shot",
+    "Description": "A precise shot that slows the target.",
+    "Intent": "Offensive",
+    "DamageSource": "Physical",
+    "Cost": { "Type": "MP", "Amount": 8 },
+    "Cooldown": 8.0,
+    "Targeting": "TargetEntity",
+    "Range": [16, 18],
+    "Area": "Point",
+    "Delivery": {
+      "Type": "Projectile",
+      "Speed": 350.0,
+      "CollisionMode": "BlockedByTerrain"
+    },
+    "Formula": "AP * 1.0",
+    "Origin": "Caster",
+    "Effects": [
+      {
+        "Name": "Crippled",
+        "Kind": "Debuff",
+        "Stacking": { "Type": "RefreshDuration" },
+        "Duration": { "Type": "Timed", "Seconds": 4.0 },
+        "DamageSource": "Physical",
+        "Modifiers": [
+          {
+            "Type": "StaticMod",
+            "StatModifier": {
+              "Type": "Multiplicative",
+              "Stat": "MS",
+              "Value": 0.5
+            }
+          }
+        ]
+      }
+    ]
+  },
+  "18": {
+    "Kind": "Active",
+    "Id": 18,
+    "Name": "Charm Curse",
+    "Description": "Curses the target, reducing their damage output.",
+    "Intent": "Offensive",
+    "DamageSource": "Magical",
+    "Cost": { "Type": "MP", "Amount": 12 },
+    "Cooldown": 8.0,
+    "Targeting": "TargetEntity",
+    "Range": [16, 10],
+    "Area": "Point",
+    "Delivery": { "Type": "Instant" },
+    "Origin": "Caster",
+    "Effects": [
+      {
+        "Name": "Cursed",
+        "Kind": "Debuff",
+        "Stacking": { "Type": "RefreshDuration" },
+        "Duration": { "Type": "Timed", "Seconds": 6.0 },
+        "DamageSource": "Magical",
+        "Modifiers": [
+          {
+            "Type": "StaticMod",
+            "StatModifier": {
+              "Type": "Multiplicative",
+              "Stat": "AP",
+              "Value": 0.7
+            }
+          },
+          {
+            "Type": "StaticMod",
+            "StatModifier": {
+              "Type": "Multiplicative",
+              "Stat": "MA",
+              "Value": 0.7
+            }
+          }
+        ]
+      }
+    ]
+  },
+  "19": {
+    "Kind": "Active",
+    "Id": 19,
+    "Name": "Thunder Spear",
+    "Description": "Hurls a spear of lightning that strikes with precision.",
+    "Intent": "Offensive",
+    "DamageSource": "Physical",
+    "Cost": { "Type": "MP", "Amount": 15 },
+    "Cooldown": 3.5,
+    "Targeting": "TargetEntity",
+    "Range": [16, 16],
+    "Area": "Point",
+    "Delivery": {
+      "Type": "Projectile",
+      "Speed": 400.0,
+      "CollisionMode": "IgnoreTerrain"
+    },
+    "ElementFormula": {
+      "Element": "Lightning",
+      "Formula": "(AP * 1.2) + (LightningA * 1500)"
+    },
+    "Origin": "Caster",
+    "Effects": []
+  },
+  "20": {
+    "Kind": "Active",
+    "Id": 20,
+    "Name": "Wind Slash",
+    "Description": "Releases a crescent of compressed air that cuts through enemies.",
+    "Intent": "Offensive",
+    "DamageSource": "Magical",
+    "Cost": { "Type": "MP", "Amount": 10 },
+    "Cooldown": 3.0,
+    "Targeting": "TargetDirection",
+    "Range": [16, 12],
+    "Area": {
+      "Type": "Cone",
+      "Angle": 35.0,
+      "Length": 144.0,
+      "MaxTargets": 5
+    },
+    "Delivery": { "Type": "Instant" },
+    "ImpactVisuals": { "Vfx": "WindSlash" },
+    "ElementFormula": {
+      "Element": "Air",
+      "Formula": "(MA * 1.1) + (AirA * 1800)"
+    },
+    "Origin": "Caster",
+    "Effects": []
+  },
+  "21": {
+    "Kind": "Active",
+    "Id": 21,
+    "Name": "Battle Cry",
+    "Description": "Lets out a war cry that empowers the caster's physical attacks.",
+    "Intent": "Supportive",
+    "DamageSource": "Physical",
+    "Cost": { "Type": "MP", "Amount": 15 },
+    "Cooldown": 30.0,
+    "Targeting": "Self",
+    "Area": "Point",
+    "Delivery": { "Type": "Instant" },
+    "Origin": "Caster",
+    "Effects": [
+      {
+        "Name": "Empowered",
+        "Kind": "Buff",
+        "Stacking": { "Type": "RefreshDuration" },
+        "Duration": { "Type": "Timed", "Seconds": 20.0 },
+        "DamageSource": "Physical",
+        "Modifiers": [
+          {
+            "Type": "StaticMod",
+            "StatModifier": {
+              "Type": "Multiplicative",
+              "Stat": "AP",
+              "Value": 1.3
+            }
+          }
+        ]
+      }
+    ]
+  },
+  "22": {
+    "Kind": "Active",
+    "Id": 22,
+    "Name": "Healing Light",
+    "Description": "Channels restorative energy to heal the caster.",
+    "Intent": "Supportive",
+    "DamageSource": "Magical",
+    "Cost": { "Type": "MP", "Amount": 25 },
+    "Cooldown": 8.0,
+    "Targeting": "Self",
+    "Area": "Point",
+    "Delivery": { "Type": "Instant" },
+    "Origin": "Caster",
+    "Effects": [
+      {
+        "Name": "Restored",
+        "Kind": "ResourceOverTime",
+        "Stacking": { "Type": "RefreshDuration" },
+        "Duration": { "Type": "Instant" },
+        "DamageSource": "Magical",
+        "Modifiers": [
+          {
+            "Type": "AbilityDamageMod",
+            "AbilityDamageValue": "MA * 2.0",
+            "Element": "Light"
+          }
+        ]
+      }
+    ]
+  },
+  "23": {
+    "Kind": "Active",
+    "Id": 23,
+    "Name": "Enfeeble",
+    "Description": "Weakens the target, reducing their defenses.",
+    "Intent": "Offensive",
+    "DamageSource": "Magical",
+    "Cost": { "Type": "MP", "Amount": 10 },
+    "Cooldown": 12.0,
+    "Targeting": "TargetEntity",
+    "Range": [16, 10],
+    "Area": "Point",
+    "Delivery": { "Type": "Instant" },
+    "Origin": "Caster",
+    "Effects": [
+      {
+        "Name": "Enfeebled",
+        "Kind": "Debuff",
+        "Stacking": { "Type": "RefreshDuration" },
+        "Duration": { "Type": "Timed", "Seconds": 8.0 },
+        "DamageSource": "Magical",
+        "Modifiers": [
+          {
+            "Type": "StaticMod",
+            "StatModifier": {
+              "Type": "Multiplicative",
+              "Stat": "DP",
+              "Value": 0.6
+            }
+          },
+          {
+            "Type": "StaticMod",
+            "StatModifier": {
+              "Type": "Multiplicative",
+              "Stat": "MD",
+              "Value": 0.6
+            }
+          }
+        ]
+      }
+    ]
+  },
+  "24": {
+    "Kind": "Active",
+    "Id": 24,
+    "Name": "Regeneration",
+    "Description": "Blesses the caster with regenerative powers over time.",
+    "Intent": "Supportive",
+    "DamageSource": "Magical",
+    "Cost": { "Type": "MP", "Amount": 20 },
+    "Cooldown": 25.0,
+    "Targeting": "Self",
+    "Area": "Point",
+    "Delivery": { "Type": "Instant" },
+    "Origin": "Caster",
+    "Effects": [
+      {
+        "Name": "Regenerating",
+        "Kind": "ResourceOverTime",
+        "Stacking": { "Type": "RefreshDuration" },
+        "Duration": { "Type": "Loop", "Interval": 2.0, "Duration": 16.0 },
+        "DamageSource": "Magical",
+        "Modifiers": [
+          {
+            "Type": "AbilityDamageMod",
+            "AbilityDamageValue": "MA * 0.5",
+            "Element": "Light"
+          }
+        ]
+      }
+    ]
   }
 }

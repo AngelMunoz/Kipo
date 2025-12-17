@@ -10,9 +10,11 @@ open Pomo.Core.Domain.Action
 open Pomo.Core.Domain.Units
 open Pomo.Core.Domain.Events
 open Pomo.Core.Domain.Entity
+open Pomo.Core.Domain.Skill
 open Pomo.Core.Domain.AI
 open Pomo.Core.EventBus
 open Pomo.Core.Stores
+open Pomo.Core
 open Systems
 
 module EntitySpawnerLogic =
@@ -156,6 +158,8 @@ module EntitySpawnerLogic =
     (pending: PendingSpawn)
     (eventBus: EventBus)
     (aiArchetypeStore: AIArchetypeStore)
+    (aiEntityStore: AIEntityStore)
+    (aiFamilyStore: AIFamilyStore)
     =
     let entityId = pending.EntityId
     let pos = pending.Position
@@ -201,10 +205,35 @@ module EntitySpawnerLogic =
       configurePlayerLoadout(entityId, eventBus)
 
 
-    | SystemCommunications.SpawnType.Enemy archetypeId ->
+    | SystemCommunications.SpawnType.Enemy(archetypeId,
+                                           entityDefKey,
+                                           mapOverride) ->
       let archetype = aiArchetypeStore.find archetypeId
-      let baseStats, resource = createEnemyStats archetype
       let factions = HashSet [ Faction.Enemy ]
+
+      // Look up entity definition
+      let aiEntity: AIEntityDefinition option =
+        match entityDefKey with
+        | ValueSome key -> aiEntityStore.tryFind key |> Option.ofValueOption
+        | ValueNone -> aiEntityStore.all() |> Seq.tryHead
+
+      // Look up family config from entity's family
+      let familyConfig: AIFamilyConfig option =
+        aiEntity
+        |> Option.bind(fun e ->
+          let familyKey = e.Family.ToString()
+          aiFamilyStore.tryFind familyKey |> Option.ofValueOption)
+
+      // Apply full override chain for stats (including map override)
+      let baseStats =
+        archetype.baseStats
+        |> MapSpawning.resolveStats familyConfig aiEntity mapOverride
+
+      let resource = {
+        HP = baseStats.Charm
+        MP = baseStats.Magic
+        Status = Status.Alive
+      }
 
       eventBus.Publish(
         StateChangeEvent.Combat(ResourcesChanged struct (entityId, resource))
@@ -225,7 +254,12 @@ module EntitySpawnerLogic =
         )
       )
 
-      // Initialize AI Controller
+      // Resolve skills (with map override restrictions/extras)
+      let skills =
+        match aiEntity with
+        | Some entity -> MapSpawning.resolveSkills entity.Skills mapOverride
+        | None -> [||]
+
       let controller: AIController = {
         controlledEntityId = entityId
         archetypeId = archetypeId
@@ -253,6 +287,15 @@ module EntitySpawnerLogic =
         waypointIndex = 0
         lastDecisionTime = TimeSpan.Zero
         currentTarget = ValueNone
+        decisionTree =
+          aiEntity
+          |> Option.map(fun e -> e.DecisionTree)
+          |> Option.defaultValue "MeleeAttacker" // Default tree
+        preferredIntent =
+          familyConfig
+          |> Option.map(fun f -> f.PreferredIntent)
+          |> Option.defaultValue SkillIntent.Offensive // Default to offensive
+        skills = skills
         memories = HashMap.empty
       }
 
@@ -327,7 +370,12 @@ module EntitySpawnerLogic =
 
         for pending in pendingSpawns do
           if currentTime >= pending.SpawnStartTime + pending.Duration then
-            finalizeSpawn pending core.EventBus stores.AIArchetypeStore
+            finalizeSpawn
+              pending
+              core.EventBus
+              stores.AIArchetypeStore
+              stores.AIEntityStore
+              stores.AIFamilyStore
 
             toRemove.Add(pending)
 

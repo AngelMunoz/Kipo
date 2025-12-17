@@ -127,6 +127,84 @@ module JsonFileLoader =
     with ex ->
       Error $"Failed to load file '{filePath}': {ex.Message}"
 
+  let readAIFamilies (deserializer: JDeckDeserializer) (filePath: string) =
+    try
+      let json =
+        Path.Combine(AppContext.BaseDirectory, filePath) |> File.ReadAllBytes
+
+      match deserializer.Deserialize<Map<string, AI.AIFamilyConfig>> json with
+      | Ok result ->
+        let mutable newMap = HashMap.empty<string, AI.AIFamilyConfig>
+
+        for KeyValue(key, value) in result do
+          newMap <- HashMap.add key value newMap
+
+        Ok newMap
+      | Error decodeError -> Error $"Deserialization error: {decodeError}"
+    with ex ->
+      Error $"Failed to load file '{filePath}': {ex.Message}"
+
+  let readAIEntities(filePath: string) =
+    try
+      let json =
+        Path.Combine(AppContext.BaseDirectory, filePath) |> File.ReadAllBytes
+
+      let doc = JsonDocument.Parse(json)
+      let mutable newMap = HashMap.empty<string, AI.AIEntityDefinition>
+
+      for prop in doc.RootElement.EnumerateObject() do
+        let key = prop.Name
+
+        match AI.Serialization.AIEntityDefinition.decoder key prop.Value with
+        | Ok entity -> newMap <- HashMap.add key entity newMap
+        | Error err -> failwith $"Failed to decode AI entity '{key}': {err}"
+
+      Ok newMap
+    with ex ->
+      Error $"Failed to load file '{filePath}': {ex.Message}"
+
+  let readMapEntityGroups (deserializer: JDeckDeserializer) (filePath: string) =
+    try
+      let fullPath = Path.Combine(AppContext.BaseDirectory, filePath)
+
+      if not(File.Exists fullPath) then
+        Ok HashMap.empty
+      else
+        let json = File.ReadAllBytes fullPath
+
+        match deserializer.Deserialize<Map<string, AI.MapEntityGroup>> json with
+        | Ok result ->
+          let mutable newMap = HashMap.empty<string, AI.MapEntityGroup>
+
+          for KeyValue(key, value) in result do
+            newMap <- HashMap.add key value newMap
+
+          Ok newMap
+        | Error decodeError -> Error $"Deserialization error: {decodeError}"
+    with ex ->
+      Error $"Failed to load file '{filePath}': {ex.Message}"
+
+  let readDecisionTrees(filePath: string) =
+    try
+      let json =
+        Path.Combine(AppContext.BaseDirectory, filePath) |> File.ReadAllBytes
+
+      let doc = JsonDocument.Parse(json)
+      let mutable newMap = HashMap.empty<string, AI.DecisionTree>
+
+      for prop in doc.RootElement.EnumerateObject() do
+        let name = prop.Name
+
+        match AI.Serialization.DecisionTree.decoder name prop.Value with
+        | Ok tree -> newMap <- HashMap.add name tree newMap
+        | Error err ->
+          failwith $"Failed to decode decision tree '{name}': {err}"
+
+      Ok newMap
+    with ex ->
+      Error $"Failed to load file '{filePath}': {ex.Message}"
+
+
 
 module Stores =
   open Pomo.Core.Domain.Units
@@ -168,6 +246,26 @@ module Stores =
     abstract member find: effectId: string -> EmitterConfig list
     abstract member tryFind: effectId: string -> EmitterConfig list voption
     abstract member all: unit -> seq<string * EmitterConfig list>
+
+  type AIFamilyStore =
+    abstract member find: family: string -> AI.AIFamilyConfig
+    abstract member tryFind: family: string -> AI.AIFamilyConfig voption
+    abstract member all: unit -> seq<AI.AIFamilyConfig>
+
+  type AIEntityStore =
+    abstract member find: key: string -> AI.AIEntityDefinition
+    abstract member tryFind: key: string -> AI.AIEntityDefinition voption
+    abstract member all: unit -> seq<AI.AIEntityDefinition>
+
+  type DecisionTreeStore =
+    abstract member find: name: string -> AI.DecisionTree
+    abstract member tryFind: name: string -> AI.DecisionTree voption
+    abstract member all: unit -> seq<AI.DecisionTree>
+
+  type MapEntityGroupStore =
+    abstract member find: groupKey: string -> AI.MapEntityGroup
+    abstract member tryFind: groupKey: string -> AI.MapEntityGroup voption
+    abstract member all: unit -> seq<AI.MapEntityGroup>
 
 
   module Skill =
@@ -289,3 +387,60 @@ module Stores =
             member _.all() = particleMap |> HashMap.toSeq
         }
       | Error errMsg -> failwith $"Failed to create ParticleStore: {errMsg}"
+
+  module AIFamily =
+    let create
+      (loader: string -> Result<HashMap<string, AI.AIFamilyConfig>, string>)
+      =
+      match loader "Content/AIFamilies.json" with
+      | Ok familyMap ->
+        { new AIFamilyStore with
+            member _.find(family: string) = HashMap.find family familyMap
+            member _.tryFind(family: string) = HashMap.tryFindV family familyMap
+            member _.all() = familyMap |> HashMap.toValueSeq
+        }
+      | Error errMsg -> failwith $"Failed to create AIFamilyStore: {errMsg}"
+
+  module AIEntity =
+    let create
+      (loader: string -> Result<HashMap<string, AI.AIEntityDefinition>, string>)
+      =
+      match loader "Content/AIEntities.json" with
+      | Ok entityMap ->
+        { new AIEntityStore with
+            member _.find(key: string) = HashMap.find key entityMap
+            member _.tryFind(key: string) = HashMap.tryFindV key entityMap
+            member _.all() = entityMap |> HashMap.toValueSeq
+        }
+      | Error errMsg -> failwith $"Failed to create AIEntityStore: {errMsg}"
+
+  module MapEntityGroup =
+    let create
+      (loader: string -> Result<HashMap<string, AI.MapEntityGroup>, string>)
+      (mapKey: string)
+      =
+      match loader $"Content/Maps/{mapKey}.ai-entities.json" with
+      | Ok groupMap ->
+        { new MapEntityGroupStore with
+            member _.find(groupKey: string) = HashMap.find groupKey groupMap
+
+            member _.tryFind(groupKey: string) =
+              HashMap.tryFindV groupKey groupMap
+
+            member _.all() = groupMap |> HashMap.toValueSeq
+        }
+      | Error errMsg ->
+        failwith $"Failed to create MapEntityGroupStore: {errMsg}"
+
+  module DecisionTree =
+    let create
+      (loader: string -> Result<HashMap<string, AI.DecisionTree>, string>)
+      =
+      match loader "Content/DecisionTrees.json" with
+      | Ok treeMap ->
+        { new DecisionTreeStore with
+            member _.find(name: string) = HashMap.find name treeMap
+            member _.tryFind(name: string) = HashMap.tryFindV name treeMap
+            member _.all() = treeMap |> HashMap.toValueSeq
+        }
+      | Error errMsg -> failwith $"Failed to create DecisionTreeStore: {errMsg}"

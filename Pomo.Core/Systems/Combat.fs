@@ -711,13 +711,12 @@ module Combat =
       (target: SystemCommunications.SkillTarget)
       =
       match ctx.SkillStore.tryFind skillId with
-      | ValueSome(Skill.Active activeSkill) ->
-        // Apply cost and cooldown now that the ability is confirmed
+      | ValueSome(Active activeSkill) ->
         Execution.applyResourceCost ctx casterId activeSkill
         Execution.applyCooldown ctx casterId skillId activeSkill
 
         match activeSkill.Delivery with
-        | Delivery.Projectile projectileInfo ->
+        | Projectile projectileInfo ->
           handleProjectileDelivery
             ctx
             casterId
@@ -725,8 +724,7 @@ module Combat =
             target
             activeSkill
             projectileInfo
-        | Delivery.Instant ->
-          handleInstantDelivery ctx casterId target activeSkill
+        | Instant -> handleInstantDelivery ctx casterId target activeSkill
       | _ -> ()
 
     let handleProjectileImpact
