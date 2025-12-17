@@ -8,9 +8,12 @@ open Pomo.Core.Domain.Units
 open Pomo.Core.Domain
 open Pomo.Core.Domain.World
 open Pomo.Core.Domain.Core
+open Pomo.Core.Domain.Events
 open Pomo.Core.Stores
 open Pomo.Core.Domain.Item
 open Pomo.Core.Domain.Spatial
+open Pomo.Core.Domain.Projectile
+open Pomo.Core.Domain.Skill
 
 module Projections =
 
@@ -25,15 +28,12 @@ module Projections =
       | true, value -> ValueSome value
       | false, _ -> ValueNone
 
-
-
-
   let private liveEntities(world: World) =
     world.Resources
     |> AMap.filter(fun _ resource -> resource.Status = Entity.Status.Alive)
     |> AMap.keys
 
-  let private effectKindToCombatStatus(effect: Skill.ActiveEffect) =
+  let inline private effectKindToCombatStatus(effect: Skill.ActiveEffect) =
     match effect.SourceEffect.Kind with
     | Skill.EffectKind.Stun -> Some CombatStatus.Stunned
     | Skill.EffectKind.Silence -> Some CombatStatus.Silenced
@@ -124,39 +124,64 @@ module Projections =
               ElementAttributes = stats.ElementAttributes.Add(element, updated)
         }
 
-
-    let applySingleModifier
-      (accStats: Entity.DerivedStats)
+    let inline applySingleModifier
+      (accStats: Entity.DerivedStats byref)
       (statModifier: StatModifier)
       =
       match statModifier with
       | Additive(stat, value) ->
-        updateStat accStats stat ((+)(int value)) ((+) value)
+        accStats <- updateStat accStats stat ((+)(int value)) ((+) value)
       | Multiplicative(stat, value) ->
         let multiplyI(current: int) = float current * value |> int
         let multiplyF(current: float) = current * value
-        updateStat accStats stat multiplyI multiplyF
+        accStats <- updateStat accStats stat multiplyI multiplyF
 
     let applyModifiers
       (stats: Entity.DerivedStats)
       (effects: Skill.ActiveEffect IndexList voption)
       (equipmentBonuses: StatModifier IndexList)
       =
-      let fromEffects =
-        match effects with
-        | ValueNone -> [||]
-        | ValueSome effectList ->
-          effectList.AsArray
-          |> Array.collect _.SourceEffect.Modifiers
-          |> Array.choose (function
-            | Skill.EffectModifier.StaticMod m -> Some m
+      let mutable result = stats
+
+      for modifier in equipmentBonuses do
+        applySingleModifier &result modifier
+
+      match effects with
+      | ValueNone -> ()
+      | ValueSome effectList ->
+        for effect in effectList do
+          for modifier in effect.SourceEffect.Modifiers do
+            match modifier with
+            | Skill.EffectModifier.StaticMod m -> applySingleModifier &result m
             | Skill.EffectModifier.ResourceChange _
             | Skill.EffectModifier.AbilityDamageMod _
-            | Skill.EffectModifier.DynamicMod _ -> None)
+            | Skill.EffectModifier.DynamicMod _ -> ()
 
-      equipmentBonuses.AsArray
-      |> Array.append fromEffects
-      |> Array.fold applySingleModifier stats
+      result
+
+    let inline collectEquipmentStats
+      (equipmentStats: HashMap<Slot, StatModifier array>)
+      : StatModifier IndexList =
+      if equipmentStats.IsEmpty then
+        IndexList.Empty
+      else
+        let mutable totalCount = 0
+
+        for _, stats in equipmentStats do
+          totalCount <- totalCount + stats.Length
+
+        if totalCount = 0 then
+          IndexList.Empty
+        else
+          let allStats = Array.zeroCreate totalCount
+          let mutable idx = 0
+
+          for _, stats in equipmentStats do
+            for stat in stats do
+              allStats[idx] <- stat
+              idx <- idx + 1
+
+          IndexList.ofArray allStats
 
     let getEquipmentStatBonusesForId
       (world: World, itemStore: ItemStore, entityId: Guid<EntityId>)
@@ -180,13 +205,7 @@ module Projections =
           )
 
         let equipmentStats = equipmentStats |> Option.defaultValue HashMap.empty
-
-        return
-          equipmentStats
-          |> HashMap.toValueArray
-          |> Array.fold
-            (fun acc stats -> IndexList.ofArray stats |> IndexList.append acc)
-            IndexList.Empty
+        return collectEquipmentStats equipmentStats
       }
 
   let private calculateDerivedStats (itemStore: ItemStore) (world: World) =
@@ -260,6 +279,42 @@ module Projections =
       ModelConfigIds = HashMap.empty
     }
 
+  [<Struct>]
+  type EntityScenarioContext = {
+    ScenarioId: Guid<ScenarioId>
+    Scenario: Scenario
+    MapKey: string
+  }
+
+  [<Struct>]
+  type CombatReadyContext = {
+    Resources: Entity.Resource
+    DerivedStats: Entity.DerivedStats
+    Cooldowns: HashMap<int<SkillId>, TimeSpan>
+    Factions: Entity.Faction HashSet
+  }
+
+  [<Struct>]
+  type ProjectileFlightContext = {
+    Projectile: LiveProjectile
+    Position: Vector2
+    HasAnimation: bool
+  }
+
+  [<Struct>]
+  type EffectOwnerTransform = {
+    Position: Vector2
+    Velocity: Vector2
+    Rotation: float32
+    Effects: ActiveEffect IndexList
+  }
+
+  [<Struct>]
+  type MovingEntityContext = {
+    MovementState: MovementState
+    DerivedStats: Entity.DerivedStats
+  }
+
   type ProjectionService =
     abstract LiveEntities: aset<Guid<EntityId>>
     abstract CombatStatuses: amap<Guid<EntityId>, IndexList<CombatStatus>>
@@ -271,11 +326,16 @@ module Projections =
     abstract ActionSets:
       amap<Guid<EntityId>, HashMap<Action.GameAction, SlotProcessing>>
 
-    /// Forces the current world state and computes the physics/grid for this frame.
+    abstract EntityScenarioContexts: amap<Guid<EntityId>, EntityScenarioContext>
+    abstract CombatReadyContexts: amap<Guid<EntityId>, CombatReadyContext>
+
+    abstract ProjectileFlightContexts:
+      amap<Guid<EntityId>, ProjectileFlightContext>
+
+    abstract EffectOwnerTransforms: amap<Guid<EntityId>, EffectOwnerTransform>
+    abstract MovingEntities: amap<Guid<EntityId>, MovingEntityContext>
     abstract ComputeMovementSnapshot: Guid<ScenarioId> -> MovementSnapshot
 
-    /// Helper to query a snapshot (pure function, no longer adaptive)
-    /// liveEntities filters to only include valid combat targets (excludes projectiles, dead entities)
     abstract GetNearbyEntitiesSnapshot:
       MovementSnapshot * HashSet<Guid<EntityId>> * Vector2 * float32 ->
         IndexList<struct (Guid<EntityId> * Vector2)>
@@ -342,7 +402,90 @@ module Projections =
       ModelConfigIds = newModelConfigIds
     }
 
+  let private entityScenarioContexts(world: World) =
+    world.EntityScenario
+    |> AMap.mapA(fun _entityId scenarioId -> adaptive {
+      let! scenario = world.Scenarios |> AMap.tryFind scenarioId
+
+      match scenario with
+      | Some s ->
+        return
+          Some {
+            ScenarioId = scenarioId
+            Scenario = s
+            MapKey = s.Map.Key
+          }
+      | None -> return None
+    })
+    |> AMap.choose(fun _ v -> v)
+
+  /// CombatReadyContext: joins Resources + DerivedStats + Cooldowns + Factions
+  let private combatReadyContexts
+    (world: World)
+    (derivedStats: amap<Guid<EntityId>, Entity.DerivedStats>)
+    =
+    (world.Resources, derivedStats)
+    ||> AMap.choose2V(fun entityId res stats ->
+      match res, stats with
+      | ValueSome r, ValueSome s -> ValueSome struct (entityId, r, s)
+      | _ -> ValueNone)
+    |> AMap.mapA(fun entityId struct (_id, resources, stats) -> adaptive {
+      let! cooldowns = world.AbilityCooldowns |> AMap.tryFind entityId
+      and! factions = world.Factions |> AMap.tryFind entityId
+
+      let entityCooldowns = cooldowns |> Option.defaultValue HashMap.empty
+      let entityFactions = factions |> Option.defaultValue HashSet.empty
+
+      return {
+        Resources = resources
+        DerivedStats = stats
+        Cooldowns = entityCooldowns
+        Factions = entityFactions
+      }
+    })
+
+  let private projectileFlightContexts(world: World) =
+    world.LiveProjectiles
+    |> AMap.mapA(fun entityId projectile -> adaptive {
+      let! position = world.Positions |> AMap.tryFind entityId
+      and! animation = world.ActiveAnimations |> AMap.tryFind entityId
+
+      return {
+        Projectile = projectile
+        Position = position |> Option.defaultValue Vector2.Zero
+        HasAnimation = animation.IsSome
+      }
+    })
+
+  let private effectOwnerTransforms(world: World) =
+    world.ActiveEffects
+    |> AMap.mapA(fun entityId effects -> adaptive {
+      let! position = world.Positions |> AMap.tryFind entityId
+      and! velocity = world.Velocities |> AMap.tryFind entityId
+      and! rotation = world.Rotations |> AMap.tryFind entityId
+
+      return {
+        Position = position |> Option.defaultValue Vector2.Zero
+        Velocity = velocity |> Option.defaultValue Vector2.Zero
+        Rotation = rotation |> Option.defaultValue 0.0f
+        Effects = effects
+      }
+    })
+
+  /// MovingEntities: filters to entities with non-Idle movement state
+  let private movingEntities
+    (world: World)
+    (derivedStats: amap<Guid<EntityId>, Entity.DerivedStats>)
+    =
+    (world.MovementStates, derivedStats)
+    ||> AMap.choose2V(fun _ state stats ->
+      match state, stats with
+      | ValueSome s, ValueSome st when s <> Idle ->
+        ValueSome { MovementState = s; DerivedStats = st }
+      | _ -> ValueNone)
+
   let create(itemStore: ItemStore, world: World) =
+    let derivedStats = calculateDerivedStats itemStore world
 
     { new ProjectionService with
         member _.LiveEntities = liveEntities world
@@ -352,6 +495,11 @@ module Projections =
         member _.Inventories = inventoryDefs(world, itemStore)
         member _.EntityScenarios = world.EntityScenario
         member _.ActionSets = activeActionSets world
+        member _.EntityScenarioContexts = entityScenarioContexts world
+        member _.CombatReadyContexts = combatReadyContexts world derivedStats
+        member _.ProjectileFlightContexts = projectileFlightContexts world
+        member _.EffectOwnerTransforms = effectOwnerTransforms world
+        member _.MovingEntities = movingEntities world derivedStats
 
         member _.ComputeMovementSnapshot(scenarioId) =
           let time = world.Time |> AVal.map _.Delta |> AVal.force
