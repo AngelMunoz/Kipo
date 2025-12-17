@@ -287,32 +287,11 @@ module Projections =
   }
 
   [<Struct>]
-  type CombatReadyContext = {
-    Resources: Entity.Resource
-    DerivedStats: Entity.DerivedStats
-    Cooldowns: HashMap<int<SkillId>, TimeSpan>
-    Factions: Entity.Faction HashSet
-  }
-
-  [<Struct>]
-  type ProjectileFlightContext = {
-    Projectile: LiveProjectile
-    Position: Vector2
-    HasAnimation: bool
-  }
-
-  [<Struct>]
   type EffectOwnerTransform = {
     Position: Vector2
     Velocity: Vector2
     Rotation: float32
     Effects: ActiveEffect IndexList
-  }
-
-  [<Struct>]
-  type MovingEntityContext = {
-    MovementState: MovementState
-    DerivedStats: Entity.DerivedStats
   }
 
   type ProjectionService =
@@ -327,13 +306,7 @@ module Projections =
       amap<Guid<EntityId>, HashMap<Action.GameAction, SlotProcessing>>
 
     abstract EntityScenarioContexts: amap<Guid<EntityId>, EntityScenarioContext>
-    abstract CombatReadyContexts: amap<Guid<EntityId>, CombatReadyContext>
-
-    abstract ProjectileFlightContexts:
-      amap<Guid<EntityId>, ProjectileFlightContext>
-
     abstract EffectOwnerTransforms: amap<Guid<EntityId>, EffectOwnerTransform>
-    abstract MovingEntities: amap<Guid<EntityId>, MovingEntityContext>
     abstract ComputeMovementSnapshot: Guid<ScenarioId> -> MovementSnapshot
 
     abstract GetNearbyEntitiesSnapshot:
@@ -419,44 +392,6 @@ module Projections =
     })
     |> AMap.choose(fun _ v -> v)
 
-  /// CombatReadyContext: joins Resources + DerivedStats + Cooldowns + Factions
-  let private combatReadyContexts
-    (world: World)
-    (derivedStats: amap<Guid<EntityId>, Entity.DerivedStats>)
-    =
-    (world.Resources, derivedStats)
-    ||> AMap.choose2V(fun entityId res stats ->
-      match res, stats with
-      | ValueSome r, ValueSome s -> ValueSome struct (entityId, r, s)
-      | _ -> ValueNone)
-    |> AMap.mapA(fun entityId struct (_id, resources, stats) -> adaptive {
-      let! cooldowns = world.AbilityCooldowns |> AMap.tryFind entityId
-      and! factions = world.Factions |> AMap.tryFind entityId
-
-      let entityCooldowns = cooldowns |> Option.defaultValue HashMap.empty
-      let entityFactions = factions |> Option.defaultValue HashSet.empty
-
-      return {
-        Resources = resources
-        DerivedStats = stats
-        Cooldowns = entityCooldowns
-        Factions = entityFactions
-      }
-    })
-
-  let private projectileFlightContexts(world: World) =
-    world.LiveProjectiles
-    |> AMap.mapA(fun entityId projectile -> adaptive {
-      let! position = world.Positions |> AMap.tryFind entityId
-      and! animation = world.ActiveAnimations |> AMap.tryFind entityId
-
-      return {
-        Projectile = projectile
-        Position = position |> Option.defaultValue Vector2.Zero
-        HasAnimation = animation.IsSome
-      }
-    })
-
   let private effectOwnerTransforms(world: World) =
     world.ActiveEffects
     |> AMap.mapA(fun entityId effects -> adaptive {
@@ -472,21 +407,7 @@ module Projections =
       }
     })
 
-  /// MovingEntities: filters to entities with non-Idle movement state
-  let private movingEntities
-    (world: World)
-    (derivedStats: amap<Guid<EntityId>, Entity.DerivedStats>)
-    =
-    (world.MovementStates, derivedStats)
-    ||> AMap.choose2V(fun _ state stats ->
-      match state, stats with
-      | ValueSome s, ValueSome st when s <> Idle ->
-        ValueSome { MovementState = s; DerivedStats = st }
-      | _ -> ValueNone)
-
   let create(itemStore: ItemStore, world: World) =
-    let derivedStats = calculateDerivedStats itemStore world
-
     { new ProjectionService with
         member _.LiveEntities = liveEntities world
         member _.CombatStatuses = calculateCombatStatuses world
@@ -496,10 +417,7 @@ module Projections =
         member _.EntityScenarios = world.EntityScenario
         member _.ActionSets = activeActionSets world
         member _.EntityScenarioContexts = entityScenarioContexts world
-        member _.CombatReadyContexts = combatReadyContexts world derivedStats
-        member _.ProjectileFlightContexts = projectileFlightContexts world
         member _.EffectOwnerTransforms = effectOwnerTransforms world
-        member _.MovingEntities = movingEntities world derivedStats
 
         member _.ComputeMovementSnapshot(scenarioId) =
           let time = world.Time |> AVal.map _.Delta |> AVal.force
