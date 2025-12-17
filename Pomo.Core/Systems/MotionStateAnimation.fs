@@ -65,39 +65,20 @@ type MotionStateAnimationSystem(game: Game, env: PomoEnvironment) =
 
   let (Core core) = env.CoreServices
   let (Gameplay gameplay) = env.GameplayServices
-  let (Stores stores) = env.StoreServices
 
   override this.Update(gameTime) =
-    let velocities = core.World.Velocities |> AMap.force
-    let activeAnimations = core.World.ActiveAnimations |> AMap.force
-    let modelConfigIds = core.World.ModelConfigId |> AMap.force
-    let liveEntities = gameplay.Projections.LiveEntities |> ASet.force
+    // Force the pre-joined, pre-filtered projection
+    // ModelConfig → RunClipIds resolution was done adaptively (cached)
+    let animContexts =
+      gameplay.Projections.AnimationControlContexts |> AMap.force
 
-    for entityId in liveEntities do
-      let velocity =
-        velocities
-        |> HashMap.tryFindV entityId
-        |> ValueOption.defaultValue Vector2.Zero
-
-      let currentAnims =
-        activeAnimations
-        |> HashMap.tryFindV entityId
-        |> ValueOption.defaultValue IndexList.empty
-
-      let runClipIds =
-        modelConfigIds
-        |> HashMap.tryFindV entityId
-        |> ValueOption.bind(fun configId ->
-          stores.ModelStore.tryFind configId
-          |> ValueOption.bind(fun config ->
-            config.AnimationBindings |> HashMap.tryFindV "Run"))
-
+    for entityId, ctx in animContexts do
       match
         AnimationStateLogic.determineAnimationChange
           entityId
-          velocity
-          currentAnims
-          runClipIds
+          ctx.Velocity
+          ctx.ActiveAnimations
+          ctx.RunClipIds
       with
       | ValueSome event -> core.EventBus.Publish(event)
       | ValueNone -> ()

@@ -126,7 +126,12 @@ module CompositionRoot =
       let struct (mutableWorld, worldView) = World.create scope.Random
 
       // 2. Create Gameplay Services
-      let projections = Projections.create(scope.Stores.ItemStore, worldView)
+      let projections =
+        Projections.create(
+          scope.Stores.ItemStore,
+          scope.Stores.ModelStore,
+          worldView
+        )
 
       let cameraService =
         CameraSystem.create(
@@ -153,7 +158,7 @@ module CompositionRoot =
         )
 
       let navigationService =
-        Navigation.create(eventBus, scope.Stores.MapStore, worldView)
+        Navigation.create(eventBus, scope.Stores.MapStore, projections)
 
       let inventoryService =
         Inventory.create(eventBus, scope.Stores.ItemStore, worldView)

@@ -99,63 +99,56 @@ module ResourceManager =
     | ValueNone -> ()
 
   module private Regeneration =
+    open Pomo.Core.Projections
+
     let processAutoRegen
-      (allResources: HashMap<Guid<EntityId>, Entity.Resource>)
-      (allInCombat: HashMap<Guid<EntityId>, TimeSpan>)
-      (allStats: HashMap<Guid<EntityId>, Entity.DerivedStats>)
+      (regenContexts: HashMap<Guid<EntityId>, RegenerationContext>)
       (totalGameTime: TimeSpan)
       (deltaTime: TimeSpan)
       (eventBus: EventBus)
       (accumulators: Dictionary<Guid<EntityId>, struct (float * float)>)
       =
-      for entityId, currentResources in allResources do
-        let inCombatUntil =
-          allInCombat.TryFindV entityId
-          |> ValueOption.defaultValue TimeSpan.Zero
+      for entityId, ctx in regenContexts do
+        if totalGameTime > ctx.InCombatUntil then
+          let currentResources = ctx.Resources
+          let stats = ctx.DerivedStats
 
-        if totalGameTime > inCombatUntil then
-          match allStats.TryFindV entityId with
-          | ValueSome stats ->
-            let struct (currentHpAcc, currentMpAcc) =
-              match accumulators.TryGetValue entityId with
-              | true, value -> value
-              | false, _ -> struct (0.0, 0.0)
+          let struct (currentHpAcc, currentMpAcc) =
+            match accumulators.TryGetValue entityId with
+            | true, value -> value
+            | false, _ -> struct (0.0, 0.0)
 
-            let hpRegenThisFrame = float stats.HPRegen * deltaTime.TotalSeconds
-            let mpRegenThisFrame = float stats.MPRegen * deltaTime.TotalSeconds
+          let hpRegenThisFrame = float stats.HPRegen * deltaTime.TotalSeconds
+          let mpRegenThisFrame = float stats.MPRegen * deltaTime.TotalSeconds
 
-            let newHpAcc = currentHpAcc + hpRegenThisFrame
-            let newMpAcc = currentMpAcc + mpRegenThisFrame
+          let newHpAcc = currentHpAcc + hpRegenThisFrame
+          let newMpAcc = currentMpAcc + mpRegenThisFrame
 
-            let hpToHeal = int newHpAcc
-            let mpToHeal = int newMpAcc
+          let hpToHeal = int newHpAcc
+          let mpToHeal = int newMpAcc
 
-            let remainderHpAcc = newHpAcc - float hpToHeal
-            let remainderMpAcc = newMpAcc - float mpToHeal
+          let remainderHpAcc = newHpAcc - float hpToHeal
+          let remainderMpAcc = newMpAcc - float mpToHeal
 
-            // Update the mutable dictionary with the new remainder
-            accumulators[entityId] <- remainderHpAcc, remainderMpAcc
+          // Update the mutable dictionary with the new remainder
+          accumulators[entityId] <- remainderHpAcc, remainderMpAcc
 
-            if hpToHeal > 0 || mpToHeal > 0 then
-              let newHP = min stats.HP (currentResources.HP + hpToHeal)
-              let newMP = min stats.MP (currentResources.MP + mpToHeal)
+          if hpToHeal > 0 || mpToHeal > 0 then
+            let newHP = min stats.HP (currentResources.HP + hpToHeal)
+            let newMP = min stats.MP (currentResources.MP + mpToHeal)
 
-              if
-                newHP <> currentResources.HP || newMP <> currentResources.MP
-              then
-                let newResources = {
-                  currentResources with
-                      HP = newHP
-                      MP = newMP
-                }
+            if newHP <> currentResources.HP || newMP <> currentResources.MP then
+              let newResources = {
+                currentResources with
+                    HP = newHP
+                    MP = newMP
+              }
 
-                eventBus.Publish(
-                  StateChangeEvent.Combat(
-                    CombatEvents.ResourcesChanged
-                      struct (entityId, newResources)
-                  )
+              eventBus.Publish(
+                StateChangeEvent.Combat(
+                  CombatEvents.ResourcesChanged struct (entityId, newResources)
                 )
-          | ValueNone -> ()
+              )
 
   open Pomo.Core.Environment
   open Pomo.Core.Environment.Patterns
@@ -167,7 +160,6 @@ module ResourceManager =
     let (Gameplay gameplay) = env.GameplayServices
 
     let subscriptions = new CompositeDisposable()
-    let allStats = gameplay.Projections.DerivedStats
     let regenAccumulators = Dictionary<Guid<EntityId>, struct (float * float)>()
 
     override this.Initialize() =
@@ -198,9 +190,10 @@ module ResourceManager =
 
     override this.Update gameTime =
       base.Update gameTime
-      let allResources = core.World.Resources |> AMap.force
-      let allInCombat = core.World.InCombatUntil |> AMap.force
-      let allStats = allStats |> AMap.force
+
+      // Force the pre-joined, pre-filtered projection
+      let regenContexts =
+        gameplay.Projections.RegenerationContexts |> AMap.force
 
       let struct (totalGameTime, deltaTime) =
         core.World.Time
@@ -208,9 +201,7 @@ module ResourceManager =
         |> AVal.force
 
       Regeneration.processAutoRegen
-        allResources
-        allInCombat
-        allStats
+        regenContexts
         totalGameTime
         deltaTime
         core.EventBus
