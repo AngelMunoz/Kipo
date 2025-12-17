@@ -12,6 +12,7 @@ open Pomo.Core.Domain.Particles
 open Pomo.Core.Domain.Skill
 open Pomo.Core.Domain.Units
 open Pomo.Core.Environment
+open Pomo.Core.Projections
 open Pomo.Core.Systems.Systems
 
 module ParticleSystem =
@@ -440,10 +441,12 @@ module ParticleSystem =
     ActiveEffectVisuals:
       System.Collections.Generic.Dictionary<Guid<EffectId>, string>
     ParticleStore: Stores.ParticleStore
+    // For syncing gameplay effects to visuals (stable - keyed by ActiveEffects)
+    GameplayEffects: HashMap<Guid<EntityId>, Projections.EffectOwnerTransform>
+    // For transform updates (not stable - raw world data)
     Positions: HashMap<Guid<EntityId>, Vector2>
     Velocities: HashMap<Guid<EntityId>, Vector2>
     Rotations: HashMap<Guid<EntityId>, float32>
-    GameplayEffects: HashMap<Guid<EntityId>, IndexList<Skill.ActiveEffect>>
   }
 
   /// Sync gameplay effects to visual effects - spawns new visuals for new effects
@@ -452,8 +455,8 @@ module ParticleSystem =
     (currentFrameEffectIds: System.Collections.Generic.HashSet<Guid<EffectId>>)
     =
     ctx.GameplayEffects
-    |> HashMap.iter(fun entityId effectList ->
-      for gameplayEffect in effectList do
+    |> HashMap.iter(fun entityId transform ->
+      for gameplayEffect in transform.Effects do
         match gameplayEffect.SourceEffect.Visuals.VfxId with
         | ValueSome vfxId ->
           currentFrameEffectIds.Add(gameplayEffect.Id) |> ignore
@@ -518,30 +521,35 @@ module ParticleSystem =
   let inline updateSingleEffect
     (ctx: ParticleUpdateContext)
     (effect: Particles.ActiveEffect)
-    : bool = // Returns true if effect should be removed
+    : bool =
     let mutable ownerVelocity = Vector3.Zero
     let mutable ownerRotation = Quaternion.Identity
 
     match effect.Owner with
     | ValueSome ownerId ->
-      match ctx.Positions.TryFindV ownerId with
+      // Use raw Positions/Velocities/Rotations (works for all entity types)
+      match ctx.Positions |> HashMap.tryFindV ownerId with
       | ValueSome pos ->
         effect.Position.Value <- Vector3(pos.X, 0.0f, pos.Y)
 
-        match ctx.Velocities.TryFindV ownerId with
-        | ValueSome vel -> ownerVelocity <- Vector3(vel.X, 0.0f, vel.Y)
-        | ValueNone -> ()
+        let vel =
+          ctx.Velocities
+          |> HashMap.tryFindV ownerId
+          |> ValueOption.defaultValue Vector2.Zero
 
-        match ctx.Rotations.TryFindV ownerId with
-        | ValueSome rot ->
-          ownerRotation <-
-            Quaternion.CreateFromAxisAngle(
-              Vector3.Up,
-              -rot + MathHelper.PiOver2
-            )
-        | ValueNone -> ()
+        ownerVelocity <- Vector3(vel.X, 0.0f, vel.Y)
 
-      | ValueNone -> effect.IsAlive.Value <- false
+        let rot =
+          ctx.Rotations
+          |> HashMap.tryFindV ownerId
+          |> ValueOption.defaultValue 0.0f
+
+        ownerRotation <-
+          Quaternion.CreateFromAxisAngle(Vector3.Up, -rot + MathHelper.PiOver2)
+
+      | ValueNone ->
+        // Owner doesn't exist - kill the effect
+        effect.IsAlive.Value <- false
     | ValueNone -> ()
 
     let shouldSpawn = effect.IsAlive.Value
@@ -577,15 +585,23 @@ module ParticleSystem =
     let effectsById =
       System.Collections.Generic.Dictionary<string, Particles.ActiveEffect>()
 
+    let effectOwnerTransforms =
+      env.GameplayServices.Projections.EffectOwnerTransforms
+
+    let dt = core.World.Time |> AVal.map(_.Delta.TotalSeconds >> float32)
+
     override this.Update(gameTime) =
-      let dt =
-        core.World.Time
-        |> AVal.map(_.Delta.TotalSeconds >> float32)
-        |> AVal.force
+      let dt = dt |> AVal.force
 
       let effects = core.World.VisualEffects
 
-      // Create update context
+      // Gameplay effects (stable - for syncing)
+      let gameplayEffects = effectOwnerTransforms |> AMap.force
+      // Raw transforms (not stable - for position updates)
+      let positions = core.World.Positions |> AMap.force
+      let velocities = core.World.Velocities |> AMap.force
+      let rotations = core.World.Rotations |> AMap.force
+
       let ctx: ParticleUpdateContext = {
         Dt = dt
         Rng = core.World.Rng
@@ -593,10 +609,10 @@ module ParticleSystem =
         EffectsById = effectsById
         ActiveEffectVisuals = activeEffectVisuals
         ParticleStore = particleStore
-        Positions = core.World.Positions |> AMap.force
-        Velocities = core.World.Velocities |> AMap.force
-        Rotations = core.World.Rotations |> AMap.force
-        GameplayEffects = core.World.ActiveEffects |> AMap.force
+        GameplayEffects = gameplayEffects
+        Positions = positions
+        Velocities = velocities
+        Rotations = rotations
       }
 
       // 1. Sync gameplay effects to visuals

@@ -294,6 +294,20 @@ module Projections =
     Effects: ActiveEffect IndexList
   }
 
+  [<Struct>]
+  type RegenerationContext = {
+    Resources: Entity.Resource
+    InCombatUntil: TimeSpan
+    DerivedStats: Entity.DerivedStats
+  }
+
+  [<Struct>]
+  type AnimationControlContext = {
+    Velocity: Vector2
+    ActiveAnimations: Animation.AnimationState IndexList
+    RunClipIds: string[] voption
+  }
+
   type ProjectionService =
     abstract LiveEntities: aset<Guid<EntityId>>
     abstract CombatStatuses: amap<Guid<EntityId>, IndexList<CombatStatus>>
@@ -307,6 +321,11 @@ module Projections =
 
     abstract EntityScenarioContexts: amap<Guid<EntityId>, EntityScenarioContext>
     abstract EffectOwnerTransforms: amap<Guid<EntityId>, EffectOwnerTransform>
+    abstract RegenerationContexts: amap<Guid<EntityId>, RegenerationContext>
+
+    abstract AnimationControlContexts:
+      amap<Guid<EntityId>, AnimationControlContext>
+
     abstract ComputeMovementSnapshot: Guid<ScenarioId> -> MovementSnapshot
 
     abstract GetNearbyEntitiesSnapshot:
@@ -407,17 +426,77 @@ module Projections =
       }
     })
 
-  let create(itemStore: ItemStore, world: World) =
+  let private regenerationContexts
+    (world: World)
+    (derivedStats: amap<Guid<EntityId>, Entity.DerivedStats>)
+    =
+    // Join Resources + DerivedStats (both required for regen)
+    (world.Resources, derivedStats)
+    ||> AMap.choose2V(fun _ resources stats ->
+      match resources, stats with
+      | ValueSome r, ValueSome s when r.Status = Entity.Status.Alive ->
+        ValueSome struct (r, s)
+      | _ -> ValueNone)
+    // Add InCombatUntil (optional, defaults to Zero)
+    |> AMap.mapA(fun entityId struct (resources, stats) -> adaptive {
+      let! inCombatUntil = world.InCombatUntil |> AMap.tryFind entityId
+
+      return {
+        Resources = resources
+        InCombatUntil = inCombatUntil |> Option.defaultValue TimeSpan.Zero
+        DerivedStats = stats
+      }
+    })
+
+  let private animationControlContexts (world: World) (modelStore: ModelStore) =
+    world.ModelConfigId
+    |> AMap.mapA(fun entityId configId -> adaptive {
+      let! velocity = world.Velocities |> AMap.tryFind entityId
+      and! activeAnims = world.ActiveAnimations |> AMap.tryFind entityId
+      and! resources = world.Resources |> AMap.tryFind entityId
+
+      // Filter: only alive entities
+      let isAlive =
+        resources
+        |> Option.map(fun r -> r.Status = Entity.Status.Alive)
+        |> Option.defaultValue false
+
+      if not isAlive then
+        return None
+      else
+        // Stable trunk: resolve RunClipIds from ModelStore
+        let runClipIds =
+          modelStore.tryFind configId
+          |> ValueOption.bind(fun cfg ->
+            cfg.AnimationBindings |> HashMap.tryFindV "Run")
+
+        return
+          Some {
+            Velocity = velocity |> Option.defaultValue Vector2.Zero
+            ActiveAnimations =
+              activeAnims |> Option.defaultValue IndexList.empty
+            RunClipIds = runClipIds
+          }
+    })
+    |> AMap.choose(fun _ v -> v)
+
+  let create(itemStore: ItemStore, modelStore: ModelStore, world: World) =
+    let derivedStats = calculateDerivedStats itemStore world
+
     { new ProjectionService with
         member _.LiveEntities = liveEntities world
         member _.CombatStatuses = calculateCombatStatuses world
-        member _.DerivedStats = calculateDerivedStats itemStore world
+        member _.DerivedStats = derivedStats
         member _.EquipedItems = equippedItemDefs(world, itemStore)
         member _.Inventories = inventoryDefs(world, itemStore)
         member _.EntityScenarios = world.EntityScenario
         member _.ActionSets = activeActionSets world
         member _.EntityScenarioContexts = entityScenarioContexts world
         member _.EffectOwnerTransforms = effectOwnerTransforms world
+        member _.RegenerationContexts = regenerationContexts world derivedStats
+
+        member _.AnimationControlContexts =
+          animationControlContexts world modelStore
 
         member _.ComputeMovementSnapshot(scenarioId) =
           let time = world.Time |> AVal.map _.Delta |> AVal.force

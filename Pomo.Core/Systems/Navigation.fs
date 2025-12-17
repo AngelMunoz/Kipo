@@ -7,22 +7,26 @@ open FSharp.Data.Adaptive
 open Pomo.Core
 open Pomo.Core.EventBus
 open Pomo.Core.Domain.Events
-open Pomo.Core.Domain.Units
-open Pomo.Core.Domain.World
 open Pomo.Core.Domain.Navigation
 open Pomo.Core.Stores
 open Pomo.Core.Algorithms
-open Pomo.Core.Projections // To get entity positions
+open Pomo.Core.Projections
 open Pomo.Core.Algorithms.Pathfinding
 
 module Navigation =
   open Pomo.Core.Domain.Core
 
-  let create(eventBus: EventBus, mapStore: MapStore, world: World) =
+  let create
+    (
+      eventBus: EventBus,
+      mapStore: MapStore,
+      projections: Projections.ProjectionService
+    ) =
     let entitySize = Constants.Navigation.EntitySize
     let gridCache = System.Collections.Generic.Dictionary<string, NavGrid>()
+    let scenarioContexts = projections.EntityScenarioContexts
 
-    let getNavGrid(mapKey: string) =
+    let inline getNavGrid(mapKey: string) =
       match gridCache.TryGetValue mapKey with
       | true, grid -> grid
       | false, _ ->
@@ -34,8 +38,43 @@ module Navigation =
         gridCache[mapKey] <- grid
         grid
 
-    // Define the threshold for free movement (16 units * 5 = 80 units)
     let freeMovementThreshold = Constants.Entity.Size.X * 5.0f
+
+    let inline tryGetEntityPosition entityId ctx =
+      let snapshot = projections.ComputeMovementSnapshot ctx.ScenarioId
+
+      snapshot.Positions
+      |> HashMap.tryFindV entityId
+      |> ValueOption.map(fun pos -> struct (ctx, pos))
+
+    let inline publishPath entityId path =
+      if not(List.isEmpty path) then
+        eventBus.Publish(
+          StateChangeEvent.Physics(
+            PhysicsEvents.MovementStateChanged
+              struct (entityId, MovingAlongPath path)
+          )
+        )
+
+    let inline updateMovement
+      entityId
+      targetPosition
+      struct (ctx, currentPosition)
+      =
+      let distance = Vector2.Distance(currentPosition, targetPosition)
+
+      if distance < freeMovementThreshold then
+        eventBus.Publish(
+          StateChangeEvent.Physics(
+            PhysicsEvents.MovementStateChanged
+              struct (entityId, MovingTo targetPosition)
+          )
+        )
+      else
+        let navGrid = getNavGrid ctx.MapKey
+
+        AStar.findPath navGrid currentPosition targetPosition
+        |> ValueOption.iter(publishPath entityId)
 
     { new CoreEventListener with
         member _.StartListening() =
@@ -43,45 +82,10 @@ module Navigation =
           |> Observable.subscribe(fun event ->
             let entityId = event.EntityId
             let targetPosition = event.Target
+            let scenarioContexts = scenarioContexts |> AMap.force
 
-            let entityScenarios = world.EntityScenario |> AMap.force
-            let scenarios = world.Scenarios |> AMap.force
-
-            match entityScenarios |> HashMap.tryFindV entityId with
-            | ValueSome scenarioId ->
-              match scenarios |> HashMap.tryFindV scenarioId with
-              | ValueSome scenario ->
-                match
-                  world.Positions |> AMap.force |> HashMap.tryFindV entityId
-                with
-                | ValueSome currentPosition ->
-                  let distance =
-                    Vector2.Distance(currentPosition, targetPosition)
-
-                  if distance < freeMovementThreshold then
-                    // Use direct movement for close targets (free movement)
-                    eventBus.Publish(
-                      StateChangeEvent.Physics(
-                        PhysicsEvents.MovementStateChanged
-                          struct (entityId, MovingTo targetPosition)
-                      )
-                    )
-                  else
-                    // Use pathfinding for distant targets
-                    let navGrid = getNavGrid scenario.Map.Key
-
-                    match
-                      AStar.findPath navGrid currentPosition targetPosition
-                    with
-                    | ValueSome path when not(List.isEmpty path) ->
-                      eventBus.Publish(
-                        StateChangeEvent.Physics(
-                          PhysicsEvents.MovementStateChanged
-                            struct (entityId, MovingAlongPath path)
-                        )
-                      )
-                    | _ -> () // No path found
-                | ValueNone -> ()
-              | ValueNone -> ()
-            | ValueNone -> ())
+            scenarioContexts
+            |> HashMap.tryFindV entityId
+            |> ValueOption.bind(tryGetEntityPosition entityId)
+            |> ValueOption.iter(updateMovement entityId targetPosition))
     }
