@@ -480,7 +480,7 @@
   <object id="162" name="Defense Towers Spawn" type="Spawn" x="271.485" y="790.041" width="235.255" height="104.07" rotation="324.6">
    <properties>
     <property name="EntityGroup" value="defense_towers"/>
-    <property name="MaxSpawns" type="int" value="2"/>
+    <property name="MaxSpawns" type="int" value="4"/>
    </properties>
   </object>
   <object id="163" name="Fire Mages Spawn" type="Spawn" x="298.763" y="99.9776" width="115.764" height="183.585">

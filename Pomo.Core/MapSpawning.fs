@@ -71,12 +71,14 @@ module MapSpawning =
       let roll = float32(random.NextDouble()) * totalWeight
       let mutable cumulative = 0.0f
       let mutable selected = group.Entities[0]
+      let mutable found = false
 
       for i = 0 to weights.Length - 1 do
         cumulative <- cumulative + weights[i]
 
-        if roll <= cumulative && selected = group.Entities[0] then
+        if not found && roll <= cumulative then
           selected <- group.Entities[i]
+          found <- true
 
       Some selected
 
@@ -124,7 +126,19 @@ module MapSpawning =
             | ValueSome(ClosedPolygon points) when not points.IsEmpty ->
               let offset = getRandomPointInPolygon points random
               Vector2(obj.X + offset.X, obj.Y + offset.Y)
-            | _ -> Vector2(obj.X, obj.Y)
+            | ValueSome(RectangleShape(width, height)) ->
+              // Random point within rectangle bounds
+              let offsetX = float32(random.NextDouble()) * width
+              let offsetY = float32(random.NextDouble()) * height
+              Vector2(obj.X + offsetX, obj.Y + offsetY)
+            | _ ->
+              // Fallback: use object's width/height if defined
+              if obj.Width > 0.0f && obj.Height > 0.0f then
+                let offsetX = float32(random.NextDouble()) * obj.Width
+                let offsetY = float32(random.NextDouble()) * obj.Height
+                Vector2(obj.X + offsetX, obj.Y + offsetY)
+              else
+                Vector2(obj.X, obj.Y)
 
           // Create candidates for each spawn slot
           seq {
