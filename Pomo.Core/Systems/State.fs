@@ -56,6 +56,69 @@ module StateUpdate =
       world.AIControllers.Remove(entity) |> ignore
       world.EntityScenario.Remove(entity) |> ignore
 
+    /// Apply an EntitySpawnBundle atomically - all components set in one pass
+    let applyEntitySpawnBundle
+      (world: MutableWorld)
+      (bundle: EntitySpawnBundle)
+      =
+      let entityId = bundle.Snapshot.Id
+
+      // Core entity data (always present)
+      world.Positions[entityId] <- bundle.Snapshot.Position
+      world.Velocities[entityId] <- bundle.Snapshot.Velocity
+      world.EntityScenario[entityId] <- bundle.Snapshot.ScenarioId
+      world.SpawningEntities.Remove entityId |> ignore
+
+      // Optional components
+      bundle.Resources
+      |> ValueOption.iter(fun r -> world.Resources[entityId] <- r)
+
+      bundle.Factions
+      |> ValueOption.iter(fun f -> world.Factions[entityId] <- f)
+
+      bundle.BaseStats
+      |> ValueOption.iter(fun s -> world.BaseStats[entityId] <- s)
+
+      bundle.ModelConfig
+      |> ValueOption.iter(fun m -> world.ModelConfigId[entityId] <- m)
+
+      bundle.InputMap
+      |> ValueOption.iter(fun im -> world.InputMaps[entityId] <- im)
+
+      bundle.ActionSets
+      |> ValueOption.iter(fun aSets -> world.ActionSets[entityId] <- aSets)
+
+      bundle.ActiveActionSet
+      |> ValueOption.iter(fun aSet -> world.ActiveActionSets[entityId] <- aSet)
+
+      // Inventory items - create instances and add to inventory
+      bundle.InventoryItems
+      |> ValueOption.iter(fun items ->
+        let inventory =
+          items
+          |> Array.fold
+            (fun acc item ->
+              world.ItemInstances[item.InstanceId] <- item
+              HashSet.add item.InstanceId acc)
+            HashSet.empty
+
+        world.EntityInventories[entityId] <- inventory)
+
+      // Equipped slots
+      bundle.EquippedSlots
+      |> ValueOption.iter(fun slots ->
+        let equipped =
+          slots
+          |> Array.fold
+            (fun acc struct (slot, instanceId) ->
+              HashMap.add slot instanceId acc)
+            HashMap.empty
+
+        world.EquippedItems[entityId] <- equipped)
+
+      bundle.AIController
+      |> ValueOption.iter(fun ai -> world.AIControllers[entityId] <- ai)
+
     let inline addSpawningEntity
       (world: MutableWorld)
       struct (entityId: Guid<EntityId>, scenarioId: Guid<ScenarioId>,
@@ -428,6 +491,8 @@ module StateUpdate =
             | Removed removed -> Entity.removeEntity mutableWorld removed
             | Spawning spawning ->
               Entity.addSpawningEntity mutableWorld spawning
+            | EntitySpawned bundle ->
+              Entity.applyEntitySpawnBundle mutableWorld bundle
           | Input event ->
             match event with
             | RawStateChanged rawIChanged ->

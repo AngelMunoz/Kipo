@@ -393,6 +393,9 @@ module CompositionRoot =
                   Previous = previous
                 })
 
+              // Flush ring buffer events to subscribers
+              eventBus.FlushToObservable()
+
               hudDesktop
               |> ValueOption.iter(fun d ->
                 scope.UIService.SetMouseOverUI d.IsMouseOverGUI)

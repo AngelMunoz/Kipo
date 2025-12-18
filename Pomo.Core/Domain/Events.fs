@@ -205,6 +205,25 @@ module SystemCommunications =
 
 // --- State Change Events ---
 
+/// Bundle of all components for spawning an entity atomically.
+/// Reduces 17+ individual events to a single event publication.
+[<Struct>]
+type EntitySpawnBundle = {
+  Snapshot: EntitySnapshot
+  Resources: Resource voption
+  Factions: Faction HashSet voption
+  BaseStats: BaseStats voption
+  ModelConfig: string voption
+  InputMap: InputMap voption
+  ActionSets: HashMap<int, HashMap<GameAction, SlotProcessing>> voption
+  ActiveActionSet: int voption
+  /// Item instances to create, with their instance data
+  InventoryItems: ItemInstance[] voption
+  /// Slots to equip after items are created
+  EquippedSlots: struct (Slot * Guid<ItemInstanceId>)[] voption
+  AIController: AIController voption
+}
+
 type EntityLifecycleEvents =
   | Spawning of
     spawning:
@@ -214,6 +233,8 @@ type EntityLifecycleEvents =
       Vector2)
   | Created of created: EntitySnapshot
   | Removed of removed: Guid<EntityId>
+  /// Bundled spawn event - applies all components atomically
+  | EntitySpawned of bundle: EntitySpawnBundle
 
 type InputEvents =
   | RawStateChanged of rawIChanged: struct (Guid<EntityId> * RawInputState)

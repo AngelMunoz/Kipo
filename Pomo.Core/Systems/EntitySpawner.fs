@@ -91,9 +91,17 @@ module EntitySpawnerLogic =
 
     baseStats, resource
 
-  let configurePlayerLoadout(entityId: Guid<EntityId>, eventBus: EventBus) =
-    // Default Loadout (Hardcoded for now, moved from PomoGame)
-    // TODO: Move this to a Loadout service or similar
+  /// Player loadout data returned for bundling
+  [<Struct>]
+  type PlayerLoadoutData = {
+    Items: Item.ItemInstance[]
+    EquippedSlots: struct (Item.Slot * Guid<ItemInstanceId>)[]
+    ActionSets: HashMap<int, HashMap<GameAction, Core.SlotProcessing>>
+    ActiveActionSet: int
+  }
+
+  let createPlayerLoadout() =
+    // Equipment items
     let wizardHat: Item.ItemInstance = {
       Item.InstanceId = Guid.NewGuid() |> UMX.tag
       ItemId = 4 |> UMX.tag
@@ -106,50 +114,7 @@ module EntitySpawnerLogic =
       UsesLeft = ValueNone
     }
 
-    eventBus.Publish(
-      GameEvent.State(StateChangeEvent.Inventory(ItemInstanceCreated wizardHat))
-    )
-
-    eventBus.Publish(
-      GameEvent.State(
-        StateChangeEvent.Inventory(ItemInstanceCreated magicStaff)
-      )
-    )
-
-    eventBus.Publish(
-      GameEvent.State(
-        StateChangeEvent.Inventory(
-          ItemAddedToInventory struct (entityId, wizardHat.InstanceId)
-        )
-      )
-    )
-
-    eventBus.Publish(
-      GameEvent.State(
-        StateChangeEvent.Inventory(
-          ItemAddedToInventory struct (entityId, magicStaff.InstanceId)
-        )
-      )
-    )
-
-    eventBus.Publish(
-      GameEvent.State(
-        StateChangeEvent.Inventory(
-          ItemEquipped struct (entityId, Item.Slot.Head, wizardHat.InstanceId)
-        )
-      )
-    )
-
-    eventBus.Publish(
-      GameEvent.State(
-        StateChangeEvent.Inventory(
-          ItemEquipped
-            struct (entityId, Item.Slot.Weapon, magicStaff.InstanceId)
-        )
-      )
-    )
-
-    // Default Skills
+    // Consumable items
     let potion: Item.ItemInstance = {
       InstanceId = %Guid.NewGuid()
       ItemId = %2
@@ -162,32 +127,7 @@ module EntitySpawnerLogic =
       UsesLeft = ValueSome 20
     }
 
-    eventBus.Publish(
-      GameEvent.State(
-        StateChangeEvent.Inventory(
-          ItemAddedToInventory struct (entityId, potion.InstanceId)
-        )
-      )
-    )
-
-    eventBus.Publish(
-      GameEvent.State(
-        StateChangeEvent.Inventory(
-          ItemAddedToInventory struct (entityId, trollBloodPotion.InstanceId)
-        )
-      )
-    )
-
-    eventBus.Publish(
-      GameEvent.State(StateChangeEvent.Inventory(ItemInstanceCreated potion))
-    )
-
-    eventBus.Publish(
-      GameEvent.State(
-        StateChangeEvent.Inventory(ItemInstanceCreated trollBloodPotion)
-      )
-    )
-
+    // Action sets
     let actionSet1 = [
       UseSlot1, Core.SlotProcessing.Skill %7 // Summon Boulder
       UseSlot2, Core.SlotProcessing.Skill %8 // Catchy Song
@@ -216,17 +156,15 @@ module EntitySpawnerLogic =
       3, HashMap.ofList actionSet3
     ]
 
-    eventBus.Publish(
-      GameEvent.State(
-        Input(ActionSetsChanged struct (entityId, HashMap.ofList actionSets))
-      )
-    )
-
-    eventBus.Publish(
-      GameEvent.State(
-        StateChangeEvent.Input(ActiveActionSetChanged struct (entityId, 3))
-      )
-    )
+    {
+      Items = [| wizardHat; magicStaff; potion; trollBloodPotion |]
+      EquippedSlots = [|
+        struct (Item.Slot.Head, wizardHat.InstanceId)
+        struct (Item.Slot.Weapon, magicStaff.InstanceId)
+      |]
+      ActionSets = HashMap.ofList actionSets
+      ActiveActionSet = 3
+    }
 
   let finalizeSpawn
     (pending: PendingSpawn)
@@ -245,52 +183,28 @@ module EntitySpawnerLogic =
       Velocity = Vector2.Zero
     }
 
-    // 1. Create the entity in the world
-    eventBus.Publish(GameEvent.State(EntityLifecycle(Created snapshot)))
-
     match pending.Type with
-    | SystemCommunications.SpawnType.Player playerIndex ->
+    | SystemCommunications.SpawnType.Player _playerIndex ->
       let baseStats, resource = createPlayerStats()
       let factions = HashSet [ Faction.Player ]
-
-      eventBus.Publish(
-        GameEvent.State(
-          StateChangeEvent.Combat(ResourcesChanged struct (entityId, resource))
-        )
-      )
-
-      eventBus.Publish(
-        GameEvent.State(
-          StateChangeEvent.Combat(FactionsChanged struct (entityId, factions))
-        )
-      )
-
-      eventBus.Publish(
-        GameEvent.State(
-          StateChangeEvent.Combat(BaseStatsChanged struct (entityId, baseStats))
-        )
-      )
-
-      // Set Model Configuration
-      eventBus.Publish(
-        GameEvent.State(
-          StateChangeEvent.Visuals(
-            ModelConfigChanged struct (entityId, "HumanoidBase")
-          )
-        )
-      )
-
-      // Initialize Input Map
       let inputMap = InputMapping.createDefaultInputMap()
+      let loadout = createPlayerLoadout()
 
-      eventBus.Publish(
-        GameEvent.State(
-          StateChangeEvent.Input(MapChanged struct (entityId, inputMap))
-        )
-      )
+      let bundle: EntitySpawnBundle = {
+        Snapshot = snapshot
+        Resources = ValueSome resource
+        Factions = ValueSome factions
+        BaseStats = ValueSome baseStats
+        ModelConfig = ValueSome "HumanoidBase"
+        InputMap = ValueSome inputMap
+        ActionSets = ValueSome loadout.ActionSets
+        ActiveActionSet = ValueSome loadout.ActiveActionSet
+        InventoryItems = ValueSome loadout.Items
+        EquippedSlots = ValueSome loadout.EquippedSlots
+        AIController = ValueNone
+      }
 
-      configurePlayerLoadout(entityId, eventBus)
-
+      eventBus.Publish(GameEvent.State(EntityLifecycle(EntitySpawned bundle)))
 
     | SystemCommunications.SpawnType.Faction info ->
       let archetype = aiArchetypeStore.find info.ArchetypeId
@@ -324,33 +238,6 @@ module EntitySpawnerLogic =
         MP = baseStats.Magic
         Status = Status.Alive
       }
-
-      eventBus.Publish(
-        GameEvent.State(
-          StateChangeEvent.Combat(ResourcesChanged struct (entityId, resource))
-        )
-      )
-
-      eventBus.Publish(
-        GameEvent.State(
-          StateChangeEvent.Combat(FactionsChanged struct (entityId, factions))
-        )
-      )
-
-      eventBus.Publish(
-        GameEvent.State(
-          StateChangeEvent.Combat(BaseStatsChanged struct (entityId, baseStats))
-        )
-      )
-
-      // Set Model Configuration
-      eventBus.Publish(
-        GameEvent.State(
-          StateChangeEvent.Visuals(
-            ModelConfigChanged struct (entityId, "HumanoidBase")
-          )
-        )
-      )
 
       // Resolve skills (with map override restrictions/extras)
       let skills =
@@ -398,11 +285,21 @@ module EntitySpawnerLogic =
         memories = HashMap.empty
       }
 
-      eventBus.Publish(
-        GameEvent.State(
-          StateChangeEvent.AI(ControllerUpdated struct (entityId, controller))
-        )
-      )
+      let bundle: EntitySpawnBundle = {
+        Snapshot = snapshot
+        Resources = ValueSome resource
+        Factions = ValueSome factions
+        BaseStats = ValueSome baseStats
+        ModelConfig = ValueSome "HumanoidBase"
+        InputMap = ValueNone
+        ActionSets = ValueNone
+        ActiveActionSet = ValueNone
+        InventoryItems = ValueNone
+        EquippedSlots = ValueNone
+        AIController = ValueSome controller
+      }
+
+      eventBus.Publish(GameEvent.State(EntityLifecycle(EntitySpawned bundle)))
 
   open Pomo.Core.Environment
   open Pomo.Core.Environment.Patterns
