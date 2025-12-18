@@ -291,3 +291,63 @@ type StateChangeEvent =
   // Uncategorized
   | CreateProjectile of
     projParams: struct (Guid<EntityId> * LiveProjectile * Vector2 voption)
+
+// --- Intent Events (user actions and commands) ---
+[<Struct>]
+type IntentEvent =
+  | Ability of ability: SystemCommunications.AbilityIntent
+  | Attack of attack: SystemCommunications.AttackIntent
+  | EffectApplication of effectApp: SystemCommunications.EffectApplicationIntent
+  | EffectDamage of effectDmg: SystemCommunications.EffectDamageIntent
+  | EffectResource of effectRes: SystemCommunications.EffectResourceIntent
+  | MovementTarget of movement: SystemCommunications.SetMovementTarget
+  | TargetSelection of target: SystemCommunications.TargetSelected
+  | Portal of portal: SystemCommunications.PortalTravel
+  | SlotActivated of slot: SystemCommunications.SlotActivated
+
+// --- Item Intent Events ---
+[<Struct>]
+type ItemIntentEvent =
+  | PickUp of pickUp: SystemCommunications.PickUpItemIntent
+  | Equip of equip: SystemCommunications.EquipItemIntent
+  | Unequip of unequip: SystemCommunications.UnequipItemIntent
+  | Drop of drop: SystemCommunications.DropItemIntent
+  | Use of useItem: SystemCommunications.UseItemIntent
+
+// --- Notification Events (UI feedback) ---
+[<Struct>]
+type NotificationEvent =
+  | ShowMessage of message: SystemCommunications.ShowNotification
+  | DamageDealt of damage: SystemCommunications.DamageDealt
+  | ResourceRestored of restored: SystemCommunications.ResourceRestored
+
+// --- Lifecycle Events (entity state changes for systems) ---
+[<Struct>]
+type LifecycleEvent =
+  | EntityDied of died: SystemCommunications.EntityDied
+  | ProjectileImpacted of impact: SystemCommunications.ProjectileImpacted
+
+// --- Spawning Events ---
+[<Struct>]
+type SpawningEvent =
+  | SpawnEntity of spawn: SystemCommunications.SpawnEntityIntent
+  | RegisterZones of zones: SystemCommunications.RegisterSpawnZones
+
+// --- Collision Events (already exists, just rename for consistency) ---
+type CollisionEvent = SystemCommunications.CollisionEvents
+
+// --- Scene Events ---
+[<Struct>]
+type SceneEvent = Transition of transition: SystemCommunications.SceneTransition
+
+// === Top-Level GameEvent ===
+[<Struct>]
+type GameEvent =
+  | State of state: StateChangeEvent
+  | Intent of intent: IntentEvent
+  | ItemIntent of itemIntent: ItemIntentEvent
+  | Notification of notification: NotificationEvent
+  | Lifecycle of lifecycle: LifecycleEvent
+  | Spawn of spawning: SpawningEvent
+  | Collision of collision: CollisionEvent
+  | Scene of scene: SceneEvent

@@ -21,11 +21,15 @@ module Inventory =
     (eventBus: EventBus)
     (intent: SystemCommunications.PickUpItemIntent)
     =
-    eventBus.Publish(Inventory(ItemInstanceCreated intent.Item))
+    eventBus.Publish(
+      GameEvent.State(Inventory(ItemInstanceCreated intent.Item))
+    )
 
     eventBus.Publish(
-      Inventory(
-        ItemAddedToInventory struct (intent.Picker, intent.Item.InstanceId)
+      GameEvent.State(
+        Inventory(
+          ItemAddedToInventory struct (intent.Picker, intent.Item.InstanceId)
+        )
       )
     )
 
@@ -43,34 +47,38 @@ module Inventory =
           | ValueNone ->
             // infinite uses, so just publish effect application intent
             eventBus.Publish(
-              {
-                SourceEntity = intent.EntityId
-                TargetEntity = intent.EntityId
-                Effect = props.Effect
-              }
-              : SystemCommunications.EffectApplicationIntent
+              GameEvent.Intent(
+                IntentEvent.EffectApplication {
+                  SourceEntity = intent.EntityId
+                  TargetEntity = intent.EntityId
+                  Effect = props.Effect
+                }
+              )
             )
           | ValueSome usesLeft ->
 
             if usesLeft > 0 then
               // publsh effect application intent
               eventBus.Publish(
-                {
-                  SourceEntity = intent.EntityId
-                  TargetEntity = intent.EntityId
-                  Effect = props.Effect
-                }
-                : SystemCommunications.EffectApplicationIntent
+                GameEvent.Intent(
+                  IntentEvent.EffectApplication {
+                    SourceEntity = intent.EntityId
+                    TargetEntity = intent.EntityId
+                    Effect = props.Effect
+                  }
+                )
               )
               // decrement usages left and publish update event
               eventBus.Publish(
-                Inventory(
-                  UpdateItemInstance {
-                    itemInstance with
-                        UsesLeft =
-                          itemInstance.UsesLeft
-                          |> ValueOption.map(fun uses -> uses - 1)
-                  }
+                GameEvent.State(
+                  Inventory(
+                    UpdateItemInstance {
+                      itemInstance with
+                          UsesLeft =
+                            itemInstance.UsesLeft
+                            |> ValueOption.map(fun uses -> uses - 1)
+                    }
+                  )
                 )
               )
             else
@@ -95,11 +103,20 @@ module Inventory =
     { new CoreEventListener with
         member _.StartListening() : IDisposable =
           new CompositeDisposable(
-            eventBus
-              .GetObservableFor<SystemCommunications.PickUpItemIntent>()
-              .Subscribe(handlePickUpItemIntent eventBus),
-            eventBus
-              .GetObservableFor<SystemCommunications.UseItemIntent>()
-              .Subscribe(handleUseItemIntent(eventBus, itemStore, world))
+            eventBus.Observable
+            |> Observable.choose(fun e ->
+              match e with
+              | GameEvent.ItemIntent(ItemIntentEvent.PickUp intent) ->
+                Some intent
+              | _ -> None)
+            |> Observable.subscribe(handlePickUpItemIntent eventBus),
+            eventBus.Observable
+            |> Observable.choose(fun e ->
+              match e with
+              | GameEvent.ItemIntent(ItemIntentEvent.Use intent) -> Some intent
+              | _ -> None)
+            |> Observable.subscribe(
+              handleUseItemIntent(eventBus, itemStore, world)
+            )
           )
     }

@@ -1342,17 +1342,25 @@ type AISystem(game: Game, env: PomoEnvironment) =
                 (getCooldowns())
 
             match command with
-            | ValueSome cmd -> core.EventBus.Publish cmd
+            | ValueSome cmd ->
+              core.EventBus.Publish(
+                GameEvent.Intent(IntentEvent.MovementTarget cmd)
+              )
             | ValueNone -> ()
 
             match abilityIntent with
-            | ValueSome intent -> core.EventBus.Publish intent
+            | ValueSome intent ->
+              core.EventBus.Publish(
+                GameEvent.Intent(IntentEvent.Ability intent)
+              )
             | ValueNone -> ()
 
             if updatedController <> controller then
               core.EventBus.Publish(
-                StateChangeEvent.AI(
-                  ControllerUpdated struct (controllerId, updatedController)
+                GameEvent.State(
+                  StateChangeEvent.AI(
+                    ControllerUpdated struct (controllerId, updatedController)
+                  )
                 )
               )
           | _ -> ()

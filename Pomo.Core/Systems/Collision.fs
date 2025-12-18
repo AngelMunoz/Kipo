@@ -299,8 +299,10 @@ module Collision =
                 // Simple radius check
                 if distance < Core.Constants.Entity.CollisionDistance then
                   core.EventBus.Publish(
-                    SystemCommunications.EntityCollision
-                      struct (entityId, otherId)
+                    GameEvent.Collision(
+                      SystemCommunications.EntityCollision
+                        struct (entityId, otherId)
+                    )
                   )
               | ValueNone -> ()
 
@@ -427,12 +429,13 @@ module Collision =
                     match processHitResult findObj cacheKey mtv with
                     | TriggerHit portalData ->
                       core.EventBus.Publish(
-                        {
-                          EntityId = entityId
-                          TargetMap = portalData.TargetMap
-                          TargetSpawn = portalData.TargetSpawn
-                        }
-                        : SystemCommunications.PortalTravel
+                        GameEvent.Intent(
+                          IntentEvent.Portal {
+                            EntityId = entityId
+                            TargetMap = portalData.TargetMap
+                            TargetSpawn = portalData.TargetSpawn
+                          }
+                        )
                       )
                     | WallHit(wallMtv, obj) ->
                       iterationMTV <- iterationMTV + wallMtv
@@ -471,18 +474,27 @@ module Collision =
                   | ValueNone -> ()
                 | ValueNone -> ()
 
-                core.EventBus.Publish(impact)
-                core.EventBus.Publish(EntityLifecycle(Removed entityId))
+                core.EventBus.Publish(
+                  GameEvent.Lifecycle(LifecycleEvent.ProjectileImpacted impact)
+                )
+
+                core.EventBus.Publish(
+                  GameEvent.State(EntityLifecycle(Removed entityId))
+                )
               | ValueNone ->
                 // Regular entity - apply position correction and sliding
                 core.EventBus.Publish(
-                  Physics(PositionChanged struct (entityId, currentPos))
+                  GameEvent.State(
+                    Physics(PositionChanged struct (entityId, currentPos))
+                  )
                 )
 
                 match lastCollidedObj with
                 | ValueSome obj ->
                   core.EventBus.Publish(
-                    SystemCommunications.MapObjectCollision
-                      struct (entityId, obj, totalMTV)
+                    GameEvent.Collision(
+                      SystemCommunications.MapObjectCollision
+                        struct (entityId, obj, totalMTV)
+                    )
                   )
                 | ValueNone -> ()

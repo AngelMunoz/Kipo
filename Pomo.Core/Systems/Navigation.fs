@@ -12,6 +12,7 @@ open Pomo.Core.Stores
 open Pomo.Core.Algorithms
 open Pomo.Core.Projections
 open Pomo.Core.Algorithms.Pathfinding
+open FSharp.Control.Reactive
 
 module Navigation =
   open Pomo.Core.Domain.Core
@@ -50,9 +51,10 @@ module Navigation =
     let inline publishPath entityId path =
       if not(List.isEmpty path) then
         eventBus.Publish(
-          StateChangeEvent.Physics(
-            PhysicsEvents.MovementStateChanged
-              struct (entityId, MovingAlongPath path)
+          GameEvent.State(
+            Physics(
+              MovementStateChanged struct (entityId, MovingAlongPath path)
+            )
           )
         )
 
@@ -65,9 +67,10 @@ module Navigation =
 
       if distance < freeMovementThreshold then
         eventBus.Publish(
-          StateChangeEvent.Physics(
-            PhysicsEvents.MovementStateChanged
-              struct (entityId, MovingTo targetPosition)
+          GameEvent.State(
+            Physics(
+              MovementStateChanged struct (entityId, MovingTo targetPosition)
+            )
           )
         )
       else
@@ -78,7 +81,12 @@ module Navigation =
 
     { new CoreEventListener with
         member _.StartListening() =
-          eventBus.GetObservableFor<SystemCommunications.SetMovementTarget>()
+          eventBus.Observable
+          |> Observable.choose(fun event ->
+            match event with
+            | GameEvent.Intent(IntentEvent.MovementTarget target) ->
+              Some target
+            | _ -> None)
           |> Observable.subscribe(fun event ->
             let entityId = event.EntityId
             let targetPosition = event.Target

@@ -314,9 +314,11 @@ module Projectile =
       }
 
       eventBus.Publish(
-        Animation(
-          ActiveAnimationsChanged
-            struct (projectileId, IndexList.single spinAnim)
+        GameEvent.State(
+          StateChangeEvent.Animation(
+            ActiveAnimationsChanged
+              struct (projectileId, IndexList.single spinAnim)
+          )
         )
       )
     | ValueSome _ -> ()
@@ -449,5 +451,10 @@ module Projectile =
           for impact in evs do
             spawnImpactVisual vfxCtx impact
 
-      sysEvents |> Seq.iter core.EventBus.Publish
-      stateEvents |> Seq.iter core.EventBus.Publish
+      sysEvents
+      |> Seq.iter(fun e ->
+        core.EventBus.Publish(
+          GameEvent.Lifecycle(LifecycleEvent.ProjectileImpacted e)
+        ))
+
+      stateEvents |> Seq.iter(fun e -> core.EventBus.Publish(GameEvent.State e))

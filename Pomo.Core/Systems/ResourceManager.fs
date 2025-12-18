@@ -32,14 +32,18 @@ module ResourceManager =
         let newResources = { currentResources with HP = newHP }
 
         eventBus.Publish(
-          StateChangeEvent.Combat(
-            CombatEvents.ResourcesChanged struct (event.Target, newResources)
+          GameEvent.State(
+            StateChangeEvent.Combat(
+              CombatEvents.ResourcesChanged struct (event.Target, newResources)
+            )
           )
         )
 
         eventBus.Publish(
-          StateChangeEvent.Combat(
-            CombatEvents.InCombatTimerRefreshed event.Target
+          GameEvent.State(
+            StateChangeEvent.Combat(
+              CombatEvents.InCombatTimerRefreshed event.Target
+            )
           )
         )
 
@@ -50,11 +54,13 @@ module ResourceManager =
 
           match scenarioId with
           | ValueSome sid ->
-            eventBus.Publish<SystemCommunications.EntityDied>(
-              {
-                EntityId = event.Target
-                ScenarioId = sid
-              }
+            eventBus.Publish(
+              GameEvent.Lifecycle(
+                LifecycleEvent.EntityDied {
+                  EntityId = event.Target
+                  ScenarioId = sid
+                }
+              )
             )
           | ValueNone -> ()
       | ValueNone -> ()
@@ -100,17 +106,23 @@ module ResourceManager =
           { currentResources with MP = newMP }
 
       eventBus.Publish(
-        StateChangeEvent.Combat(
-          ResourcesChanged struct (event.Target, resources)
+        GameEvent.State(
+          StateChangeEvent.Combat(
+            ResourcesChanged struct (event.Target, resources)
+          )
         )
       )
 
-      eventBus.Publish<SystemCommunications.ShowNotification> {
-        Message =
-          let amount = event.Amount
-          $"%d{amount} {event.ResourceType}"
-        Position = position
-      }
+      eventBus.Publish(
+        GameEvent.Notification(
+          NotificationEvent.ShowMessage {
+            Message =
+              let amount = event.Amount
+              $"%d{amount} {event.ResourceType}"
+            Position = position
+          }
+        )
+      )
     | ValueNone -> ()
 
   module private Regeneration =
@@ -160,8 +172,11 @@ module ResourceManager =
               }
 
               eventBus.Publish(
-                StateChangeEvent.Combat(
-                  CombatEvents.ResourcesChanged struct (entityId, newResources)
+                GameEvent.State(
+                  StateChangeEvent.Combat(
+                    CombatEvents.ResourcesChanged
+                      struct (entityId, newResources)
+                  )
                 )
               )
 
@@ -180,13 +195,22 @@ module ResourceManager =
     override this.Initialize() =
       base.Initialize()
 
-      core.EventBus.GetObservableFor<SystemCommunications.DamageDealt>()
+      core.EventBus.Observable
+      |> Observable.choose(fun e ->
+        match e with
+        | GameEvent.Notification(NotificationEvent.DamageDealt dmg) -> Some dmg
+        | _ -> None)
       |> Observable.subscribe(
         Handlers.handleDamageDealt core.World core.EventBus
       )
       |> subscriptions.Add
 
-      core.EventBus.GetObservableFor<SystemCommunications.ResourceRestored>()
+      core.EventBus.Observable
+      |> Observable.choose(fun e ->
+        match e with
+        | GameEvent.Notification(NotificationEvent.ResourceRestored restored) ->
+          Some restored
+        | _ -> None)
       |> Observable.subscribe(
         handleResourceRestored
           core.World

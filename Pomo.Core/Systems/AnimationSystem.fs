@@ -154,10 +154,16 @@ type AnimationSystem(game: Game, env: PomoEnvironment) =
     // Publish events
     for entityId, newAnims, newPose in updates do
       core.EventBus.Publish(
-        Animation(ActiveAnimationsChanged struct (entityId, newAnims))
+        GameEvent.State(
+          Animation(ActiveAnimationsChanged struct (entityId, newAnims))
+        )
       )
 
-      core.EventBus.Publish(Animation(PoseChanged struct (entityId, newPose)))
+      core.EventBus.Publish(
+        GameEvent.State(Animation(PoseChanged struct (entityId, newPose)))
+      )
 
     for entityId in removals do
-      core.EventBus.Publish(Animation(AnimationStateRemoved entityId))
+      core.EventBus.Publish(
+        GameEvent.State(Animation(AnimationStateRemoved entityId))
+      )

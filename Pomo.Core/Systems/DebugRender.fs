@@ -271,9 +271,9 @@ module DebugRender =
           |> IndexList.map(fun obj ->
             let color =
               match obj.Type with
-              | ValueSome Wall -> Color.Red
-              | ValueSome Spawn -> Color.Green
-              | ValueSome Zone ->
+              | ValueSome MapObjectType.Wall -> Color.Red
+              | ValueSome MapObjectType.Spawn -> Color.Green
+              | ValueSome MapObjectType.Zone ->
                 if obj.Name.Contains("Void") then Color.Purple
                 elif obj.Name.Contains("Slow") then Color.Yellow
                 elif obj.Name.Contains("Speed") then Color.Cyan
@@ -846,7 +846,11 @@ module DebugRender =
 
       let eventBus = core.EventBus
 
-      eventBus.GetObservableFor<SystemCommunications.AbilityIntent>()
+      eventBus.Observable
+      |> FSharp.Control.Reactive.Observable.choose(fun e ->
+        match e with
+        | GameEvent.Intent(IntentEvent.Ability intent) -> Some intent
+        | _ -> None)
       |> FSharp.Control.Reactive.Observable.subscribe(fun intent ->
         if not this.Visible then
           ()
@@ -899,7 +903,12 @@ module DebugRender =
         | _ -> ())
       |> subscriptions.Add
 
-      eventBus.GetObservableFor<SystemCommunications.ProjectileImpacted>()
+      eventBus.Observable
+      |> FSharp.Control.Reactive.Observable.choose(fun e ->
+        match e with
+        | GameEvent.Lifecycle(LifecycleEvent.ProjectileImpacted impact) ->
+          Some impact
+        | _ -> None)
       |> FSharp.Control.Reactive.Observable.subscribe(fun impact ->
         if not this.Visible then
           ()

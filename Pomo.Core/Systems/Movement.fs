@@ -33,7 +33,7 @@ module Movement =
 
         for id, newPosition in movements do
           core.EventBus.Publish(
-            Physics(PositionChanged struct (id, newPosition))
+            GameEvent.State(Physics(PositionChanged struct (id, newPosition)))
           )
 
         let rotations =
@@ -41,5 +41,5 @@ module Movement =
 
         for id, newRotation in rotations do
           core.EventBus.Publish(
-            Physics(RotationChanged struct (id, newRotation))
+            GameEvent.State(Physics(RotationChanged struct (id, newRotation)))
           )

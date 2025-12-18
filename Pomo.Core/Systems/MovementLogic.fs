@@ -17,8 +17,13 @@ module MovementLogic =
     | WaypointReached of remainingPath: Vector2 list
 
   let notifyArrived (entityId: Guid<EntityId>) (eventBus: EventBus) =
-    eventBus.Publish(Physics(VelocityChanged struct (entityId, Vector2.Zero)))
-    eventBus.Publish(Physics(MovementStateChanged struct (entityId, Idle)))
+    eventBus.Publish(
+      GameEvent.State(Physics(VelocityChanged struct (entityId, Vector2.Zero)))
+    )
+
+    eventBus.Publish(
+      GameEvent.State(Physics(MovementStateChanged struct (entityId, Idle)))
+    )
 
   let notifyWaypointReached
     (entityId: Guid<EntityId>)
@@ -26,8 +31,10 @@ module MovementLogic =
     (eventBus: EventBus)
     =
     eventBus.Publish(
-      Physics(
-        MovementStateChanged struct (entityId, MovingAlongPath remainingPath)
+      GameEvent.State(
+        Physics(
+          MovementStateChanged struct (entityId, MovingAlongPath remainingPath)
+        )
       )
     )
 
@@ -38,7 +45,9 @@ module MovementLogic =
     (eventBus: EventBus)
     =
     if newVelocity <> lastVelocity then
-      eventBus.Publish(Physics(VelocityChanged struct (entityId, newVelocity)))
+      eventBus.Publish(
+        GameEvent.State(Physics(VelocityChanged struct (entityId, newVelocity)))
+      )
 
     newVelocity
 

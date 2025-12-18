@@ -77,7 +77,9 @@ module RawInput =
       }
 
       core.EventBus.Publish(
-        StateChangeEvent.Input(
-          InputEvents.RawStateChanged struct (entityId, newRawInputState)
+        GameEvent.State(
+          StateChangeEvent.Input(
+            InputEvents.RawStateChanged struct (entityId, newRawInputState)
+          )
         )
       )

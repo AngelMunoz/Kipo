@@ -403,7 +403,11 @@ module StateUpdate =
       base.UpdateOrder <- 1000
 
       sub <-
-        eventBus.GetObservableFor<StateChangeEvent>()
+        eventBus.Observable
+        |> Observable.choose(fun e ->
+          match e with
+          | GameEvent.State stateEvent -> Some stateEvent
+          | _ -> None)
         |> Observable.subscribe(fun e -> events.Enqueue(e))
 
     override _.Dispose(disposing: bool) : unit =

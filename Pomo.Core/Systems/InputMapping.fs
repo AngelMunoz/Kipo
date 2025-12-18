@@ -120,8 +120,8 @@ module InputMapping =
       match actionStates |> AVal.force with
       | Some states ->
         core.EventBus.Publish(
-          StateChangeEvent.Input(
-            InputEvents.GameActionStatesChanged struct (entityId, states)
+          GameEvent.State(
+            Input(GameActionStatesChanged struct (entityId, states))
           )
         )
       | None -> ()

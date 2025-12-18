@@ -25,9 +25,11 @@ module Equipment =
 
     let handleEquipItemIntent(intent: SystemCommunications.EquipItemIntent) =
       eventBus.Publish(
-        Inventory(
-          ItemEquipped
-            struct (intent.EntityId, intent.Slot, intent.ItemInstanceId)
+        GameEvent.State(
+          Inventory(
+            ItemEquipped
+              struct (intent.EntityId, intent.Slot, intent.ItemInstanceId)
+          )
         )
       )
 
@@ -40,8 +42,11 @@ module Equipment =
       match HashMap.tryFindV intent.Slot equippedItems with
       | ValueSome itemInstanceId ->
         eventBus.Publish(
-          Inventory(
-            ItemUnequipped struct (intent.EntityId, intent.Slot, itemInstanceId)
+          GameEvent.State(
+            Inventory(
+              ItemUnequipped
+                struct (intent.EntityId, intent.Slot, itemInstanceId)
+            )
           )
         )
       | ValueNone -> () // Item not found in slot, do nothing
@@ -50,14 +55,21 @@ module Equipment =
         member this.StartListening() : IDisposable =
           let disposable = new CompositeDisposable()
 
-          eventBus
-            .GetObservableFor<SystemCommunications.EquipItemIntent>()
-            .Subscribe(handleEquipItemIntent)
+          eventBus.Observable
+          |> Observable.choose(fun e ->
+            match e with
+            | GameEvent.ItemIntent(ItemIntentEvent.Equip intent) -> Some intent
+            | _ -> None)
+          |> Observable.subscribe handleEquipItemIntent
           |> disposable.Add
 
-          eventBus
-            .GetObservableFor<SystemCommunications.UnequipItemIntent>()
-            .Subscribe(handleUnequipItemIntent)
+          eventBus.Observable
+          |> Observable.choose(fun e ->
+            match e with
+            | GameEvent.ItemIntent(ItemIntentEvent.Unequip intent) ->
+              Some intent
+            | _ -> None)
+          |> Observable.subscribe handleUnequipItemIntent
           |> disposable.Add
 
           disposable

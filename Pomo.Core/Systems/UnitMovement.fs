@@ -54,7 +54,11 @@ module UnitMovement =
       base.Initialize()
 
       sub <-
-        core.EventBus.GetObservableFor<SystemCommunications.CollisionEvents>()
+        core.EventBus.Observable
+        |> Observable.choose(fun e ->
+          match e with
+          | GameEvent.Collision(collision) -> Some collision
+          | _ -> None)
         |> Observable.subscribe(fun e -> collisionEvents.Enqueue(e))
 
 

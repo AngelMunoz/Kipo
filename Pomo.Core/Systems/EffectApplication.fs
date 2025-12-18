@@ -136,16 +136,21 @@ module Effects =
     let create(world: World, eventBus: EventBus) =
       let handler(intent: SystemCommunications.EffectApplicationIntent) =
         match applyEffect world intent with
-        | ValueSome(Persistent ev) -> eventBus.Publish ev
-        | ValueSome(InstantDmg dmg) -> eventBus.Publish dmg
-        | ValueSome(InstantRes res) -> eventBus.Publish res
+        | ValueSome(Persistent ev) -> eventBus.Publish(GameEvent.State ev)
+        | ValueSome(InstantDmg dmg) ->
+          eventBus.Publish(GameEvent.Intent(IntentEvent.EffectDamage dmg))
+        | ValueSome(InstantRes res) ->
+          eventBus.Publish(GameEvent.Intent(IntentEvent.EffectResource res))
         | ValueNone -> ()
 
       { new CoreEventListener with
           member _.StartListening() =
-            eventBus.GetObservableFor<
-              SystemCommunications.EffectApplicationIntent
-             >()
+            eventBus.Observable
+            |> Observable.choose(fun e ->
+              match e with
+              | GameEvent.Intent(IntentEvent.EffectApplication intent) ->
+                Some intent
+              | _ -> None)
             |> Observable.subscribe handler
       }
 
@@ -405,8 +410,15 @@ module Effects =
         for evts in events do
           for evt in evts do
             match evt with
-            | State stateEvent -> core.EventBus.Publish stateEvent
-            | EffectTick(DamageIntent dmg) -> core.EventBus.Publish dmg
-            | EffectTick(ResourceIntent res) -> core.EventBus.Publish res
+            | State stateEvent ->
+              core.EventBus.Publish(GameEvent.State stateEvent)
+            | EffectTick(DamageIntent dmg) ->
+              core.EventBus.Publish(
+                GameEvent.Intent(IntentEvent.EffectDamage dmg)
+              )
+            | EffectTick(ResourceIntent res) ->
+              core.EventBus.Publish(
+                GameEvent.Intent(IntentEvent.EffectResource res)
+              )
 
       publishEvents(allEvents |> AMap.toASetValues |> ASet.force)

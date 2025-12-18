@@ -80,5 +80,5 @@ type MotionStateAnimationSystem(game: Game, env: PomoEnvironment) =
           ctx.ActiveAnimations
           ctx.RunClipIds
       with
-      | ValueSome event -> core.EventBus.Publish(event)
+      | ValueSome event -> core.EventBus.Publish(GameEvent.State event)
       | ValueNone -> ()

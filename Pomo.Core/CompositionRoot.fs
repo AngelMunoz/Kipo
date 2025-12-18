@@ -225,7 +225,7 @@ module CompositionRoot =
       let mapDependentComponents = new ResizeArray<IGameComponent>()
 
       let clearCurrentMapData() =
-        eventBus.Publish(EntityLifecycle(Removed playerId))
+        eventBus.Publish(GameEvent.State(EntityLifecycle(Removed playerId)))
 
       // Initialize WorldMapService
       let worldMapService =
@@ -258,7 +258,9 @@ module CompositionRoot =
           Position = playerPos
         }
 
-        eventBus.Publish playerIntent
+        eventBus.Publish(
+          GameEvent.Spawn(SpawningEvent.SpawnEntity playerIntent)
+        )
 
         // Spawn enemies using MapSpawning module
         let spawnCtx: MapSpawning.SpawnContext = {
@@ -270,8 +272,16 @@ module CompositionRoot =
         }
 
         let publisher: MapSpawning.SpawnEventPublisher = {
-          RegisterZones = eventBus.Publish
-          SpawnEntity = eventBus.Publish
+          RegisterZones =
+            fun zones ->
+              eventBus.Publish(
+                GameEvent.Spawn(SpawningEvent.RegisterZones zones)
+              )
+          SpawnEntity =
+            fun entity ->
+              eventBus.Publish(
+                GameEvent.Spawn(SpawningEvent.SpawnEntity entity)
+              )
         }
 
         MapSpawning.spawnEnemiesForScenario spawnCtx candidates publisher
@@ -334,7 +344,11 @@ module CompositionRoot =
 
       // Bridge EventBus to SceneTransitionSubject
       subs.Add(
-        eventBus.GetObservableFor<SystemCommunications.SceneTransition>()
+        eventBus.Observable
+        |> Observable.choose(fun e ->
+          match e with
+          | GameEvent.Scene(SceneEvent.Transition t) -> Some t
+          | _ -> None)
         |> Observable.subscribe(fun event ->
           sceneTransitionSubject.OnNext event.Scene)
       )
@@ -353,7 +367,11 @@ module CompositionRoot =
 
       // Handle Portal Travel
       subs.Add(
-        eventBus.GetObservableFor<SystemCommunications.PortalTravel>()
+        eventBus.Observable
+        |> Observable.choose(fun e ->
+          match e with
+          | GameEvent.Intent(IntentEvent.Portal intent) -> Some intent
+          | _ -> None)
         |> Observable.subscribe(fun event ->
           if event.EntityId = playerId then
             // Trigger Scene Transition instead of local loadMap
