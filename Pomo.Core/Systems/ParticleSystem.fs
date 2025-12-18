@@ -441,8 +441,8 @@ module ParticleSystem =
     ActiveEffectVisuals:
       System.Collections.Generic.Dictionary<Guid<EffectId>, string>
     ParticleStore: Stores.ParticleStore
-    // For syncing gameplay effects to visuals (stable - keyed by ActiveEffects)
-    GameplayEffects: HashMap<Guid<EntityId>, Projections.EffectOwnerTransform>
+    // For syncing gameplay effects to visuals (direct from world.ActiveEffects)
+    ActiveEffects: HashMap<Guid<EntityId>, Skill.ActiveEffect IndexList>
     // For transform updates (not stable - raw world data)
     Positions: HashMap<Guid<EntityId>, Vector2>
     Velocities: HashMap<Guid<EntityId>, Vector2>
@@ -454,9 +454,9 @@ module ParticleSystem =
     (ctx: ParticleUpdateContext)
     (currentFrameEffectIds: System.Collections.Generic.HashSet<Guid<EffectId>>)
     =
-    ctx.GameplayEffects
-    |> HashMap.iter(fun entityId transform ->
-      for gameplayEffect in transform.Effects do
+    ctx.ActiveEffects
+    |> HashMap.iter(fun entityId effects ->
+      for gameplayEffect in effects do
         match gameplayEffect.SourceEffect.Visuals.VfxId with
         | ValueSome vfxId ->
           currentFrameEffectIds.Add(gameplayEffect.Id) |> ignore
@@ -601,9 +601,6 @@ module ParticleSystem =
     let effectsById =
       System.Collections.Generic.Dictionary<string, Particles.ActiveEffect>()
 
-    let effectOwnerTransforms =
-      env.GameplayServices.Projections.EffectOwnerTransforms
-
     let dt = core.World.Time |> AVal.map(_.Delta.TotalSeconds >> float32)
 
     override this.Update(gameTime) =
@@ -611,8 +608,8 @@ module ParticleSystem =
 
       let effects = core.World.VisualEffects
 
-      // Gameplay effects (stable - for syncing)
-      let gameplayEffects = effectOwnerTransforms |> AMap.force
+      // Active effects from world (stable - entities with effects)
+      let activeEffects = core.World.ActiveEffects |> AMap.force
       // Raw transforms (not stable - for position updates)
       let positions = core.World.Positions |> AMap.force
       let velocities = core.World.Velocities |> AMap.force
@@ -625,7 +622,7 @@ module ParticleSystem =
         EffectsById = effectsById
         ActiveEffectVisuals = activeEffectVisuals
         ParticleStore = particleStore
-        GameplayEffects = gameplayEffects
+        ActiveEffects = activeEffects
         Positions = positions
         Velocities = velocities
         Rotations = rotations

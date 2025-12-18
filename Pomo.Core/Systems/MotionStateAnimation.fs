@@ -64,21 +64,47 @@ type MotionStateAnimationSystem(game: Game, env: PomoEnvironment) =
   inherit GameComponent(game)
 
   let (Core core) = env.CoreServices
-  let (Gameplay gameplay) = env.GameplayServices
+  let (Stores stores) = env.StoreServices
 
   override this.Update(gameTime) =
-    // Force the pre-joined, pre-filtered projection
-    // ModelConfig → RunClipIds resolution was done adaptively (cached)
-    let animContexts =
-      gameplay.Projections.AnimationControlContexts |> AMap.force
+    // Force world data directly - no reactive projection
+    let velocities = core.World.Velocities |> AMap.force
+    let activeAnimations = core.World.ActiveAnimations |> AMap.force
+    let resources = core.World.Resources |> AMap.force
+    let modelConfigIds = core.World.ModelConfigId |> AMap.force
 
-    for entityId, ctx in animContexts do
-      match
-        AnimationStateLogic.determineAnimationChange
-          entityId
-          ctx.Velocity
-          ctx.ActiveAnimations
-          ctx.RunClipIds
-      with
-      | ValueSome event -> core.EventBus.Publish(GameEvent.State event)
-      | ValueNone -> ()
+    for entityId, configId in modelConfigIds do
+      // Filter: only alive entities
+      let isAlive =
+        resources
+        |> HashMap.tryFind entityId
+        |> Option.map(fun r -> r.Status = Entity.Status.Alive)
+        |> Option.defaultValue false
+
+      if isAlive then
+        // Get velocity and animations
+        let velocity =
+          velocities
+          |> HashMap.tryFind entityId
+          |> Option.defaultValue Vector2.Zero
+
+        let currentAnims =
+          activeAnimations
+          |> HashMap.tryFind entityId
+          |> Option.defaultValue IndexList.empty
+
+        // Resolve RunClipIds from ModelStore
+        let runClipIds =
+          stores.ModelStore.tryFind configId
+          |> ValueOption.bind(fun cfg ->
+            cfg.AnimationBindings |> HashMap.tryFindV "Run")
+
+        match
+          AnimationStateLogic.determineAnimationChange
+            entityId
+            velocity
+            currentAnims
+            runClipIds
+        with
+        | ValueSome event -> core.EventBus.Publish(GameEvent.State event)
+        | ValueNone -> ()

@@ -423,6 +423,8 @@ module CompositionRoot =
         { new IDisposable with
             member _.Dispose() =
               subs.Dispose()
+              // Dispose EventBus to release ring buffer
+              (eventBus :> IDisposable).Dispose()
               hudDesktop |> ValueOption.iter(fun d -> d.Dispose())
               // Cleanup map dependent components
               for c in mapDependentComponents do

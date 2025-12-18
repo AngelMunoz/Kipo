@@ -287,25 +287,10 @@ module Projections =
   }
 
   [<Struct>]
-  type EffectOwnerTransform = {
-    Position: Vector2
-    Velocity: Vector2
-    Rotation: float32
-    Effects: ActiveEffect IndexList
-  }
-
-  [<Struct>]
   type RegenerationContext = {
     Resources: Entity.Resource
     InCombatUntil: TimeSpan
     DerivedStats: Entity.DerivedStats
-  }
-
-  [<Struct>]
-  type AnimationControlContext = {
-    Velocity: Vector2
-    ActiveAnimations: Animation.AnimationState IndexList
-    RunClipIds: string[] voption
   }
 
   type ProjectionService =
@@ -320,11 +305,7 @@ module Projections =
       amap<Guid<EntityId>, HashMap<Action.GameAction, SlotProcessing>>
 
     abstract EntityScenarioContexts: amap<Guid<EntityId>, EntityScenarioContext>
-    abstract EffectOwnerTransforms: amap<Guid<EntityId>, EffectOwnerTransform>
     abstract RegenerationContexts: amap<Guid<EntityId>, RegenerationContext>
-
-    abstract AnimationControlContexts:
-      amap<Guid<EntityId>, AnimationControlContext>
 
     abstract ComputeMovementSnapshot: Guid<ScenarioId> -> MovementSnapshot
 
@@ -411,21 +392,6 @@ module Projections =
     })
     |> AMap.choose(fun _ v -> v)
 
-  let private effectOwnerTransforms(world: World) =
-    world.ActiveEffects
-    |> AMap.mapA(fun entityId effects -> adaptive {
-      let! position = world.Positions |> AMap.tryFind entityId
-      and! velocity = world.Velocities |> AMap.tryFind entityId
-      and! rotation = world.Rotations |> AMap.tryFind entityId
-
-      return {
-        Position = position |> Option.defaultValue Vector2.Zero
-        Velocity = velocity |> Option.defaultValue Vector2.Zero
-        Rotation = rotation |> Option.defaultValue 0.0f
-        Effects = effects
-      }
-    })
-
   let private regenerationContexts
     (world: World)
     (derivedStats: amap<Guid<EntityId>, Entity.DerivedStats>)
@@ -448,38 +414,6 @@ module Projections =
       }
     })
 
-  let private animationControlContexts (world: World) (modelStore: ModelStore) =
-    world.ModelConfigId
-    |> AMap.mapA(fun entityId configId -> adaptive {
-      let! velocity = world.Velocities |> AMap.tryFind entityId
-      and! activeAnims = world.ActiveAnimations |> AMap.tryFind entityId
-      and! resources = world.Resources |> AMap.tryFind entityId
-
-      // Filter: only alive entities
-      let isAlive =
-        resources
-        |> Option.map(fun r -> r.Status = Entity.Status.Alive)
-        |> Option.defaultValue false
-
-      if not isAlive then
-        return None
-      else
-        // Stable trunk: resolve RunClipIds from ModelStore
-        let runClipIds =
-          modelStore.tryFind configId
-          |> ValueOption.bind(fun cfg ->
-            cfg.AnimationBindings |> HashMap.tryFindV "Run")
-
-        return
-          Some {
-            Velocity = velocity |> Option.defaultValue Vector2.Zero
-            ActiveAnimations =
-              activeAnims |> Option.defaultValue IndexList.empty
-            RunClipIds = runClipIds
-          }
-    })
-    |> AMap.choose(fun _ v -> v)
-
   let create(itemStore: ItemStore, modelStore: ModelStore, world: World) =
     let derivedStats = calculateDerivedStats itemStore world
 
@@ -492,11 +426,7 @@ module Projections =
         member _.EntityScenarios = world.EntityScenario
         member _.ActionSets = activeActionSets world
         member _.EntityScenarioContexts = entityScenarioContexts world
-        member _.EffectOwnerTransforms = effectOwnerTransforms world
         member _.RegenerationContexts = regenerationContexts world derivedStats
-
-        member _.AnimationControlContexts =
-          animationControlContexts world modelStore
 
         member _.ComputeMovementSnapshot(scenarioId) =
           let time = world.Time |> AVal.map _.Delta |> AVal.force
