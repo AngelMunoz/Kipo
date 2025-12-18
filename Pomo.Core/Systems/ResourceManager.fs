@@ -42,6 +42,21 @@ module ResourceManager =
             CombatEvents.InCombatTimerRefreshed event.Target
           )
         )
+
+        // Emit EntityDied if HP dropped to 0 or below
+        if newHP <= 0 then
+          let scenarioId =
+            world.EntityScenario |> AMap.force |> HashMap.tryFindV event.Target
+
+          match scenarioId with
+          | ValueSome sid ->
+            eventBus.Publish<SystemCommunications.EntityDied>(
+              {
+                EntityId = event.Target
+                ScenarioId = sid
+              }
+            )
+          | ValueNone -> ()
       | ValueNone -> ()
 
   let handleResourceRestored

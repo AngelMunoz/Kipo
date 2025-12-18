@@ -197,12 +197,23 @@ module Perception =
     (controllerFactions: Faction HashSet)
     (targetFactions: Faction HashSet)
     =
-    let isEnemy = controllerFactions.Contains Enemy
-    let isAlly = controllerFactions.Contains Ally
-    let targetIsPlayer = targetFactions.Contains Player
-    let targetIsAlly = targetFactions.Contains Ally
-    let targetIsEnemy = targetFactions.Contains Enemy
-    isEnemy && (targetIsPlayer || targetIsAlly) || isAlly && targetIsEnemy
+    // Rule 1: Same faction NEVER attacks same faction
+    let hasOverlap = controllerFactions |> Seq.exists targetFactions.Contains
+
+    if hasOverlap then
+      false
+    else
+      // Rule 2: Ally and Player don't attack each other
+      let isAllyOrPlayer =
+        controllerFactions.Contains Ally || controllerFactions.Contains Player
+
+      let targetIsAllyOrPlayer =
+        targetFactions.Contains Ally || targetFactions.Contains Player
+
+      if isAllyOrPlayer && targetIsAllyOrPlayer then
+        false
+      else
+        true // All other combinations are hostile
 
   let isInFieldOfView
     (facingDir: Vector2)

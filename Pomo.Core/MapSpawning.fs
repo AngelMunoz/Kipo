@@ -55,17 +55,21 @@ module MapSpawning =
       findPoint 20
 
   /// Select a random entity from a group using weighted selection
-  let selectEntityFromGroup (random: Random) (group: MapEntityGroup) =
+  let selectEntityFromGroup
+    (random: Random)
+    (group: MapEntityGroup)
+    : string voption =
     if group.Entities.Length = 0 then
-      None
+      ValueNone
     else
       let weights =
-        match group.Weights with
-        | ValueSome w when w.Length = group.Entities.Length -> w
-        | _ ->
+        group.Weights
+        |> ValueOption.filter(fun w -> w.Length = group.Entities.Length)
+        |> ValueOption.defaultValue(
           Array.create
             group.Entities.Length
             (1.0f / float32 group.Entities.Length)
+        )
 
       let totalWeight = Array.sum weights
       let roll = float32(random.NextDouble()) * totalWeight
@@ -80,7 +84,7 @@ module MapSpawning =
           selected <- group.Entities[i]
           found <- true
 
-      Some selected
+      ValueSome selected
 
   /// Represents a spawn candidate extracted from map objects
   type SpawnCandidate = {
@@ -178,29 +182,37 @@ module MapSpawning =
     )
     |> Option.defaultValue Vector2.Zero
 
-  /// Resolve entity definition, archetype, and map override from an entity group
-  let resolveEntityFromGroup
+  /// Result of resolving an entity from a group
+  [<Struct>]
+  type ResolvedEntityInfo = {
+    EntityKey: string
+    ArchetypeId: int<AiArchetypeId>
+    MapOverride: MapEntityOverride voption
+    Faction: Faction voption
+  }
+
+  /// Resolve entity definition, archetype, map override, and faction from an entity group
+  /// Returns ValueNone if resolution fails at any step
+  let tryResolveEntityFromGroup
     (random: Random)
     (groupStore: MapEntityGroupStore option)
     (entityStore: AIEntityStore)
     (groupName: string)
-    : (string voption * int<AiArchetypeId> * MapEntityOverride voption) =
-    match groupStore with
-    | Some store ->
-      match store.tryFind groupName with
-      | ValueSome group ->
-        match selectEntityFromGroup random group with
-        | Some entityKey ->
-          // Look up the map override for this entity
-          let mapOverride = group.Overrides |> HashMap.tryFindV entityKey
-
-          match entityStore.tryFind entityKey with
-          | ValueSome entity ->
-            ValueSome entityKey, entity.ArchetypeId, mapOverride
-          | ValueNone -> ValueNone, %1<AiArchetypeId>, ValueNone
-        | None -> ValueNone, %1<AiArchetypeId>, ValueNone
-      | ValueNone -> ValueNone, %1<AiArchetypeId>, ValueNone
-    | None -> ValueNone, %1<AiArchetypeId>, ValueNone
+    : ResolvedEntityInfo voption =
+    groupStore
+    |> Option.toValueOption
+    |> ValueOption.bind(fun (store: MapEntityGroupStore) ->
+      store.tryFind groupName)
+    |> ValueOption.bind(fun group ->
+      selectEntityFromGroup random group
+      |> ValueOption.bind(fun entityKey ->
+        entityStore.tryFind entityKey
+        |> ValueOption.map(fun entity -> {
+          EntityKey = entityKey
+          ArchetypeId = entity.ArchetypeId
+          MapOverride = group.Overrides |> HashMap.tryFindV entityKey
+          Faction = group.Faction
+        })))
 
   /// Load map entity group store for a map (returns None if not found)
   let tryLoadMapEntityGroupStore(mapKey: string) : MapEntityGroupStore option =
@@ -305,3 +317,122 @@ module MapSpawning =
       match o.ExtraSkills with
       | ValueSome extras -> Array.append filtered extras
       | ValueNone -> filtered
+
+  [<Struct>]
+  type SpawnZoneInfo = {
+    ZoneName: string
+    MaxSpawns: int
+    SpawnInfo: SystemCommunications.FactionSpawnInfo
+    SpawnPositions: Vector2[]
+  }
+
+  /// Build spawn zone info from resolved entity data
+  let private buildZoneInfo
+    (zoneName: string)
+    (zoneItems: SpawnCandidate[])
+    (resolved: ResolvedEntityInfo)
+    : SpawnZoneInfo =
+    {
+      ZoneName = zoneName
+      MaxSpawns = zoneItems.Length
+      SpawnInfo = {
+        ArchetypeId = resolved.ArchetypeId
+        EntityDefinitionKey = ValueSome resolved.EntityKey
+        MapOverride = resolved.MapOverride
+        Faction = resolved.Faction
+        SpawnZoneName = ValueSome zoneName
+      }
+      SpawnPositions = zoneItems |> Array.map(fun c -> c.Position)
+    }
+
+  /// Build spawn zones from candidates, filtering out zones that fail to resolve
+  let buildSpawnZones
+    (random: Random)
+    (mapEntityGroupStore: MapEntityGroupStore option)
+    (entityStore: AIEntityStore)
+    (candidates: SpawnCandidate[])
+    : SpawnZoneInfo[] =
+    candidates
+    |> Array.filter(fun c -> not c.IsPlayerSpawn)
+    |> Array.groupBy(fun c -> c.Name)
+    |> Array.choose(fun (zoneName, zoneItems) ->
+      zoneItems[0].EntityGroup
+      |> ValueOption.bind(fun groupName ->
+        tryResolveEntityFromGroup
+          random
+          mapEntityGroupStore
+          entityStore
+          groupName)
+      |> ValueOption.map(buildZoneInfo zoneName zoneItems)
+      |> ValueOption.toOption)
+
+  /// Convert SpawnZoneInfo to SpawnZoneData for event publishing
+  let toSpawnZoneData
+    (scenarioId: Guid<ScenarioId>)
+    (zoneInfo: SpawnZoneInfo)
+    : SystemCommunications.SpawnZoneData =
+    {
+      ZoneName = zoneInfo.ZoneName
+      ScenarioId = scenarioId
+      MaxSpawns = zoneInfo.MaxSpawns
+      SpawnInfo = zoneInfo.SpawnInfo
+      SpawnPositions = zoneInfo.SpawnPositions
+    }
+
+  /// Context for spawning enemies in a scenario
+  [<Struct>]
+  type SpawnContext = {
+    Random: Random
+    MapEntityGroupStore: MapEntityGroupStore option
+    EntityStore: AIEntityStore
+    ScenarioId: Guid<ScenarioId>
+    MaxEnemies: int
+  }
+
+  /// Publishers for spawn-related events
+  type SpawnEventPublisher = {
+    RegisterZones: SystemCommunications.RegisterSpawnZones -> unit
+    SpawnEntity: SystemCommunications.SpawnEntityIntent -> unit
+  }
+
+  /// Spawn all enemies for a scenario
+  /// Builds spawn zones, registers them for respawn tracking, and spawns initial enemies
+  let spawnEnemiesForScenario
+    (ctx: SpawnContext)
+    (candidates: SpawnCandidate[])
+    (publisher: SpawnEventPublisher)
+    =
+    let spawnZones =
+      buildSpawnZones
+        ctx.Random
+        ctx.MapEntityGroupStore
+        ctx.EntityStore
+        candidates
+
+    // Register spawn zones for respawn tracking
+    publisher.RegisterZones {
+      ScenarioId = ctx.ScenarioId
+      MaxEnemies = ctx.MaxEnemies
+      Zones = spawnZones |> Array.map(toSpawnZoneData ctx.ScenarioId)
+    }
+
+    // Spawn initial enemies from each zone
+    let mutable totalEnemyCount = 0
+
+    for zone in spawnZones do
+      for i = 0 to min
+        (zone.MaxSpawns - 1)
+        (ctx.MaxEnemies - totalEnemyCount - 1) do
+        if
+          totalEnemyCount < ctx.MaxEnemies && i < zone.SpawnPositions.Length
+        then
+          let enemyId = Guid.NewGuid() |> UMX.tag
+
+          publisher.SpawnEntity {
+            EntityId = enemyId
+            ScenarioId = ctx.ScenarioId
+            Type = SystemCommunications.SpawnType.Faction zone.SpawnInfo
+            Position = zone.SpawnPositions[i]
+          }
+
+          totalEnemyCount <- totalEnemyCount + 1

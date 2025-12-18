@@ -551,6 +551,7 @@ module ParticleSystem =
         // Owner doesn't exist - kill the effect
         effect.IsAlive.Value <- false
     | ValueNone -> ()
+    // Ownerless effects (combat VFX) stay alive - removal is handled below
 
     let shouldSpawn = effect.IsAlive.Value
     let mutable anyParticlesAlive = false
@@ -569,7 +570,22 @@ module ParticleSystem =
       if emitter.Particles.Count > 0 then
         anyParticlesAlive <- true
 
-    not shouldSpawn && not anyParticlesAlive
+    // Determine if effect should be removed
+    match effect.Owner with
+    | ValueSome _ ->
+      // Owned effects: remove when not spawning AND no particles
+      not shouldSpawn && not anyParticlesAlive
+    | ValueNone ->
+      // Ownerless effects (combat VFX): remove when all spawning is done AND no particles
+      // This handles cleanup without touching IsAlive (which would affect visual appearance)
+      let allSpawningDone =
+        effect.Emitters
+        |> List.forall(fun emitter ->
+          let burstDone = emitter.BurstDone.Value || emitter.Config.Burst = 0
+          let noContinuousRate = emitter.Config.Rate = 0
+          burstDone && noContinuousRate)
+
+      allSpawningDone && not anyParticlesAlive
 
   type ParticleSystem(game: Game, env: PomoEnvironment) =
     inherit GameSystem(game)
@@ -614,6 +630,12 @@ module ParticleSystem =
         Velocities = velocities
         Rotations = rotations
       }
+
+      // Detect if effects list was externally cleared (e.g., on map change)
+      // and sync our tracking dictionaries
+      if effects.Count = 0 && effectsById.Count > 0 then
+        effectsById.Clear()
+        activeEffectVisuals.Clear()
 
       // 1. Sync gameplay effects to visuals
       let currentFrameEffectIds =

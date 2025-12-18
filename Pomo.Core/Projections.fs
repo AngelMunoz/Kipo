@@ -333,7 +333,7 @@ module Projections =
         IndexList<struct (Guid<EntityId> * Vector2)>
 
 
-  let private calculateMovementSnapshot
+  let calculateMovementSnapshot
     (time: TimeSpan)
     (velocities: HashMap<Guid<EntityId>, Vector2>)
     (positions: HashMap<Guid<EntityId>, Vector2>)

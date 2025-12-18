@@ -748,10 +748,6 @@ module DebugRender =
     let spriteBatch = lazy (new SpriteBatch(game.GraphicsDevice))
     let mutable pixel: Texture2D voption = ValueNone
     let mutable hudFont = Unchecked.defaultof<_>
-
-    let mutable pixel: Texture2D voption = ValueNone
-    let mutable hudFont = Unchecked.defaultof<_>
-
     let mutable wasF11Down = false // Latch for toggle key
 
     let showStats = cval false
@@ -845,7 +841,6 @@ module DebugRender =
       hudFont <- game.Content.Load<SpriteFont>("Fonts/Hud")
 
       let p = new Texture2D(game.GraphicsDevice, 1, 1)
-      p.SetData([| Color.White |])
       p.SetData([| Color.White |])
       pixel <- ValueSome p
 
@@ -978,17 +973,15 @@ module DebugRender =
         totalEntities <- 0
         visibleEntities <- 0
       else
-        // Prune expired transient commands (moved from Draw)
-        let activeTransient = ResizeArray()
-
-        for struct (cmd, duration) in transientCommands do
+        // Prune expired transient commands in-place (backwards to avoid index shifting)
+        for i = transientCommands.Count - 1 downto 0 do
+          let struct (cmd, duration) = transientCommands.[i]
           let newDuration = duration - gameTime.ElapsedGameTime
 
           if newDuration > TimeSpan.Zero then
-            activeTransient.Add struct (cmd, newDuration)
-
-        transientCommands.Clear()
-        transientCommands.AddRange activeTransient
+            transientCommands.[i] <- struct (cmd, newDuration)
+          else
+            transientCommands.RemoveAt(i)
 
     override _.Draw gameTime =
 

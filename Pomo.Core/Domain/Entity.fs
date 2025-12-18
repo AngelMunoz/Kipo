@@ -37,6 +37,16 @@ module Entity =
     | Ally
     | Enemy
     | AIControlled
+    | TeamRed
+    | TeamBlue
+    | TeamGreen
+    | TeamYellow
+    | TeamOrange
+    | TeamPurple
+    | TeamPink
+    | TeamCyan
+    | TeamWhite
+    | TeamBlack
 
   [<Struct>]
   type Family =
@@ -137,6 +147,16 @@ module Entity =
           | "Ally" -> return Ally
           | "Enemy" -> return Enemy
           | "AIControlled" -> return AIControlled
+          | "TeamRed" -> return TeamRed
+          | "TeamBlue" -> return TeamBlue
+          | "TeamGreen" -> return TeamGreen
+          | "TeamYellow" -> return TeamYellow
+          | "TeamOrange" -> return TeamOrange
+          | "TeamPurple" -> return TeamPurple
+          | "TeamPink" -> return TeamPink
+          | "TeamCyan" -> return TeamCyan
+          | "TeamWhite" -> return TeamWhite
+          | "TeamBlack" -> return TeamBlack
           | other ->
             return!
               DecodeError.ofError(json.Clone(), $"Unknown Faction: {other}")

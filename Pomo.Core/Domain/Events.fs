@@ -32,13 +32,19 @@ type Selection =
 
 [<RequireQualifiedAccess>]
 module SystemCommunications =
-  [<RequireQualifiedAccess>]
+  [<Struct>]
+  type FactionSpawnInfo = {
+    ArchetypeId: int<AiArchetypeId>
+    EntityDefinitionKey: string voption
+    MapOverride: MapEntityOverride voption
+    Faction: Faction voption
+    SpawnZoneName: string voption
+  }
+
+  [<RequireQualifiedAccess; Struct>]
   type SpawnType =
     | Player of playerIndex: int
-    | Enemy of
-      archetypeId: int<AiArchetypeId> *
-      entityDefinitionKey: string voption *
-      mapOverride: MapEntityOverride voption
+    | Faction of FactionSpawnInfo
 
   [<Struct>]
   type SpawnEntityIntent = {
@@ -46,6 +52,22 @@ module SystemCommunications =
     ScenarioId: Guid<ScenarioId>
     Type: SpawnType
     Position: Vector2
+  }
+
+  [<Struct>]
+  type SpawnZoneData = {
+    ZoneName: string
+    ScenarioId: Guid<ScenarioId>
+    MaxSpawns: int
+    SpawnInfo: FactionSpawnInfo
+    SpawnPositions: Vector2[]
+  }
+
+  [<Struct>]
+  type RegisterSpawnZones = {
+    ScenarioId: Guid<ScenarioId>
+    MaxEnemies: int
+    Zones: SpawnZoneData[]
   }
 
   [<Struct>]
@@ -129,7 +151,10 @@ module SystemCommunications =
   }
 
   [<Struct>]
-  type EntityDied = { Target: Guid<EntityId> }
+  type EntityDied = {
+    EntityId: Guid<EntityId>
+    ScenarioId: Guid<ScenarioId>
+  }
 
   [<Struct>]
   type ProjectileImpacted = {

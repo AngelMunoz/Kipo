@@ -244,7 +244,8 @@ module CompositionRoot =
         let mapEntityGroupStore =
           MapSpawning.tryLoadMapEntityGroupStore mapDef.Key
 
-        let candidates = MapSpawning.extractSpawnCandidates mapDef scope.Random
+        let candidates =
+          MapSpawning.extractSpawnCandidates mapDef scope.Random |> Seq.toArray
 
         let playerPos =
           MapSpawning.findPlayerSpawnPosition targetSpawn candidates
@@ -259,42 +260,21 @@ module CompositionRoot =
 
         eventBus.Publish playerIntent
 
-        // Spawn enemies
-        let mutable enemyCount = 0
+        // Spawn enemies using MapSpawning module
+        let spawnCtx: MapSpawning.SpawnContext = {
+          Random = scope.Random
+          MapEntityGroupStore = mapEntityGroupStore
+          EntityStore = scope.Stores.AIEntityStore
+          ScenarioId = scenarioId
+          MaxEnemies = maxEnemies
+        }
 
-        let enemyCandidates =
-          candidates |> Seq.filter(fun c -> not c.IsPlayerSpawn)
+        let publisher: MapSpawning.SpawnEventPublisher = {
+          RegisterZones = eventBus.Publish
+          SpawnEntity = eventBus.Publish
+        }
 
-        for candidate in enemyCandidates do
-          if enemyCount < maxEnemies then
-            let enemyId = Guid.NewGuid() |> UMX.tag
-
-            let entityDefKey, archetypeId, mapOverride =
-              match candidate.EntityGroup with
-              | ValueSome groupName ->
-                MapSpawning.resolveEntityFromGroup
-                  scope.Random
-                  mapEntityGroupStore
-                  scope.Stores.AIEntityStore
-                  groupName
-              | ValueNone ->
-                let id = if enemyCount % 2 = 0 then %1 else %2
-                ValueNone, id, ValueNone
-
-            let enemyIntent: SystemCommunications.SpawnEntityIntent = {
-              EntityId = enemyId
-              ScenarioId = scenarioId
-              Type =
-                SystemCommunications.SpawnType.Enemy(
-                  archetypeId,
-                  entityDefKey,
-                  mapOverride
-                )
-              Position = candidate.Position
-            }
-
-            eventBus.Publish enemyIntent
-            enemyCount <- enemyCount + 1
+        MapSpawning.spawnEnemiesForScenario spawnCtx candidates publisher
 
       // TODO: MapDependentSystems should be monitoring the
       // ScenarioState which should include the map data

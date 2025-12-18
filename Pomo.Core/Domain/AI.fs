@@ -155,10 +155,12 @@ type MapEntityOverride = {
   ExtraSkills: int<SkillId>[] voption
 }
 
+[<Struct>]
 type MapEntityGroup = {
   Entities: string[]
   Weights: float32[] voption
   Overrides: HashMap<string, MapEntityOverride>
+  Faction: Faction voption
 }
 
 [<Struct>]
@@ -493,10 +495,16 @@ module Serialization =
         and! weightsOpt =
           VOptional.Property.array ("Weights", Required.float) json
 
+        and! factionOpt =
+          VOptional.Property.get
+            ("Faction", Pomo.Core.Domain.Entity.Serialization.Faction.decoder)
+            json
+
         return {
           Entities = entities
           Weights = weightsOpt |> ValueOption.map(Array.map float32)
           Overrides = HashMap.empty
+          Faction = factionOpt
         }
       }
 
