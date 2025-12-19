@@ -20,10 +20,12 @@ open Pomo.Core.Systems.Systems
 module AbilityActivation =
   open System.Reactive.Disposables
   open Pomo.Core.Domain.Spatial.Search
+  open Pomo.Core.Environment
 
   [<Struct>]
   type AbilityActivationContext = {
     EventBus: EventBus
+    StateWrite: IStateWriteService
     SkillStore: SkillStore
     Rng: Random
     SearchContext: SearchContext voption
@@ -134,7 +136,7 @@ module AbilityActivation =
         Target = target
       }
 
-      eventBus.Publish intent
+      eventBus.Publish(GameEvent.Intent(IntentEvent.Ability intent))
 
     let private publishMultiPointIntent
       (ctx: AbilityActivationContext)
@@ -236,11 +238,12 @@ module AbilityActivation =
             | _ -> "Cannot cast skill"
 
           ctx.EventBus.Publish(
-            {
-              Message = message
-              Position = casterPos
-            }
-            : SystemCommunications.ShowNotification
+            GameEvent.Notification(
+              NotificationEvent.ShowMessage {
+                Message = message
+                Position = casterPos
+              }
+            )
           )
         | Ok() ->
           // Validation passed, now check range and publish intent
@@ -270,11 +273,12 @@ module AbilityActivation =
             else
               // This should have been handled by TargetingSystem, but as a fallback
               ctx.EventBus.Publish(
-                {
-                  Message = "Target is out of range"
-                  Position = casterPos
-                }
-                : SystemCommunications.ShowNotification
+                GameEvent.Notification(
+                  NotificationEvent.ShowMessage {
+                    Message = "Target is out of range"
+                    Position = casterPos
+                  }
+                )
               )
 
     [<Struct>]
@@ -343,8 +347,8 @@ module AbilityActivation =
           }
 
           // Always clear the pending cast after checking
-          changeCtx.AbilityActivationContext.EventBus.Publish(
-            StateChangeEvent.Combat(PendingSkillCastCleared entityId)
+          changeCtx.AbilityActivationContext.StateWrite.ClearPendingSkillCast(
+            entityId
           )
         | _ -> () // No pending cast or data missing
       else
@@ -365,6 +369,7 @@ module AbilityActivation =
 
     let activationContext = {
       EventBus = core.EventBus
+      StateWrite = core.StateWrite
       SkillStore = skillStore
       Rng = core.World.Rng
       SearchContext =
@@ -423,10 +428,10 @@ module AbilityActivation =
     override this.Initialize() =
       base.Initialize()
 
-      core.EventBus.GetObservableFor<StateChangeEvent>()
+      core.EventBus.Observable
       |> Observable.choose(fun e ->
         match e with
-        | Physics(MovementStateChanged data) -> Some data
+        | GameEvent.State(Physics(MovementStateChanged data)) -> Some data
         | _ -> None)
       |> Observable.subscribe(fun e ->
         Handlers.handleMovementStateChanged
@@ -467,8 +472,12 @@ module AbilityActivation =
           |> Option.defaultValue Vector2.Zero
 
         core.EventBus.Publish(
-          { Message = msg; Position = casterPos }
-          : SystemCommunications.ShowNotification
+          GameEvent.Notification(
+            NotificationEvent.ShowMessage {
+              Message = msg
+              Position = casterPos
+            }
+          )
         )
 
       for action in actions do
@@ -499,25 +508,28 @@ module AbilityActivation =
               match skillStore.tryFind skillId with
               | ValueSome(Active skill) ->
                 if skill.Intent = Offensive then
-                  core.EventBus.Publish(
-                    StateChangeEvent.Combat(InCombatTimerRefreshed playerId)
-                  )
+                  core.StateWrite.UpdateInCombatTimer(playerId)
 
                 match skill.Targeting with
                 | Self ->
                   core.EventBus.Publish(
-                    {
-                      Caster = playerId
-                      SkillId = skill.Id
-                      Target = SystemCommunications.TargetSelf
-                    }
-                    : SystemCommunications.AbilityIntent
+                    GameEvent.Intent(
+                      IntentEvent.Ability {
+                        Caster = playerId
+                        SkillId = skill.Id
+                        Target = SystemCommunications.TargetSelf
+                      }
+                    )
                   )
                 | _ ->
 
                   core.EventBus.Publish(
-                    { Slot = action; CasterId = playerId }
-                    : SystemCommunications.SlotActivated
+                    GameEvent.Intent(
+                      IntentEvent.SlotActivated {
+                        Slot = action
+                        CasterId = playerId
+                      }
+                    )
                   )
               | _ -> () // Should not happen due to earlier validation
             | Error msg ->
@@ -538,11 +550,12 @@ module AbilityActivation =
               | ValueSome 0 -> publishNotification "Item has no uses left!"
               | ValueSome _ ->
                 core.EventBus.Publish(
-                  {
-                    EntityId = playerId
-                    ItemInstanceId = itemInstanceId
-                  }
-                  : SystemCommunications.UseItemIntent
+                  GameEvent.ItemIntent(
+                    ItemIntentEvent.Use {
+                      EntityId = playerId
+                      ItemInstanceId = itemInstanceId
+                    }
+                  )
                 )
               | ValueNone -> ()
             | false, _ -> ()

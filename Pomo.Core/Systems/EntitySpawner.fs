@@ -16,9 +16,10 @@ open Pomo.Core.EventBus
 open Pomo.Core.Stores
 open Pomo.Core
 open Systems
+open Pomo.Core.Environment
 
 module EntitySpawnerLogic =
-
+  [<Struct>]
   type PendingSpawn = {
     EntityId: Guid<EntityId>
     ScenarioId: Guid<ScenarioId>
@@ -27,6 +28,41 @@ module EntitySpawnerLogic =
     SpawnStartTime: TimeSpan
     Duration: TimeSpan
   }
+
+  [<Struct>]
+  type SpawnedEntityInfo = {
+    EntityId: Guid<EntityId>
+    ScenarioId: Guid<ScenarioId>
+    SpawnInfo: SystemCommunications.FactionSpawnInfo
+    SpawnZoneName: string voption
+  }
+
+  [<Struct>]
+  type SpawnZoneConfig = {
+    ZoneName: string
+    MaxSpawns: int
+    SpawnInfo: SystemCommunications.FactionSpawnInfo
+    SpawnPositions: Vector2[]
+  }
+
+  [<Struct>]
+  type ScenarioSpawnConfig = {
+    ScenarioId: Guid<ScenarioId>
+    MaxEnemies: int
+    Zones: SpawnZoneConfig[]
+  }
+
+  /// Get a random spawn position from a zone
+  let getRandomSpawnPosition (random: Random) (zone: SpawnZoneConfig) =
+    zone.SpawnPositions[random.Next(zone.SpawnPositions.Length)]
+
+  /// Get zones for a specific faction (use pre-grouped lookup instead for hot paths)
+  let getZonesForFaction (faction: Faction) (config: ScenarioSpawnConfig) =
+    config.Zones
+    |> Array.filter(fun z ->
+      match z.SpawnInfo.Faction with
+      | ValueSome f -> f = faction
+      | ValueNone -> false)
 
   // Helper to create default stats (similar to previous hardcoded values)
   let createPlayerStats() =
@@ -56,9 +92,17 @@ module EntitySpawnerLogic =
 
     baseStats, resource
 
-  let configurePlayerLoadout(entityId: Guid<EntityId>, eventBus: EventBus) =
-    // Default Loadout (Hardcoded for now, moved from PomoGame)
-    // TODO: Move this to a Loadout service or similar
+  /// Player loadout data returned for bundling
+  [<Struct>]
+  type PlayerLoadoutData = {
+    Items: Item.ItemInstance[]
+    EquippedSlots: struct (Item.Slot * Guid<ItemInstanceId>)[]
+    ActionSets: HashMap<int, HashMap<GameAction, Core.SlotProcessing>>
+    ActiveActionSet: int
+  }
+
+  let createPlayerLoadout() =
+    // Equipment items
     let wizardHat: Item.ItemInstance = {
       Item.InstanceId = Guid.NewGuid() |> UMX.tag
       ItemId = 4 |> UMX.tag
@@ -71,30 +115,7 @@ module EntitySpawnerLogic =
       UsesLeft = ValueNone
     }
 
-    eventBus.Publish(Inventory(ItemInstanceCreated wizardHat))
-    eventBus.Publish(Inventory(ItemInstanceCreated magicStaff))
-
-    eventBus.Publish(
-      Inventory(ItemAddedToInventory struct (entityId, wizardHat.InstanceId))
-    )
-
-    eventBus.Publish(
-      Inventory(ItemAddedToInventory struct (entityId, magicStaff.InstanceId))
-    )
-
-    eventBus.Publish(
-      Inventory(
-        ItemEquipped struct (entityId, Item.Slot.Head, wizardHat.InstanceId)
-      )
-    )
-
-    eventBus.Publish(
-      Inventory(
-        ItemEquipped struct (entityId, Item.Slot.Weapon, magicStaff.InstanceId)
-      )
-    )
-
-    // Default Skills
+    // Consumable items
     let potion: Item.ItemInstance = {
       InstanceId = %Guid.NewGuid()
       ItemId = %2
@@ -107,19 +128,7 @@ module EntitySpawnerLogic =
       UsesLeft = ValueSome 20
     }
 
-    eventBus.Publish(
-      Inventory(ItemAddedToInventory struct (entityId, potion.InstanceId))
-    )
-
-    eventBus.Publish(
-      Inventory(
-        ItemAddedToInventory struct (entityId, trollBloodPotion.InstanceId)
-      )
-    )
-
-    eventBus.Publish(Inventory(ItemInstanceCreated potion))
-    eventBus.Publish(Inventory(ItemInstanceCreated trollBloodPotion))
-
+    // Action sets
     let actionSet1 = [
       UseSlot1, Core.SlotProcessing.Skill %7 // Summon Boulder
       UseSlot2, Core.SlotProcessing.Skill %8 // Catchy Song
@@ -148,18 +157,22 @@ module EntitySpawnerLogic =
       3, HashMap.ofList actionSet3
     ]
 
-    eventBus.Publish(
-      Input(ActionSetsChanged struct (entityId, HashMap.ofList actionSets))
-    )
-
-    eventBus.Publish(Input(ActiveActionSetChanged struct (entityId, 3)))
+    {
+      Items = [| wizardHat; magicStaff; potion; trollBloodPotion |]
+      EquippedSlots = [|
+        struct (Item.Slot.Head, wizardHat.InstanceId)
+        struct (Item.Slot.Weapon, magicStaff.InstanceId)
+      |]
+      ActionSets = HashMap.ofList actionSets
+      ActiveActionSet = 3
+    }
 
   let finalizeSpawn
     (pending: PendingSpawn)
-    (eventBus: EventBus)
     (aiArchetypeStore: AIArchetypeStore)
     (aiEntityStore: AIEntityStore)
     (aiFamilyStore: AIFamilyStore)
+    (stateWrite: IStateWriteService)
     =
     let entityId = pending.EntityId
     let pos = pending.Position
@@ -171,49 +184,41 @@ module EntitySpawnerLogic =
       Velocity = Vector2.Zero
     }
 
-    // 1. Create the entity in the world
-    eventBus.Publish(EntityLifecycle(Created snapshot))
-
     match pending.Type with
-    | SystemCommunications.SpawnType.Player playerIndex ->
+    | SystemCommunications.SpawnType.Player _playerIndex ->
       let baseStats, resource = createPlayerStats()
       let factions = HashSet [ Faction.Player ]
-
-      eventBus.Publish(
-        StateChangeEvent.Combat(ResourcesChanged struct (entityId, resource))
-      )
-
-      eventBus.Publish(
-        StateChangeEvent.Combat(FactionsChanged struct (entityId, factions))
-      )
-
-      eventBus.Publish(
-        StateChangeEvent.Combat(BaseStatsChanged struct (entityId, baseStats))
-      )
-
-      // Set Model Configuration
-      eventBus.Publish(
-        StateChangeEvent.Visuals(
-          ModelConfigChanged struct (entityId, "HumanoidBase")
-        )
-      )
-
-      // Initialize Input Map
       let inputMap = InputMapping.createDefaultInputMap()
-      eventBus.Publish(Input(MapChanged struct (entityId, inputMap)))
+      let loadout = createPlayerLoadout()
 
-      configurePlayerLoadout(entityId, eventBus)
+      let bundle: EntitySpawnBundle = {
+        Snapshot = snapshot
+        Resources = ValueSome resource
+        Factions = ValueSome factions
+        BaseStats = ValueSome baseStats
+        ModelConfig = ValueSome "HumanoidBase"
+        InputMap = ValueSome inputMap
+        ActionSets = ValueSome loadout.ActionSets
+        ActiveActionSet = ValueSome loadout.ActiveActionSet
+        InventoryItems = ValueSome loadout.Items
+        EquippedSlots = ValueSome loadout.EquippedSlots
+        AIController = ValueNone
+      }
 
+      stateWrite.ApplyEntitySpawnBundle bundle
 
-    | SystemCommunications.SpawnType.Enemy(archetypeId,
-                                           entityDefKey,
-                                           mapOverride) ->
-      let archetype = aiArchetypeStore.find archetypeId
-      let factions = HashSet [ Faction.Enemy ]
+    | SystemCommunications.SpawnType.Faction info ->
+      let archetype = aiArchetypeStore.find info.ArchetypeId
+
+      // Use faction from spawn info, or default to Enemy
+      let assignedFaction =
+        info.Faction |> ValueOption.defaultValue Faction.Enemy
+
+      let factions = HashSet [ assignedFaction ]
 
       // Look up entity definition
       let aiEntity: AIEntityDefinition option =
-        match entityDefKey with
+        match info.EntityDefinitionKey with
         | ValueSome key -> aiEntityStore.tryFind key |> Option.ofValueOption
         | ValueNone -> aiEntityStore.all() |> Seq.tryHead
 
@@ -227,7 +232,7 @@ module EntitySpawnerLogic =
       // Apply full override chain for stats (including map override)
       let baseStats =
         archetype.baseStats
-        |> MapSpawning.resolveStats familyConfig aiEntity mapOverride
+        |> MapSpawning.resolveStats familyConfig aiEntity info.MapOverride
 
       let resource = {
         HP = baseStats.Charm
@@ -235,34 +240,16 @@ module EntitySpawnerLogic =
         Status = Status.Alive
       }
 
-      eventBus.Publish(
-        StateChangeEvent.Combat(ResourcesChanged struct (entityId, resource))
-      )
-
-      eventBus.Publish(
-        StateChangeEvent.Combat(FactionsChanged struct (entityId, factions))
-      )
-
-      eventBus.Publish(
-        StateChangeEvent.Combat(BaseStatsChanged struct (entityId, baseStats))
-      )
-
-      // Set Model Configuration
-      eventBus.Publish(
-        StateChangeEvent.Visuals(
-          ModelConfigChanged struct (entityId, "HumanoidBase")
-        )
-      )
-
       // Resolve skills (with map override restrictions/extras)
       let skills =
         match aiEntity with
-        | Some entity -> MapSpawning.resolveSkills entity.Skills mapOverride
+        | Some entity ->
+          MapSpawning.resolveSkills entity.Skills info.MapOverride
         | None -> [||]
 
       let controller: AIController = {
         controlledEntityId = entityId
-        archetypeId = archetypeId
+        archetypeId = info.ArchetypeId
         currentState = AIState.Idle
         stateEnterTime = TimeSpan.Zero
         spawnPosition = pos
@@ -299,9 +286,21 @@ module EntitySpawnerLogic =
         memories = HashMap.empty
       }
 
-      eventBus.Publish(
-        StateChangeEvent.AI(ControllerUpdated struct (entityId, controller))
-      )
+      let bundle: EntitySpawnBundle = {
+        Snapshot = snapshot
+        Resources = ValueSome resource
+        Factions = ValueSome factions
+        BaseStats = ValueSome baseStats
+        ModelConfig = ValueSome "HumanoidBase"
+        InputMap = ValueNone
+        ActionSets = ValueNone
+        ActiveActionSet = ValueNone
+        InventoryItems = ValueNone
+        EquippedSlots = ValueNone
+        AIController = ValueSome controller
+      }
+
+      stateWrite.ApplyEntitySpawnBundle bundle
 
   open Pomo.Core.Environment
   open Pomo.Core.Environment.Patterns
@@ -315,43 +314,210 @@ module EntitySpawnerLogic =
     let pendingSpawns = List<PendingSpawn>()
     let spawnDuration = Core.Constants.Spawning.DefaultDuration // Animation duration
 
+    // Respawn tracking: EntityId -> spawn info for respawning
+    let spawnedEntities = Dictionary<Guid<EntityId>, SpawnedEntityInfo>()
+
+    // Per-scenario spawn configuration (immutable)
+    let scenarioConfigs = Dictionary<Guid<ScenarioId>, ScenarioSpawnConfig>()
+
+    // Mutable count tracking (separate from config)
+    let scenarioCurrentCounts = Dictionary<Guid<ScenarioId>, int>()
+
+    let zoneCurrentCounts =
+      Dictionary<struct (Guid<ScenarioId> * string), int>()
+
+    // Pre-grouped zones by faction (avoids Array.filter on every death)
+    let zonesByFaction =
+      Dictionary<struct (Guid<ScenarioId> * Faction), SpawnZoneConfig[]>()
+
     let subscriptions = new System.Reactive.Disposables.CompositeDisposable()
 
+    // Helper to get current zone count
+    let getZoneCount (scenarioId: Guid<ScenarioId>) (zoneName: string) =
+      match zoneCurrentCounts.TryGetValue(struct (scenarioId, zoneName)) with
+      | true, count -> count
+      | false, _ -> 0
+
+    // Helper to get current scenario count
+    let getScenarioCount(scenarioId: Guid<ScenarioId>) =
+      match scenarioCurrentCounts.TryGetValue scenarioId with
+      | true, count -> count
+      | false, _ -> 0
+
+    // Helper to find an available spawn zone for a faction (O(1) lookup)
+    let findAvailableZone
+      (scenarioId: Guid<ScenarioId>)
+      (faction: Faction voption)
+      =
+      match scenarioConfigs.TryGetValue scenarioId with
+      | true, config when getScenarioCount scenarioId < config.MaxEnemies ->
+        // Use pre-grouped lookup for faction, or all zones if no faction
+        let matchingZones =
+          match faction with
+          | ValueSome f ->
+            match zonesByFaction.TryGetValue(struct (scenarioId, f)) with
+            | true, zones -> zones
+            | false, _ -> [||]
+          | ValueNone -> config.Zones
+
+        matchingZones
+        |> Array.tryFind(fun z ->
+          getZoneCount scenarioId z.ZoneName < z.MaxSpawns)
+      | _ -> None
+
     do
-      core.EventBus
-        .GetObservableFor<SystemCommunications.SpawnEntityIntent>()
-        .Subscribe(fun intent ->
-          let totalGameTime =
-            core.World.Time |> AVal.map _.TotalGameTime |> AVal.force
+      // Subscribe to RegisterSpawnZones to set up spawn zone tracking
+      core.EventBus.Observable
+      |> Observable.choose(fun e ->
+        match e with
+        | GameEvent.Spawn(SpawningEvent.RegisterZones zones) -> Some zones
+        | _ -> None)
+      |> Observable.subscribe(fun event ->
+        // Build immutable zone configs from event data
+        let zones =
+          event.Zones
+          |> Array.map(fun zoneData ->
+            let config: SpawnZoneConfig = {
+              ZoneName = zoneData.ZoneName
+              MaxSpawns = zoneData.MaxSpawns
+              SpawnInfo = zoneData.SpawnInfo
+              SpawnPositions = zoneData.SpawnPositions
+            }
 
-          let duration =
-            match intent.Type with
-            | SystemCommunications.SpawnType.Player _ -> TimeSpan.Zero
-            | _ -> spawnDuration
+            // Initialize zone count
+            zoneCurrentCounts[struct (event.ScenarioId, zoneData.ZoneName)] <-
+              0
 
-          let pending: PendingSpawn = {
+            config)
+
+        // Store immutable config
+        scenarioConfigs[event.ScenarioId] <- {
+          ScenarioId = event.ScenarioId
+          MaxEnemies = event.MaxEnemies
+          Zones = zones
+        }
+
+        // Pre-group zones by faction for O(1) lookup
+        zones
+        |> Array.iter(fun zone ->
+          match zone.SpawnInfo.Faction with
+          | ValueSome faction ->
+            let key = struct (event.ScenarioId, faction)
+
+            match zonesByFaction.TryGetValue key with
+            | true, existing ->
+              zonesByFaction[key] <- Array.append existing [| zone |]
+            | false, _ -> zonesByFaction[key] <- [| zone |]
+          | ValueNone -> ())
+
+        // Initialize scenario count
+        scenarioCurrentCounts[event.ScenarioId] <- 0)
+      |> subscriptions.Add
+
+      core.EventBus.Observable
+      |> Observable.choose(fun e ->
+        match e with
+        | GameEvent.Spawn(SpawningEvent.SpawnEntity spawn) -> Some spawn
+        | _ -> None)
+      |> Observable.subscribe(fun intent ->
+        let totalGameTime =
+          core.World.Time |> AVal.map _.TotalGameTime |> AVal.force
+
+        let duration =
+          match intent.Type with
+          | SystemCommunications.SpawnType.Player _ -> TimeSpan.Zero
+          | _ -> spawnDuration
+
+        let pending: PendingSpawn = {
+          EntityId = intent.EntityId
+          ScenarioId = intent.ScenarioId
+          Type = intent.Type
+          Position = intent.Position
+          SpawnStartTime = totalGameTime
+          Duration = duration
+        }
+
+        pendingSpawns.Add(pending)
+
+        // Track spawn info for respawning (only for Faction spawns)
+        match intent.Type with
+        | SystemCommunications.SpawnType.Faction info ->
+          spawnedEntities[intent.EntityId] <- {
             EntityId = intent.EntityId
             ScenarioId = intent.ScenarioId
-            Type = intent.Type
-            Position = intent.Position
-            SpawnStartTime = totalGameTime
-            Duration = duration
+            SpawnInfo = info
+            SpawnZoneName = info.SpawnZoneName
           }
 
-          pendingSpawns.Add(pending)
+          // Increment spawn counts
+          let currentScenarioCount = getScenarioCount intent.ScenarioId
 
-          // Notify that spawning has started (visuals can pick this up)
-          core.EventBus.Publish(
-            EntityLifecycle(
-              Spawning
-                struct (intent.EntityId,
-                        intent.ScenarioId,
-                        intent.Type,
-                        intent.Position)
+          scenarioCurrentCounts[intent.ScenarioId] <- currentScenarioCount + 1
+
+          match info.SpawnZoneName with
+          | ValueSome zoneName ->
+            let key = struct (intent.ScenarioId, zoneName)
+            let currentZoneCount = getZoneCount intent.ScenarioId zoneName
+            zoneCurrentCounts[key] <- currentZoneCount + 1
+          | ValueNone -> ()
+        | _ -> ()
+
+      // Note: The spawn event was already published by the source (CompositionRoot/respawner),\n        // so we don't re-publish here to avoid infinite recursion.
+
+      )
+      |> subscriptions.Add
+
+      // Subscribe to EntityDied for respawn handling
+      core.EventBus.Observable
+      |> Observable.choose(fun e ->
+        match e with
+        | GameEvent.Lifecycle(LifecycleEvent.EntityDied died) -> Some died
+        | _ -> None)
+      |> Observable.subscribe(fun event ->
+        // Emit Removed event to clean up the dead entity
+        core.StateWrite.RemoveEntity event.EntityId
+
+        // Check if this entity has spawn info for respawning
+        match spawnedEntities.TryGetValue event.EntityId with
+        | true, info ->
+          // Remove from tracking
+          spawnedEntities.Remove event.EntityId |> ignore
+
+          // Decrement spawn counts
+          let currentScenarioCount = getScenarioCount event.ScenarioId
+
+          scenarioCurrentCounts[event.ScenarioId] <-
+            max 0 (currentScenarioCount - 1)
+
+          match info.SpawnZoneName with
+          | ValueSome zoneName ->
+            let key = struct (event.ScenarioId, zoneName)
+            let currentZoneCount = getZoneCount event.ScenarioId zoneName
+            zoneCurrentCounts[key] <- max 0 (currentZoneCount - 1)
+          | ValueNone -> ()
+
+          // Find an available zone for this faction and respawn
+          match findAvailableZone event.ScenarioId info.SpawnInfo.Faction with
+          | Some zone ->
+            let newEntityId = Guid.NewGuid() |> UMX.tag
+            let newPosition = getRandomSpawnPosition core.Random zone
+
+            let respawnIntent: SystemCommunications.SpawnEntityIntent = {
+              EntityId = newEntityId
+              ScenarioId = event.ScenarioId
+              Type =
+                SystemCommunications.SpawnType.Faction {
+                  info.SpawnInfo with
+                      SpawnZoneName = ValueSome zone.ZoneName
+                }
+              Position = newPosition
+            }
+
+            core.EventBus.Publish(
+              GameEvent.Spawn(SpawningEvent.SpawnEntity respawnIntent)
             )
-          )
-
-        )
+          | None -> () // No available zone, don't respawn
+        | false, _ -> ())
       |> subscriptions.Add
 
     override _.Dispose(disposing) =
@@ -372,10 +538,10 @@ module EntitySpawnerLogic =
           if currentTime >= pending.SpawnStartTime + pending.Duration then
             finalizeSpawn
               pending
-              core.EventBus
               stores.AIArchetypeStore
               stores.AIEntityStore
               stores.AIFamilyStore
+              core.StateWrite
 
             toRemove.Add(pending)
 

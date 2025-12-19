@@ -13,6 +13,7 @@ open Pomo.Core.EventBus
 open Pomo.Core.Stores
 open Pomo.Core.Domain.World
 open Pomo.Core.Domain.Core
+open Pomo.Core.Environment
 
 module Equipment =
 
@@ -21,43 +22,39 @@ module Equipment =
     |> AMap.tryFind entityId
     |> AVal.map(Option.defaultValue HashMap.empty)
 
-  let create (world: World) (eventBus: EventBus) : CoreEventListener =
+  let create
+    (world: World)
+    (eventBus: EventBus)
+    (stateWrite: IStateWriteService)
+    : CoreEventListener =
 
     let handleEquipItemIntent(intent: SystemCommunications.EquipItemIntent) =
-      eventBus.Publish(
-        Inventory(
-          ItemEquipped
-            struct (intent.EntityId, intent.Slot, intent.ItemInstanceId)
-        )
-      )
+      stateWrite.EquipItem(intent.EntityId, intent.Slot, intent.ItemInstanceId)
 
     let handleUnequipItemIntent
       (intent: SystemCommunications.UnequipItemIntent)
       =
-      let equippedItems =
-        equipedItemsForEntity intent.EntityId world |> AVal.force
-
-      match HashMap.tryFindV intent.Slot equippedItems with
-      | ValueSome itemInstanceId ->
-        eventBus.Publish(
-          Inventory(
-            ItemUnequipped struct (intent.EntityId, intent.Slot, itemInstanceId)
-          )
-        )
-      | ValueNone -> () // Item not found in slot, do nothing
+      stateWrite.UnequipItem(intent.EntityId, intent.Slot)
 
     { new CoreEventListener with
         member this.StartListening() : IDisposable =
           let disposable = new CompositeDisposable()
 
-          eventBus
-            .GetObservableFor<SystemCommunications.EquipItemIntent>()
-            .Subscribe(handleEquipItemIntent)
+          eventBus.Observable
+          |> Observable.choose(fun e ->
+            match e with
+            | GameEvent.ItemIntent(ItemIntentEvent.Equip intent) -> Some intent
+            | _ -> None)
+          |> Observable.subscribe handleEquipItemIntent
           |> disposable.Add
 
-          eventBus
-            .GetObservableFor<SystemCommunications.UnequipItemIntent>()
-            .Subscribe(handleUnequipItemIntent)
+          eventBus.Observable
+          |> Observable.choose(fun e ->
+            match e with
+            | GameEvent.ItemIntent(ItemIntentEvent.Unequip intent) ->
+              Some intent
+            | _ -> None)
+          |> Observable.subscribe handleUnequipItemIntent
           |> disposable.Add
 
           disposable

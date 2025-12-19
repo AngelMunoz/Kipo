@@ -59,7 +59,12 @@ module Notification =
       base.Initialize()
 
       sub <-
-        core.EventBus.GetObservableFor<SystemCommunications.ShowNotification>()
+        core.EventBus.Observable
+        |> Observable.choose(fun e ->
+          match e with
+          | GameEvent.Notification(NotificationEvent.ShowMessage msg) ->
+            Some msg
+          | _ -> None)
         |> Observable.subscribe(handleEvent)
 
     override _.LoadContent() =

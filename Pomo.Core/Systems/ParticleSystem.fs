@@ -1,6 +1,7 @@
 namespace Pomo.Core.Systems
 
 open System
+open System.Collections.Generic
 open Microsoft.Xna.Framework
 open FSharp.Data.Adaptive
 
@@ -8,6 +9,7 @@ open FSharp.UMX
 
 open Pomo.Core
 open Pomo.Core.Domain
+open Pomo.Core.Domain.World
 open Pomo.Core.Domain.Particles
 open Pomo.Core.Domain.Skill
 open Pomo.Core.Domain.Units
@@ -441,12 +443,12 @@ module ParticleSystem =
     ActiveEffectVisuals:
       System.Collections.Generic.Dictionary<Guid<EffectId>, string>
     ParticleStore: Stores.ParticleStore
-    // For syncing gameplay effects to visuals (stable - keyed by ActiveEffects)
-    GameplayEffects: HashMap<Guid<EntityId>, Projections.EffectOwnerTransform>
+    // For syncing gameplay effects to visuals (direct from world.ActiveEffects)
+    ActiveEffects: HashMap<Guid<EntityId>, Skill.ActiveEffect IndexList>
     // For transform updates (not stable - raw world data)
-    Positions: HashMap<Guid<EntityId>, Vector2>
-    Velocities: HashMap<Guid<EntityId>, Vector2>
-    Rotations: HashMap<Guid<EntityId>, float32>
+    Positions: IReadOnlyDictionary<Guid<EntityId>, Vector2>
+    Velocities: IReadOnlyDictionary<Guid<EntityId>, Vector2>
+    Rotations: IReadOnlyDictionary<Guid<EntityId>, float32>
   }
 
   /// Sync gameplay effects to visual effects - spawns new visuals for new effects
@@ -454,9 +456,9 @@ module ParticleSystem =
     (ctx: ParticleUpdateContext)
     (currentFrameEffectIds: System.Collections.Generic.HashSet<Guid<EffectId>>)
     =
-    ctx.GameplayEffects
-    |> HashMap.iter(fun entityId transform ->
-      for gameplayEffect in transform.Effects do
+    ctx.ActiveEffects
+    |> HashMap.iter(fun entityId effects ->
+      for gameplayEffect in effects do
         match gameplayEffect.SourceEffect.Visuals.VfxId with
         | ValueSome vfxId ->
           currentFrameEffectIds.Add(gameplayEffect.Id) |> ignore
@@ -528,21 +530,18 @@ module ParticleSystem =
     match effect.Owner with
     | ValueSome ownerId ->
       // Use raw Positions/Velocities/Rotations (works for all entity types)
-      match ctx.Positions |> HashMap.tryFindV ownerId with
+      match ctx.Positions.TryFindV ownerId with
       | ValueSome pos ->
         effect.Position.Value <- Vector3(pos.X, 0.0f, pos.Y)
 
         let vel =
-          ctx.Velocities
-          |> HashMap.tryFindV ownerId
+          ctx.Velocities.TryFindV ownerId
           |> ValueOption.defaultValue Vector2.Zero
 
         ownerVelocity <- Vector3(vel.X, 0.0f, vel.Y)
 
         let rot =
-          ctx.Rotations
-          |> HashMap.tryFindV ownerId
-          |> ValueOption.defaultValue 0.0f
+          ctx.Rotations.TryFindV ownerId |> ValueOption.defaultValue 0.0f
 
         ownerRotation <-
           Quaternion.CreateFromAxisAngle(Vector3.Up, -rot + MathHelper.PiOver2)
@@ -551,6 +550,7 @@ module ParticleSystem =
         // Owner doesn't exist - kill the effect
         effect.IsAlive.Value <- false
     | ValueNone -> ()
+    // Ownerless effects (combat VFX) stay alive - removal is handled below
 
     let shouldSpawn = effect.IsAlive.Value
     let mutable anyParticlesAlive = false
@@ -569,7 +569,22 @@ module ParticleSystem =
       if emitter.Particles.Count > 0 then
         anyParticlesAlive <- true
 
-    not shouldSpawn && not anyParticlesAlive
+    // Determine if effect should be removed
+    match effect.Owner with
+    | ValueSome _ ->
+      // Owned effects: remove when not spawning AND no particles
+      not shouldSpawn && not anyParticlesAlive
+    | ValueNone ->
+      // Ownerless effects (combat VFX): remove when all spawning is done AND no particles
+      // This handles cleanup without touching IsAlive (which would affect visual appearance)
+      let allSpawningDone =
+        effect.Emitters
+        |> List.forall(fun emitter ->
+          let burstDone = emitter.BurstDone.Value || emitter.Config.Burst = 0
+          let noContinuousRate = emitter.Config.Rate = 0
+          burstDone && noContinuousRate)
+
+      allSpawningDone && not anyParticlesAlive
 
   type ParticleSystem(game: Game, env: PomoEnvironment) =
     inherit GameSystem(game)
@@ -585,9 +600,6 @@ module ParticleSystem =
     let effectsById =
       System.Collections.Generic.Dictionary<string, Particles.ActiveEffect>()
 
-    let effectOwnerTransforms =
-      env.GameplayServices.Projections.EffectOwnerTransforms
-
     let dt = core.World.Time |> AVal.map(_.Delta.TotalSeconds >> float32)
 
     override this.Update(gameTime) =
@@ -595,12 +607,12 @@ module ParticleSystem =
 
       let effects = core.World.VisualEffects
 
-      // Gameplay effects (stable - for syncing)
-      let gameplayEffects = effectOwnerTransforms |> AMap.force
+      // Active effects from world (stable - entities with effects)
+      let activeEffects = core.World.ActiveEffects |> AMap.force
       // Raw transforms (not stable - for position updates)
-      let positions = core.World.Positions |> AMap.force
-      let velocities = core.World.Velocities |> AMap.force
-      let rotations = core.World.Rotations |> AMap.force
+      let positions = core.World.Positions
+      let velocities = core.World.Velocities
+      let rotations = core.World.Rotations
 
       let ctx: ParticleUpdateContext = {
         Dt = dt
@@ -609,11 +621,17 @@ module ParticleSystem =
         EffectsById = effectsById
         ActiveEffectVisuals = activeEffectVisuals
         ParticleStore = particleStore
-        GameplayEffects = gameplayEffects
+        ActiveEffects = activeEffects
         Positions = positions
         Velocities = velocities
         Rotations = rotations
       }
+
+      // Detect if effects list was externally cleared (e.g., on map change)
+      // and sync our tracking dictionaries
+      if effects.Count = 0 && effectsById.Count > 0 then
+        effectsById.Clear()
+        activeEffectVisuals.Clear()
 
       // 1. Sync gameplay effects to visuals
       let currentFrameEffectIds =

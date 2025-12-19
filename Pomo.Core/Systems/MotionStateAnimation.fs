@@ -4,12 +4,14 @@ open System
 open Microsoft.Xna.Framework
 open FSharp.Data.Adaptive
 open FSharp.UMX
+open Pomo.Core
 open Pomo.Core.Domain
 open Pomo.Core.Domain.Units
 open Pomo.Core.Domain.Events
 open Pomo.Core.Domain.Animation
 open Pomo.Core.Environment
 open Pomo.Core.Domain.World
+open Pomo.Core.Projections
 open Pomo.Core.Stores
 
 module AnimationStateLogic =
@@ -32,12 +34,13 @@ module AnimationStateLogic =
     animations
     |> IndexList.exists(fun _ anim -> clipIds |> Array.contains anim.ClipId)
 
-  let determineAnimationChange
-    (entityId: Guid<EntityId>)
+  /// Determines what animation action to take based on movement state.
+  /// Returns: Some true = start run animation, Some false = stop animation, None = no change
+  let determineAnimationAction
     (currentVelocity: Vector2)
     (currentActiveAnimations: AnimationState IndexList)
     (runClipIds: string[] voption)
-    : StateChangeEvent voption =
+    : (bool * AnimationState IndexList voption) voption =
 
     match runClipIds with
     | ValueNone -> ValueNone
@@ -49,14 +52,11 @@ module AnimationStateLogic =
 
       if isMoving && not isRunAnimActive then
         let runAnims = createAnimationsFromBindings clips
-
-        ValueSome(
-          Animation(ActiveAnimationsChanged struct (entityId, runAnims))
-        )
+        ValueSome(true, ValueSome runAnims) // Start run animation
       elif not isMoving && isRunAnimActive then
-        ValueSome(Animation(AnimationStateRemoved entityId))
+        ValueSome(false, ValueNone) // Stop animation
       else
-        ValueNone
+        ValueNone // No change
 
 open Pomo.Core.Environment.Patterns
 
@@ -64,21 +64,49 @@ type MotionStateAnimationSystem(game: Game, env: PomoEnvironment) =
   inherit GameComponent(game)
 
   let (Core core) = env.CoreServices
-  let (Gameplay gameplay) = env.GameplayServices
+  let (Stores stores) = env.StoreServices
+  let stateWrite = core.StateWrite
 
   override this.Update(gameTime) =
-    // Force the pre-joined, pre-filtered projection
-    // ModelConfig → RunClipIds resolution was done adaptively (cached)
-    let animContexts =
-      gameplay.Projections.AnimationControlContexts |> AMap.force
+    // Force world data directly - no reactive projection
+    let velocities = core.World.Velocities |> Dictionary.toHashMap
+    let activeAnimations = core.World.ActiveAnimations |> AMap.force
+    let resources = core.World.Resources |> AMap.force
+    let modelConfigIds = core.World.ModelConfigId |> AMap.force
 
-    for entityId, ctx in animContexts do
-      match
-        AnimationStateLogic.determineAnimationChange
-          entityId
-          ctx.Velocity
-          ctx.ActiveAnimations
-          ctx.RunClipIds
-      with
-      | ValueSome event -> core.EventBus.Publish(event)
-      | ValueNone -> ()
+    for entityId, configId in modelConfigIds do
+      // Filter: only alive entities
+      let isAlive =
+        resources
+        |> HashMap.tryFind entityId
+        |> Option.map(fun r -> r.Status = Entity.Status.Alive)
+        |> Option.defaultValue false
+
+      if isAlive then
+        // Get velocity and animations
+        let velocity =
+          velocities
+          |> HashMap.tryFind entityId
+          |> Option.defaultValue Vector2.Zero
+
+        let currentAnims =
+          activeAnimations
+          |> HashMap.tryFind entityId
+          |> Option.defaultValue IndexList.empty
+
+        // Resolve RunClipIds from ModelStore
+        let runClipIds =
+          stores.ModelStore.tryFind configId
+          |> ValueOption.bind(fun cfg ->
+            cfg.AnimationBindings |> HashMap.tryFindV "Run")
+
+        match
+          AnimationStateLogic.determineAnimationAction
+            velocity
+            currentAnims
+            runClipIds
+        with
+        | ValueSome(true, ValueSome runAnims) ->
+          stateWrite.UpdateActiveAnimations(entityId, runAnims)
+        | ValueSome(false, _) -> stateWrite.RemoveAnimationState(entityId)
+        | _ -> ()

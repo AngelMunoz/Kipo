@@ -32,13 +32,19 @@ type Selection =
 
 [<RequireQualifiedAccess>]
 module SystemCommunications =
-  [<RequireQualifiedAccess>]
+  [<Struct>]
+  type FactionSpawnInfo = {
+    ArchetypeId: int<AiArchetypeId>
+    EntityDefinitionKey: string voption
+    MapOverride: MapEntityOverride voption
+    Faction: Faction voption
+    SpawnZoneName: string voption
+  }
+
+  [<RequireQualifiedAccess; Struct>]
   type SpawnType =
     | Player of playerIndex: int
-    | Enemy of
-      archetypeId: int<AiArchetypeId> *
-      entityDefinitionKey: string voption *
-      mapOverride: MapEntityOverride voption
+    | Faction of FactionSpawnInfo
 
   [<Struct>]
   type SpawnEntityIntent = {
@@ -46,6 +52,22 @@ module SystemCommunications =
     ScenarioId: Guid<ScenarioId>
     Type: SpawnType
     Position: Vector2
+  }
+
+  [<Struct>]
+  type SpawnZoneData = {
+    ZoneName: string
+    ScenarioId: Guid<ScenarioId>
+    MaxSpawns: int
+    SpawnInfo: FactionSpawnInfo
+    SpawnPositions: Vector2[]
+  }
+
+  [<Struct>]
+  type RegisterSpawnZones = {
+    ScenarioId: Guid<ScenarioId>
+    MaxEnemies: int
+    Zones: SpawnZoneData[]
   }
 
   [<Struct>]
@@ -129,7 +151,10 @@ module SystemCommunications =
   }
 
   [<Struct>]
-  type EntityDied = { Target: Guid<EntityId> }
+  type EntityDied = {
+    EntityId: Guid<EntityId>
+    ScenarioId: Guid<ScenarioId>
+  }
 
   [<Struct>]
   type ProjectileImpacted = {
@@ -180,89 +205,97 @@ module SystemCommunications =
 
 // --- State Change Events ---
 
-type EntityLifecycleEvents =
-  | Spawning of
-    spawning:
-      struct (Guid<EntityId> *
-      Guid<ScenarioId> *
-      SystemCommunications.SpawnType *
-      Vector2)
-  | Created of created: EntitySnapshot
-  | Removed of removed: Guid<EntityId>
+/// Bundle of all components for spawning an entity atomically.
+/// Reduces 17+ individual events to a single event publication.
+[<Struct>]
+type EntitySpawnBundle = {
+  Snapshot: EntitySnapshot
+  Resources: Resource voption
+  Factions: Faction HashSet voption
+  BaseStats: BaseStats voption
+  ModelConfig: string voption
+  InputMap: InputMap voption
+  ActionSets: HashMap<int, HashMap<GameAction, SlotProcessing>> voption
+  ActiveActionSet: int voption
+  /// Item instances to create, with their instance data
+  InventoryItems: ItemInstance[] voption
+  /// Slots to equip after items are created
+  EquippedSlots: struct (Slot * Guid<ItemInstanceId>)[] voption
+  AIController: AIController voption
+}
 
 type InputEvents =
   | RawStateChanged of rawIChanged: struct (Guid<EntityId> * RawInputState)
-  | MapChanged of iMapChanged: struct (Guid<EntityId> * InputMap)
   | GameActionStatesChanged of
     gAChanged: struct (Guid<EntityId> * HashMap<GameAction, InputActionState>)
-  | ActionSetsChanged of
-    asChanged:
-      struct (Guid<EntityId> * HashMap<int, HashMap<GameAction, SlotProcessing>>)
   | ActiveActionSetChanged of aasChanged: struct (Guid<EntityId> * int)
 
 type PhysicsEvents =
-  | PositionChanged of posChanged: struct (Guid<EntityId> * Vector2)
-  | VelocityChanged of velChanged: struct (Guid<EntityId> * Vector2)
-  | RotationChanged of rotChanged: struct (Guid<EntityId> * float32)
   | MovementStateChanged of
     mStateChanged: struct (Guid<EntityId> * MovementState)
 
-type CombatEvents =
-  | ResourcesChanged of resChanged: struct (Guid<EntityId> * Resource)
-  | FactionsChanged of facChanged: struct (Guid<EntityId> * Faction HashSet)
-  | BaseStatsChanged of statsChanged: struct (Guid<EntityId> * BaseStats)
-  | StatsChanged of entity: Guid<EntityId> * newStats: DerivedStats
-  | EffectApplied of effectApplied: struct (Guid<EntityId> * ActiveEffect)
-  | EffectExpired of effectExpired: struct (Guid<EntityId> * Guid<EffectId>)
-  | EffectRefreshed of effectRefreshed: struct (Guid<EntityId> * Guid<EffectId>)
-  | EffectStackChanged of
-    effectStackChanged: struct (Guid<EntityId> * Guid<EffectId> * int)
-  | CooldownsChanged of
-    cdChanged: struct (Guid<EntityId> * HashMap<int<SkillId>, TimeSpan>)
-  | InCombatTimerRefreshed of entityId: Guid<EntityId>
-  | PendingSkillCastSet of
-    entityId: Guid<EntityId> *
-    skillId: int<SkillId> *
-    target: SystemCommunications.SkillTarget
-  | PendingSkillCastCleared of entityId: Guid<EntityId>
-
-type InventoryEvents =
-  | ItemInstanceCreated of itemInstance: ItemInstance
-  | ItemInstanceRemoved of itemInstanceId: Guid<ItemInstanceId>
-  | UpdateItemInstance of itemInstance: ItemInstance
-  | ItemAddedToInventory of
-    itemAdded: struct (Guid<EntityId> * Guid<ItemInstanceId>)
-  | ItemRemovedFromInventory of
-    itemRemoved: struct (Guid<EntityId> * Guid<ItemInstanceId>)
-  | ItemEquipped of
-    itemEquipped: struct (Guid<EntityId> * Slot * Guid<ItemInstanceId>)
-  | ItemUnequipped of
-    itemUnequipped: struct (Guid<EntityId> * Slot * Guid<ItemInstanceId>)
-
-type AIStateChange =
-  | ControllerUpdated of
-    struct (Guid<EntityId> * Pomo.Core.Domain.AI.AIController)
-
-type VisualsEvents = ModelConfigChanged of struct (Guid<EntityId> * string)
-
-open Pomo.Core.Domain.Animation
-
-type AnimationEvents =
-  | ActiveAnimationsChanged of
-    struct (Guid<EntityId> * AnimationState IndexList)
-  | PoseChanged of struct (Guid<EntityId> * HashMap<string, Matrix>)
-  | AnimationStateRemoved of Guid<EntityId>
 
 [<Struct>]
 type StateChangeEvent =
-  | EntityLifecycle of entityLifeCycle: EntityLifecycleEvents
   | Input of input: InputEvents
   | Physics of physics: PhysicsEvents
-  | Combat of combat: CombatEvents
-  | Inventory of inventory: InventoryEvents
-  | AI of ai: AIStateChange
-  | Visuals of visuals: VisualsEvents
-  | Animation of animation: AnimationEvents
-  // Uncategorized
-  | CreateProjectile of
-    projParams: struct (Guid<EntityId> * LiveProjectile * Vector2 voption)
+
+// --- Intent Events (user actions and commands) ---
+[<Struct>]
+type IntentEvent =
+  | Ability of ability: SystemCommunications.AbilityIntent
+  | Attack of attack: SystemCommunications.AttackIntent
+  | EffectApplication of effectApp: SystemCommunications.EffectApplicationIntent
+  | EffectDamage of effectDmg: SystemCommunications.EffectDamageIntent
+  | EffectResource of effectRes: SystemCommunications.EffectResourceIntent
+  | MovementTarget of movement: SystemCommunications.SetMovementTarget
+  | TargetSelection of target: SystemCommunications.TargetSelected
+  | Portal of portal: SystemCommunications.PortalTravel
+  | SlotActivated of slot: SystemCommunications.SlotActivated
+
+// --- Item Intent Events ---
+[<Struct>]
+type ItemIntentEvent =
+  | PickUp of pickUp: SystemCommunications.PickUpItemIntent
+  | Equip of equip: SystemCommunications.EquipItemIntent
+  | Unequip of unequip: SystemCommunications.UnequipItemIntent
+  | Drop of drop: SystemCommunications.DropItemIntent
+  | Use of useItem: SystemCommunications.UseItemIntent
+
+// --- Notification Events (UI feedback) ---
+[<Struct>]
+type NotificationEvent =
+  | ShowMessage of message: SystemCommunications.ShowNotification
+  | DamageDealt of damage: SystemCommunications.DamageDealt
+  | ResourceRestored of restored: SystemCommunications.ResourceRestored
+
+// --- Lifecycle Events (entity state changes for systems) ---
+[<Struct>]
+type LifecycleEvent =
+  | EntityDied of died: SystemCommunications.EntityDied
+  | ProjectileImpacted of impact: SystemCommunications.ProjectileImpacted
+
+// --- Spawning Events ---
+[<Struct>]
+type SpawningEvent =
+  | SpawnEntity of spawn: SystemCommunications.SpawnEntityIntent
+  | RegisterZones of zones: SystemCommunications.RegisterSpawnZones
+
+// --- Collision Events (already exists, just rename for consistency) ---
+type CollisionEvent = SystemCommunications.CollisionEvents
+
+// --- Scene Events ---
+[<Struct>]
+type SceneEvent = Transition of transition: SystemCommunications.SceneTransition
+
+// === Top-Level GameEvent ===
+[<Struct>]
+type GameEvent =
+  | State of state: StateChangeEvent
+  | Intent of intent: IntentEvent
+  | ItemIntent of itemIntent: ItemIntentEvent
+  | Notification of notification: NotificationEvent
+  | Lifecycle of lifecycle: LifecycleEvent
+  | Spawn of spawning: SpawningEvent
+  | Collision of collision: CollisionEvent
+  | Scene of scene: SceneEvent

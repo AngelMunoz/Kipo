@@ -13,6 +13,17 @@
         {
           "Type": "Sequence",
           "Children": [
+            {
+              "Type": "Condition",
+              "Name": "TargetTooClose",
+              "Params": { "MinDistance": "36" }
+            },
+            { "Type": "Action", "Name": "Retreat" }
+          ]
+        },
+        {
+          "Type": "Sequence",
+          "Children": [
             { "Type": "Condition", "Name": "HasTarget" },
             { "Type": "Condition", "Name": "TargetInRange" },
             { "Type": "Action", "Name": "UseRangedAttack" }
@@ -100,6 +111,17 @@
         {
           "Type": "Sequence",
           "Children": [
+            {
+              "Type": "Condition",
+              "Name": "TargetTooClose",
+              "Params": { "MinDistance": "36" }
+            },
+            { "Type": "Action", "Name": "Retreat" }
+          ]
+        },
+        {
+          "Type": "Sequence",
+          "Children": [
             { "Type": "Condition", "Name": "HasTarget" },
             { "Type": "Action", "Name": "UseDebuff" }
           ]
@@ -125,7 +147,7 @@
             {
               "Type": "Condition",
               "Name": "TargetTooClose",
-              "Params": { "MinDistance": "48" }
+              "Params": { "MinDistance": "36" }
             },
             { "Type": "Action", "Name": "Retreat" }
           ]
@@ -150,3 +172,4 @@
     }
   }
 }
+

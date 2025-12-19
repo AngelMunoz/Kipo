@@ -12,6 +12,8 @@ open Pomo.Core.Stores
 open Pomo.Core.Algorithms
 open Pomo.Core.Projections
 open Pomo.Core.Algorithms.Pathfinding
+open FSharp.Control.Reactive
+open Pomo.Core.Environment
 
 module Navigation =
   open Pomo.Core.Domain.Core
@@ -19,6 +21,7 @@ module Navigation =
   let create
     (
       eventBus: EventBus,
+      stateWrite: IStateWriteService,
       mapStore: MapStore,
       projections: Projections.ProjectionService
     ) =
@@ -49,10 +52,13 @@ module Navigation =
 
     let inline publishPath entityId path =
       if not(List.isEmpty path) then
+        stateWrite.UpdateMovementState(entityId, MovingAlongPath path)
+
         eventBus.Publish(
-          StateChangeEvent.Physics(
-            PhysicsEvents.MovementStateChanged
-              struct (entityId, MovingAlongPath path)
+          GameEvent.State(
+            Physics(
+              MovementStateChanged struct (entityId, MovingAlongPath path)
+            )
           )
         )
 
@@ -64,10 +70,13 @@ module Navigation =
       let distance = Vector2.Distance(currentPosition, targetPosition)
 
       if distance < freeMovementThreshold then
+        stateWrite.UpdateMovementState(entityId, MovingTo targetPosition)
+
         eventBus.Publish(
-          StateChangeEvent.Physics(
-            PhysicsEvents.MovementStateChanged
-              struct (entityId, MovingTo targetPosition)
+          GameEvent.State(
+            Physics(
+              MovementStateChanged struct (entityId, MovingTo targetPosition)
+            )
           )
         )
       else
@@ -78,7 +87,12 @@ module Navigation =
 
     { new CoreEventListener with
         member _.StartListening() =
-          eventBus.GetObservableFor<SystemCommunications.SetMovementTarget>()
+          eventBus.Observable
+          |> Observable.choose(fun event ->
+            match event with
+            | GameEvent.Intent(IntentEvent.MovementTarget target) ->
+              Some target
+            | _ -> None)
           |> Observable.subscribe(fun event ->
             let entityId = event.EntityId
             let targetPosition = event.Target

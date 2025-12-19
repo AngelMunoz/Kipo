@@ -78,6 +78,7 @@ module ActionHandler =
     (
       world: World,
       eventBus: EventBus,
+      stateWrite: IStateWriteService,
       targetingService: TargetingService,
       projections: Projections.ProjectionService,
       cameraService: CameraService,
@@ -87,11 +88,11 @@ module ActionHandler =
 
     { new CoreEventListener with
         member _.StartListening() =
-          eventBus.GetObservableFor<StateChangeEvent>()
-          |> Observable.choose(fun event ->
-            match event with
-            | Input(GameActionStatesChanged struct (changedEntityId,
-                                                    actionStates)) ->
+          eventBus.Observable
+          |> Observable.choose(fun e ->
+            match e with
+            | GameEvent.State(Input(GameActionStatesChanged struct (changedEntityId,
+                                                                    actionStates))) ->
               if changedEntityId = entityId then
                 Some actionStates
               else
@@ -143,8 +144,12 @@ module ActionHandler =
                 )
 
               handleActionSetChange actionSetChangeState (fun value ->
+                stateWrite.UpdateActiveActionSet(entityId, value)
+
                 eventBus.Publish(
-                  Input(ActiveActionSetChanged struct (entityId, value))
+                  GameEvent.State(
+                    Input(ActiveActionSetChanged struct (entityId, value))
+                  )
                 ))
 
               match primaryActionState with
@@ -189,20 +194,22 @@ module ActionHandler =
                   | Some clickedEntityId ->
                     // An entity was clicked, publish an attack intent
                     eventBus.Publish(
-                      {
-                        Attacker = entityId
-                        Target = clickedEntityId
-                      }
-                      : SystemCommunications.AttackIntent
+                      GameEvent.Intent(
+                        IntentEvent.Attack {
+                          Attacker = entityId
+                          Target = clickedEntityId
+                        }
+                      )
                     )
                   | None ->
                     // Nothing was clicked, publish a movement command
                     eventBus.Publish(
-                      {
-                        EntityId = entityId
-                        Target = mousePosition
-                      }
-                      : SystemCommunications.SetMovementTarget
+                      GameEvent.Intent(
+                        IntentEvent.MovementTarget {
+                          EntityId = entityId
+                          Target = mousePosition
+                        }
+                      )
                     )
 
                 | ValueSome Self ->
@@ -216,11 +223,12 @@ module ActionHandler =
                     let selection = SelectedEntity clickedEntityId
 
                     eventBus.Publish(
-                      {
-                        Selector = entityId
-                        Selection = selection
-                      }
-                      : SystemCommunications.TargetSelected
+                      GameEvent.Intent(
+                        IntentEvent.TargetSelection {
+                          Selector = entityId
+                          Selection = selection
+                        }
+                      )
                     )
                   | None ->
                     // Invalid target, do nothing for now
@@ -230,21 +238,23 @@ module ActionHandler =
                   let selection = SelectedPosition mousePosition
 
                   eventBus.Publish(
-                    {
-                      Selector = entityId
-                      Selection = selection
-                    }
-                    : SystemCommunications.TargetSelected
+                    GameEvent.Intent(
+                      IntentEvent.TargetSelection {
+                        Selector = entityId
+                        Selection = selection
+                      }
+                    )
                   )
                 | ValueSome TargetDirection ->
                   let selection = SelectedPosition mousePosition
 
                   eventBus.Publish(
-                    {
-                      Selector = entityId
-                      Selection = selection
-                    }
-                    : SystemCommunications.TargetSelected
+                    GameEvent.Intent(
+                      IntentEvent.TargetSelection {
+                        Selector = entityId
+                        Selection = selection
+                      }
+                    )
                   )
               | ValueSome _
               | ValueNone -> ())

@@ -7,6 +7,7 @@ open FSharp.Control.Reactive
 open FSharp.UMX
 open FSharp.Data.Adaptive
 
+open Pomo.Core
 open Pomo.Core.EventBus
 open Pomo.Core.Domain
 open Pomo.Core.Domain.Events
@@ -16,10 +17,12 @@ open Pomo.Core.Systems.Systems
 
 module ResourceManager =
   open System.Reactive.Disposables
+  open Pomo.Core.Environment
 
   module private Handlers =
     let handleDamageDealt
       (world: World)
+      (stateWrite: IStateWriteService)
       (eventBus: EventBus)
       (event: SystemCommunications.DamageDealt)
       =
@@ -31,21 +34,30 @@ module ResourceManager =
         let newHP = max 0 (currentResources.HP - event.Amount)
         let newResources = { currentResources with HP = newHP }
 
-        eventBus.Publish(
-          StateChangeEvent.Combat(
-            CombatEvents.ResourcesChanged struct (event.Target, newResources)
-          )
-        )
+        stateWrite.UpdateResources(event.Target, newResources)
+        stateWrite.UpdateInCombatTimer(event.Target)
 
-        eventBus.Publish(
-          StateChangeEvent.Combat(
-            CombatEvents.InCombatTimerRefreshed event.Target
-          )
-        )
+        // Emit EntityDied if HP dropped to 0 or below
+        if newHP <= 0 then
+          let scenarioId =
+            world.EntityScenario |> AMap.force |> HashMap.tryFindV event.Target
+
+          match scenarioId with
+          | ValueSome sid ->
+            eventBus.Publish(
+              GameEvent.Lifecycle(
+                LifecycleEvent.EntityDied {
+                  EntityId = event.Target
+                  ScenarioId = sid
+                }
+              )
+            )
+          | ValueNone -> ()
       | ValueNone -> ()
 
   let handleResourceRestored
     (world: World)
+    (stateWrite: IStateWriteService)
     (eventBus: EventBus)
     (derivedStats: amap<Guid<EntityId>, Entity.DerivedStats>)
     (event: SystemCommunications.ResourceRestored)
@@ -55,9 +67,7 @@ module ResourceManager =
     let stats = derivedStats |> AMap.force
 
     let position =
-      world.Positions
-      |> AMap.force
-      |> HashMap.tryFindV event.Target
+      world.Positions.TryFindV event.Target
       |> ValueOption.defaultValue Vector2.Zero
 
     match resources.TryFindV event.Target with
@@ -84,28 +94,28 @@ module ResourceManager =
           let newMP = min maxMP (currentResources.MP + event.Amount)
           { currentResources with MP = newMP }
 
+      stateWrite.UpdateResources(event.Target, resources)
+
       eventBus.Publish(
-        StateChangeEvent.Combat(
-          ResourcesChanged struct (event.Target, resources)
+        GameEvent.Notification(
+          NotificationEvent.ShowMessage {
+            Message =
+              let amount = event.Amount
+              $"%d{amount} {event.ResourceType}"
+            Position = position
+          }
         )
       )
-
-      eventBus.Publish<SystemCommunications.ShowNotification> {
-        Message =
-          let amount = event.Amount
-          $"%d{amount} {event.ResourceType}"
-        Position = position
-      }
     | ValueNone -> ()
 
   module private Regeneration =
     open Pomo.Core.Projections
 
     let processAutoRegen
+      (stateWrite: IStateWriteService)
       (regenContexts: HashMap<Guid<EntityId>, RegenerationContext>)
       (totalGameTime: TimeSpan)
       (deltaTime: TimeSpan)
-      (eventBus: EventBus)
       (accumulators: Dictionary<Guid<EntityId>, struct (float * float)>)
       =
       for entityId, ctx in regenContexts do
@@ -144,11 +154,7 @@ module ResourceManager =
                     MP = newMP
               }
 
-              eventBus.Publish(
-                StateChangeEvent.Combat(
-                  CombatEvents.ResourcesChanged struct (entityId, newResources)
-                )
-              )
+              stateWrite.UpdateResources(entityId, newResources)
 
   open Pomo.Core.Environment
   open Pomo.Core.Environment.Patterns
@@ -158,6 +164,7 @@ module ResourceManager =
 
     let (Core core) = env.CoreServices
     let (Gameplay gameplay) = env.GameplayServices
+    let stateWrite = core.StateWrite
 
     let subscriptions = new CompositeDisposable()
     let regenAccumulators = Dictionary<Guid<EntityId>, struct (float * float)>()
@@ -165,16 +172,26 @@ module ResourceManager =
     override this.Initialize() =
       base.Initialize()
 
-      core.EventBus.GetObservableFor<SystemCommunications.DamageDealt>()
+      core.EventBus.Observable
+      |> Observable.choose(fun e ->
+        match e with
+        | GameEvent.Notification(NotificationEvent.DamageDealt dmg) -> Some dmg
+        | _ -> None)
       |> Observable.subscribe(
-        Handlers.handleDamageDealt core.World core.EventBus
+        Handlers.handleDamageDealt core.World stateWrite core.EventBus
       )
       |> subscriptions.Add
 
-      core.EventBus.GetObservableFor<SystemCommunications.ResourceRestored>()
+      core.EventBus.Observable
+      |> Observable.choose(fun e ->
+        match e with
+        | GameEvent.Notification(NotificationEvent.ResourceRestored restored) ->
+          Some restored
+        | _ -> None)
       |> Observable.subscribe(
         handleResourceRestored
           core.World
+          stateWrite
           core.EventBus
           gameplay.Projections.DerivedStats
       )
@@ -201,8 +218,8 @@ module ResourceManager =
         |> AVal.force
 
       Regeneration.processAutoRegen
+        stateWrite
         regenContexts
         totalGameTime
         deltaTime
-        core.EventBus
         regenAccumulators

@@ -4,6 +4,7 @@
     <Platforms>AnyCPU</Platforms>
   </PropertyGroup>
   <ItemGroup>
+    <Compile Include="Extensions.fs" />
     <Compile Include="Localization/LocalizationManager.fs" />
     <Compile Include="Domain/Core.fs" />
     <Compile Include="Domain/Camera.fs" />
@@ -51,14 +52,14 @@
     <Compile Include="Systems/UnitMovement.fs" />
     <Compile Include="Systems/Collision.fs" />
     <Compile Include="Systems/MapLoader.fs" />
-
     <Compile Include="Systems/CameraSystem.fs" />
     <Compile Include="Systems/TerrainRender.fs" />
     <Compile Include="Systems/Render.fs" />
     <Compile Include="Systems/RenderOrchestrator.fs" />
     <Compile Include="Systems/DebugRender.fs" />
     <Compile Include="Systems/State.fs" />
-    <Compile Include="Systems/Inventory.fs" /><Compile Include="Systems/Equipment.fs" />
+    <Compile Include="Systems/Inventory.fs" />
+    <Compile Include="Systems/Equipment.fs" />
     <Compile Include="Systems/EffectApplication.fs" />
     <Compile Include="Systems/EntitySpawner.fs" />
     <Compile Include="Systems/ParticleSystem.fs" />
@@ -119,12 +120,9 @@
     <PackageReference Include="FSharp.UMX" Version="1.1.0" />
     <PackageReference Include="JDeck" Version="1.0.0" />
     <PackageReference Include="Myra" Version="1.5.10" />
-
     <PackageReference Include="MonoGame.Framework.DesktopGL" Version="3.8.*" PrivateAssets="All" />
-
     <!-- Build and analysis tools -->
     <PackageReference Include="Ionide.Analyzers" Version="0.*" PrivateAssets="All" />
     <PackageReference Include="FSharp.Analyzers.Build" Version="0.*" PrivateAssets="All" IncludeAssets="build" />
   </ItemGroup>
-
 </Project>

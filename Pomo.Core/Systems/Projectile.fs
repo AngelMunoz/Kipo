@@ -12,6 +12,7 @@ open Pomo.Core.Domain.Projectile
 open Pomo.Core.Domain.Particles
 open Pomo.Core.Domain.Skill
 open Pomo.Core.Systems.Systems
+open Pomo.Core.Environment
 
 module Projectile =
 
@@ -68,18 +69,18 @@ module Projectile =
 
   /// Processes a descending (falling from sky) projectile.
   let private processDescendingProjectile
+    (stateWrite: IStateWriteService)
     (dt: float32)
     (ctx: ProjectileContext)
     (currentAltitude: float32)
     (fallSpeed: float32)
     =
     let commEvents = ResizeArray()
-    let stateEvents = ResizeArray()
     let newAltitude = currentAltitude - (fallSpeed * dt)
 
     if newAltitude <= 0.0f then
       commEvents.Add(makeImpact ctx ValueNone)
-      stateEvents.Add(EntityLifecycle(Removed ctx.Id))
+      stateWrite.RemoveEntity(ctx.Id)
     else
       let updatedProjectile: LiveProjectile = {
         ctx.Projectile with
@@ -89,17 +90,19 @@ module Projectile =
             }
       }
 
-      stateEvents.Add(EntityLifecycle(Removed ctx.Id))
+      stateWrite.RemoveEntity(ctx.Id)
 
-      stateEvents.Add(
-        CreateProjectile
-          struct (ctx.Id, updatedProjectile, ValueSome ctx.Position)
+      stateWrite.CreateProjectile(
+        ctx.Id,
+        updatedProjectile,
+        ValueSome ctx.Position
       )
 
-    struct (commEvents |> IndexList.ofSeq, stateEvents |> IndexList.ofSeq)
+    commEvents |> IndexList.ofSeq
 
   /// Helper to spawn a chain projectile to the next target.
   let private spawnChainProjectile
+    (stateWrite: IStateWriteService)
     (world: WorldContext)
     (ctx: ProjectileContext)
     (currentTargetId: Guid<EntityId>)
@@ -128,22 +131,21 @@ module Projectile =
             }
       }
 
-      ValueSome(
-        CreateProjectile
-          struct (newProjectileId,
-                  newLiveProjectile,
-                  ValueSome ctx.TargetPosition)
+      stateWrite.CreateProjectile(
+        newProjectileId,
+        newLiveProjectile,
+        ValueSome ctx.TargetPosition
       )
     else
-      ValueNone
+      ()
 
   /// Handles the impact of a horizontal/chained projectile.
   let private handleHorizontalImpact
+    (stateWrite: IStateWriteService)
     (world: WorldContext)
     (ctx: ProjectileContext)
     =
     let commEvents = ResizeArray()
-    let stateEvents = ResizeArray()
 
     let remainingJumps =
       match ctx.Projectile.Info.Variations with
@@ -151,32 +153,38 @@ module Projectile =
       | _ -> ValueNone
 
     commEvents.Add(makeImpact ctx remainingJumps)
-    stateEvents.Add(EntityLifecycle(Removed ctx.Id))
+    stateWrite.RemoveEntity(ctx.Id)
 
     // Handle chaining to next target
     match ctx.Projectile.Info.Variations, ctx.TargetEntity with
     | ValueSome(Chained(jumpsLeft, maxRange)), ValueSome currentTargetId when
       jumpsLeft >= 0
       ->
-      match
-        spawnChainProjectile world ctx currentTargetId jumpsLeft maxRange
-      with
-      | ValueSome event -> stateEvents.Add event
-      | ValueNone -> ()
+      spawnChainProjectile
+        stateWrite
+        world
+        ctx
+        currentTargetId
+        jumpsLeft
+        maxRange
     | _ -> ()
 
-    struct (commEvents |> IndexList.ofSeq, stateEvents |> IndexList.ofSeq)
+    commEvents |> IndexList.ofSeq
 
   /// Handles the in-flight movement of a horizontal projectile.
-  let private handleHorizontalFlight(ctx: ProjectileContext) =
+  /// Updates velocity via StateWriteService directly.
+  let private handleHorizontalFlight
+    (stateWrite: IStateWriteService)
+    (ctx: ProjectileContext)
+    =
     let direction = Vector2.Normalize(ctx.TargetPosition - ctx.Position)
     let velocity = direction * ctx.Projectile.Info.Speed
-
-    struct (IndexList.empty,
-            IndexList.single(Physics(VelocityChanged struct (ctx.Id, velocity))))
+    stateWrite.UpdateVelocity(ctx.Id, velocity)
+    IndexList.empty
 
   /// Processes a horizontal (standard) or chained projectile.
   let private processHorizontalProjectile
+    (stateWrite: IStateWriteService)
     (world: WorldContext)
     (ctx: ProjectileContext)
     =
@@ -184,11 +192,12 @@ module Projectile =
     let threshold = 4.0f
 
     if distance < threshold then
-      handleHorizontalImpact world ctx
+      handleHorizontalImpact stateWrite world ctx
     else
-      handleHorizontalFlight ctx
+      handleHorizontalFlight stateWrite ctx
 
   let processProjectile
+    (stateWrite: IStateWriteService)
     (world: WorldContext)
     (dt: float32)
     (projectileId: Guid<EntityId>)
@@ -210,8 +219,8 @@ module Projectile =
     match projPos, targetPos with
     | ValueNone, _
     | _, ValueNone ->
-      struct (IndexList.empty,
-              IndexList.single(EntityLifecycle(Removed projectileId)))
+      stateWrite.RemoveEntity(projectileId)
+      IndexList.empty
 
     | ValueSome projPos, ValueSome targetPos ->
       let ctx: ProjectileContext = {
@@ -224,10 +233,10 @@ module Projectile =
 
       match projectile.Info.Variations with
       | ValueSome(Descending(currentAltitude, fallSpeed)) ->
-        processDescendingProjectile dt ctx currentAltitude fallSpeed
-      | _ -> processHorizontalProjectile world ctx
+        processDescendingProjectile stateWrite dt ctx currentAltitude fallSpeed
+      | _ -> processHorizontalProjectile stateWrite world ctx
 
-  open Pomo.Core.Environment
+
   open Pomo.Core.Domain.Animation
   open Pomo.Core.EventBus
 
@@ -301,7 +310,7 @@ module Projectile =
     | ValueNone -> ()
 
   let inline ensureProjectileAnimation
-    (eventBus: EventBus)
+    (stateWrite: IStateWriteService)
     (activeAnims: HashMap<Guid<EntityId>, IndexList<AnimationState>>)
     (projectileId: Guid<EntityId>)
     =
@@ -313,12 +322,7 @@ module Projectile =
         Speed = 1.0f
       }
 
-      eventBus.Publish(
-        Animation(
-          ActiveAnimationsChanged
-            struct (projectileId, IndexList.single spinAnim)
-        )
-      )
+      stateWrite.UpdateActiveAnimations(projectileId, IndexList.single spinAnim)
     | ValueSome _ -> ()
 
   /// Spawns flight visuals for a projectile if not already present
@@ -376,6 +380,7 @@ module Projectile =
     let (Core core) = env.CoreServices
     let (Gameplay gameplay) = env.GameplayServices
     let (Stores stores) = env.StoreServices
+    let stateWrite = core.StateWrite
 
     // Track which projectiles already have visual effects (O(1) lookup)
     let effectOwners = System.Collections.Generic.HashSet<Guid<EntityId>>()
@@ -433,14 +438,13 @@ module Projectile =
 
         for _, (projectileId, projectile) in projectiles do
           // 1. Ensure animation
-          ensureProjectileAnimation core.EventBus activeAnims projectileId
+          ensureProjectileAnimation stateWrite activeAnims projectileId
 
           // 2. Process projectile logic
-          let struct (evs, states) =
-            processProjectile worldCtx dt projectileId projectile
+          let evs =
+            processProjectile stateWrite worldCtx dt projectileId projectile
 
           sysEvents.AddRange evs
-          stateEvents.AddRange states
 
           // 3. Flight visuals
           spawnFlightVisual vfxCtx projectileId projectile
@@ -449,5 +453,8 @@ module Projectile =
           for impact in evs do
             spawnImpactVisual vfxCtx impact
 
-      sysEvents |> Seq.iter core.EventBus.Publish
-      stateEvents |> Seq.iter core.EventBus.Publish
+      sysEvents
+      |> Seq.iter(fun e ->
+        core.EventBus.Publish(
+          GameEvent.Lifecycle(LifecycleEvent.ProjectileImpacted e)
+        ))

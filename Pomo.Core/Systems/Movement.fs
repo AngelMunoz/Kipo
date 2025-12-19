@@ -21,6 +21,7 @@ module Movement =
 
     let (Gameplay gameplay) = env.GameplayServices
     let (Core core) = env.CoreServices
+    let stateWrite = core.StateWrite
 
     override val Kind = Movement with get
 
@@ -28,18 +29,11 @@ module Movement =
       let scenarios = core.World.Scenarios |> AMap.force
 
       for (scenarioId, _) in scenarios do
-        let movements =
-          gameplay.Projections.ComputeMovementSnapshot(scenarioId).Positions
+        let snapshot = gameplay.Projections.ComputeMovementSnapshot(scenarioId)
 
-        for id, newPosition in movements do
-          core.EventBus.Publish(
-            Physics(PositionChanged struct (id, newPosition))
-          )
+        for id, newPosition in snapshot.Positions do
+          stateWrite.UpdatePosition(id, newPosition)
 
-        let rotations =
-          gameplay.Projections.ComputeMovementSnapshot(scenarioId).Rotations
+        for id, newRotation in snapshot.Rotations do
+          stateWrite.UpdateRotation(id, newRotation)
 
-        for id, newRotation in rotations do
-          core.EventBus.Publish(
-            Physics(RotationChanged struct (id, newRotation))
-          )

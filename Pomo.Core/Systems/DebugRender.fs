@@ -271,9 +271,9 @@ module DebugRender =
           |> IndexList.map(fun obj ->
             let color =
               match obj.Type with
-              | ValueSome Wall -> Color.Red
-              | ValueSome Spawn -> Color.Green
-              | ValueSome Zone ->
+              | ValueSome MapObjectType.Wall -> Color.Red
+              | ValueSome MapObjectType.Spawn -> Color.Green
+              | ValueSome MapObjectType.Zone ->
                 if obj.Name.Contains("Void") then Color.Purple
                 elif obj.Name.Contains("Slow") then Color.Yellow
                 elif obj.Name.Contains("Speed") then Color.Cyan
@@ -748,10 +748,6 @@ module DebugRender =
     let spriteBatch = lazy (new SpriteBatch(game.GraphicsDevice))
     let mutable pixel: Texture2D voption = ValueNone
     let mutable hudFont = Unchecked.defaultof<_>
-
-    let mutable pixel: Texture2D voption = ValueNone
-    let mutable hudFont = Unchecked.defaultof<_>
-
     let mutable wasF11Down = false // Latch for toggle key
 
     let showStats = cval false
@@ -846,12 +842,15 @@ module DebugRender =
 
       let p = new Texture2D(game.GraphicsDevice, 1, 1)
       p.SetData([| Color.White |])
-      p.SetData([| Color.White |])
       pixel <- ValueSome p
 
       let eventBus = core.EventBus
 
-      eventBus.GetObservableFor<SystemCommunications.AbilityIntent>()
+      eventBus.Observable
+      |> FSharp.Control.Reactive.Observable.choose(fun e ->
+        match e with
+        | GameEvent.Intent(IntentEvent.Ability intent) -> Some intent
+        | _ -> None)
       |> FSharp.Control.Reactive.Observable.subscribe(fun intent ->
         if not this.Visible then
           ()
@@ -904,7 +903,12 @@ module DebugRender =
         | _ -> ())
       |> subscriptions.Add
 
-      eventBus.GetObservableFor<SystemCommunications.ProjectileImpacted>()
+      eventBus.Observable
+      |> FSharp.Control.Reactive.Observable.choose(fun e ->
+        match e with
+        | GameEvent.Lifecycle(LifecycleEvent.ProjectileImpacted impact) ->
+          Some impact
+        | _ -> None)
       |> FSharp.Control.Reactive.Observable.subscribe(fun impact ->
         if not this.Visible then
           ()
@@ -978,17 +982,15 @@ module DebugRender =
         totalEntities <- 0
         visibleEntities <- 0
       else
-        // Prune expired transient commands (moved from Draw)
-        let activeTransient = ResizeArray()
-
-        for struct (cmd, duration) in transientCommands do
+        // Prune expired transient commands in-place (backwards to avoid index shifting)
+        for i = transientCommands.Count - 1 downto 0 do
+          let struct (cmd, duration) = transientCommands.[i]
           let newDuration = duration - gameTime.ElapsedGameTime
 
           if newDuration > TimeSpan.Zero then
-            activeTransient.Add struct (cmd, newDuration)
-
-        transientCommands.Clear()
-        transientCommands.AddRange activeTransient
+            transientCommands.[i] <- struct (cmd, newDuration)
+          else
+            transientCommands.RemoveAt(i)
 
     override _.Draw gameTime =
 

@@ -23,6 +23,7 @@ module UnitMovement =
 
     let (Core core) = env.CoreServices
     let (Gameplay gameplay) = env.GameplayServices
+    let stateWrite = core.StateWrite
 
     // Mutable state to track last known velocities to avoid spamming events
     let lastVelocities =
@@ -54,7 +55,11 @@ module UnitMovement =
       base.Initialize()
 
       sub <-
-        core.EventBus.GetObservableFor<SystemCommunications.CollisionEvents>()
+        core.EventBus.Observable
+        |> Observable.choose(fun e ->
+          match e with
+          | GameEvent.Collision(collision) -> Some collision
+          | _ -> None)
         |> Observable.subscribe(fun e -> collisionEvents.Enqueue(e))
 
 
@@ -181,13 +186,14 @@ module UnitMovement =
                 MovementLogic.handleMovingAlongPath currentPos path speed mtv
               with
               | MovementLogic.Arrived ->
-                MovementLogic.notifyArrived entityId core.EventBus
+                MovementLogic.notifyArrived entityId stateWrite core.EventBus
                 lastVelocities[entityId] <- Vector2.Zero
                 currentPaths.Remove(entityId) |> ignore
               | MovementLogic.WaypointReached remaining ->
                 MovementLogic.notifyWaypointReached
                   entityId
                   remaining
+                  stateWrite
                   core.EventBus
               | MovementLogic.Moving finalVel ->
                 let lastVel =
@@ -200,14 +206,14 @@ module UnitMovement =
                     entityId
                     finalVel
                     lastVel
-                    core.EventBus
+                    stateWrite
 
             | MovingTo target ->
               match
                 MovementLogic.handleMovingTo currentPos target speed mtv
               with
               | MovementLogic.Arrived ->
-                MovementLogic.notifyArrived entityId core.EventBus
+                MovementLogic.notifyArrived entityId stateWrite core.EventBus
                 lastVelocities[entityId] <- Vector2.Zero
                 currentPaths.Remove(entityId) |> ignore
               | MovementLogic.Moving finalVel ->
@@ -221,7 +227,7 @@ module UnitMovement =
                     entityId
                     finalVel
                     lastVel
-                    core.EventBus
+                    stateWrite
               | _ -> ()
 
             | Idle ->
@@ -234,7 +240,7 @@ module UnitMovement =
                     entityId
                     Vector2.Zero
                     lastVelocities[entityId]
-                    core.EventBus
+                    stateWrite
 
               currentPaths.Remove(entityId) |> ignore
           | ValueNone -> ()

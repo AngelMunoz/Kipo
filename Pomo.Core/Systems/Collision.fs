@@ -18,6 +18,7 @@ open Pomo.Core.Systems.Systems
 
 module Collision =
   open Pomo.Core.Domain
+  open Pomo.Core.Domain.World
 
   // Helper to get entities in nearby cells
   let private neighborOffsets = [|
@@ -113,6 +114,7 @@ module Collision =
     let (Core core) = env.CoreServices
     let (Stores stores) = env.StoreServices
     let (Gameplay gameplay) = env.GameplayServices
+    let stateWrite = env.CoreServices.StateWrite
 
     let spawnTerrainImpactEffect (vfxId: string) (pos: Vector2) =
       match stores.ParticleStore.tryFind vfxId with
@@ -299,14 +301,16 @@ module Collision =
                 // Simple radius check
                 if distance < Core.Constants.Entity.CollisionDistance then
                   core.EventBus.Publish(
-                    SystemCommunications.EntityCollision
-                      struct (entityId, otherId)
+                    GameEvent.Collision(
+                      SystemCommunications.EntityCollision
+                        struct (entityId, otherId)
+                    )
                   )
               | ValueNone -> ()
 
         // Check for map object collisions per scenario
         // Get dependencies for CCD
-        let velocities = core.World.Velocities |> AMap.force
+        let velocities = core.World.Velocities
         let time = core.World.Time |> AVal.force
         let dt = float32 time.Delta.TotalSeconds
 
@@ -333,9 +337,8 @@ module Collision =
             | ValueNone -> true // Non-projectiles always check walls
 
           if shouldCheckWalls then
-            // 1. Reconstruct Start Position
             let startPos =
-              match velocities |> HashMap.tryFindV entityId with
+              match velocities.TryFindV entityId with
               | ValueSome v -> targetPos - (v * dt)
               | ValueNone -> targetPos
 
@@ -427,12 +430,13 @@ module Collision =
                     match processHitResult findObj cacheKey mtv with
                     | TriggerHit portalData ->
                       core.EventBus.Publish(
-                        {
-                          EntityId = entityId
-                          TargetMap = portalData.TargetMap
-                          TargetSpawn = portalData.TargetSpawn
-                        }
-                        : SystemCommunications.PortalTravel
+                        GameEvent.Intent(
+                          IntentEvent.Portal {
+                            EntityId = entityId
+                            TargetMap = portalData.TargetMap
+                            TargetSpawn = portalData.TargetSpawn
+                          }
+                        )
                       )
                     | WallHit(wallMtv, obj) ->
                       iterationMTV <- iterationMTV + wallMtv
@@ -471,18 +475,21 @@ module Collision =
                   | ValueNone -> ()
                 | ValueNone -> ()
 
-                core.EventBus.Publish(impact)
-                core.EventBus.Publish(EntityLifecycle(Removed entityId))
-              | ValueNone ->
-                // Regular entity - apply position correction and sliding
                 core.EventBus.Publish(
-                  Physics(PositionChanged struct (entityId, currentPos))
+                  GameEvent.Lifecycle(LifecycleEvent.ProjectileImpacted impact)
                 )
+
+                stateWrite.RemoveEntity(entityId)
+              | ValueNone ->
+                // Regular entity - apply position correction using StateWriteService
+                stateWrite.UpdatePosition(entityId, currentPos)
 
                 match lastCollidedObj with
                 | ValueSome obj ->
                   core.EventBus.Publish(
-                    SystemCommunications.MapObjectCollision
-                      struct (entityId, obj, totalMTV)
+                    GameEvent.Collision(
+                      SystemCommunications.MapObjectCollision
+                        struct (entityId, obj, totalMTV)
+                    )
                   )
                 | ValueNone -> ()

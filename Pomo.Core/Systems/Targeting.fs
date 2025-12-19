@@ -70,6 +70,7 @@ module Targeting =
   [<Struct>]
   type HandleSelectedTargetArgs = {
     eventBus: EventBus
+    stateWrite: IStateWriteService
     skillBeingTargeted: Skill voption aval
     currentAction:
       struct (cval<Guid<EntityId> voption> * cval<GameAction voption>)
@@ -90,6 +91,7 @@ module Targeting =
 
     let handleTargetEntity
       (eventBus: EventBus)
+      (stateWrite: IStateWriteService)
       (positions: HashMap<Guid<EntityId>, Vector2>)
       (skill: ActiveSkill)
       (casterId: Guid<EntityId>)
@@ -108,30 +110,28 @@ module Targeting =
             targetPos - direction * (maxRange - SKILL_ACTIVATION_RANGE_BUFFER)
 
           eventBus.Publish(
-            {
-              EntityId = casterId
-              Target = moveTarget
-            }
-            : SystemCommunications.SetMovementTarget
+            GameEvent.Intent(
+              IntentEvent.MovementTarget {
+                EntityId = casterId
+                Target = moveTarget
+              }
+            )
           )
 
-          eventBus.Publish(
-            Combat(
-              PendingSkillCastSet(
-                casterId,
-                skill.Id,
-                SystemCommunications.TargetEntity targetId
-              )
-            )
+          stateWrite.SetPendingSkillCast(
+            casterId,
+            skill.Id,
+            SystemCommunications.TargetEntity targetId
           )
         else
           eventBus.Publish(
-            {
-              Caster = casterId
-              SkillId = skill.Id
-              Target = SystemCommunications.TargetEntity targetId
-            }
-            : SystemCommunications.AbilityIntent
+            GameEvent.Intent(
+              IntentEvent.Ability {
+                Caster = casterId
+                SkillId = skill.Id
+                Target = SystemCommunications.TargetEntity targetId
+              }
+            )
           )
 
     let handleTargetDirection
@@ -149,16 +149,18 @@ module Targeting =
         // as the skill originates from the caster.
         // We just fire the intent immediately.
         eventBus.Publish(
-          {
-            Caster = casterId
-            SkillId = skill.Id
-            Target = SystemCommunications.TargetDirection targetPos
-          }
-          : SystemCommunications.AbilityIntent
+          GameEvent.Intent(
+            IntentEvent.Ability {
+              Caster = casterId
+              SkillId = skill.Id
+              Target = SystemCommunications.TargetDirection targetPos
+            }
+          )
         )
 
     let handleTargetPosition
       (eventBus: EventBus)
+      (stateWrite: IStateWriteService)
       (positions: HashMap<Guid<EntityId>, Vector2>)
       (skill: ActiveSkill)
       (casterId: Guid<EntityId>)
@@ -178,30 +180,28 @@ module Targeting =
             targetPos - direction * (maxRange - SKILL_ACTIVATION_RANGE_BUFFER)
 
           eventBus.Publish(
-            {
-              EntityId = casterId
-              Target = moveTarget
-            }
-            : SystemCommunications.SetMovementTarget
+            GameEvent.Intent(
+              IntentEvent.MovementTarget {
+                EntityId = casterId
+                Target = moveTarget
+              }
+            )
           )
 
-          eventBus.Publish(
-            StateChangeEvent.Combat(
-              CombatEvents.PendingSkillCastSet(
-                casterId,
-                skill.Id,
-                SystemCommunications.TargetPosition targetPos
-              )
-            )
+          stateWrite.SetPendingSkillCast(
+            casterId,
+            skill.Id,
+            SystemCommunications.TargetPosition targetPos
           )
         else
           eventBus.Publish(
-            {
-              Caster = casterId
-              SkillId = skill.Id
-              Target = SystemCommunications.TargetPosition targetPos
-            }
-            : SystemCommunications.AbilityIntent
+            GameEvent.Intent(
+              IntentEvent.Ability {
+                Caster = casterId
+                SkillId = skill.Id
+                Target = SystemCommunications.TargetPosition targetPos
+              }
+            )
           )
 
   let handleTargetSelected
@@ -211,6 +211,7 @@ module Targeting =
     =
     let {
           eventBus = eventBus
+          stateWrite = stateWrite
           skillBeingTargeted = skillBeingTargeted
           currentAction = _entityId, _action
         } =
@@ -236,6 +237,7 @@ module Targeting =
             | TargetEntity, SelectedEntity targetId ->
               TargetingHandlers.handleTargetEntity
                 eventBus
+                stateWrite
                 positions
                 activeSkill
                 casterId
@@ -243,6 +245,7 @@ module Targeting =
             | TargetPosition, SelectedPosition targetPos ->
               TargetingHandlers.handleTargetPosition
                 eventBus
+                stateWrite
                 positions
                 activeSkill
                 casterId
@@ -273,6 +276,7 @@ module Targeting =
   let create
     (
       eventBus: EventBus,
+      stateWrite: IStateWriteService,
       skillStore: SkillStore,
       projections: Projections.ProjectionService
     ) =
@@ -295,6 +299,7 @@ module Targeting =
       handleTargetSelected
         {
           eventBus = eventBus
+          stateWrite = stateWrite
           skillBeingTargeted = skillBeingTargeted
           currentAction = struct (_entityId, _action)
         }
@@ -307,22 +312,32 @@ module Targeting =
 
         member _.StartListening() =
           let sub1 =
-            eventBus.GetObservableFor<SystemCommunications.SlotActivated>()
+            eventBus.Observable
+            |> Observable.choose(fun e ->
+              match e with
+              | GameEvent.Intent(IntentEvent.SlotActivated slot) -> Some slot
+              | _ -> None)
             |> Observable.subscribe(fun event ->
               transact(fun () ->
                 _action.Value <- ValueSome event.Slot
                 _entityId.Value <- ValueSome event.CasterId))
 
           let sub2 =
-            eventBus.GetObservableFor<SystemCommunications.TargetSelected>()
+            eventBus.Observable
+            |> Observable.choose(fun e ->
+              match e with
+              | GameEvent.Intent(IntentEvent.TargetSelection target) ->
+                Some target
+              | _ -> None)
             |> Observable.subscribe(fun event ->
               handleSelected(event.Selector, event.Selection))
 
           let sub3 =
-            eventBus.GetObservableFor<StateChangeEvent>()
-            |> Observable.choose(fun event ->
-              match event with
-              | Input(RawStateChanged struct (_, rawInput)) -> Some rawInput
+            eventBus.Observable
+            |> Observable.choose(fun e ->
+              match e with
+              | GameEvent.State(Input(RawStateChanged struct (_, rawInput))) ->
+                Some rawInput
               | _ -> None)
             |> Observable.subscribe(fun rawInput ->
               let currentTargetingMode = targetingMode |> AVal.force

@@ -4,6 +4,7 @@ open System
 open FSharp.UMX
 open FSharp.Data.Adaptive
 open Microsoft.Xna.Framework
+open Pomo.Core
 open Pomo.Core.Domain
 open Pomo.Core.Domain.AI
 open Pomo.Core.Domain.Core
@@ -11,6 +12,7 @@ open Pomo.Core.Domain.Entity
 open Pomo.Core.Domain.Events
 open Pomo.Core.Domain.Units
 open Pomo.Core.Domain.World
+open Pomo.Core.Projections
 open Pomo.Core.Stores
 open Pomo.Core.EventBus
 
@@ -197,12 +199,23 @@ module Perception =
     (controllerFactions: Faction HashSet)
     (targetFactions: Faction HashSet)
     =
-    let isEnemy = controllerFactions.Contains Enemy
-    let isAlly = controllerFactions.Contains Ally
-    let targetIsPlayer = targetFactions.Contains Player
-    let targetIsAlly = targetFactions.Contains Ally
-    let targetIsEnemy = targetFactions.Contains Enemy
-    isEnemy && (targetIsPlayer || targetIsAlly) || isAlly && targetIsEnemy
+    // Rule 1: Same faction NEVER attacks same faction
+    let hasOverlap = controllerFactions |> Seq.exists targetFactions.Contains
+
+    if hasOverlap then
+      false
+    else
+      // Rule 2: Ally and Player don't attack each other
+      let isAllyOrPlayer =
+        controllerFactions.Contains Ally || controllerFactions.Contains Player
+
+      let targetIsAllyOrPlayer =
+        targetFactions.Contains Ally || targetFactions.Contains Player
+
+      if isAllyOrPlayer && targetIsAllyOrPlayer then
+        false
+      else
+        true // All other combinations are hostile
 
   let isInFieldOfView
     (facingDir: Vector2)
@@ -1232,7 +1245,7 @@ type AISystem(game: Game, env: PomoEnvironment) =
       match velocitiesOpt with
       | ValueSome v -> v
       | ValueNone ->
-        let v = core.World.Velocities |> AMap.force
+        let v = core.World.Velocities |> Dictionary.toHashMap
         velocitiesOpt <- ValueSome v
         v
 
@@ -1331,17 +1344,22 @@ type AISystem(game: Game, env: PomoEnvironment) =
                 (getCooldowns())
 
             match command with
-            | ValueSome cmd -> core.EventBus.Publish cmd
+            | ValueSome cmd ->
+              core.EventBus.Publish(
+                GameEvent.Intent(IntentEvent.MovementTarget cmd)
+              )
             | ValueNone -> ()
 
             match abilityIntent with
-            | ValueSome intent -> core.EventBus.Publish intent
+            | ValueSome intent ->
+              core.EventBus.Publish(
+                GameEvent.Intent(IntentEvent.Ability intent)
+              )
             | ValueNone -> ()
 
             if updatedController <> controller then
-              core.EventBus.Publish(
-                StateChangeEvent.AI(
-                  ControllerUpdated struct (controllerId, updatedController)
-                )
+              core.StateWrite.UpdateAIController(
+                controllerId,
+                updatedController
               )
           | _ -> ()

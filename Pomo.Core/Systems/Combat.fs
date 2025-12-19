@@ -19,6 +19,7 @@ open Pomo.Core.Systems.DamageCalculator
 
 module Combat =
   open System.Reactive.Disposables
+  open Pomo.Core.Environment
 
   [<Struct>]
   type EntityContext = {
@@ -32,6 +33,7 @@ module Combat =
     Time: Time
     Rng: Random
     EventBus: EventBus
+    StateWrite: IStateWriteService
     EntityContext: EntityContext
     SearchContext: Spatial.Search.SearchContext
     SkillStore: Stores.SkillStore
@@ -257,36 +259,40 @@ module Combat =
 
       if result.IsEvaded then
         ctx.EventBus.Publish(
-          {
-            Message = "Miss"
-            Position = targetPos
-          }
-          : SystemCommunications.ShowNotification
+          GameEvent.Notification(
+            NotificationEvent.ShowMessage {
+              Message = "Miss"
+              Position = targetPos
+            }
+          )
         )
       else
         ctx.EventBus.Publish(
-          {
-            Target = targetId
-            Amount = result.Amount
-          }
-          : SystemCommunications.DamageDealt
+          GameEvent.Notification(
+            NotificationEvent.DamageDealt {
+              Target = targetId
+              Amount = result.Amount
+            }
+          )
         )
 
         ctx.EventBus.Publish(
-          {
-            Message = $"-{result.Amount}"
-            Position = targetPos
-          }
-          : SystemCommunications.ShowNotification
+          GameEvent.Notification(
+            NotificationEvent.ShowMessage {
+              Message = $"-{result.Amount}"
+              Position = targetPos
+            }
+          )
         )
 
         if result.IsCritical then
           ctx.EventBus.Publish(
-            {
-              Message = "Crit!"
-              Position = targetPos
-            }
-            : SystemCommunications.ShowNotification
+            GameEvent.Notification(
+              NotificationEvent.ShowMessage {
+                Message = "Crit!"
+                Position = targetPos
+              }
+            )
           )
 
         for effect in activeSkill.Effects do
@@ -296,7 +302,9 @@ module Combat =
             Effect = effect
           }
 
-          ctx.EventBus.Publish intent
+          ctx.EventBus.Publish(
+            GameEvent.Intent(IntentEvent.EffectApplication intent)
+          )
 
     let applyResourceCost
       (ctx: WorldContext)
@@ -329,11 +337,7 @@ module Combat =
                     MP = currentResources.MP - requiredAmount
               }
 
-        ctx.EventBus.Publish(
-          StateChangeEvent.Combat(
-            CombatEvents.ResourcesChanged struct (casterId, newResources)
-          )
-        )
+        ctx.StateWrite.UpdateResources(casterId, newResources)
       | ValueNone -> ()
 
     let applyCooldown
@@ -354,11 +358,7 @@ module Combat =
         let readyTime = totalGameTime + cd
         let newCooldowns = currentCooldowns.Add(skillId, readyTime)
 
-        ctx.EventBus.Publish(
-          StateChangeEvent.Combat(
-            CombatEvents.CooldownsChanged struct (casterId, newCooldowns)
-          )
-        )
+        ctx.StateWrite.UpdateCooldowns(casterId, newCooldowns)
       | ValueNone -> ()
 
 
@@ -421,21 +421,20 @@ module Combat =
                   formula
 
               Some(
-                {
-                  Amount = changeAmount
-                  ResourceType = resource
-                  Target = intent.TargetEntity
-                }
-                : SystemCommunications.ResourceRestored
+                GameEvent.Notification(
+                  NotificationEvent.ResourceRestored {
+                    Amount = changeAmount
+                    ResourceType = resource
+                    Target = intent.TargetEntity
+                  }
+                )
               )
             | _ -> None)
 
         for resourceChangeEvent in totalResourceChangeFromModifiers do
           ctx.EventBus.Publish resourceChangeEvent
 
-        ctx.EventBus.Publish(
-          EffectExpired struct (intent.TargetEntity, intent.ActiveEffectId)
-        )
+        ctx.StateWrite.ExpireEffect(intent.TargetEntity, intent.ActiveEffectId)
       | _ -> ()
 
     let handleEffectDamageIntent
@@ -464,22 +463,24 @@ module Combat =
 
         if totalDamage > 0 then
           ctx.EventBus.Publish(
-            {
-              Target = intent.TargetEntity
-              Amount = totalDamage
-            }
-            : SystemCommunications.DamageDealt
+            GameEvent.Notification(
+              NotificationEvent.DamageDealt {
+                Target = intent.TargetEntity
+                Amount = totalDamage
+              }
+            )
           )
 
           let targetPos =
             Targeting.getPosition ctx.EntityContext intent.TargetEntity
 
           ctx.EventBus.Publish(
-            {
-              Message = $"-{totalDamage}"
-              Position = targetPos
-            }
-            : SystemCommunications.ShowNotification
+            GameEvent.Notification(
+              NotificationEvent.ShowMessage {
+                Message = $"-{totalDamage}"
+                Position = targetPos
+              }
+            )
           )
       | _ -> ()
 
@@ -526,9 +527,10 @@ module Combat =
             Info = projectileInfo
           }
 
-          ctx.EventBus.Publish(
-            StateChangeEvent.CreateProjectile
-              struct (projectileId, liveProjectile, ValueNone)
+          ctx.StateWrite.CreateProjectile(
+            projectileId,
+            liveProjectile,
+            ValueNone
           )
       else
         // Fallback to single target logic
@@ -544,9 +546,10 @@ module Combat =
             Info = projectileInfo
           }
 
-          ctx.EventBus.Publish(
-            StateChangeEvent.CreateProjectile
-              struct (projectileId, liveProjectile, ValueNone)
+          ctx.StateWrite.CreateProjectile(
+            projectileId,
+            liveProjectile,
+            ValueNone
           )
         | SystemCommunications.TargetPosition targetPos ->
           // Position-targeted projectile (e.g., falling boulder)
@@ -560,9 +563,10 @@ module Combat =
           }
 
           // Start projectile at caster position
-          ctx.EventBus.Publish(
-            StateChangeEvent.CreateProjectile
-              struct (projectileId, liveProjectile, ValueNone)
+          ctx.StateWrite.CreateProjectile(
+            projectileId,
+            liveProjectile,
+            ValueNone
           )
         | _ -> ()
 
@@ -796,19 +800,21 @@ module Combat =
 
           if result.IsEvaded then
             ctx.EventBus.Publish(
-              {
-                Message = "Miss"
-                Position = targetPos
-              }
-              : SystemCommunications.ShowNotification
+              GameEvent.Notification(
+                NotificationEvent.ShowMessage {
+                  Message = "Miss"
+                  Position = targetPos
+                }
+              )
             )
           else
             ctx.EventBus.Publish(
-              {
-                Target = targetId
-                Amount = result.Amount
-              }
-              : SystemCommunications.DamageDealt
+              GameEvent.Notification(
+                NotificationEvent.DamageDealt {
+                  Target = targetId
+                  Amount = result.Amount
+                }
+              )
             )
 
             let baseMessage = $"-{result.Amount}"
@@ -821,30 +827,33 @@ module Combat =
             let finalMessage = baseMessage + debugText
 
             ctx.EventBus.Publish(
-              {
-                Message = finalMessage
-                Position = targetPos
-              }
-              : SystemCommunications.ShowNotification
+              GameEvent.Notification(
+                NotificationEvent.ShowMessage {
+                  Message = finalMessage
+                  Position = targetPos
+                }
+              )
             )
 
             if result.IsCritical then
               ctx.EventBus.Publish(
-                {
-                  Message = "Crit!"
-                  Position = targetPos
-                }
-                : SystemCommunications.ShowNotification
+                GameEvent.Notification(
+                  NotificationEvent.ShowMessage {
+                    Message = "Crit!"
+                    Position = targetPos
+                  }
+                )
               )
 
             for effect in skill.Effects do
               ctx.EventBus.Publish(
-                {
-                  SourceEntity = impact.CasterId
-                  TargetEntity = targetId
-                  Effect = effect
-                }
-                : SystemCommunications.EffectApplicationIntent
+                GameEvent.Intent(
+                  IntentEvent.EffectApplication {
+                    SourceEntity = impact.CasterId
+                    TargetEntity = targetId
+                    Effect = effect
+                  }
+                )
               )
       | _ -> () // Skill not found
 
@@ -903,6 +912,7 @@ module Combat =
             Rng = core.World.Rng
             Time = core.World.Time |> AVal.force
             EventBus = eventBus
+            StateWrite = core.StateWrite
             SearchContext = searchCtx
             EntityContext = entityContext
             SkillStore = skillStore
@@ -911,7 +921,11 @@ module Combat =
           }
         | ValueNone -> ValueNone
 
-      eventBus.GetObservableFor<SystemCommunications.AbilityIntent>()
+      eventBus.Observable
+      |> Observable.choose(fun e ->
+        match e with
+        | GameEvent.Intent(IntentEvent.Ability intent) -> Some intent
+        | _ -> None)
       |> Observable.subscribe(fun event ->
         match createCtx event.Caster with
         | ValueSome ctx ->
@@ -923,21 +937,34 @@ module Combat =
         | ValueNone -> ())
       |> subscriptions.Add
 
-      eventBus.GetObservableFor<SystemCommunications.ProjectileImpacted>()
+      eventBus.Observable
+      |> Observable.choose(fun e ->
+        match e with
+        | GameEvent.Lifecycle(LifecycleEvent.ProjectileImpacted impact) ->
+          Some impact
+        | _ -> None)
       |> Observable.subscribe(fun event ->
         match createCtx event.CasterId with
         | ValueSome ctx -> Handlers.handleProjectileImpact ctx event
         | ValueNone -> ())
       |> subscriptions.Add
 
-      eventBus.GetObservableFor<SystemCommunications.EffectDamageIntent>()
+      eventBus.Observable
+      |> Observable.choose(fun e ->
+        match e with
+        | GameEvent.Intent(IntentEvent.EffectDamage intent) -> Some intent
+        | _ -> None)
       |> Observable.subscribe(fun event ->
         match createCtx event.SourceEntity with
         | ValueSome ctx -> Handlers.handleEffectDamageIntent ctx event
         | ValueNone -> ())
       |> subscriptions.Add
 
-      eventBus.GetObservableFor<SystemCommunications.EffectResourceIntent>()
+      eventBus.Observable
+      |> Observable.choose(fun e ->
+        match e with
+        | GameEvent.Intent(IntentEvent.EffectResource intent) -> Some intent
+        | _ -> None)
       |> Observable.subscribe(fun event ->
         match createCtx event.SourceEntity with
         | ValueSome ctx -> Handlers.handleEffectResourceIntent ctx event

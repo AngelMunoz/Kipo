@@ -33,6 +33,7 @@ open Pomo.Core.Systems.Projectile
 open Pomo.Core.Systems.DebugRender
 open Pomo.Core.Systems.ResourceManager
 open Pomo.Core.Systems.EntitySpawnerLogic
+open Pomo.Core.Systems.StateWrite
 
 open Pomo.Core.Domain.Scenes
 
@@ -124,6 +125,7 @@ module CompositionRoot =
       // 1. Create World and Local EventBus
       let eventBus = new EventBus()
       let struct (mutableWorld, worldView) = World.create scope.Random
+      let stateWriteService = StateWrite.create mutableWorld
 
       // 2. Create Gameplay Services
       let projections =
@@ -142,15 +144,22 @@ module CompositionRoot =
         )
 
       let targetingService =
-        Targeting.create(eventBus, scope.Stores.SkillStore, projections)
+        Targeting.create(
+          eventBus,
+          stateWriteService,
+          scope.Stores.SkillStore,
+          projections
+        )
 
       // 3. Create Listeners
-      let effectApplication = EffectApplication.create(worldView, eventBus)
+      let effectApplication =
+        EffectApplication.create(worldView, stateWriteService, eventBus)
 
       let actionHandler =
         ActionHandler.create(
           worldView,
           eventBus,
+          stateWriteService,
           targetingService,
           projections,
           cameraService,
@@ -158,12 +167,23 @@ module CompositionRoot =
         )
 
       let navigationService =
-        Navigation.create(eventBus, scope.Stores.MapStore, projections)
+        Navigation.create(
+          eventBus,
+          stateWriteService,
+          scope.Stores.MapStore,
+          projections
+        )
 
       let inventoryService =
-        Inventory.create(eventBus, scope.Stores.ItemStore, worldView)
+        Inventory.create(
+          eventBus,
+          scope.Stores.ItemStore,
+          worldView,
+          stateWriteService
+        )
 
-      let equipmentService = Equipment.create worldView eventBus
+      let equipmentService =
+        Equipment.create worldView eventBus stateWriteService
 
       // 4. Construct PomoEnvironment (Local Scope)
       let pomoEnv =
@@ -172,6 +192,7 @@ module CompositionRoot =
               { new CoreServices with
                   member _.EventBus = eventBus
                   member _.World = worldView
+                  member _.StateWrite = stateWriteService
                   member _.Random = scope.Random
                   member _.UIService = scope.UIService
               }
@@ -219,13 +240,12 @@ module CompositionRoot =
       baseComponents.Add(new AnimationSystem(game, pomoEnv))
       baseComponents.Add(new ParticleSystem.ParticleSystem(game, pomoEnv))
       baseComponents.Add(new MotionStateAnimationSystem(game, pomoEnv))
-      baseComponents.Add(new StateUpdateSystem(game, pomoEnv, mutableWorld))
 
       // Map Dependent Systems (Renderers)
       let mapDependentComponents = new ResizeArray<IGameComponent>()
 
       let clearCurrentMapData() =
-        eventBus.Publish(EntityLifecycle(Removed playerId))
+        stateWriteService.RemoveEntity(playerId)
 
       // Initialize WorldMapService
       let worldMapService =
@@ -244,7 +264,8 @@ module CompositionRoot =
         let mapEntityGroupStore =
           MapSpawning.tryLoadMapEntityGroupStore mapDef.Key
 
-        let candidates = MapSpawning.extractSpawnCandidates mapDef scope.Random
+        let candidates =
+          MapSpawning.extractSpawnCandidates mapDef scope.Random |> Seq.toArray
 
         let playerPos =
           MapSpawning.findPlayerSpawnPosition targetSpawn candidates
@@ -257,44 +278,33 @@ module CompositionRoot =
           Position = playerPos
         }
 
-        eventBus.Publish playerIntent
+        eventBus.Publish(
+          GameEvent.Spawn(SpawningEvent.SpawnEntity playerIntent)
+        )
 
-        // Spawn enemies
-        let mutable enemyCount = 0
+        // Spawn enemies using MapSpawning module
+        let spawnCtx: MapSpawning.SpawnContext = {
+          Random = scope.Random
+          MapEntityGroupStore = mapEntityGroupStore
+          EntityStore = scope.Stores.AIEntityStore
+          ScenarioId = scenarioId
+          MaxEnemies = maxEnemies
+        }
 
-        let enemyCandidates =
-          candidates |> Seq.filter(fun c -> not c.IsPlayerSpawn)
+        let publisher: MapSpawning.SpawnEventPublisher = {
+          RegisterZones =
+            fun zones ->
+              eventBus.Publish(
+                GameEvent.Spawn(SpawningEvent.RegisterZones zones)
+              )
+          SpawnEntity =
+            fun entity ->
+              eventBus.Publish(
+                GameEvent.Spawn(SpawningEvent.SpawnEntity entity)
+              )
+        }
 
-        for candidate in enemyCandidates do
-          if enemyCount < maxEnemies then
-            let enemyId = Guid.NewGuid() |> UMX.tag
-
-            let entityDefKey, archetypeId, mapOverride =
-              match candidate.EntityGroup with
-              | ValueSome groupName ->
-                MapSpawning.resolveEntityFromGroup
-                  scope.Random
-                  mapEntityGroupStore
-                  scope.Stores.AIEntityStore
-                  groupName
-              | ValueNone ->
-                let id = if enemyCount % 2 = 0 then %1 else %2
-                ValueNone, id, ValueNone
-
-            let enemyIntent: SystemCommunications.SpawnEntityIntent = {
-              EntityId = enemyId
-              ScenarioId = scenarioId
-              Type =
-                SystemCommunications.SpawnType.Enemy(
-                  archetypeId,
-                  entityDefKey,
-                  mapOverride
-                )
-              Position = candidate.Position
-            }
-
-            eventBus.Publish enemyIntent
-            enemyCount <- enemyCount + 1
+        MapSpawning.spawnEnemiesForScenario spawnCtx candidates publisher
 
       // TODO: MapDependentSystems should be monitoring the
       // ScenarioState which should include the map data
@@ -354,7 +364,11 @@ module CompositionRoot =
 
       // Bridge EventBus to SceneTransitionSubject
       subs.Add(
-        eventBus.GetObservableFor<SystemCommunications.SceneTransition>()
+        eventBus.Observable
+        |> Observable.choose(fun e ->
+          match e with
+          | GameEvent.Scene(SceneEvent.Transition t) -> Some t
+          | _ -> None)
         |> Observable.subscribe(fun event ->
           sceneTransitionSubject.OnNext event.Scene)
       )
@@ -373,7 +387,11 @@ module CompositionRoot =
 
       // Handle Portal Travel
       subs.Add(
-        eventBus.GetObservableFor<SystemCommunications.PortalTravel>()
+        eventBus.Observable
+        |> Observable.choose(fun e ->
+          match e with
+          | GameEvent.Intent(IntentEvent.Portal intent) -> Some intent
+          | _ -> None)
         |> Observable.subscribe(fun event ->
           if event.EntityId = playerId then
             // Trigger Scene Transition instead of local loadMap
@@ -395,6 +413,9 @@ module CompositionRoot =
                   Previous = previous
                 })
 
+              // Flush ring buffer events to subscribers
+              eventBus.FlushToObservable()
+
               hudDesktop
               |> ValueOption.iter(fun d ->
                 scope.UIService.SetMouseOverUI d.IsMouseOverGUI)
@@ -410,8 +431,15 @@ module CompositionRoot =
               hudDesktop |> ValueOption.iter(fun d -> d.Render())
         }
 
+      // Flush all queued state writes at the end of the frame (same timing as old StateUpdateSystem)
+      let stateWriteFlushComponent =
+        { new GameComponent(game, UpdateOrder = 1000) with
+            override _.Update(_) = stateWriteService.FlushWrites()
+        }
+
       baseComponents.Add(worldUpdateComponent)
       baseComponents.Add(hudDrawComponent)
+      baseComponents.Add(stateWriteFlushComponent)
 
       let allComponents = [
         yield! baseComponents
@@ -422,6 +450,10 @@ module CompositionRoot =
         { new IDisposable with
             member _.Dispose() =
               subs.Dispose()
+              // Dispose EventBus to release ring buffer
+              (eventBus :> IDisposable).Dispose()
+              // Dispose StateWriteService to return pooled array
+              stateWriteService.Dispose()
               hudDesktop |> ValueOption.iter(fun d -> d.Dispose())
               // Cleanup map dependent components
               for c in mapDependentComponents do
