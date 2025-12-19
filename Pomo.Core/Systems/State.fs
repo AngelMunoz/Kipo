@@ -511,8 +511,6 @@ module StateUpdate =
               Entity.updateMovementState mutableWorld mStateChanged
           | Combat event ->
             match event with
-            | ResourcesChanged resChanged ->
-              Combat.updateResources mutableWorld resChanged
             | FactionsChanged facChanged ->
               Combat.updateFactions mutableWorld facChanged
             | BaseStatsChanged statsChanged ->
@@ -521,16 +519,12 @@ module StateUpdate =
               Attributes.updateDerivedStats mutableWorld (entity, newStats)
             | EffectApplied(entity, effect) ->
               Attributes.applyEffect mutableWorld (entity, effect)
-            | CooldownsChanged cdChanged ->
-              Combat.updateCooldowns mutableWorld cdChanged
             | EffectExpired effectExpired ->
               Attributes.expireEffect mutableWorld effectExpired
             | EffectRefreshed effectRefreshed ->
               Attributes.refreshEffect mutableWorld effectRefreshed
             | EffectStackChanged effectStackChanged ->
               Attributes.changeEffectStack mutableWorld effectStackChanged
-            | InCombatTimerRefreshed entityId ->
-              Combat.updateInCombatTimer mutableWorld entityId
             | PendingSkillCastSet(entityId, skillId, target) ->
               Combat.setPendingSkillCast mutableWorld entityId skillId target
             | PendingSkillCastCleared entityId ->
@@ -657,6 +651,12 @@ module StateWrite =
 
         member _.UpdateResources(id, res) =
           buffer.Enqueue(UpdateResources(id, res))
+
+        member _.UpdateCooldowns(id, cds) =
+          buffer.Enqueue(UpdateCooldowns(id, cds))
+
+        member _.UpdateInCombatTimer(id) =
+          buffer.Enqueue(UpdateInCombatTimer id)
 
         member _.FlushWrites() =
           transact(fun () -> buffer.Flush(mutableWorld))

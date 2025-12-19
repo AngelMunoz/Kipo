@@ -36,6 +36,11 @@ module Environment =
     abstract UpdateVelocity: Guid<EntityId> * Vector2 -> unit
     abstract UpdateRotation: Guid<EntityId> * float32 -> unit
     abstract UpdateResources: Guid<EntityId> * Entity.Resource -> unit
+
+    abstract UpdateCooldowns:
+      Guid<EntityId> * HashMap<int<SkillId>, TimeSpan> -> unit
+
+    abstract UpdateInCombatTimer: Guid<EntityId> -> unit
     abstract FlushWrites: unit -> unit
 
   type CoreServices =

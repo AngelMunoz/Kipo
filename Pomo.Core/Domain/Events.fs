@@ -251,7 +251,6 @@ type PhysicsEvents =
     mStateChanged: struct (Guid<EntityId> * MovementState)
 
 type CombatEvents =
-  | ResourcesChanged of resChanged: struct (Guid<EntityId> * Resource)
   | FactionsChanged of facChanged: struct (Guid<EntityId> * Faction HashSet)
   | BaseStatsChanged of statsChanged: struct (Guid<EntityId> * BaseStats)
   | StatsChanged of entity: Guid<EntityId> * newStats: DerivedStats
@@ -260,9 +259,6 @@ type CombatEvents =
   | EffectRefreshed of effectRefreshed: struct (Guid<EntityId> * Guid<EffectId>)
   | EffectStackChanged of
     effectStackChanged: struct (Guid<EntityId> * Guid<EffectId> * int)
-  | CooldownsChanged of
-    cdChanged: struct (Guid<EntityId> * HashMap<int<SkillId>, TimeSpan>)
-  | InCombatTimerRefreshed of entityId: Guid<EntityId>
   | PendingSkillCastSet of
     entityId: Guid<EntityId> *
     skillId: int<SkillId> *

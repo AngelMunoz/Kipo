@@ -19,6 +19,7 @@ open Pomo.Core.Systems.DamageCalculator
 
 module Combat =
   open System.Reactive.Disposables
+  open Pomo.Core.Environment
 
   [<Struct>]
   type EntityContext = {
@@ -32,6 +33,7 @@ module Combat =
     Time: Time
     Rng: Random
     EventBus: EventBus
+    StateWrite: IStateWriteService
     EntityContext: EntityContext
     SearchContext: Spatial.Search.SearchContext
     SkillStore: Stores.SkillStore
@@ -335,13 +337,7 @@ module Combat =
                     MP = currentResources.MP - requiredAmount
               }
 
-        ctx.EventBus.Publish(
-          GameEvent.State(
-            StateChangeEvent.Combat(
-              CombatEvents.ResourcesChanged struct (casterId, newResources)
-            )
-          )
-        )
+        ctx.StateWrite.UpdateResources(casterId, newResources)
       | ValueNone -> ()
 
     let applyCooldown
@@ -362,13 +358,7 @@ module Combat =
         let readyTime = totalGameTime + cd
         let newCooldowns = currentCooldowns.Add(skillId, readyTime)
 
-        ctx.EventBus.Publish(
-          GameEvent.State(
-            StateChangeEvent.Combat(
-              CombatEvents.CooldownsChanged struct (casterId, newCooldowns)
-            )
-          )
-        )
+        ctx.StateWrite.UpdateCooldowns(casterId, newCooldowns)
       | ValueNone -> ()
 
 
@@ -931,6 +921,7 @@ module Combat =
             Rng = core.World.Rng
             Time = core.World.Time |> AVal.force
             EventBus = eventBus
+            StateWrite = core.StateWrite
             SearchContext = searchCtx
             EntityContext = entityContext
             SkillStore = skillStore

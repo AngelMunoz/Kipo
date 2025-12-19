@@ -507,11 +507,7 @@ module AbilityActivation =
               match skillStore.tryFind skillId with
               | ValueSome(Active skill) ->
                 if skill.Intent = Offensive then
-                  core.EventBus.Publish(
-                    GameEvent.State(
-                      StateChangeEvent.Combat(InCombatTimerRefreshed playerId)
-                    )
-                  )
+                  core.StateWrite.UpdateInCombatTimer(playerId)
 
                 match skill.Targeting with
                 | Self ->

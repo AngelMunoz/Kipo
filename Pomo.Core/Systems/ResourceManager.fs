@@ -16,10 +16,12 @@ open Pomo.Core.Systems.Systems
 
 module ResourceManager =
   open System.Reactive.Disposables
+  open Pomo.Core.Environment
 
   module private Handlers =
     let handleDamageDealt
       (world: World)
+      (stateWrite: IStateWriteService)
       (eventBus: EventBus)
       (event: SystemCommunications.DamageDealt)
       =
@@ -31,21 +33,8 @@ module ResourceManager =
         let newHP = max 0 (currentResources.HP - event.Amount)
         let newResources = { currentResources with HP = newHP }
 
-        eventBus.Publish(
-          GameEvent.State(
-            StateChangeEvent.Combat(
-              CombatEvents.ResourcesChanged struct (event.Target, newResources)
-            )
-          )
-        )
-
-        eventBus.Publish(
-          GameEvent.State(
-            StateChangeEvent.Combat(
-              CombatEvents.InCombatTimerRefreshed event.Target
-            )
-          )
-        )
+        stateWrite.UpdateResources(event.Target, newResources)
+        stateWrite.UpdateInCombatTimer(event.Target)
 
         // Emit EntityDied if HP dropped to 0 or below
         if newHP <= 0 then
@@ -67,6 +56,7 @@ module ResourceManager =
 
   let handleResourceRestored
     (world: World)
+    (stateWrite: IStateWriteService)
     (eventBus: EventBus)
     (derivedStats: amap<Guid<EntityId>, Entity.DerivedStats>)
     (event: SystemCommunications.ResourceRestored)
@@ -105,13 +95,7 @@ module ResourceManager =
           let newMP = min maxMP (currentResources.MP + event.Amount)
           { currentResources with MP = newMP }
 
-      eventBus.Publish(
-        GameEvent.State(
-          StateChangeEvent.Combat(
-            ResourcesChanged struct (event.Target, resources)
-          )
-        )
-      )
+      stateWrite.UpdateResources(event.Target, resources)
 
       eventBus.Publish(
         GameEvent.Notification(
@@ -129,10 +113,10 @@ module ResourceManager =
     open Pomo.Core.Projections
 
     let processAutoRegen
+      (stateWrite: IStateWriteService)
       (regenContexts: HashMap<Guid<EntityId>, RegenerationContext>)
       (totalGameTime: TimeSpan)
       (deltaTime: TimeSpan)
-      (eventBus: EventBus)
       (accumulators: Dictionary<Guid<EntityId>, struct (float * float)>)
       =
       for entityId, ctx in regenContexts do
@@ -171,14 +155,7 @@ module ResourceManager =
                     MP = newMP
               }
 
-              eventBus.Publish(
-                GameEvent.State(
-                  StateChangeEvent.Combat(
-                    CombatEvents.ResourcesChanged
-                      struct (entityId, newResources)
-                  )
-                )
-              )
+              stateWrite.UpdateResources(entityId, newResources)
 
   open Pomo.Core.Environment
   open Pomo.Core.Environment.Patterns
@@ -188,6 +165,7 @@ module ResourceManager =
 
     let (Core core) = env.CoreServices
     let (Gameplay gameplay) = env.GameplayServices
+    let stateWrite = core.StateWrite
 
     let subscriptions = new CompositeDisposable()
     let regenAccumulators = Dictionary<Guid<EntityId>, struct (float * float)>()
@@ -201,7 +179,7 @@ module ResourceManager =
         | GameEvent.Notification(NotificationEvent.DamageDealt dmg) -> Some dmg
         | _ -> None)
       |> Observable.subscribe(
-        Handlers.handleDamageDealt core.World core.EventBus
+        Handlers.handleDamageDealt core.World stateWrite core.EventBus
       )
       |> subscriptions.Add
 
@@ -214,6 +192,7 @@ module ResourceManager =
       |> Observable.subscribe(
         handleResourceRestored
           core.World
+          stateWrite
           core.EventBus
           gameplay.Projections.DerivedStats
       )
@@ -240,8 +219,8 @@ module ResourceManager =
         |> AVal.force
 
       Regeneration.processAutoRegen
+        stateWrite
         regenContexts
         totalGameTime
         deltaTime
-        core.EventBus
         regenAccumulators
