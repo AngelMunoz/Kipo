@@ -55,9 +55,25 @@ These events remain on the `EventBus` for side-effects (visuals, UI, clear pendi
    - Eliminated heap allocations during the high-frequency mutation loop.
 
 4. **State.fs Cleanup**:
+
    - Removed `StateUpdateSystem`.
    - Purged truly dead helper functions.
    - Preserved modular helpers (Entity, Combat, Inventory, AI) to keep `applyCommand` readable and maintainable.
+
+5. **Interface Segregation**:
+
+   - Split `IStateWriteService` into 9 semantically focused sub-interfaces:
+     - `IPhysicsWriteService` (Position, Velocity, Rotation)
+     - `IEntityLifecycleService` (RemoveEntity, ApplyEntitySpawnBundle, CreateProjectile)
+     - `IMovementWriteService`, `IInputWriteService`, `ICombatWriteService`
+     - `IEffectsWriteService`, `IInventoryWriteService`, `IAnimationWriteService`, `IAIWriteService`
+   - `IStateWriteService` inherits all sub-interfaces for backward compatibility.
+   - Enables future refactoring where systems depend only on the specific interface they need.
+
+6. **Dual-Buffer Architecture**:
+   - `NonAdaptiveBuffer`: Handles Position/Velocity/Rotation writes. Flushed **without** `transact()` since these target `Dictionary<>`.
+   - `AdaptiveBuffer`: Handles all other writes. Flushed **within** `transact()` for `cmap<>` mutations.
+   - `FlushWrites()` flushes non-adaptive first, then adaptive in a transaction.
 
 ---
 

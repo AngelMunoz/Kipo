@@ -371,13 +371,28 @@ module StateWrite =
   open System.Buffers
   open System.Collections.Generic
   open Pomo.Core.Environment
+  open System.Diagnostics
 
-  /// Commands for state mutations. Using struct to avoid heap allocations.
   [<Struct>]
-  type Command =
+  type NonAdaptiveCommand =
     | UpdatePosition of posEntityId: Guid<EntityId> * position: Vector2
     | UpdateVelocity of velEntityId: Guid<EntityId> * velocity: Vector2
     | UpdateRotation of rotEntityId: Guid<EntityId> * rotation: float32
+
+  let inline applyNonAdaptiveCommand
+    (world: MutableWorld)
+    (cmd: NonAdaptiveCommand)
+    =
+    match cmd with
+    | UpdatePosition(id, pos) ->
+      StateUpdate.Entity.updatePosition world struct (id, pos)
+    | UpdateVelocity(id, vel) ->
+      StateUpdate.Entity.updateVelocity world struct (id, vel)
+    | UpdateRotation(id, rot) ->
+      StateUpdate.Entity.updateRotation world struct (id, rot)
+
+  [<Struct>]
+  type AdaptiveCommand =
     | UpdateRawInputState of
       rawEntityId: Guid<EntityId> *
       rawState: RawInput.RawInputState
@@ -440,15 +455,8 @@ module StateWrite =
       pos: Vector2 voption
     | ApplyEntitySpawnBundle of bundle: EntitySpawnBundle
 
-  /// Apply a single command to the mutable world.
-  let inline applyCommand (world: MutableWorld) (cmd: inref<Command>) =
+  let inline applyAdaptiveCommand (world: MutableWorld) (cmd: AdaptiveCommand) =
     match cmd with
-    | UpdatePosition(id, pos) ->
-      StateUpdate.Entity.updatePosition world struct (id, pos)
-    | UpdateVelocity(id, vel) ->
-      StateUpdate.Entity.updateVelocity world struct (id, vel)
-    | UpdateRotation(id, rot) ->
-      StateUpdate.Entity.updateRotation world struct (id, rot)
     | UpdateRawInputState(id, rawState) ->
       if world.EntityExists.Contains id then
         StateUpdate.RawInput.updateState world struct (id, rawState)
@@ -507,135 +515,198 @@ module StateWrite =
       StateUpdate.Inventory.equipItem world struct (entityId, slot, instanceId)
     | UnequipItem(entityId, slot) ->
       StateUpdate.Inventory.unequipItem world struct (entityId, slot)
-    // AI
+
     | UpdateAIController(entityId, controller) ->
       StateUpdate.AI.updateController world (entityId, controller)
-    // Projectiles
+
     | CreateProjectile(entityId, proj, pos) ->
       StateUpdate.Entity.createProjectile world (entityId, proj, pos)
     | ApplyEntitySpawnBundle bundle ->
       StateUpdate.Entity.applyEntitySpawnBundle world bundle
 
-  /// Mutable command buffer using ArrayPool for zero-allocation queuing.
-  type CommandBuffer(initialCapacity: int) =
-    let pool = ArrayPool<Command>.Shared
-    let mutable commands = pool.Rent(initialCapacity)
+  type CommandBuffer<'T>
+    (initialCapacity: int, [<InlineIfLambda>] apply: MutableWorld -> 'T -> unit)
+    =
+    let pool = ArrayPool<'T>.Shared
+    let mutable commands = pool.Rent initialCapacity
     let mutable count = 0
+    let mutable lowUsageFrames = 0
 
-    member _.Enqueue(cmd: Command) =
+    member _.Enqueue(cmd: 'T) =
       if count >= commands.Length then
         let newSize = commands.Length * 2
-        let next = pool.Rent(newSize)
+        let next = pool.Rent newSize
         Array.Copy(commands, next, commands.Length)
-        pool.Return(commands)
+        pool.Return commands
         commands <- next
+        lowUsageFrames <- 0
+#if DEBUG
+        Debug.WriteLine $"CommandBuffer resized to {newSize}"
+#endif
 
       commands[count] <- cmd
       count <- count + 1
 
     member _.Flush(world: MutableWorld) =
       for i = 0 to count - 1 do
-        let mutable cmd = commands[i]
-        applyCommand world &cmd
+        let cmd = commands[i]
+        apply world cmd
+
+      if count < commands.Length / 4 && commands.Length > initialCapacity then
+        lowUsageFrames <- lowUsageFrames + 1
+
+        if lowUsageFrames > 60 then
+          let smaller = pool.Rent(max initialCapacity (commands.Length / 2))
+          pool.Return commands
+          commands <- smaller
+          lowUsageFrames <- 0
+#if DEBUG
+          Debug.WriteLine $"CommandBuffer resized to {commands.Length}"
+#endif
+      else
+        lowUsageFrames <- 0
 
       count <- 0
 
     member _.Dispose() =
-      pool.Return(commands)
+      pool.Return commands
       count <- 0
 
-  /// Create a state write service that queues writes and flushes them atomically.
   let create(mutableWorld: MutableWorld) : IStateWriteService =
-    let buffer = CommandBuffer(2048)
+    let nonAdaptiveBuffer =
+      CommandBuffer<NonAdaptiveCommand>(1024, applyNonAdaptiveCommand)
+
+    let adaptiveBuffer =
+      CommandBuffer<AdaptiveCommand>(1024, applyAdaptiveCommand)
 
     { new IStateWriteService with
+
         member _.UpdatePosition(id, pos) =
-          buffer.Enqueue(UpdatePosition(id, pos))
+          nonAdaptiveBuffer.Enqueue(NonAdaptiveCommand.UpdatePosition(id, pos))
 
         member _.UpdateVelocity(id, vel) =
-          buffer.Enqueue(UpdateVelocity(id, vel))
+          nonAdaptiveBuffer.Enqueue(NonAdaptiveCommand.UpdateVelocity(id, vel))
 
         member _.UpdateRotation(id, rot) =
-          buffer.Enqueue(UpdateRotation(id, rot))
+          nonAdaptiveBuffer.Enqueue(NonAdaptiveCommand.UpdateRotation(id, rot))
 
-        member _.RemoveEntity(id) = buffer.Enqueue(RemoveEntity(id))
 
-        member _.UpdateRawInputState(entityId, rawState) =
-          buffer.Enqueue(UpdateRawInputState(entityId, rawState))
-
-        member _.UpdateGameActionStates(entityId, actionStates) =
-          buffer.Enqueue(UpdateGameActionStates(entityId, actionStates))
-
-        member _.UpdateActiveActionSet(entityId, actionSet) =
-          buffer.Enqueue(UpdateActiveActionSet(entityId, actionSet))
-
-        member _.UpdateMovementState(entityId, movementState) =
-          buffer.Enqueue(UpdateMovementState(entityId, movementState))
-
-        member _.UpdateResources(entityId, resources) =
-          buffer.Enqueue(UpdateResources(entityId, resources))
-
-        member _.UpdateCooldowns(id, cds) =
-          buffer.Enqueue(UpdateCooldowns(id, cds))
-
-        member _.UpdateInCombatTimer(id) =
-          buffer.Enqueue(UpdateInCombatTimer id)
-
-        member _.UpdateActiveAnimations(id, anims) =
-          buffer.Enqueue(UpdateActiveAnimations(id, anims))
-
-        member _.UpdatePose(id, pose) = buffer.Enqueue(UpdatePose(id, pose))
-
-        member _.RemoveAnimationState(id) =
-          buffer.Enqueue(RemoveAnimationState id)
-
-        member _.UpdateModelConfig(id, configId) =
-          buffer.Enqueue(UpdateModelConfig(id, configId))
-
-        member _.ApplyEffect(id, effect) =
-          buffer.Enqueue(ApplyEffect(id, effect))
-
-        member _.ExpireEffect(id, effectId) =
-          buffer.Enqueue(ExpireEffect(id, effectId))
-
-        member _.RefreshEffect(id, effectId) =
-          buffer.Enqueue(RefreshEffect(id, effectId))
-
-        member _.ChangeEffectStack(id, effectId, stack) =
-          buffer.Enqueue(ChangeEffectStack(id, effectId, stack))
-
-        member _.SetPendingSkillCast(id, skillId, target) =
-          buffer.Enqueue(SetPendingSkillCast(id, skillId, target))
-
-        member _.ClearPendingSkillCast(id) =
-          buffer.Enqueue(ClearPendingSkillCast id)
-
-        member _.CreateItemInstance(instance) =
-          buffer.Enqueue(CreateItemInstance instance)
-
-        member _.UpdateItemInstance(instance) =
-          buffer.Enqueue(UpdateItemInstance instance)
-
-        member _.AddItemToInventory(entityId, instanceId) =
-          buffer.Enqueue(AddItemToInventory(entityId, instanceId))
-
-        member _.EquipItem(entityId, slot, instanceId) =
-          buffer.Enqueue(EquipItem(entityId, slot, instanceId))
-
-        member _.UnequipItem(entityId, slot) =
-          buffer.Enqueue(UnequipItem(entityId, slot))
-
-        member _.UpdateAIController(entityId, controller) =
-          buffer.Enqueue(UpdateAIController(entityId, controller))
-
-        member _.CreateProjectile(entityId, proj, pos) =
-          buffer.Enqueue(CreateProjectile(entityId, proj, pos))
+        member _.RemoveEntity(id) =
+          adaptiveBuffer.Enqueue(AdaptiveCommand.RemoveEntity(id))
 
         member _.ApplyEntitySpawnBundle(bundle) =
-          buffer.Enqueue(ApplyEntitySpawnBundle bundle)
+          adaptiveBuffer.Enqueue(AdaptiveCommand.ApplyEntitySpawnBundle bundle)
+
+        member _.CreateProjectile(entityId, proj, pos) =
+          adaptiveBuffer.Enqueue(
+            AdaptiveCommand.CreateProjectile(entityId, proj, pos)
+          )
+
+
+        member _.UpdateMovementState(entityId, movementState) =
+          adaptiveBuffer.Enqueue(
+            AdaptiveCommand.UpdateMovementState(entityId, movementState)
+          )
+
+
+        member _.UpdateRawInputState(entityId, rawState) =
+          adaptiveBuffer.Enqueue(
+            AdaptiveCommand.UpdateRawInputState(entityId, rawState)
+          )
+
+        member _.UpdateGameActionStates(entityId, actionStates) =
+          adaptiveBuffer.Enqueue(
+            AdaptiveCommand.UpdateGameActionStates(entityId, actionStates)
+          )
+
+        member _.UpdateActiveActionSet(entityId, actionSet) =
+          adaptiveBuffer.Enqueue(
+            AdaptiveCommand.UpdateActiveActionSet(entityId, actionSet)
+          )
+
+
+        member _.UpdateResources(entityId, resources) =
+          adaptiveBuffer.Enqueue(
+            AdaptiveCommand.UpdateResources(entityId, resources)
+          )
+
+        member _.UpdateCooldowns(id, cds) =
+          adaptiveBuffer.Enqueue(AdaptiveCommand.UpdateCooldowns(id, cds))
+
+        member _.UpdateInCombatTimer(id) =
+          adaptiveBuffer.Enqueue(AdaptiveCommand.UpdateInCombatTimer id)
+
+        member _.SetPendingSkillCast(id, skillId, target) =
+          adaptiveBuffer.Enqueue(
+            AdaptiveCommand.SetPendingSkillCast(id, skillId, target)
+          )
+
+        member _.ClearPendingSkillCast(id) =
+          adaptiveBuffer.Enqueue(AdaptiveCommand.ClearPendingSkillCast id)
+
+
+        member _.ApplyEffect(id, effect) =
+          adaptiveBuffer.Enqueue(AdaptiveCommand.ApplyEffect(id, effect))
+
+        member _.ExpireEffect(id, effectId) =
+          adaptiveBuffer.Enqueue(AdaptiveCommand.ExpireEffect(id, effectId))
+
+        member _.RefreshEffect(id, effectId) =
+          adaptiveBuffer.Enqueue(AdaptiveCommand.RefreshEffect(id, effectId))
+
+        member _.ChangeEffectStack(id, effectId, stack) =
+          adaptiveBuffer.Enqueue(
+            AdaptiveCommand.ChangeEffectStack(id, effectId, stack)
+          )
+
+
+        member _.CreateItemInstance(instance) =
+          adaptiveBuffer.Enqueue(AdaptiveCommand.CreateItemInstance instance)
+
+        member _.UpdateItemInstance(instance) =
+          adaptiveBuffer.Enqueue(AdaptiveCommand.UpdateItemInstance instance)
+
+        member _.AddItemToInventory(entityId, instanceId) =
+          adaptiveBuffer.Enqueue(
+            AdaptiveCommand.AddItemToInventory(entityId, instanceId)
+          )
+
+        member _.EquipItem(entityId, slot, instanceId) =
+          adaptiveBuffer.Enqueue(
+            AdaptiveCommand.EquipItem(entityId, slot, instanceId)
+          )
+
+        member _.UnequipItem(entityId, slot) =
+          adaptiveBuffer.Enqueue(AdaptiveCommand.UnequipItem(entityId, slot))
+
+
+        member _.UpdateActiveAnimations(id, anims) =
+          adaptiveBuffer.Enqueue(
+            AdaptiveCommand.UpdateActiveAnimations(id, anims)
+          )
+
+        member _.UpdatePose(id, pose) =
+          adaptiveBuffer.Enqueue(AdaptiveCommand.UpdatePose(id, pose))
+
+        member _.RemoveAnimationState(id) =
+          adaptiveBuffer.Enqueue(AdaptiveCommand.RemoveAnimationState id)
+
+        member _.UpdateModelConfig(id, configId) =
+          adaptiveBuffer.Enqueue(
+            AdaptiveCommand.UpdateModelConfig(id, configId)
+          )
+
+
+        member _.UpdateAIController(entityId, controller) =
+          adaptiveBuffer.Enqueue(
+            AdaptiveCommand.UpdateAIController(entityId, controller)
+          )
 
         member _.FlushWrites() =
-          transact(fun () -> buffer.Flush(mutableWorld))
+          nonAdaptiveBuffer.Flush mutableWorld
+          transact(fun () -> adaptiveBuffer.Flush mutableWorld)
 
-        member _.Dispose() = buffer.Dispose()
+        member _.Dispose() =
+          nonAdaptiveBuffer.Dispose()
+          adaptiveBuffer.Dispose()
     }

@@ -31,15 +31,22 @@ module Environment =
     inherit CoreEventListener
     abstract member TargetingMode: Targeting voption aval with get
 
-  /// Interface for the state write service.
-  /// Implementations queue writes and flush them at the end of the frame.
-  type IStateWriteService =
-    inherit IDisposable
+  type IPhysicsWriteService =
     abstract UpdatePosition: Guid<EntityId> * Vector2 -> unit
     abstract UpdateVelocity: Guid<EntityId> * Vector2 -> unit
     abstract UpdateRotation: Guid<EntityId> * float32 -> unit
-    abstract RemoveEntity: Guid<EntityId> -> unit
 
+  type IEntityLifecycleService =
+    abstract RemoveEntity: Guid<EntityId> -> unit
+    abstract ApplyEntitySpawnBundle: EntitySpawnBundle -> unit
+
+    abstract CreateProjectile:
+      Guid<EntityId> * LiveProjectile * Vector2 voption -> unit
+
+  type IMovementWriteService =
+    abstract UpdateMovementState: Guid<EntityId> * Events.MovementState -> unit
+
+  type IInputWriteService =
     abstract UpdateRawInputState:
       Guid<EntityId> * RawInput.RawInputState -> unit
 
@@ -48,7 +55,8 @@ module Environment =
         unit
 
     abstract UpdateActiveActionSet: Guid<EntityId> * int -> unit
-    abstract UpdateMovementState: Guid<EntityId> * Events.MovementState -> unit
+
+  type ICombatWriteService =
     abstract UpdateResources: Guid<EntityId> * Entity.Resource -> unit
 
     abstract UpdateCooldowns:
@@ -56,34 +64,46 @@ module Environment =
 
     abstract UpdateInCombatTimer: Guid<EntityId> -> unit
 
+    abstract SetPendingSkillCast:
+      Guid<EntityId> * int<SkillId> * SystemCommunications.SkillTarget -> unit
+
+    abstract ClearPendingSkillCast: Guid<EntityId> -> unit
+
+  type IEffectsWriteService =
+    abstract ApplyEffect: Guid<EntityId> * Skill.ActiveEffect -> unit
+    abstract ExpireEffect: Guid<EntityId> * Guid<EffectId> -> unit
+    abstract RefreshEffect: Guid<EntityId> * Guid<EffectId> -> unit
+    abstract ChangeEffectStack: Guid<EntityId> * Guid<EffectId> * int -> unit
+
+  type IInventoryWriteService =
+    abstract CreateItemInstance: ItemInstance -> unit
+    abstract UpdateItemInstance: ItemInstance -> unit
+    abstract AddItemToInventory: Guid<EntityId> * Guid<ItemInstanceId> -> unit
+    abstract EquipItem: Guid<EntityId> * Slot * Guid<ItemInstanceId> -> unit
+    abstract UnequipItem: Guid<EntityId> * Slot -> unit
+
+  type IAnimationWriteService =
     abstract UpdateActiveAnimations:
       Guid<EntityId> * IndexList<Animation.AnimationState> -> unit
 
     abstract UpdatePose: Guid<EntityId> * HashMap<string, Matrix> -> unit
     abstract RemoveAnimationState: Guid<EntityId> -> unit
     abstract UpdateModelConfig: Guid<EntityId> * string -> unit
-    abstract ApplyEffect: Guid<EntityId> * Skill.ActiveEffect -> unit
-    abstract ExpireEffect: Guid<EntityId> * Guid<EffectId> -> unit
-    abstract RefreshEffect: Guid<EntityId> * Guid<EffectId> -> unit
-    abstract ChangeEffectStack: Guid<EntityId> * Guid<EffectId> * int -> unit
 
-    abstract SetPendingSkillCast:
-      Guid<EntityId> * int<SkillId> * SystemCommunications.SkillTarget -> unit
-
-    abstract ClearPendingSkillCast: Guid<EntityId> -> unit
-    // Inventory
-    abstract CreateItemInstance: ItemInstance -> unit
-    abstract UpdateItemInstance: ItemInstance -> unit
-    abstract AddItemToInventory: Guid<EntityId> * Guid<ItemInstanceId> -> unit
-    abstract EquipItem: Guid<EntityId> * Slot * Guid<ItemInstanceId> -> unit
-    abstract UnequipItem: Guid<EntityId> * Slot -> unit
-    // AI
+  type IAIWriteService =
     abstract UpdateAIController: Guid<EntityId> * AI.AIController -> unit
-    // Projectiles
-    abstract CreateProjectile:
-      Guid<EntityId> * LiveProjectile * Vector2 voption -> unit
 
-    abstract ApplyEntitySpawnBundle: EntitySpawnBundle -> unit
+  type IStateWriteService =
+    inherit IDisposable
+    inherit IPhysicsWriteService
+    inherit IEntityLifecycleService
+    inherit IMovementWriteService
+    inherit IInputWriteService
+    inherit ICombatWriteService
+    inherit IEffectsWriteService
+    inherit IInventoryWriteService
+    inherit IAnimationWriteService
+    inherit IAIWriteService
     abstract FlushWrites: unit -> unit
 
   type CoreServices =
