@@ -491,14 +491,6 @@ module StateUpdate =
 
         while events.TryDequeue(&event) do
           match event with
-          | EntityLifecycle event ->
-            match event with
-            | Created created -> Entity.addEntity mutableWorld created
-            | Removed removed -> Entity.removeEntity mutableWorld removed
-            | Spawning spawning ->
-              Entity.addSpawningEntity mutableWorld spawning
-            | EntitySpawned bundle ->
-              Entity.applyEntitySpawnBundle mutableWorld bundle
           | Input event ->
             match event with
             | RawStateChanged rawIChanged ->
@@ -576,18 +568,19 @@ module StateWrite =
       projEntityId: Guid<EntityId> *
       proj: Projectile.LiveProjectile *
       pos: Vector2 voption
+    | ApplyEntitySpawnBundle of bundle: EntitySpawnBundle
 
   /// Apply a single command to the mutable world.
   let inline applyCommand (world: MutableWorld) (cmd: inref<Command>) =
     match cmd with
     | UpdatePosition(id, pos) ->
-      if world.Positions.ContainsKey id then
+      if world.EntityExists.Contains id then
         world.Positions[id] <- pos
     | UpdateVelocity(id, vel) ->
-      if world.Velocities.ContainsKey id then
+      if world.EntityExists.Contains id then
         world.Velocities[id] <- vel
     | UpdateRotation(id, rot) ->
-      if world.Positions.ContainsKey id then
+      if world.EntityExists.Contains id then
         world.Rotations[id] <- rot
     | UpdateResources(id, res) -> world.Resources[id] <- res
     | UpdateCooldowns(id, cds) -> world.AbilityCooldowns[id] <- cds
@@ -633,7 +626,7 @@ module StateWrite =
     | EquipItem(entityId, slot, instanceId) ->
       StateUpdate.Inventory.equipItem world struct (entityId, slot, instanceId)
     | UnequipItem(entityId, slot) ->
-      if world.Positions.ContainsKey entityId then
+      if world.EntityExists.Contains entityId then
         let currentEquipped =
           world.EquippedItems.TryGetValue entityId
           |> Option.defaultValue HashMap.empty
@@ -645,22 +638,36 @@ module StateWrite =
     // Projectiles
     | CreateProjectile(entityId, proj, pos) ->
       StateUpdate.Entity.createProjectile world (entityId, proj, pos)
+    | ApplyEntitySpawnBundle bundle ->
+      StateUpdate.Entity.applyEntitySpawnBundle world bundle
 
-  /// Mutable command buffer. Uses ResizeArray for simplicity.
-  /// Can optimize with ArrayPool later if profiling shows it's needed.
+  /// Mutable command buffer using ArrayPool for zero-allocation queuing.
   type CommandBuffer(initialCapacity: int) =
-    let commands = ResizeArray<Command>(initialCapacity)
+    let pool = ArrayPool<Command>.Shared
+    let mutable commands = pool.Rent(initialCapacity)
+    let mutable count = 0
 
-    member _.Enqueue(cmd: Command) = commands.Add(cmd)
+    member _.Enqueue(cmd: Command) =
+      if count >= commands.Length then
+        let newSize = commands.Length * 2
+        let next = pool.Rent(newSize)
+        Array.Copy(commands, next, commands.Length)
+        pool.Return(commands)
+        commands <- next
+
+      commands[count] <- cmd
+      count <- count + 1
 
     member _.Flush(world: MutableWorld) =
-      for i = 0 to commands.Count - 1 do
+      for i = 0 to count - 1 do
         let mutable cmd = commands[i]
         applyCommand world &cmd
 
-      commands.Clear()
+      count <- 0
 
-    member _.Dispose() = commands.Clear()
+    member _.Dispose() =
+      pool.Return(commands)
+      count <- 0
 
   /// Create a state write service that queues writes and flushes them atomically.
   let create(mutableWorld: MutableWorld) : IStateWriteService =
@@ -736,6 +743,9 @@ module StateWrite =
 
         member _.CreateProjectile(entityId, proj, pos) =
           buffer.Enqueue(CreateProjectile(entityId, proj, pos))
+
+        member _.ApplyEntitySpawnBundle(bundle) =
+          buffer.Enqueue(ApplyEntitySpawnBundle bundle)
 
         member _.FlushWrites() =
           transact(fun () -> buffer.Flush(mutableWorld))

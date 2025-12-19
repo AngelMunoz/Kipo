@@ -240,7 +240,7 @@ module CompositionRoot =
       let mapDependentComponents = new ResizeArray<IGameComponent>()
 
       let clearCurrentMapData() =
-        eventBus.Publish(GameEvent.State(EntityLifecycle(Removed playerId)))
+        stateWriteService.RemoveEntity(playerId)
 
       // Initialize WorldMapService
       let worldMapService =

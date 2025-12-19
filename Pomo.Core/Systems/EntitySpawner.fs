@@ -16,6 +16,7 @@ open Pomo.Core.EventBus
 open Pomo.Core.Stores
 open Pomo.Core
 open Systems
+open Pomo.Core.Environment
 
 module EntitySpawnerLogic =
   [<Struct>]
@@ -168,10 +169,10 @@ module EntitySpawnerLogic =
 
   let finalizeSpawn
     (pending: PendingSpawn)
-    (eventBus: EventBus)
     (aiArchetypeStore: AIArchetypeStore)
     (aiEntityStore: AIEntityStore)
     (aiFamilyStore: AIFamilyStore)
+    (stateWrite: IStateWriteService)
     =
     let entityId = pending.EntityId
     let pos = pending.Position
@@ -204,7 +205,7 @@ module EntitySpawnerLogic =
         AIController = ValueNone
       }
 
-      eventBus.Publish(GameEvent.State(EntityLifecycle(EntitySpawned bundle)))
+      stateWrite.ApplyEntitySpawnBundle bundle
 
     | SystemCommunications.SpawnType.Faction info ->
       let archetype = aiArchetypeStore.find info.ArchetypeId
@@ -299,7 +300,7 @@ module EntitySpawnerLogic =
         AIController = ValueSome controller
       }
 
-      eventBus.Publish(GameEvent.State(EntityLifecycle(EntitySpawned bundle)))
+      stateWrite.ApplyEntitySpawnBundle bundle
 
   open Pomo.Core.Environment
   open Pomo.Core.Environment.Patterns
@@ -474,11 +475,7 @@ module EntitySpawnerLogic =
         | _ -> None)
       |> Observable.subscribe(fun event ->
         // Emit Removed event to clean up the dead entity
-        core.EventBus.Publish(
-          GameEvent.State(
-            StateChangeEvent.EntityLifecycle(Removed event.EntityId)
-          )
-        )
+        core.StateWrite.RemoveEntity event.EntityId
 
         // Check if this entity has spawn info for respawning
         match spawnedEntities.TryGetValue event.EntityId with
@@ -541,10 +538,10 @@ module EntitySpawnerLogic =
           if currentTime >= pending.SpawnStartTime + pending.Duration then
             finalizeSpawn
               pending
-              core.EventBus
               stores.AIArchetypeStore
               stores.AIEntityStore
               stores.AIFamilyStore
+              core.StateWrite
 
             toRemove.Add(pending)
 

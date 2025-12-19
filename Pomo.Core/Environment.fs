@@ -73,6 +73,7 @@ module Environment =
     abstract CreateProjectile:
       Guid<EntityId> * LiveProjectile * Vector2 voption -> unit
 
+    abstract ApplyEntitySpawnBundle: EntitySpawnBundle -> unit
     abstract FlushWrites: unit -> unit
 
   type CoreServices =

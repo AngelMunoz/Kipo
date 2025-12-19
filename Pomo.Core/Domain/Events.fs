@@ -224,18 +224,6 @@ type EntitySpawnBundle = {
   AIController: AIController voption
 }
 
-type EntityLifecycleEvents =
-  | Spawning of
-    spawning:
-      struct (Guid<EntityId> *
-      Guid<ScenarioId> *
-      SystemCommunications.SpawnType *
-      Vector2)
-  | Created of created: EntitySnapshot
-  | Removed of removed: Guid<EntityId>
-  /// Bundled spawn event - applies all components atomically
-  | EntitySpawned of bundle: EntitySpawnBundle
-
 type InputEvents =
   | RawStateChanged of rawIChanged: struct (Guid<EntityId> * RawInputState)
   | GameActionStatesChanged of
@@ -247,14 +235,10 @@ type PhysicsEvents =
     mStateChanged: struct (Guid<EntityId> * MovementState)
 
 
-
-
 [<Struct>]
 type StateChangeEvent =
-  | EntityLifecycle of entityLifeCycle: EntityLifecycleEvents
   | Input of input: InputEvents
   | Physics of physics: PhysicsEvents
-// Uncategorized
 
 // --- Intent Events (user actions and commands) ---
 [<Struct>]

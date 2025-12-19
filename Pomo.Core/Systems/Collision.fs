@@ -479,9 +479,7 @@ module Collision =
                   GameEvent.Lifecycle(LifecycleEvent.ProjectileImpacted impact)
                 )
 
-                core.EventBus.Publish(
-                  GameEvent.State(EntityLifecycle(Removed entityId))
-                )
+                stateWrite.RemoveEntity(entityId)
               | ValueNone ->
                 // Regular entity - apply position correction using StateWriteService
                 stateWrite.UpdatePosition(entityId, currentPos)
