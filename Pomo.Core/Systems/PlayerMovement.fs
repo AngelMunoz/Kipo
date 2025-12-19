@@ -53,6 +53,7 @@ module PlayerMovement =
 
     let (Core core) = env.CoreServices
     let (Gameplay gameplay) = env.GameplayServices
+    let stateWrite = core.StateWrite
 
     let speed = 100.0f
 
@@ -148,7 +149,7 @@ module PlayerMovement =
               playerId
               Vector2.Zero
               lastVelocity
-              core.EventBus
+              stateWrite
       else
         let movementState = movementState |> AVal.force
 
@@ -169,14 +170,14 @@ module PlayerMovement =
               accumulatedMtv
           with
           | MovementLogic.Arrived ->
-            MovementLogic.notifyArrived playerId core.EventBus
+            MovementLogic.notifyArrived playerId stateWrite core.EventBus
           | MovementLogic.Moving finalVelocity ->
             lastVelocity <-
               MovementLogic.notifyVelocityChange
                 playerId
                 finalVelocity
                 lastVelocity
-                core.EventBus
+                stateWrite
           | _ -> () // Should not happen for MovingTo
 
         | Some(MovingAlongPath path) ->
@@ -188,7 +189,7 @@ module PlayerMovement =
               accumulatedMtv
           with
           | MovementLogic.Arrived ->
-            MovementLogic.notifyArrived playerId core.EventBus
+            MovementLogic.notifyArrived playerId stateWrite core.EventBus
             lastVelocity <- Vector2.Zero
           | MovementLogic.WaypointReached remainingWaypoints ->
             MovementLogic.notifyWaypointReached
@@ -201,7 +202,7 @@ module PlayerMovement =
                 playerId
                 finalVelocity
                 lastVelocity
-                core.EventBus
+                stateWrite
 
         | Some Idle ->
           let mutable targetVelocity = currentVelocity
@@ -215,5 +216,5 @@ module PlayerMovement =
               playerId
               targetVelocity
               lastVelocity
-              core.EventBus
+              stateWrite
         | None -> ()

@@ -584,3 +584,88 @@ module StateUpdate =
           // Uncategorized
           | CreateProjectile projParams ->
             Entity.createProjectile mutableWorld projParams)
+
+/// High-performance state write service using command queue pattern.
+/// All state modifications go through this module to ensure consistent
+/// frame timing and avoid GC pressure from adaptive collections.
+module StateWrite =
+  open System.Buffers
+  open System.Collections.Generic
+  open Pomo.Core.Environment
+
+  /// Commands for state mutations. Using struct to avoid heap allocations.
+  [<Struct>]
+  type Command =
+    | UpdatePosition of posEntityId: Guid<EntityId> * position: Vector2
+    | UpdateVelocity of velEntityId: Guid<EntityId> * velocity: Vector2
+    | UpdateRotation of rotEntityId: Guid<EntityId> * rotation: float32
+    | UpdateResources of
+      resEntityId: Guid<EntityId> *
+      resources: Entity.Resource
+    | UpdateCooldowns of
+      cdEntityId: Guid<EntityId> *
+      cooldowns: HashMap<int<SkillId>, TimeSpan>
+    | UpdateInCombatTimer of ictEntityId: Guid<EntityId>
+    | AddEntity of addEntityId: Guid<EntityId> * scenarioId: Guid<ScenarioId>
+    | RemoveEntity of removeEntityId: Guid<EntityId>
+
+  /// Apply a single command to the mutable world.
+  let inline applyCommand (world: MutableWorld) (cmd: inref<Command>) =
+    match cmd with
+    | UpdatePosition(id, pos) ->
+      if world.Positions.ContainsKey id then
+        world.Positions[id] <- pos
+    | UpdateVelocity(id, vel) ->
+      if world.Velocities.ContainsKey id then
+        world.Velocities[id] <- vel
+    | UpdateRotation(id, rot) ->
+      if world.Positions.ContainsKey id then
+        world.Rotations[id] <- rot
+    | UpdateResources(id, res) -> world.Resources[id] <- res
+    | UpdateCooldowns(id, cds) -> world.AbilityCooldowns[id] <- cds
+    | UpdateInCombatTimer id ->
+      let combatEndTime =
+        world.Time.Value.TotalGameTime + StateUpdate.COMBAT_DURATION
+
+      world.InCombatUntil[id] <- combatEndTime
+    | AddEntity(id, sid) -> world.EntityScenario[id] <- sid
+    | RemoveEntity id -> StateUpdate.Entity.removeEntity world id
+
+  /// Mutable command buffer. Uses ResizeArray for simplicity.
+  /// Can optimize with ArrayPool later if profiling shows it's needed.
+  type CommandBuffer(initialCapacity: int) =
+    let commands = ResizeArray<Command>(initialCapacity)
+
+    member _.Enqueue(cmd: Command) = commands.Add(cmd)
+
+    member _.Flush(world: MutableWorld) =
+      for i = 0 to commands.Count - 1 do
+        let mutable cmd = commands[i]
+        applyCommand world &cmd
+
+      commands.Clear()
+
+    member _.Dispose() = commands.Clear()
+
+  /// Create a state write service that queues writes and flushes them atomically.
+  let create(mutableWorld: MutableWorld) : IStateWriteService =
+    let buffer = CommandBuffer(2048)
+
+    { new IStateWriteService with
+        member _.UpdatePosition(id, pos) =
+          buffer.Enqueue(UpdatePosition(id, pos))
+
+        member _.UpdateVelocity(id, vel) =
+          buffer.Enqueue(UpdateVelocity(id, vel))
+
+        member _.UpdateRotation(id, rot) =
+          buffer.Enqueue(UpdateRotation(id, rot))
+
+        member _.UpdateResources(id, res) =
+          buffer.Enqueue(UpdateResources(id, res))
+
+        member _.FlushWrites() =
+          transact(fun () -> buffer.Flush(mutableWorld))
+
+        member _.Dispose() = buffer.Dispose()
+    }

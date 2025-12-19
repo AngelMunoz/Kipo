@@ -23,6 +23,7 @@ module UnitMovement =
 
     let (Core core) = env.CoreServices
     let (Gameplay gameplay) = env.GameplayServices
+    let stateWrite = core.StateWrite
 
     // Mutable state to track last known velocities to avoid spamming events
     let lastVelocities =
@@ -185,7 +186,7 @@ module UnitMovement =
                 MovementLogic.handleMovingAlongPath currentPos path speed mtv
               with
               | MovementLogic.Arrived ->
-                MovementLogic.notifyArrived entityId core.EventBus
+                MovementLogic.notifyArrived entityId stateWrite core.EventBus
                 lastVelocities[entityId] <- Vector2.Zero
                 currentPaths.Remove(entityId) |> ignore
               | MovementLogic.WaypointReached remaining ->
@@ -204,14 +205,14 @@ module UnitMovement =
                     entityId
                     finalVel
                     lastVel
-                    core.EventBus
+                    stateWrite
 
             | MovingTo target ->
               match
                 MovementLogic.handleMovingTo currentPos target speed mtv
               with
               | MovementLogic.Arrived ->
-                MovementLogic.notifyArrived entityId core.EventBus
+                MovementLogic.notifyArrived entityId stateWrite core.EventBus
                 lastVelocities[entityId] <- Vector2.Zero
                 currentPaths.Remove(entityId) |> ignore
               | MovementLogic.Moving finalVel ->
@@ -225,7 +226,7 @@ module UnitMovement =
                     entityId
                     finalVel
                     lastVel
-                    core.EventBus
+                    stateWrite
               | _ -> ()
 
             | Idle ->
@@ -238,7 +239,7 @@ module UnitMovement =
                     entityId
                     Vector2.Zero
                     lastVelocities[entityId]
-                    core.EventBus
+                    stateWrite
 
               currentPaths.Remove(entityId) |> ignore
           | ValueNone -> ()

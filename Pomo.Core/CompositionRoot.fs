@@ -33,6 +33,7 @@ open Pomo.Core.Systems.Projectile
 open Pomo.Core.Systems.DebugRender
 open Pomo.Core.Systems.ResourceManager
 open Pomo.Core.Systems.EntitySpawnerLogic
+open Pomo.Core.Systems.StateWrite
 
 open Pomo.Core.Domain.Scenes
 
@@ -124,6 +125,7 @@ module CompositionRoot =
       // 1. Create World and Local EventBus
       let eventBus = new EventBus()
       let struct (mutableWorld, worldView) = World.create scope.Random
+      let stateWriteService = StateWrite.create mutableWorld
 
       // 2. Create Gameplay Services
       let projections =
@@ -172,6 +174,7 @@ module CompositionRoot =
               { new CoreServices with
                   member _.EventBus = eventBus
                   member _.World = worldView
+                  member _.StateWrite = stateWriteService
                   member _.Random = scope.Random
                   member _.UIService = scope.UIService
               }
@@ -411,8 +414,15 @@ module CompositionRoot =
               hudDesktop |> ValueOption.iter(fun d -> d.Render())
         }
 
+      // Flush all queued state writes at the end of the frame (same timing as old StateUpdateSystem)
+      let stateWriteFlushComponent =
+        { new GameComponent(game, UpdateOrder = 1000) with
+            override _.Update(_) = stateWriteService.FlushWrites()
+        }
+
       baseComponents.Add(worldUpdateComponent)
       baseComponents.Add(hudDrawComponent)
+      baseComponents.Add(stateWriteFlushComponent)
 
       let allComponents = [
         yield! baseComponents
@@ -425,6 +435,8 @@ module CompositionRoot =
               subs.Dispose()
               // Dispose EventBus to release ring buffer
               (eventBus :> IDisposable).Dispose()
+              // Dispose StateWriteService to return pooled array
+              stateWriteService.Dispose()
               hudDesktop |> ValueOption.iter(fun d -> d.Dispose())
               // Cleanup map dependent components
               for c in mapDependentComponents do

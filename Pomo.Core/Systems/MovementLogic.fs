@@ -6,6 +6,7 @@ open Pomo.Core.Domain.Events
 open Pomo.Core.Domain.Units
 open Pomo.Core.Algorithms
 open Pomo.Core.EventBus
+open Pomo.Core.Environment
 
 module MovementLogic =
 
@@ -16,10 +17,12 @@ module MovementLogic =
     | Moving of velocity: Vector2
     | WaypointReached of remainingPath: Vector2 list
 
-  let notifyArrived (entityId: Guid<EntityId>) (eventBus: EventBus) =
-    eventBus.Publish(
-      GameEvent.State(Physics(VelocityChanged struct (entityId, Vector2.Zero)))
-    )
+  let notifyArrived
+    (entityId: Guid<EntityId>)
+    (stateWrite: IStateWriteService)
+    (eventBus: EventBus)
+    =
+    stateWrite.UpdateVelocity(entityId, Vector2.Zero)
 
     eventBus.Publish(
       GameEvent.State(Physics(MovementStateChanged struct (entityId, Idle)))
@@ -42,12 +45,10 @@ module MovementLogic =
     (entityId: Guid<EntityId>)
     (newVelocity: Vector2)
     (lastVelocity: Vector2)
-    (eventBus: EventBus)
+    (stateWrite: IStateWriteService)
     =
     if newVelocity <> lastVelocity then
-      eventBus.Publish(
-        GameEvent.State(Physics(VelocityChanged struct (entityId, newVelocity)))
-      )
+      stateWrite.UpdateVelocity(entityId, newVelocity)
 
     newVelocity
 
