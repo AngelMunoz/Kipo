@@ -527,11 +527,10 @@ module Combat =
             Info = projectileInfo
           }
 
-          ctx.EventBus.Publish(
-            GameEvent.State(
-              StateChangeEvent.CreateProjectile
-                struct (projectileId, liveProjectile, ValueNone)
-            )
+          ctx.StateWrite.CreateProjectile(
+            projectileId,
+            liveProjectile,
+            ValueNone
           )
       else
         // Fallback to single target logic
@@ -547,11 +546,10 @@ module Combat =
             Info = projectileInfo
           }
 
-          ctx.EventBus.Publish(
-            GameEvent.State(
-              StateChangeEvent.CreateProjectile
-                struct (projectileId, liveProjectile, ValueNone)
-            )
+          ctx.StateWrite.CreateProjectile(
+            projectileId,
+            liveProjectile,
+            ValueNone
           )
         | SystemCommunications.TargetPosition targetPos ->
           // Position-targeted projectile (e.g., falling boulder)
@@ -565,11 +563,10 @@ module Combat =
           }
 
           // Start projectile at caster position
-          ctx.EventBus.Publish(
-            GameEvent.State(
-              StateChangeEvent.CreateProjectile
-                struct (projectileId, liveProjectile, ValueNone)
-            )
+          ctx.StateWrite.CreateProjectile(
+            projectileId,
+            liveProjectile,
+            ValueNone
           )
         | _ -> ()
 

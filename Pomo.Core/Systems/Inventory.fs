@@ -12,29 +12,26 @@ open Pomo.Core.Domain.Events
 open Pomo.Core.EventBus
 open Pomo.Core.Stores
 open Pomo.Core.Domain.World
+open Pomo.Core.Environment
 
 module Inventory =
   open Pomo.Core.Domain.Core
   open Pomo.Core.Projections
 
   let handlePickUpItemIntent
-    (eventBus: EventBus)
+    (stateWrite: IStateWriteService)
     (intent: SystemCommunications.PickUpItemIntent)
     =
-    eventBus.Publish(
-      GameEvent.State(Inventory(ItemInstanceCreated intent.Item))
-    )
-
-    eventBus.Publish(
-      GameEvent.State(
-        Inventory(
-          ItemAddedToInventory struct (intent.Picker, intent.Item.InstanceId)
-        )
-      )
-    )
+    stateWrite.CreateItemInstance(intent.Item)
+    stateWrite.AddItemToInventory(intent.Picker, intent.Item.InstanceId)
 
   let handleUseItemIntent
-    (eventBus: EventBus, itemStore: ItemStore, world: World)
+    (
+      eventBus: EventBus,
+      itemStore: ItemStore,
+      world: World,
+      stateWrite: IStateWriteService
+    )
     (intent: SystemCommunications.UseItemIntent)
     =
     match world.ItemInstances.TryGetValue intent.ItemInstanceId with
@@ -45,7 +42,6 @@ module Inventory =
         | Item.ItemKind.Usable props ->
           match itemInstance.UsesLeft with
           | ValueNone ->
-            // infinite uses, so just publish effect application intent
             eventBus.Publish(
               GameEvent.Intent(
                 IntentEvent.EffectApplication {
@@ -58,7 +54,6 @@ module Inventory =
           | ValueSome usesLeft ->
 
             if usesLeft > 0 then
-              // publsh effect application intent
               eventBus.Publish(
                 GameEvent.Intent(
                   IntentEvent.EffectApplication {
@@ -68,37 +63,28 @@ module Inventory =
                   }
                 )
               )
-              // decrement usages left and publish update event
-              eventBus.Publish(
-                GameEvent.State(
-                  Inventory(
-                    UpdateItemInstance {
-                      itemInstance with
-                          UsesLeft =
-                            itemInstance.UsesLeft
-                            |> ValueOption.map(fun uses -> uses - 1)
-                    }
-                  )
-                )
-              )
+
+              stateWrite.UpdateItemInstance {
+                itemInstance with
+                    UsesLeft =
+                      itemInstance.UsesLeft
+                      |> ValueOption.map(fun uses -> uses - 1)
+              }
             else
-              // no uses left or infinite uses
               ()
-        | Item.ItemKind.NonUsable ->
-          // cannot use non-usable items
-          ()
-        | Item.ItemKind.Wearable _ ->
-          // cannot use wearable items
-          ()
-      | ValueNone ->
-        // item definition not found
-        ()
-    | false, _ ->
-      // item instance not found
-      ()
+        | Item.ItemKind.NonUsable -> ()
+        | Item.ItemKind.Wearable _ -> ()
+      | ValueNone -> ()
+    | false, _ -> ()
 
 
-  let create(eventBus: EventBus, itemStore: ItemStore, world: World) =
+  let create
+    (
+      eventBus: EventBus,
+      itemStore: ItemStore,
+      world: World,
+      stateWrite: IStateWriteService
+    ) =
 
     { new CoreEventListener with
         member _.StartListening() : IDisposable =
@@ -109,14 +95,14 @@ module Inventory =
               | GameEvent.ItemIntent(ItemIntentEvent.PickUp intent) ->
                 Some intent
               | _ -> None)
-            |> Observable.subscribe(handlePickUpItemIntent eventBus),
+            |> Observable.subscribe(handlePickUpItemIntent stateWrite),
             eventBus.Observable
             |> Observable.choose(fun e ->
               match e with
               | GameEvent.ItemIntent(ItemIntentEvent.Use intent) -> Some intent
               | _ -> None)
             |> Observable.subscribe(
-              handleUseItemIntent(eventBus, itemStore, world)
+              handleUseItemIntent(eventBus, itemStore, world, stateWrite)
             )
           )
     }

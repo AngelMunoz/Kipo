@@ -17,6 +17,8 @@ open Pomo.Core.Domain.Core
 open Pomo.Core.Domain.Units
 open Pomo.Core.Domain
 open Pomo.Core.Domain.Events
+open Pomo.Core.Domain.Item
+open Pomo.Core.Domain.Projectile
 
 
 module Environment =
@@ -36,6 +38,7 @@ module Environment =
     abstract UpdatePosition: Guid<EntityId> * Vector2 -> unit
     abstract UpdateVelocity: Guid<EntityId> * Vector2 -> unit
     abstract UpdateRotation: Guid<EntityId> * float32 -> unit
+    abstract RemoveEntity: Guid<EntityId> -> unit
     abstract UpdateResources: Guid<EntityId> * Entity.Resource -> unit
 
     abstract UpdateCooldowns:
@@ -58,6 +61,18 @@ module Environment =
       Guid<EntityId> * int<SkillId> * SystemCommunications.SkillTarget -> unit
 
     abstract ClearPendingSkillCast: Guid<EntityId> -> unit
+    // Inventory
+    abstract CreateItemInstance: ItemInstance -> unit
+    abstract UpdateItemInstance: ItemInstance -> unit
+    abstract AddItemToInventory: Guid<EntityId> * Guid<ItemInstanceId> -> unit
+    abstract EquipItem: Guid<EntityId> * Slot * Guid<ItemInstanceId> -> unit
+    abstract UnequipItem: Guid<EntityId> * Slot -> unit
+    // AI
+    abstract UpdateAIController: Guid<EntityId> * AI.AIController -> unit
+    // Projectiles
+    abstract CreateProjectile:
+      Guid<EntityId> * LiveProjectile * Vector2 voption -> unit
+
     abstract FlushWrites: unit -> unit
 
   type CoreServices =

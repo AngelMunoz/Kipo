@@ -238,51 +238,23 @@ type EntityLifecycleEvents =
 
 type InputEvents =
   | RawStateChanged of rawIChanged: struct (Guid<EntityId> * RawInputState)
-  | MapChanged of iMapChanged: struct (Guid<EntityId> * InputMap)
   | GameActionStatesChanged of
     gAChanged: struct (Guid<EntityId> * HashMap<GameAction, InputActionState>)
-  | ActionSetsChanged of
-    asChanged:
-      struct (Guid<EntityId> * HashMap<int, HashMap<GameAction, SlotProcessing>>)
   | ActiveActionSetChanged of aasChanged: struct (Guid<EntityId> * int)
 
 type PhysicsEvents =
   | MovementStateChanged of
     mStateChanged: struct (Guid<EntityId> * MovementState)
 
-type CombatEvents =
-  | FactionsChanged of facChanged: struct (Guid<EntityId> * Faction HashSet)
-  | BaseStatsChanged of statsChanged: struct (Guid<EntityId> * BaseStats)
-  | StatsChanged of entity: Guid<EntityId> * newStats: DerivedStats
 
-type InventoryEvents =
-  | ItemInstanceCreated of itemInstance: ItemInstance
-  | ItemInstanceRemoved of itemInstanceId: Guid<ItemInstanceId>
-  | UpdateItemInstance of itemInstance: ItemInstance
-  | ItemAddedToInventory of
-    itemAdded: struct (Guid<EntityId> * Guid<ItemInstanceId>)
-  | ItemRemovedFromInventory of
-    itemRemoved: struct (Guid<EntityId> * Guid<ItemInstanceId>)
-  | ItemEquipped of
-    itemEquipped: struct (Guid<EntityId> * Slot * Guid<ItemInstanceId>)
-  | ItemUnequipped of
-    itemUnequipped: struct (Guid<EntityId> * Slot * Guid<ItemInstanceId>)
 
-type AIStateChange =
-  | ControllerUpdated of
-    struct (Guid<EntityId> * Pomo.Core.Domain.AI.AIController)
 
 [<Struct>]
 type StateChangeEvent =
   | EntityLifecycle of entityLifeCycle: EntityLifecycleEvents
   | Input of input: InputEvents
   | Physics of physics: PhysicsEvents
-  | Combat of combat: CombatEvents
-  | Inventory of inventory: InventoryEvents
-  | AI of ai: AIStateChange
-  // Uncategorized
-  | CreateProjectile of
-    projParams: struct (Guid<EntityId> * LiveProjectile * Vector2 voption)
+// Uncategorized
 
 // --- Intent Events (user actions and commands) ---
 [<Struct>]

@@ -497,56 +497,14 @@ module StateUpdate =
             match event with
             | RawStateChanged rawIChanged ->
               RawInput.updateState mutableWorld rawIChanged
-            | MapChanged iMapChanged ->
-              InputMapping.updateMap mutableWorld iMapChanged
             | GameActionStatesChanged gAChanged ->
               InputMapping.updateActionStates mutableWorld gAChanged
-            | ActionSetsChanged aSChanged ->
-              Combat.updateActionSets mutableWorld aSChanged
             | ActiveActionSetChanged aasChanged ->
               Combat.activeActionSetChanged mutableWorld aasChanged
           | Physics event ->
             match event with
             | MovementStateChanged mStateChanged ->
-              Entity.updateMovementState mutableWorld mStateChanged
-          | Combat event ->
-            match event with
-            | FactionsChanged facChanged ->
-              Combat.updateFactions mutableWorld facChanged
-            | BaseStatsChanged statsChanged ->
-              Attributes.updateBaseStats mutableWorld statsChanged
-            | StatsChanged(entity, newStats) ->
-              Attributes.updateDerivedStats mutableWorld (entity, newStats)
-          | Inventory event ->
-            match event with
-            | ItemInstanceCreated itemInstance ->
-              Inventory.alterItemInstance
-                mutableWorld
-                itemInstance.InstanceId
-                (ValueSome itemInstance)
-            | ItemInstanceRemoved itemInstanceId ->
-              Inventory.alterItemInstance mutableWorld itemInstanceId ValueNone
-            | ItemAddedToInventory itemAdded ->
-              Inventory.addItemToInventory mutableWorld itemAdded
-            | ItemRemovedFromInventory itemRemoved ->
-              Inventory.removeItemFromInventory mutableWorld itemRemoved
-            | ItemEquipped itemEquipped ->
-              Inventory.equipItem mutableWorld itemEquipped
-            | ItemUnequipped itemUnequipped ->
-              Inventory.unequipItem mutableWorld itemUnequipped
-            | UpdateItemInstance itemInstance ->
-              Inventory.alterItemInstance
-                mutableWorld
-                itemInstance.InstanceId
-                (ValueSome itemInstance)
-          | AI event ->
-            match event with
-            | ControllerUpdated(entityId, controller) ->
-              AI.updateController mutableWorld (entityId, controller)
-
-          // Uncategorized
-          | CreateProjectile projParams ->
-            Entity.createProjectile mutableWorld projParams)
+              Entity.updateMovementState mutableWorld mStateChanged)
 
 /// High-performance state write service using command queue pattern.
 /// All state modifications go through this module to ensure consistent
@@ -588,12 +546,30 @@ module StateWrite =
       stackEntityId: Guid<EntityId> *
       stackEffectId: Guid<EffectId> *
       newStack: int
-    // Pending skill cast
     | SetPendingSkillCast of
       pendingEntityId: Guid<EntityId> *
       skillId: int<SkillId> *
       target: SystemCommunications.SkillTarget
     | ClearPendingSkillCast of clearEntityId: Guid<EntityId>
+    // Inventory
+    | CreateItemInstance of instance: Item.ItemInstance
+    | UpdateItemInstance of instance: Item.ItemInstance
+    | AddItemToInventory of
+      invEntityId: Guid<EntityId> *
+      instanceId: Guid<ItemInstanceId>
+    | EquipItem of
+      eqEntityId: Guid<EntityId> *
+      slot: Item.Slot *
+      eqInstanceId: Guid<ItemInstanceId>
+    | UnequipItem of ueqEntityId: Guid<EntityId> * ueqSlot: Item.Slot
+    // AI
+    | UpdateAIController of
+      aiEntityId: Guid<EntityId> *
+      controller: AI.AIController
+    | CreateProjectile of
+      projEntityId: Guid<EntityId> *
+      proj: Projectile.LiveProjectile *
+      pos: Vector2 voption
 
   /// Apply a single command to the mutable world.
   let inline applyCommand (world: MutableWorld) (cmd: inref<Command>) =
@@ -639,6 +615,30 @@ module StateWrite =
       StateUpdate.Combat.setPendingSkillCast world id skillId target
     | ClearPendingSkillCast id ->
       StateUpdate.Combat.clearPendingSkillCast world id
+    // Inventory
+    | CreateItemInstance instance ->
+      world.ItemInstances[instance.InstanceId] <- instance
+    | UpdateItemInstance instance ->
+      world.ItemInstances[instance.InstanceId] <- instance
+    | AddItemToInventory(entityId, instanceId) ->
+      StateUpdate.Inventory.addItemToInventory
+        world
+        struct (entityId, instanceId)
+    | EquipItem(entityId, slot, instanceId) ->
+      StateUpdate.Inventory.equipItem world struct (entityId, slot, instanceId)
+    | UnequipItem(entityId, slot) ->
+      if world.Positions.ContainsKey entityId then
+        let currentEquipped =
+          world.EquippedItems.TryGetValue entityId
+          |> Option.defaultValue HashMap.empty
+
+        world.EquippedItems[entityId] <- HashMap.remove slot currentEquipped
+    // AI
+    | UpdateAIController(entityId, controller) ->
+      StateUpdate.AI.updateController world (entityId, controller)
+    // Projectiles
+    | CreateProjectile(entityId, proj, pos) ->
+      StateUpdate.Entity.createProjectile world (entityId, proj, pos)
 
   /// Mutable command buffer. Uses ResizeArray for simplicity.
   /// Can optimize with ArrayPool later if profiling shows it's needed.
@@ -669,6 +669,8 @@ module StateWrite =
 
         member _.UpdateRotation(id, rot) =
           buffer.Enqueue(UpdateRotation(id, rot))
+
+        member _.RemoveEntity(id) = buffer.Enqueue(RemoveEntity(id))
 
         member _.UpdateResources(id, res) =
           buffer.Enqueue(UpdateResources(id, res))
@@ -707,6 +709,27 @@ module StateWrite =
 
         member _.ClearPendingSkillCast(id) =
           buffer.Enqueue(ClearPendingSkillCast id)
+
+        member _.CreateItemInstance(instance) =
+          buffer.Enqueue(CreateItemInstance instance)
+
+        member _.UpdateItemInstance(instance) =
+          buffer.Enqueue(UpdateItemInstance instance)
+
+        member _.AddItemToInventory(entityId, instanceId) =
+          buffer.Enqueue(AddItemToInventory(entityId, instanceId))
+
+        member _.EquipItem(entityId, slot, instanceId) =
+          buffer.Enqueue(EquipItem(entityId, slot, instanceId))
+
+        member _.UnequipItem(entityId, slot) =
+          buffer.Enqueue(UnequipItem(entityId, slot))
+
+        member _.UpdateAIController(entityId, controller) =
+          buffer.Enqueue(UpdateAIController(entityId, controller))
+
+        member _.CreateProjectile(entityId, proj, pos) =
+          buffer.Enqueue(CreateProjectile(entityId, proj, pos))
 
         member _.FlushWrites() =
           transact(fun () -> buffer.Flush(mutableWorld))

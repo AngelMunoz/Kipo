@@ -169,9 +169,15 @@ module CompositionRoot =
         Navigation.create(eventBus, scope.Stores.MapStore, projections)
 
       let inventoryService =
-        Inventory.create(eventBus, scope.Stores.ItemStore, worldView)
+        Inventory.create(
+          eventBus,
+          scope.Stores.ItemStore,
+          worldView,
+          stateWriteService
+        )
 
-      let equipmentService = Equipment.create worldView eventBus
+      let equipmentService =
+        Equipment.create worldView eventBus stateWriteService
 
       // 4. Construct PomoEnvironment (Local Scope)
       let pomoEnv =

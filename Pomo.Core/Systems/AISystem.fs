@@ -1356,11 +1356,8 @@ type AISystem(game: Game, env: PomoEnvironment) =
             | ValueNone -> ()
 
             if updatedController <> controller then
-              core.EventBus.Publish(
-                GameEvent.State(
-                  StateChangeEvent.AI(
-                    ControllerUpdated struct (controllerId, updatedController)
-                  )
-                )
+              core.StateWrite.UpdateAIController(
+                controllerId,
+                updatedController
               )
           | _ -> ()
