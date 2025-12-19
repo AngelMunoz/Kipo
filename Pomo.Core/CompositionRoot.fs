@@ -144,10 +144,16 @@ module CompositionRoot =
         )
 
       let targetingService =
-        Targeting.create(eventBus, scope.Stores.SkillStore, projections)
+        Targeting.create(
+          eventBus,
+          stateWriteService,
+          scope.Stores.SkillStore,
+          projections
+        )
 
       // 3. Create Listeners
-      let effectApplication = EffectApplication.create(worldView, eventBus)
+      let effectApplication =
+        EffectApplication.create(worldView, stateWriteService, eventBus)
 
       let actionHandler =
         ActionHandler.create(

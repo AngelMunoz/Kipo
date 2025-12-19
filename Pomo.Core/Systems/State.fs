@@ -517,18 +517,6 @@ module StateUpdate =
               Attributes.updateBaseStats mutableWorld statsChanged
             | StatsChanged(entity, newStats) ->
               Attributes.updateDerivedStats mutableWorld (entity, newStats)
-            | EffectApplied(entity, effect) ->
-              Attributes.applyEffect mutableWorld (entity, effect)
-            | EffectExpired effectExpired ->
-              Attributes.expireEffect mutableWorld effectExpired
-            | EffectRefreshed effectRefreshed ->
-              Attributes.refreshEffect mutableWorld effectRefreshed
-            | EffectStackChanged effectStackChanged ->
-              Attributes.changeEffectStack mutableWorld effectStackChanged
-            | PendingSkillCastSet(entityId, skillId, target) ->
-              Combat.setPendingSkillCast mutableWorld entityId skillId target
-            | PendingSkillCastCleared entityId ->
-              Combat.clearPendingSkillCast mutableWorld entityId
           | Inventory event ->
             match event with
             | ItemInstanceCreated itemInstance ->
@@ -590,6 +578,22 @@ module StateWrite =
     | UpdatePose of poseEntityId: Guid<EntityId> * pose: HashMap<string, Matrix>
     | RemoveAnimationState of removeAnimEntityId: Guid<EntityId>
     | UpdateModelConfig of modelEntityId: Guid<EntityId> * configId: string
+    // Effects
+    | ApplyEffect of effectEntityId: Guid<EntityId> * effect: Skill.ActiveEffect
+    | ExpireEffect of expireEntityId: Guid<EntityId> * effectId: Guid<EffectId>
+    | RefreshEffect of
+      refreshEntityId: Guid<EntityId> *
+      refreshEffectId: Guid<EffectId>
+    | ChangeEffectStack of
+      stackEntityId: Guid<EntityId> *
+      stackEffectId: Guid<EffectId> *
+      newStack: int
+    // Pending skill cast
+    | SetPendingSkillCast of
+      pendingEntityId: Guid<EntityId> *
+      skillId: int<SkillId> *
+      target: SystemCommunications.SkillTarget
+    | ClearPendingSkillCast of clearEntityId: Guid<EntityId>
 
   /// Apply a single command to the mutable world.
   let inline applyCommand (world: MutableWorld) (cmd: inref<Command>) =
@@ -619,6 +623,22 @@ module StateWrite =
       world.ActiveAnimations.Remove id |> ignore
       world.Poses.Remove id |> ignore
     | UpdateModelConfig(id, configId) -> world.ModelConfigId[id] <- configId
+    // Effects
+    | ApplyEffect(id, effect) ->
+      StateUpdate.Attributes.applyEffect world (id, effect)
+    | ExpireEffect(id, effectId) ->
+      StateUpdate.Attributes.expireEffect world struct (id, effectId)
+    | RefreshEffect(id, effectId) ->
+      StateUpdate.Attributes.refreshEffect world struct (id, effectId)
+    | ChangeEffectStack(id, effectId, stack) ->
+      StateUpdate.Attributes.changeEffectStack
+        world
+        struct (id, effectId, stack)
+    // Pending skill cast
+    | SetPendingSkillCast(id, skillId, target) ->
+      StateUpdate.Combat.setPendingSkillCast world id skillId target
+    | ClearPendingSkillCast id ->
+      StateUpdate.Combat.clearPendingSkillCast world id
 
   /// Mutable command buffer. Uses ResizeArray for simplicity.
   /// Can optimize with ArrayPool later if profiling shows it's needed.
@@ -669,6 +689,24 @@ module StateWrite =
 
         member _.UpdateModelConfig(id, configId) =
           buffer.Enqueue(UpdateModelConfig(id, configId))
+
+        member _.ApplyEffect(id, effect) =
+          buffer.Enqueue(ApplyEffect(id, effect))
+
+        member _.ExpireEffect(id, effectId) =
+          buffer.Enqueue(ExpireEffect(id, effectId))
+
+        member _.RefreshEffect(id, effectId) =
+          buffer.Enqueue(RefreshEffect(id, effectId))
+
+        member _.ChangeEffectStack(id, effectId, stack) =
+          buffer.Enqueue(ChangeEffectStack(id, effectId, stack))
+
+        member _.SetPendingSkillCast(id, skillId, target) =
+          buffer.Enqueue(SetPendingSkillCast(id, skillId, target))
+
+        member _.ClearPendingSkillCast(id) =
+          buffer.Enqueue(ClearPendingSkillCast id)
 
         member _.FlushWrites() =
           transact(fun () -> buffer.Flush(mutableWorld))

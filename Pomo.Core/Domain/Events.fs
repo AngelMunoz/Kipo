@@ -254,16 +254,6 @@ type CombatEvents =
   | FactionsChanged of facChanged: struct (Guid<EntityId> * Faction HashSet)
   | BaseStatsChanged of statsChanged: struct (Guid<EntityId> * BaseStats)
   | StatsChanged of entity: Guid<EntityId> * newStats: DerivedStats
-  | EffectApplied of effectApplied: struct (Guid<EntityId> * ActiveEffect)
-  | EffectExpired of effectExpired: struct (Guid<EntityId> * Guid<EffectId>)
-  | EffectRefreshed of effectRefreshed: struct (Guid<EntityId> * Guid<EffectId>)
-  | EffectStackChanged of
-    effectStackChanged: struct (Guid<EntityId> * Guid<EffectId> * int)
-  | PendingSkillCastSet of
-    entityId: Guid<EntityId> *
-    skillId: int<SkillId> *
-    target: SystemCommunications.SkillTarget
-  | PendingSkillCastCleared of entityId: Guid<EntityId>
 
 type InventoryEvents =
   | ItemInstanceCreated of itemInstance: ItemInstance

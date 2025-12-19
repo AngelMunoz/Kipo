@@ -20,10 +20,12 @@ open Pomo.Core.Systems.Systems
 module AbilityActivation =
   open System.Reactive.Disposables
   open Pomo.Core.Domain.Spatial.Search
+  open Pomo.Core.Environment
 
   [<Struct>]
   type AbilityActivationContext = {
     EventBus: EventBus
+    StateWrite: IStateWriteService
     SkillStore: SkillStore
     Rng: Random
     SearchContext: SearchContext voption
@@ -345,10 +347,8 @@ module AbilityActivation =
           }
 
           // Always clear the pending cast after checking
-          changeCtx.AbilityActivationContext.EventBus.Publish(
-            GameEvent.State(
-              StateChangeEvent.Combat(PendingSkillCastCleared entityId)
-            )
+          changeCtx.AbilityActivationContext.StateWrite.ClearPendingSkillCast(
+            entityId
           )
         | _ -> () // No pending cast or data missing
       else
@@ -369,6 +369,7 @@ module AbilityActivation =
 
     let activationContext = {
       EventBus = core.EventBus
+      StateWrite = core.StateWrite
       SkillStore = skillStore
       Rng = core.World.Rng
       SearchContext =

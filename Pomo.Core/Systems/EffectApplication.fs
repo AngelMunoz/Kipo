@@ -17,6 +17,7 @@ module Effects =
 
   module EffectApplication =
     open Pomo.Core.Domain.Core
+    open Pomo.Core.Environment
 
     let private createNewActiveEffect
       (intent: SystemCommunications.EffectApplicationIntent)
@@ -31,8 +32,17 @@ module Effects =
         StackCount = 1
       }
 
+    /// Internal effect state change types - replaces removed CombatEvents
+    [<Struct>]
+    type InternalEffectChange =
+      | Applied of appliedData: struct (Guid<EntityId> * ActiveEffect)
+      | Refreshed of refreshedData: struct (Guid<EntityId> * Guid<EffectId>)
+      | StackChanged of
+        stackData: struct (Guid<EntityId> * Guid<EffectId> * int)
+
+    /// Result of applying an effect - uses internal effect types routed to StateWriteService
     type ApplyEventResult =
-      | Persistent of StateChangeEvent
+      | Persistent of InternalEffectChange
       | InstantRes of SystemCommunications.EffectResourceIntent
       | InstantDmg of SystemCommunications.EffectDamageIntent
 
@@ -85,28 +95,19 @@ module Effects =
             else
               let newEffect = createNewActiveEffect intent totalGameTime
 
-              EffectApplied struct (intent.TargetEntity, newEffect)
-              |> StateChangeEvent.Combat
+              Applied struct (intent.TargetEntity, newEffect)
               |> Persistent
               |> ValueSome
           | RefreshDuration ->
             match findExisting effectsOnTarget with
             | Some activeEffect ->
-              let refreshedEffect = {
-                activeEffect with
-                    StartTime = totalGameTime
-              }
-
-
-              EffectRefreshed struct (intent.TargetEntity, refreshedEffect.Id)
-              |> StateChangeEvent.Combat
+              Refreshed struct (intent.TargetEntity, activeEffect.Id)
               |> Persistent
               |> ValueSome
             | None ->
               let newEffect = createNewActiveEffect intent totalGameTime
 
-              EffectApplied struct (intent.TargetEntity, newEffect)
-              |> StateChangeEvent.Combat
+              Applied struct (intent.TargetEntity, newEffect)
               |> Persistent
               |> ValueSome
           | AddStack maxStacks ->
@@ -115,10 +116,8 @@ module Effects =
               if effectToStack.StackCount < maxStacks then
                 let newStackCount = effectToStack.StackCount + 1
 
-
-                EffectStackChanged
+                StackChanged
                   struct (intent.TargetEntity, effectToStack.Id, newStackCount)
-                |> StateChangeEvent.Combat
                 |> Persistent
                 |> ValueSome
               else
@@ -126,17 +125,26 @@ module Effects =
             | None ->
               let newEffect = createNewActiveEffect intent totalGameTime
 
-              EffectApplied struct (intent.TargetEntity, newEffect)
-              |> StateChangeEvent.Combat
+              Applied struct (intent.TargetEntity, newEffect)
               |> Persistent
               |> ValueSome
 
         event
 
-    let create(world: World, eventBus: EventBus) =
+    let create
+      (world: World, stateWrite: IStateWriteService, eventBus: EventBus)
+      =
       let handler(intent: SystemCommunications.EffectApplicationIntent) =
         match applyEffect world intent with
-        | ValueSome(Persistent ev) -> eventBus.Publish(GameEvent.State ev)
+        | ValueSome(Persistent ev) ->
+          // Route to StateWriteService
+          match ev with
+          | Applied struct (entityId, effect) ->
+            stateWrite.ApplyEffect(entityId, effect)
+          | Refreshed struct (entityId, effectId) ->
+            stateWrite.RefreshEffect(entityId, effectId)
+          | StackChanged struct (entityId, effectId, stack) ->
+            stateWrite.ChangeEffectStack(entityId, effectId, stack)
         | ValueSome(InstantDmg dmg) ->
           eventBus.Publish(GameEvent.Intent(IntentEvent.EffectDamage dmg))
         | ValueSome(InstantRes res) ->
@@ -154,6 +162,10 @@ module Effects =
             |> Observable.subscribe handler
       }
 
+  [<Struct>]
+  type private EffectStateChange =
+    | EffectExpired of expiredData: struct (Guid<EntityId> * Guid<EffectId>)
+
   // Wrapper DU to hold different event types
   [<Struct>]
   type TickingEffect =
@@ -162,7 +174,7 @@ module Effects =
 
   [<Struct>]
   type private LifecycleEvent =
-    | State of state: StateChangeEvent
+    | EffectState of effectState: EffectStateChange
     | EffectTick of intent: TickingEffect
 
   let timedEffects(effects: amap<Guid<EntityId>, IndexList<ActiveEffect>>) =
@@ -290,11 +302,7 @@ module Effects =
 
           if elapsedTime >= duration then
             IndexList.single(
-              State(
-                StateChangeEvent.Combat(
-                  EffectExpired struct (entityId, effect.Id)
-                )
-              )
+              EffectState(EffectExpired struct (entityId, effect.Id))
             )
           else
             IndexList.empty)
@@ -322,11 +330,7 @@ module Effects =
 
           if elapsedTime >= duration then
             IndexList.single(
-              State(
-                StateChangeEvent.Combat(
-                  EffectExpired struct (entityId, effect.Id)
-                )
-              )
+              EffectState(EffectExpired struct (entityId, effect.Id))
             )
           else
             Helpers.generateIntervalEvents
@@ -410,8 +414,11 @@ module Effects =
         for evts in events do
           for evt in evts do
             match evt with
-            | State stateEvent ->
-              core.EventBus.Publish(GameEvent.State stateEvent)
+            | EffectState effectChange ->
+              // Route effect state changes to StateWriteService
+              match effectChange with
+              | EffectExpired struct (entityId, effectId) ->
+                core.StateWrite.ExpireEffect(entityId, effectId)
             | EffectTick(DamageIntent dmg) ->
               core.EventBus.Publish(
                 GameEvent.Intent(IntentEvent.EffectDamage dmg)

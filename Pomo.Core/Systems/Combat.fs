@@ -434,13 +434,7 @@ module Combat =
         for resourceChangeEvent in totalResourceChangeFromModifiers do
           ctx.EventBus.Publish resourceChangeEvent
 
-        ctx.EventBus.Publish(
-          GameEvent.State(
-            StateChangeEvent.Combat(
-              EffectExpired struct (intent.TargetEntity, intent.ActiveEffectId)
-            )
-          )
-        )
+        ctx.StateWrite.ExpireEffect(intent.TargetEntity, intent.ActiveEffectId)
       | _ -> ()
 
     let handleEffectDamageIntent

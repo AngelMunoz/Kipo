@@ -70,6 +70,7 @@ module Targeting =
   [<Struct>]
   type HandleSelectedTargetArgs = {
     eventBus: EventBus
+    stateWrite: IStateWriteService
     skillBeingTargeted: Skill voption aval
     currentAction:
       struct (cval<Guid<EntityId> voption> * cval<GameAction voption>)
@@ -90,6 +91,7 @@ module Targeting =
 
     let handleTargetEntity
       (eventBus: EventBus)
+      (stateWrite: IStateWriteService)
       (positions: HashMap<Guid<EntityId>, Vector2>)
       (skill: ActiveSkill)
       (casterId: Guid<EntityId>)
@@ -116,16 +118,10 @@ module Targeting =
             )
           )
 
-          eventBus.Publish(
-            GameEvent.State(
-              StateChangeEvent.Combat(
-                PendingSkillCastSet(
-                  casterId,
-                  skill.Id,
-                  SystemCommunications.TargetEntity targetId
-                )
-              )
-            )
+          stateWrite.SetPendingSkillCast(
+            casterId,
+            skill.Id,
+            SystemCommunications.TargetEntity targetId
           )
         else
           eventBus.Publish(
@@ -164,6 +160,7 @@ module Targeting =
 
     let handleTargetPosition
       (eventBus: EventBus)
+      (stateWrite: IStateWriteService)
       (positions: HashMap<Guid<EntityId>, Vector2>)
       (skill: ActiveSkill)
       (casterId: Guid<EntityId>)
@@ -191,16 +188,10 @@ module Targeting =
             )
           )
 
-          eventBus.Publish(
-            GameEvent.State(
-              StateChangeEvent.Combat(
-                CombatEvents.PendingSkillCastSet(
-                  casterId,
-                  skill.Id,
-                  SystemCommunications.TargetPosition targetPos
-                )
-              )
-            )
+          stateWrite.SetPendingSkillCast(
+            casterId,
+            skill.Id,
+            SystemCommunications.TargetPosition targetPos
           )
         else
           eventBus.Publish(
@@ -220,6 +211,7 @@ module Targeting =
     =
     let {
           eventBus = eventBus
+          stateWrite = stateWrite
           skillBeingTargeted = skillBeingTargeted
           currentAction = _entityId, _action
         } =
@@ -245,6 +237,7 @@ module Targeting =
             | TargetEntity, SelectedEntity targetId ->
               TargetingHandlers.handleTargetEntity
                 eventBus
+                stateWrite
                 positions
                 activeSkill
                 casterId
@@ -252,6 +245,7 @@ module Targeting =
             | TargetPosition, SelectedPosition targetPos ->
               TargetingHandlers.handleTargetPosition
                 eventBus
+                stateWrite
                 positions
                 activeSkill
                 casterId
@@ -282,6 +276,7 @@ module Targeting =
   let create
     (
       eventBus: EventBus,
+      stateWrite: IStateWriteService,
       skillStore: SkillStore,
       projections: Projections.ProjectionService
     ) =
@@ -304,6 +299,7 @@ module Targeting =
       handleTargetSelected
         {
           eventBus = eventBus
+          stateWrite = stateWrite
           skillBeingTargeted = skillBeingTargeted
           currentAction = struct (_entityId, _action)
         }

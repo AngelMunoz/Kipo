@@ -16,6 +16,7 @@ open Pomo.Core.Domain.Skill
 open Pomo.Core.Domain.Core
 open Pomo.Core.Domain.Units
 open Pomo.Core.Domain
+open Pomo.Core.Domain.Events
 
 
 module Environment =
@@ -48,6 +49,15 @@ module Environment =
     abstract UpdatePose: Guid<EntityId> * HashMap<string, Matrix> -> unit
     abstract RemoveAnimationState: Guid<EntityId> -> unit
     abstract UpdateModelConfig: Guid<EntityId> * string -> unit
+    abstract ApplyEffect: Guid<EntityId> * Skill.ActiveEffect -> unit
+    abstract ExpireEffect: Guid<EntityId> * Guid<EffectId> -> unit
+    abstract RefreshEffect: Guid<EntityId> * Guid<EffectId> -> unit
+    abstract ChangeEffectStack: Guid<EntityId> * Guid<EffectId> * int -> unit
+
+    abstract SetPendingSkillCast:
+      Guid<EntityId> * int<SkillId> * SystemCommunications.SkillTarget -> unit
+
+    abstract ClearPendingSkillCast: Guid<EntityId> -> unit
     abstract FlushWrites: unit -> unit
 
   type CoreServices =
