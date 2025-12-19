@@ -4,12 +4,14 @@ open System
 open Microsoft.Xna.Framework
 open FSharp.Data.Adaptive
 open FSharp.UMX
+open Pomo.Core
 open Pomo.Core.Domain
 open Pomo.Core.Domain.Units
 open Pomo.Core.Domain.Events
 open Pomo.Core.Domain.Animation
 open Pomo.Core.Environment
 open Pomo.Core.Domain.World
+open Pomo.Core.Projections
 open Pomo.Core.Stores
 
 module AnimationStateLogic =
@@ -67,7 +69,7 @@ type MotionStateAnimationSystem(game: Game, env: PomoEnvironment) =
 
   override this.Update(gameTime) =
     // Force world data directly - no reactive projection
-    let velocities = core.World.Velocities |> AMap.force
+    let velocities = core.World.Velocities |> Dictionary.toHashMap
     let activeAnimations = core.World.ActiveAnimations |> AMap.force
     let resources = core.World.Resources |> AMap.force
     let modelConfigIds = core.World.ModelConfigId |> AMap.force

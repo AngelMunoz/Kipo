@@ -7,6 +7,7 @@ open FSharp.Control.Reactive
 open FSharp.UMX
 open FSharp.Data.Adaptive
 
+open Pomo.Core
 open Pomo.Core.EventBus
 open Pomo.Core.Domain
 open Pomo.Core.Domain.Events
@@ -66,9 +67,7 @@ module ResourceManager =
     let stats = derivedStats |> AMap.force
 
     let position =
-      world.Positions
-      |> AMap.force
-      |> HashMap.tryFindV event.Target
+      world.Positions.TryFindV event.Target
       |> ValueOption.defaultValue Vector2.Zero
 
     match resources.TryFindV event.Target with

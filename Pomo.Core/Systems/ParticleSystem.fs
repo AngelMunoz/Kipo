@@ -1,6 +1,7 @@
 namespace Pomo.Core.Systems
 
 open System
+open System.Collections.Generic
 open Microsoft.Xna.Framework
 open FSharp.Data.Adaptive
 
@@ -8,6 +9,7 @@ open FSharp.UMX
 
 open Pomo.Core
 open Pomo.Core.Domain
+open Pomo.Core.Domain.World
 open Pomo.Core.Domain.Particles
 open Pomo.Core.Domain.Skill
 open Pomo.Core.Domain.Units
@@ -444,9 +446,9 @@ module ParticleSystem =
     // For syncing gameplay effects to visuals (direct from world.ActiveEffects)
     ActiveEffects: HashMap<Guid<EntityId>, Skill.ActiveEffect IndexList>
     // For transform updates (not stable - raw world data)
-    Positions: HashMap<Guid<EntityId>, Vector2>
-    Velocities: HashMap<Guid<EntityId>, Vector2>
-    Rotations: HashMap<Guid<EntityId>, float32>
+    Positions: IReadOnlyDictionary<Guid<EntityId>, Vector2>
+    Velocities: IReadOnlyDictionary<Guid<EntityId>, Vector2>
+    Rotations: IReadOnlyDictionary<Guid<EntityId>, float32>
   }
 
   /// Sync gameplay effects to visual effects - spawns new visuals for new effects
@@ -528,21 +530,18 @@ module ParticleSystem =
     match effect.Owner with
     | ValueSome ownerId ->
       // Use raw Positions/Velocities/Rotations (works for all entity types)
-      match ctx.Positions |> HashMap.tryFindV ownerId with
+      match ctx.Positions.TryFindV ownerId with
       | ValueSome pos ->
         effect.Position.Value <- Vector3(pos.X, 0.0f, pos.Y)
 
         let vel =
-          ctx.Velocities
-          |> HashMap.tryFindV ownerId
+          ctx.Velocities.TryFindV ownerId
           |> ValueOption.defaultValue Vector2.Zero
 
         ownerVelocity <- Vector3(vel.X, 0.0f, vel.Y)
 
         let rot =
-          ctx.Rotations
-          |> HashMap.tryFindV ownerId
-          |> ValueOption.defaultValue 0.0f
+          ctx.Rotations.TryFindV ownerId |> ValueOption.defaultValue 0.0f
 
         ownerRotation <-
           Quaternion.CreateFromAxisAngle(Vector3.Up, -rot + MathHelper.PiOver2)
@@ -611,9 +610,9 @@ module ParticleSystem =
       // Active effects from world (stable - entities with effects)
       let activeEffects = core.World.ActiveEffects |> AMap.force
       // Raw transforms (not stable - for position updates)
-      let positions = core.World.Positions |> AMap.force
-      let velocities = core.World.Velocities |> AMap.force
-      let rotations = core.World.Rotations |> AMap.force
+      let positions = core.World.Positions
+      let velocities = core.World.Velocities
+      let rotations = core.World.Rotations
 
       let ctx: ParticleUpdateContext = {
         Dt = dt

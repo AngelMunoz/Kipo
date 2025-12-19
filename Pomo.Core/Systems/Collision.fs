@@ -18,6 +18,7 @@ open Pomo.Core.Systems.Systems
 
 module Collision =
   open Pomo.Core.Domain
+  open Pomo.Core.Domain.World
 
   // Helper to get entities in nearby cells
   let private neighborOffsets = [|
@@ -309,7 +310,7 @@ module Collision =
 
         // Check for map object collisions per scenario
         // Get dependencies for CCD
-        let velocities = core.World.Velocities |> AMap.force
+        let velocities = core.World.Velocities
         let time = core.World.Time |> AVal.force
         let dt = float32 time.Delta.TotalSeconds
 
@@ -336,9 +337,8 @@ module Collision =
             | ValueNone -> true // Non-projectiles always check walls
 
           if shouldCheckWalls then
-            // 1. Reconstruct Start Position
             let startPos =
-              match velocities |> HashMap.tryFindV entityId with
+              match velocities.TryFindV entityId with
               | ValueSome v -> targetPos - (v * dt)
               | ValueNone -> targetPos
 

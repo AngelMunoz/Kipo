@@ -26,6 +26,7 @@ module StateUpdate =
   /// </remarks>
   module Entity =
     let addEntity (world: MutableWorld) (entity: Entity.EntitySnapshot) =
+      world.EntityExists.Add(entity.Id) |> ignore
       world.Positions[entity.Id] <- entity.Position
       world.Velocities[entity.Id] <- entity.Velocity
       world.EntityScenario[entity.Id] <- entity.ScenarioId
@@ -33,8 +34,10 @@ module StateUpdate =
       world.SpawningEntities.Remove entity.Id |> ignore
 
     let inline removeEntity (world: MutableWorld) (entity: Guid<EntityId>) =
+      world.EntityExists.Remove(entity) |> ignore
       world.Positions.Remove(entity) |> ignore
       world.Velocities.Remove(entity) |> ignore
+      world.Rotations.Remove(entity) |> ignore
       world.LiveProjectiles.Remove(entity) |> ignore
       world.SpawningEntities.Remove(entity) |> ignore
       world.MovementStates.Remove(entity) |> ignore
@@ -62,6 +65,7 @@ module StateUpdate =
       (bundle: EntitySpawnBundle)
       =
       let entityId = bundle.Snapshot.Id
+      world.EntityExists.Add(entityId) |> ignore
 
       // Core entity data (always present)
       world.Positions[entityId] <- bundle.Snapshot.Position
@@ -99,8 +103,8 @@ module StateUpdate =
           |> Array.fold
             (fun acc item ->
               world.ItemInstances[item.InstanceId] <- item
-              HashSet.add item.InstanceId acc)
-            HashSet.empty
+              FSharp.Data.Adaptive.HashSet.add item.InstanceId acc)
+            FSharp.Data.Adaptive.HashSet.empty
 
         world.EntityInventories[entityId] <- inventory)
 
@@ -134,28 +138,28 @@ module StateUpdate =
       (world: MutableWorld)
       struct (entity: Guid<EntityId>, position: Vector2)
       =
-      if world.Positions.ContainsKey entity then
+      if world.EntityExists.Contains entity then
         world.Positions[entity] <- position
 
     let inline updateVelocity
       (world: MutableWorld)
       struct (entity: Guid<EntityId>, velocity: Vector2)
       =
-      if world.Velocities.ContainsKey entity then
+      if world.EntityExists.Contains entity then
         world.Velocities[entity] <- velocity
 
     let inline updateRotation
       (world: MutableWorld)
       struct (entity: Guid<EntityId>, rotation: float32)
       =
-      if world.Positions.ContainsKey entity then
+      if world.EntityExists.Contains entity then
         world.Rotations[entity] <- rotation
 
     let inline updateMovementState
       (world: MutableWorld)
       struct (entity: Guid<EntityId>, movementState: MovementState)
       =
-      if world.Positions.ContainsKey entity then
+      if world.EntityExists.Contains entity then
         world.MovementStates[entity] <- movementState
 
     let createProjectile
@@ -174,7 +178,9 @@ module StateUpdate =
           match projectile.Target with
           | Projectile.PositionTarget targetPos -> Some targetPos
           | Projectile.EntityTarget _ ->
-            world.Positions.TryGetValue projectile.Caster
+            match world.Positions.TryGetValue projectile.Caster with
+            | true, pos -> Some pos
+            | false, _ -> None
 
       match startingPos with
       | Some pos ->

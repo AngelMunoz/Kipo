@@ -4,6 +4,7 @@ open System
 open FSharp.UMX
 open FSharp.Data.Adaptive
 open Microsoft.Xna.Framework
+open Pomo.Core
 open Pomo.Core.Domain
 open Pomo.Core.Domain.AI
 open Pomo.Core.Domain.Core
@@ -11,6 +12,7 @@ open Pomo.Core.Domain.Entity
 open Pomo.Core.Domain.Events
 open Pomo.Core.Domain.Units
 open Pomo.Core.Domain.World
+open Pomo.Core.Projections
 open Pomo.Core.Stores
 open Pomo.Core.EventBus
 
@@ -1243,7 +1245,7 @@ type AISystem(game: Game, env: PomoEnvironment) =
       match velocitiesOpt with
       | ValueSome v -> v
       | ValueNone ->
-        let v = core.World.Velocities |> AMap.force
+        let v = core.World.Velocities |> Dictionary.toHashMap
         velocitiesOpt <- ValueSome v
         v
 

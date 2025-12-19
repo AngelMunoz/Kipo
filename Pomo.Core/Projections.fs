@@ -3,7 +3,9 @@ namespace Pomo.Core
 open System
 open FSharp.UMX
 open Microsoft.Xna.Framework
+open System.Collections.Generic
 open FSharp.Data.Adaptive
+open Pomo.Core
 open Pomo.Core.Domain.Units
 open Pomo.Core.Domain
 open Pomo.Core.Domain.World
@@ -16,18 +18,6 @@ open Pomo.Core.Domain.Projectile
 open Pomo.Core.Domain.Skill
 
 module Projections =
-
-  module private Dictionary =
-    open System.Collections.Generic
-
-    let tryFindV
-      (key: 'Key)
-      (dict: IReadOnlyDictionary<'Key, 'Value>)
-      : 'Value voption =
-      match dict.TryGetValue key with
-      | true, value -> ValueSome value
-      | false, _ -> ValueNone
-
   let private liveEntities(world: World) =
     world.Resources
     |> AMap.filter(fun _ resource -> resource.Status = Entity.Status.Alive)
@@ -430,9 +420,9 @@ module Projections =
 
         member _.ComputeMovementSnapshot(scenarioId) =
           let time = world.Time |> AVal.map _.Delta |> AVal.force
-          let velocities = world.Velocities |> AMap.force
-          let positions = world.Positions |> AMap.force
-          let rotations = world.Rotations |> AMap.force
+          let velocities = world.Velocities |> Dictionary.toHashMap
+          let positions = world.Positions |> Dictionary.toHashMap
+          let rotations = world.Rotations |> Dictionary.toHashMap
           let modelConfigIds = world.ModelConfigId |> AMap.force
           let entityScenarios = world.EntityScenario |> AMap.force
 

@@ -4,6 +4,7 @@ open System
 open FSharp.UMX
 open FSharp.Data.Adaptive
 open Microsoft.Xna.Framework
+open System.Collections.Generic
 open System.Collections.Concurrent
 open Pomo.Core.Domain.Units
 open Pomo.Core.Domain.Units
@@ -19,6 +20,7 @@ module World =
   open RawInput
   open Action
   open Core
+  open System.Collections.Generic
 
   [<Struct>]
   type Scenario = {
@@ -43,11 +45,12 @@ module World =
       cmap<Guid<EntityId>, HashMap<int, HashMap<GameAction, SlotProcessing>>>
     ActiveActionSets: cmap<Guid<EntityId>, int>
     // entity components
-    Positions: cmap<Guid<EntityId>, Vector2>
-    Velocities: cmap<Guid<EntityId>, Vector2>
+    EntityExists: HashSet<Guid<EntityId>>
+    Positions: Dictionary<Guid<EntityId>, Vector2>
+    Velocities: Dictionary<Guid<EntityId>, Vector2>
     MovementStates: cmap<Guid<EntityId>, MovementState>
     Resources: cmap<Guid<EntityId>, Entity.Resource>
-    Factions: cmap<Guid<EntityId>, Entity.Faction HashSet>
+    Factions: cmap<Guid<EntityId>, FSharp.Data.Adaptive.HashSet<Entity.Faction>>
     BaseStats: cmap<Guid<EntityId>, Entity.BaseStats>
     DerivedStats: cmap<Guid<EntityId>, Entity.DerivedStats>
     ActiveEffects: cmap<Guid<EntityId>, Skill.ActiveEffect IndexList>
@@ -60,7 +63,8 @@ module World =
         struct (int<SkillId> * SystemCommunications.SkillTarget)
        >
     ItemInstances: ConcurrentDictionary<Guid<ItemInstanceId>, ItemInstance>
-    EntityInventories: cmap<Guid<EntityId>, HashSet<Guid<ItemInstanceId>>>
+    EntityInventories:
+      cmap<Guid<EntityId>, FSharp.Data.Adaptive.HashSet<Guid<ItemInstanceId>>>
     EquippedItems: cmap<Guid<EntityId>, HashMap<Slot, Guid<ItemInstanceId>>>
     AIControllers: cmap<Guid<EntityId>, AI.AIController>
     SpawningEntities:
@@ -72,7 +76,7 @@ module World =
     Scenarios: cmap<Guid<ScenarioId>, Scenario>
     EntityScenario: cmap<Guid<EntityId>, Guid<ScenarioId>>
     // 3D Integration
-    Rotations: cmap<Guid<EntityId>, float32>
+    Rotations: Dictionary<Guid<EntityId>, float32>
     ModelConfigId: cmap<Guid<EntityId>, string>
     // Animation
     Poses: cmap<Guid<EntityId>, HashMap<string, Matrix>>
@@ -95,11 +99,15 @@ module World =
 
     abstract ActiveActionSets: amap<Guid<EntityId>, int>
     // entity components
-    abstract Positions: amap<Guid<EntityId>, Vector2>
-    abstract Velocities: amap<Guid<EntityId>, Vector2>
+    abstract EntityExists: IReadOnlySet<Guid<EntityId>>
+    abstract Positions: IReadOnlyDictionary<Guid<EntityId>, Vector2>
+    abstract Velocities: IReadOnlyDictionary<Guid<EntityId>, Vector2>
     abstract MovementStates: amap<Guid<EntityId>, MovementState>
     abstract Resources: amap<Guid<EntityId>, Entity.Resource>
-    abstract Factions: amap<Guid<EntityId>, Entity.Faction HashSet>
+
+    abstract Factions:
+      amap<Guid<EntityId>, FSharp.Data.Adaptive.HashSet<Entity.Faction>>
+
     abstract BaseStats: amap<Guid<EntityId>, Entity.BaseStats>
     abstract DerivedStats: amap<Guid<EntityId>, Entity.DerivedStats>
     abstract ActiveEffects: amap<Guid<EntityId>, Skill.ActiveEffect IndexList>
@@ -117,10 +125,10 @@ module World =
        >
 
     abstract ItemInstances:
-      Collections.Generic.IReadOnlyDictionary<Guid<ItemInstanceId>, ItemInstance>
+      IReadOnlyDictionary<Guid<ItemInstanceId>, ItemInstance>
 
     abstract EntityInventories:
-      amap<Guid<EntityId>, HashSet<Guid<ItemInstanceId>>>
+      amap<Guid<EntityId>, FSharp.Data.Adaptive.HashSet<Guid<ItemInstanceId>>>
 
     abstract EquippedItems:
       amap<Guid<EntityId>, HashMap<Slot, Guid<ItemInstanceId>>>
@@ -135,7 +143,7 @@ module World =
 
     abstract Scenarios: amap<Guid<ScenarioId>, Scenario>
     abstract EntityScenario: amap<Guid<EntityId>, Guid<ScenarioId>>
-    abstract Rotations: amap<Guid<EntityId>, float32>
+    abstract Rotations: IReadOnlyDictionary<Guid<EntityId>, float32>
     abstract ModelConfigId: amap<Guid<EntityId>, string>
 
     abstract Poses: amap<Guid<EntityId>, HashMap<string, Matrix>>
@@ -153,8 +161,9 @@ module World =
           TotalGameTime = TimeSpan.Zero
           Previous = TimeSpan.Zero
         }
-      Positions = cmap()
-      Velocities = cmap()
+      EntityExists = HashSet()
+      Positions = Dictionary()
+      Velocities = Dictionary()
       MovementStates = cmap()
       RawInputStates = cmap()
       InputMaps = cmap()
@@ -177,7 +186,7 @@ module World =
       SpawningEntities = cmap()
       Scenarios = cmap()
       EntityScenario = cmap()
-      Rotations = cmap()
+      Rotations = Dictionary()
       ModelConfigId = cmap()
       Poses = cmap()
       ActiveAnimations = cmap()
@@ -188,6 +197,7 @@ module World =
       { new World with
           member _.Rng = rng
           member _.Time = mutableWorld.Time
+          member _.EntityExists = mutableWorld.EntityExists
           member _.Positions = mutableWorld.Positions
           member _.Velocities = mutableWorld.Velocities
           member _.MovementStates = mutableWorld.MovementStates
