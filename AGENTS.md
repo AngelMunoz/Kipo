@@ -50,8 +50,8 @@
 
 - **Data as Primary Organizing Principle**: All game logic organized around immutable data structures
 - **Pure Data Transformations**: Functions transform data without side effects
-- **Immutable Data Structures**: FDA collections (`cmap`, `amap`, `cset`, `aset`, `clist`, `alist`) enforce immutability
-- **Reactive Data Flow**: FDA extends DOP with automatic incremental computation
+- **Non-Reactive by Default**: Use standard BCL collections (`Dictionary`, `HashSet`) or FDA non-adaptive collections (`HashMap`, `HashSet`, `IndexList`) for most game systems. Reserve adaptive collections (`cmap`, `amap`, `cset`, `aset`) for state that genuinely benefits from incremental computation
+- **Reactive When Warranted**: Use FDA reactive patterns only when you need automatic change propagation or expensive derived computations that benefit from caching
 
 ### FDA Implementation
 
@@ -82,6 +82,23 @@
 - **Discriminated unions that represent domain concepts must be decorated as a struct DU**
 - **Value tuples** (`struct(v1,v2)`) are favored over reference tuples
 - **ValueOption** is favored over Option unless necessary (convert `Option.toValueOption` or `ValueOption.ofOption` when necessary as some libraries do not provide value options)
+
+### Memory Optimization Patterns
+
+**ArrayPool-Based Buffers**: Use `System.Buffers.ArrayPool<T>.Shared` for frequently-resized arrays (see `CommandBuffer` in `State.fs` and `RingEventBus` in `EventBus.fs`):
+
+- Rent arrays from pool instead of allocating
+- Return to pool when resizing or disposing
+- Auto-shrink after sustained low usage (e.g., 60 frames at < 25% capacity)
+
+**Struct Commands**: Use `[<Struct>]` DUs for high-frequency command queues:
+
+```fsharp
+[<Struct>]
+type Command =
+  | UpdatePosition of entityId: Guid<EntityId> * position: Vector2
+  | UpdateVelocity of entityId: Guid<EntityId> * velocity: Vector2
+```
 
 ## Testing Strategy
 
@@ -211,52 +228,29 @@ let processEffect effect =
    | effect -> handleOtherEffect effect
 ```
 
-**Game Systems and Drawable Game Systems:**
+**Game Systems:**
 
-When implementing Sytems, whether they're a GameComponent (or our GameSystem class) or a DrawableGameComponent. The component class itself should be a slim wrapper that delegates all logic to module-level functions.
+When implementing Systems (whether `GameComponent`, `GameSystem`, or `DrawableGameComponent`), the component class must be a **thin wrapper** that:
 
-Data used for updates and draws should be stored in let bindings within the class to allow FSharp.Data.Adaptive to start tracking and caching data.
-only at evaluation time (e.g. inside the Update or Draw methods) should we call `AVal.force` to get the current value.
+1. Stores dependencies as `let` bindings
+2. Delegates all logic to module-level functions
+3. Calls `AVal.force` only inside `Update()` or `Draw()` to resolve values
+
+**Default to non-reactive iteration**: Most systems should iterate over `HashMap` directly rather than using adaptive transformations. Use adaptive patterns only when you need cached derived computations.
 
 ```fsharp
+module SomeSystem =
+  let processEntity stateWrite entityId position =
+    // Pure logic here
+    stateWrite.UpdatePosition(entityId, position)
 
-module System =
-   let nonAdaptiveLogic data currentValue =
-      // non-adaptive logic here
-      let transformedData =
-         External.processData data currentValue
-      transformedData
+  type SomeSystem(game: Game, projections, stateWrite) =
+    inherit GameSystem(game)
 
-   let transformation (data: _ aval) (otherData: amap<_,_>): _ aval =
-      otherData
-      |> AMap.mapA(fun key value -> adaptive {
-         let! data = data
-         // adaptive logic here
-         let transformedValue = nonAdaptiveLogic data value
-         // use transformedValue in further adaptive computations
-         let adaptiveResult = Module.adaptiveLogic transformedValue
-         return! adaptiveResult
-      })
-
-   let publishEventsFromTransformation data eventBus =
-      for data in data do
-         eventBus.Publish(data)
-
-
-   type System(game: Game) =
-      inherit GameSystem(game) =
-
-      let adaptiveData =
-         transformation
-            Projections.SomeAdaptiveValue this.World
-            Projections.SomeAdaptiveMap this.World
-
-      override _.Update(gameTime) =
-         let currentValue = AVal.force adaptiveData
-         // use currentValue for update logic
-
-         // for example to trigger events:
-         publishEventsFromTransformation currentValue this.EventBus
+    override _.Update _ =
+      let snapshot = projections.ComputeSnapshot()
+      for id, pos in snapshot.Positions do
+        processEntity stateWrite id pos
 ```
 
 ## Animation System & 3D Assets

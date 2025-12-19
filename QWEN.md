@@ -2,7 +2,7 @@
 
 This is a cross-platform game built with F# and MonoGame. The project is structured to share core logic across multiple platforms (Windows, DesktopGL, Android, iOS).
 
-- The general guidelines of this project are in [AGENTS.md](AGENTS.md) and [.agents/fsharp_conventions.md](.agents/fsharp_conventions.md)
+> [!IMPORTANT] > **You MUST read and follow [AGENTS.md](AGENTS.md)** — it contains the authoritative guidelines for this project. This file provides Qwen-specific customizations and quick reference. Also check [.agents/fsharp_conventions.md](.agents/fsharp_conventions.md) for F# code style.
 
 ## Code sugestions
 
@@ -12,53 +12,21 @@ When you're suggesting code to the user, your proposed code should avoid living 
 - Logic that can be reused should be moved to module-level functions.
 - Avoid putting large amounts of logic directly inside class methods.
 
-**Game Systems and Drawable Game Systems:**
+**Game Systems:**
 
-When implementing Sytems, whether they're a GameComponent (or our GameSystem class) or a DrawableGameComponent. The component class itself should be a slim wrapper that delegates all logic to module-level functions.
+Systems inherit from `GameSystem` (which extends `GameComponent`). The class must be a **thin wrapper** that:
 
-Data used for updates and draws should be stored in let bindings within the class to allow FSharp.Data.Adaptive to start tracking and caching data.
-only at evaluation time (e.g. inside the Update or Draw methods) should we call `AVal.force` to get the current value.
+1. Stores dependencies in `let` bindings
+2. Delegates all logic to module-level functions
+3. Calls `AVal.force` only inside `Update()` or `Draw()` to resolve values
 
-```fsharp
+**Default to non-reactive iteration**: Most systems iterate over `HashMap` directly rather than using adaptive transformations. Use adaptive patterns only when caching derived computations is beneficial.
 
-module System =
-   let nonAdaptiveLogic data currentValue =
-      // non-adaptive logic here
-      let transformedData =
-         External.processData data currentValue
-      transformedData
+### Memory Optimization
 
-   let transformation (data: _ aval) (otherData: amap<_,_>): _ aval =
-      otherData
-      |> AMap.mapA(fun key value -> adaptive {
-         let! data = data
-         // adaptive logic here
-         let transformedValue = nonAdaptiveLogic data value
-         // use transformedValue in further adaptive computations
-         let adaptiveResult = Module.adaptiveLogic transformedValue
-         return! adaptiveResult
-      })
-
-   let publishEventsFromTransformation data eventBus =
-      for data in data do
-         eventBus.Publish(data)
-
-
-   type System(game: Game) =
-      inherit GameSystem(game) =
-
-      let adaptiveData =
-         transformation
-            Projections.SomeAdaptiveValue this.World
-            Projections.SomeAdaptiveMap this.World
-
-      override _.Update(gameTime) =
-         let currentValue = AVal.force adaptiveData
-         // use currentValue for update logic
-
-         // for example to trigger events:
-         publishEventsFromTransformation currentValue this.EventBus
-```
+- Use `System.Buffers.ArrayPool<T>.Shared` for frequently-resized arrays (see `State.fs`, `EventBus.fs`)
+- Use `[<Struct>]` DUs for high-frequency commands
+- Auto-shrink buffers after sustained low usage
 
 ## Animation System & 3D Assets
 

@@ -13,21 +13,21 @@ open Pomo.Core.Domain.Map
 module Pathfinding =
 
   module Grid =
-    let worldToGrid (cellSize: float32) (pos: Vector2) : GridCell = {
+    let inline worldToGrid (cellSize: float32) (pos: Vector2) : GridCell = {
       X = int(pos.X / cellSize)
       Y = int(pos.Y / cellSize)
     }
 
-    let gridToWorld (cellSize: float32) (cell: GridCell) : Vector2 =
+    let inline gridToWorld (cellSize: float32) (cell: GridCell) : Vector2 =
       Vector2(
         float32 cell.X * cellSize + cellSize * 0.5f,
         float32 cell.Y * cellSize + cellSize * 0.5f
       )
 
-    let isValid (grid: NavGrid) (cell: GridCell) =
+    let inline isValid (grid: NavGrid) (cell: GridCell) =
       cell.X >= 0 && cell.X < grid.Width && cell.Y >= 0 && cell.Y < grid.Height
 
-    let isWalkable (grid: NavGrid) (cell: GridCell) =
+    let inline isWalkable (grid: NavGrid) (cell: GridCell) =
       isValid grid cell && not grid.IsBlocked[cell.X, cell.Y]
 
     let getNeighbors (grid: NavGrid) (cell: GridCell) =
@@ -383,7 +383,7 @@ module Pathfinding =
 
   module AStar =
 
-    let private heuristic (a: GridCell) (b: GridCell) : float32 =
+    let inline private heuristic (a: GridCell) (b: GridCell) : float32 =
       // Euclidean distance for heuristic
       let dx = float32(a.X - b.X)
       let dy = float32(a.Y - b.Y)
@@ -407,11 +407,7 @@ module Pathfinding =
 
       buildPath endNode []
 
-    let private hasLineOfSight
-      (grid: NavGrid)
-      (startPos: Vector2)
-      (endPos: Vector2)
-      =
+    let hasLineOfSight (grid: NavGrid) (startPos: Vector2) (endPos: Vector2) =
       let dist = Vector2.Distance(startPos, endPos)
 
       if dist < grid.CellSize then
@@ -451,6 +447,31 @@ module Pathfinding =
 
         optimize start rest []
 
+    /// Find nearest walkable cell using spiral search (max 10 cells radius)
+    let private findNearestWalkableCell
+      (grid: NavGrid)
+      (cell: GridCell)
+      : GridCell voption =
+      if Grid.isWalkable grid cell then
+        ValueSome cell
+      else
+        let mutable found = ValueNone
+        let mutable radius = 1
+        let maxRadius = 10
+
+        while found.IsNone && radius <= maxRadius do
+          for dx in -radius .. radius do
+            for dy in -radius .. radius do
+              if (abs dx = radius || abs dy = radius) && found.IsNone then
+                let candidate = { X = cell.X + dx; Y = cell.Y + dy }
+
+                if Grid.isWalkable grid candidate then
+                  found <- ValueSome candidate
+
+          radius <- radius + 1
+
+        found
+
     let findPath
       (grid: NavGrid)
       (startPos: Vector2)
@@ -459,16 +480,25 @@ module Pathfinding =
       let startCell = Grid.worldToGrid grid.CellSize startPos
       let endCell = Grid.worldToGrid grid.CellSize endPos
 
-      if not(Grid.isWalkable grid endCell) then
+      // If end cell is blocked, find nearest walkable cell
+      let targetCell =
+        if Grid.isWalkable grid endCell then
+          endCell
+        else
+          match findNearestWalkableCell grid endCell with
+          | ValueSome walkable -> walkable
+          | ValueNone -> endCell // Will fail below
+
+      if not(Grid.isWalkable grid targetCell) then
         ValueNone
-      elif startCell = endCell then
+      elif startCell = targetCell then
         ValueSome [ endPos ]
       else
         let openSet = PriorityQueue<NavNode, float32>()
         let closedSet = Dictionary<GridCell, NavNode>()
         let gScores = Dictionary<GridCell, float32>()
 
-        let hStart = heuristic startCell endCell
+        let hStart = heuristic startCell targetCell
 
         let startNode = {
           Position = startCell
@@ -484,7 +514,7 @@ module Pathfinding =
         while openSet.Count > 0 && result.IsValueNone do
           let current = openSet.Dequeue()
 
-          if current.Position = endCell then
+          if current.Position = targetCell then
             result <- ValueSome current
           else if not(closedSet.ContainsKey current.Position) then
             closedSet[current.Position] <- current
@@ -508,7 +538,7 @@ module Pathfinding =
 
                 if newG < bestG then
                   gScores[neighborCell] <- newG
-                  let newH = heuristic neighborCell endCell
+                  let newH = heuristic neighborCell targetCell
                   let newF = newG + newH
 
                   let neighborNode = {

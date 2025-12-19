@@ -22,13 +22,13 @@
     <Compile Include="Domain/Scenes.fs" />
     <Compile Include="Domain/Events.fs" />
     <Compile Include="Domain/World.fs" />
+    <Compile Include="Algorithms/Physics.fs" />
+    <Compile Include="Algorithms/Pathfinding.fs" />
     <Compile Include="EventBus.fs" />
     <Compile Include="Serialization.fs" />
     <Compile Include="Stores.fs" />
     <Compile Include="MapSpawning.fs" />
     <Compile Include="Projections.fs" />
-    <Compile Include="Algorithms/Physics.fs" />
-    <Compile Include="Algorithms/Pathfinding.fs" />
     <Compile Include="Graphics/RenderMath.fs" />
     <Compile Include="Graphics/QuadBatch.fs" />
     <Compile Include="Graphics/BillboardBatch.fs" />

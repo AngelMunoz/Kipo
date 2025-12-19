@@ -10,9 +10,26 @@ open Pomo.Core.Domain.Map
 open Pomo.Core.Domain.AI
 open Pomo.Core.Domain.Events
 open Pomo.Core.Stores
+open Pomo.Core.Domain.Navigation
+open Pomo.Core.Domain.Spatial
+open Pomo.Core.Algorithms.Pathfinding
 
 /// Module containing map-related spawning logic
 module MapSpawning =
+
+  /// Border padding to offset spawns from zone edges
+  [<Literal>]
+  let SpawnBorderPadding = 8.0f
+
+  /// Maximum spiral search radius (in grid cells) for finding walkable position
+  [<Literal>]
+  let MaxWalkableSearchRadius = 10
+
+  /// Rotate a vector by angle in radians
+  let inline private rotateVector (v: Vector2) (radians: float32) =
+    let cos = MathF.Cos radians
+    let sin = MathF.Sin radians
+    Vector2(v.X * cos - v.Y * sin, v.X * sin + v.Y * cos)
 
   /// Get a random point inside a polygon
   let getRandomPointInPolygon (poly: IndexList<Vector2>) (random: Random) =
@@ -86,6 +103,34 @@ module MapSpawning =
 
       ValueSome selected
 
+  /// Find nearest walkable cell using spiral search from given position
+  let findNearestWalkable (navGrid: NavGrid) (pos: Vector2) : Vector2 voption =
+    let startCell = Grid.worldToGrid navGrid.CellSize pos
+
+    if Grid.isWalkable navGrid startCell then
+      ValueSome pos
+    else
+      // Spiral outward: check cells at increasing distance
+      let mutable found = ValueNone
+      let mutable radius = 1
+
+      while found.IsNone && radius <= MaxWalkableSearchRadius do
+        for dx in -radius .. radius do
+          for dy in -radius .. radius do
+            // Only check perimeter cells
+            if (abs dx = radius || abs dy = radius) && found.IsNone then
+              let cell: GridCell = {
+                X = startCell.X + dx
+                Y = startCell.Y + dy
+              }
+
+              if Grid.isWalkable navGrid cell then
+                found <- ValueSome(Grid.gridToWorld navGrid.CellSize cell)
+
+        radius <- radius + 1
+
+      found
+
   /// Represents a spawn candidate extracted from map objects
   type SpawnCandidate = {
     Name: string
@@ -96,10 +141,12 @@ module MapSpawning =
 
   /// Extract spawn candidates from a map definition
   /// Respects MaxSpawns property to generate multiple candidates per spawn area
+  /// Validates positions against NavGrid and finds nearest walkable if blocked
   let extractSpawnCandidates
     (mapDef: MapDefinition)
+    (navGrid: NavGrid)
     (random: Random)
-    : SpawnCandidate seq =
+    : SpawnCandidate array =
     mapDef.ObjectGroups
     |> IndexList.collect(fun group ->
       group.Objects
@@ -124,25 +171,54 @@ module MapSpawning =
               | _ -> ValueNone)
             |> ValueOption.defaultValue 1
 
-          // Generate a position within the spawn area
+          // Generate a position within the spawn area with border padding
           let getRandomPosition() =
-            match obj.CollisionShape with
-            | ValueSome(ClosedPolygon points) when not points.IsEmpty ->
-              let offset = getRandomPointInPolygon points random
-              Vector2(obj.X + offset.X, obj.Y + offset.Y)
-            | ValueSome(RectangleShape(width, height)) ->
-              // Random point within rectangle bounds
-              let offsetX = float32(random.NextDouble()) * width
-              let offsetY = float32(random.NextDouble()) * height
-              Vector2(obj.X + offsetX, obj.Y + offsetY)
-            | _ ->
-              // Fallback: use object's width/height if defined
-              if obj.Width > 0.0f && obj.Height > 0.0f then
-                let offsetX = float32(random.NextDouble()) * obj.Width
-                let offsetY = float32(random.NextDouble()) * obj.Height
-                Vector2(obj.X + offsetX, obj.Y + offsetY)
-              else
-                Vector2(obj.X, obj.Y)
+            let radians = MathHelper.ToRadians obj.Rotation
+
+            let rawPos =
+              match obj.CollisionShape with
+              | ValueSome(ClosedPolygon points) when not points.IsEmpty ->
+                let offset = getRandomPointInPolygon points random
+                // Rotate local offset around origin, then translate to world position
+                let rotatedOffset = rotateVector offset radians
+                Vector2(obj.X + rotatedOffset.X, obj.Y + rotatedOffset.Y)
+              | ValueSome(RectangleShape(width, height)) ->
+                // Random point within rectangle bounds with padding
+                let insetW = max 0f (width - 2.0f * SpawnBorderPadding)
+                let insetH = max 0f (height - 2.0f * SpawnBorderPadding)
+
+                let offsetX =
+                  SpawnBorderPadding + float32(random.NextDouble()) * insetW
+
+                let offsetY =
+                  SpawnBorderPadding + float32(random.NextDouble()) * insetH
+
+                // Local offset before rotation
+                let localOffset = Vector2(offsetX, offsetY)
+                // Rotate around origin, then translate to world position
+                let rotatedOffset = rotateVector localOffset radians
+                Vector2(obj.X + rotatedOffset.X, obj.Y + rotatedOffset.Y)
+              | _ ->
+                // Fallback: use object's width/height if defined with padding
+                if obj.Width > 0.0f && obj.Height > 0.0f then
+                  let insetW = max 0f (obj.Width - 2.0f * SpawnBorderPadding)
+                  let insetH = max 0f (obj.Height - 2.0f * SpawnBorderPadding)
+
+                  let offsetX =
+                    SpawnBorderPadding + float32(random.NextDouble()) * insetW
+
+                  let offsetY =
+                    SpawnBorderPadding + float32(random.NextDouble()) * insetH
+
+                  let localOffset = Vector2(offsetX, offsetY)
+                  let rotatedOffset = rotateVector localOffset radians
+                  Vector2(obj.X + rotatedOffset.X, obj.Y + rotatedOffset.Y)
+                else
+                  Vector2(obj.X, obj.Y)
+            // Validate position is walkable, find nearest walkable if not
+            match findNearestWalkable navGrid rawPos with
+            | ValueSome validPos -> validPos
+            | ValueNone -> rawPos // Fallback to raw position if no walkable found
 
           // Create candidates for each spawn slot
           seq {
@@ -156,7 +232,7 @@ module MapSpawning =
           }
           |> IndexList.ofSeq
         | _ -> IndexList.empty))
-    |> IndexList.toSeq
+    |> IndexList.toArray
 
   /// Determine the player spawn position from candidates
   let findPlayerSpawnPosition

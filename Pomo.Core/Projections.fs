@@ -296,6 +296,7 @@ module Projections =
 
     abstract EntityScenarioContexts: amap<Guid<EntityId>, EntityScenarioContext>
     abstract RegenerationContexts: amap<Guid<EntityId>, RegenerationContext>
+    abstract AIControlledEntities: aset<Guid<EntityId>>
 
     abstract ComputeMovementSnapshot: Guid<ScenarioId> -> MovementSnapshot
 
@@ -417,6 +418,7 @@ module Projections =
         member _.ActionSets = activeActionSets world
         member _.EntityScenarioContexts = entityScenarioContexts world
         member _.RegenerationContexts = regenerationContexts world derivedStats
+        member _.AIControlledEntities = world.AIControllers |> AMap.keys
 
         member _.ComputeMovementSnapshot(scenarioId) =
           let time = world.Time |> AVal.map _.Delta |> AVal.force

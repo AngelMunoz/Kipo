@@ -62,14 +62,24 @@ module Navigation =
           )
         )
 
-    let inline updateMovement
-      entityId
-      targetPosition
-      struct (ctx, currentPosition)
-      =
+    let updateMovement entityId targetPosition struct (ctx, currentPosition) =
       let distance = Vector2.Distance(currentPosition, targetPosition)
+      let navGrid = getNavGrid ctx.MapKey
 
-      if distance < freeMovementThreshold then
+      // Check if this entity is AI-controlled (always use A*)
+      let isAI =
+        projections.AIControlledEntities
+        |> ASet.force
+        |> HashSet.contains entityId
+
+      // Player can use direct movement if close AND has clear line of sight
+      // AI always uses A* pathfinding to avoid getting stuck
+      let useDirect =
+        not isAI
+        && distance < freeMovementThreshold
+        && AStar.hasLineOfSight navGrid currentPosition targetPosition
+
+      if useDirect then
         stateWrite.UpdateMovementState(entityId, MovingTo targetPosition)
 
         eventBus.Publish(
@@ -80,10 +90,18 @@ module Navigation =
           )
         )
       else
-        let navGrid = getNavGrid ctx.MapKey
+        // Use A* pathfinding
+        match AStar.findPath navGrid currentPosition targetPosition with
+        | ValueSome path -> publishPath entityId path
+        | ValueNone ->
+          // No path found (unreachable target) - set to Idle
+          stateWrite.UpdateMovementState(entityId, Idle)
 
-        AStar.findPath navGrid currentPosition targetPosition
-        |> ValueOption.iter(publishPath entityId)
+          eventBus.Publish(
+            GameEvent.State(
+              Physics(MovementStateChanged struct (entityId, Idle))
+            )
+          )
 
     { new CoreEventListener with
         member _.StartListening() =

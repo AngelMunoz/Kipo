@@ -264,8 +264,15 @@ module CompositionRoot =
         let mapEntityGroupStore =
           MapSpawning.tryLoadMapEntityGroupStore mapDef.Key
 
+        // Generate NavGrid for spawn validation
+        let navGrid =
+          Algorithms.Pathfinding.Grid.generate
+            mapDef
+            Domain.Core.Constants.Navigation.GridCellSize
+            Domain.Core.Constants.Navigation.EntitySize
+
         let candidates =
-          MapSpawning.extractSpawnCandidates mapDef scope.Random |> Seq.toArray
+          MapSpawning.extractSpawnCandidates mapDef navGrid scope.Random
 
         let playerPos =
           MapSpawning.findPlayerSpawnPosition targetSpawn candidates
