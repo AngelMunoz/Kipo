@@ -32,12 +32,13 @@ module AnimationStateLogic =
     animations
     |> IndexList.exists(fun _ anim -> clipIds |> Array.contains anim.ClipId)
 
-  let determineAnimationChange
-    (entityId: Guid<EntityId>)
+  /// Determines what animation action to take based on movement state.
+  /// Returns: Some true = start run animation, Some false = stop animation, None = no change
+  let determineAnimationAction
     (currentVelocity: Vector2)
     (currentActiveAnimations: AnimationState IndexList)
     (runClipIds: string[] voption)
-    : StateChangeEvent voption =
+    : (bool * AnimationState IndexList voption) voption =
 
     match runClipIds with
     | ValueNone -> ValueNone
@@ -49,14 +50,11 @@ module AnimationStateLogic =
 
       if isMoving && not isRunAnimActive then
         let runAnims = createAnimationsFromBindings clips
-
-        ValueSome(
-          Animation(ActiveAnimationsChanged struct (entityId, runAnims))
-        )
+        ValueSome(true, ValueSome runAnims) // Start run animation
       elif not isMoving && isRunAnimActive then
-        ValueSome(Animation(AnimationStateRemoved entityId))
+        ValueSome(false, ValueNone) // Stop animation
       else
-        ValueNone
+        ValueNone // No change
 
 open Pomo.Core.Environment.Patterns
 
@@ -65,6 +63,7 @@ type MotionStateAnimationSystem(game: Game, env: PomoEnvironment) =
 
   let (Core core) = env.CoreServices
   let (Stores stores) = env.StoreServices
+  let stateWrite = core.StateWrite
 
   override this.Update(gameTime) =
     // Force world data directly - no reactive projection
@@ -100,11 +99,12 @@ type MotionStateAnimationSystem(game: Game, env: PomoEnvironment) =
             cfg.AnimationBindings |> HashMap.tryFindV "Run")
 
         match
-          AnimationStateLogic.determineAnimationChange
-            entityId
+          AnimationStateLogic.determineAnimationAction
             velocity
             currentAnims
             runClipIds
         with
-        | ValueSome event -> core.EventBus.Publish(GameEvent.State event)
-        | ValueNone -> ()
+        | ValueSome(true, ValueSome runAnims) ->
+          stateWrite.UpdateActiveAnimations(entityId, runAnims)
+        | ValueSome(false, _) -> stateWrite.RemoveAnimationState(entityId)
+        | _ -> ()

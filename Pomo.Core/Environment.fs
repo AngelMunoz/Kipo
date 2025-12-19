@@ -41,6 +41,13 @@ module Environment =
       Guid<EntityId> * HashMap<int<SkillId>, TimeSpan> -> unit
 
     abstract UpdateInCombatTimer: Guid<EntityId> -> unit
+
+    abstract UpdateActiveAnimations:
+      Guid<EntityId> * IndexList<Animation.AnimationState> -> unit
+
+    abstract UpdatePose: Guid<EntityId> * HashMap<string, Matrix> -> unit
+    abstract RemoveAnimationState: Guid<EntityId> -> unit
+    abstract UpdateModelConfig: Guid<EntityId> * string -> unit
     abstract FlushWrites: unit -> unit
 
   type CoreServices =

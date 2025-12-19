@@ -307,7 +307,7 @@ module Projectile =
     | ValueNone -> ()
 
   let inline ensureProjectileAnimation
-    (eventBus: EventBus)
+    (stateWrite: IStateWriteService)
     (activeAnims: HashMap<Guid<EntityId>, IndexList<AnimationState>>)
     (projectileId: Guid<EntityId>)
     =
@@ -319,14 +319,7 @@ module Projectile =
         Speed = 1.0f
       }
 
-      eventBus.Publish(
-        GameEvent.State(
-          StateChangeEvent.Animation(
-            ActiveAnimationsChanged
-              struct (projectileId, IndexList.single spinAnim)
-          )
-        )
-      )
+      stateWrite.UpdateActiveAnimations(projectileId, IndexList.single spinAnim)
     | ValueSome _ -> ()
 
   /// Spawns flight visuals for a projectile if not already present
@@ -442,7 +435,7 @@ module Projectile =
 
         for _, (projectileId, projectile) in projectiles do
           // 1. Ensure animation
-          ensureProjectileAnimation core.EventBus activeAnims projectileId
+          ensureProjectileAnimation stateWrite activeAnims projectileId
 
           // 2. Process projectile logic
           let struct (evs, states) =

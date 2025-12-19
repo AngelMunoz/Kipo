@@ -282,16 +282,6 @@ type AIStateChange =
   | ControllerUpdated of
     struct (Guid<EntityId> * Pomo.Core.Domain.AI.AIController)
 
-type VisualsEvents = ModelConfigChanged of struct (Guid<EntityId> * string)
-
-open Pomo.Core.Domain.Animation
-
-type AnimationEvents =
-  | ActiveAnimationsChanged of
-    struct (Guid<EntityId> * AnimationState IndexList)
-  | PoseChanged of struct (Guid<EntityId> * HashMap<string, Matrix>)
-  | AnimationStateRemoved of Guid<EntityId>
-
 [<Struct>]
 type StateChangeEvent =
   | EntityLifecycle of entityLifeCycle: EntityLifecycleEvents
@@ -300,8 +290,6 @@ type StateChangeEvent =
   | Combat of combat: CombatEvents
   | Inventory of inventory: InventoryEvents
   | AI of ai: AIStateChange
-  | Visuals of visuals: VisualsEvents
-  | Animation of animation: AnimationEvents
   // Uncategorized
   | CreateProjectile of
     projParams: struct (Guid<EntityId> * LiveProjectile * Vector2 voption)

@@ -123,6 +123,7 @@ type AnimationSystem(game: Game, env: PomoEnvironment) =
 
   let (Core core) = env.CoreServices
   let (Stores stores) = env.StoreServices
+  let stateWrite = core.StateWrite
 
   override _.Update _ =
     // Get the game time delta from the World's time source
@@ -151,19 +152,10 @@ type AnimationSystem(game: Game, env: PomoEnvironment) =
         updates.Add((entityId, newAnims, newPose))
       | ValueNone -> removals.Add entityId
 
-    // Publish events
+    // Apply state updates directly via StateWriteService
     for entityId, newAnims, newPose in updates do
-      core.EventBus.Publish(
-        GameEvent.State(
-          Animation(ActiveAnimationsChanged struct (entityId, newAnims))
-        )
-      )
-
-      core.EventBus.Publish(
-        GameEvent.State(Animation(PoseChanged struct (entityId, newPose)))
-      )
+      stateWrite.UpdateActiveAnimations(entityId, newAnims)
+      stateWrite.UpdatePose(entityId, newPose)
 
     for entityId in removals do
-      core.EventBus.Publish(
-        GameEvent.State(Animation(AnimationStateRemoved entityId))
-      )
+      stateWrite.RemoveAnimationState(entityId)

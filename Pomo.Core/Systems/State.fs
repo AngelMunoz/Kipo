@@ -555,19 +555,6 @@ module StateUpdate =
             match event with
             | ControllerUpdated(entityId, controller) ->
               AI.updateController mutableWorld (entityId, controller)
-          | Visuals event ->
-            match event with
-            | ModelConfigChanged(entityId, configId) ->
-              if mutableWorld.Positions.ContainsKey entityId then
-                mutableWorld.ModelConfigId[entityId] <- configId
-          | Animation event ->
-            match event with
-            | ActiveAnimationsChanged animsChanged ->
-              Animation.updateActiveAnimations mutableWorld animsChanged
-            | PoseChanged poseChanged ->
-              Animation.updatePose mutableWorld poseChanged
-            | AnimationStateRemoved entityId ->
-              Animation.removeAnimationState mutableWorld entityId
 
           // Uncategorized
           | CreateProjectile projParams ->
@@ -596,6 +583,13 @@ module StateWrite =
     | UpdateInCombatTimer of ictEntityId: Guid<EntityId>
     | AddEntity of addEntityId: Guid<EntityId> * scenarioId: Guid<ScenarioId>
     | RemoveEntity of removeEntityId: Guid<EntityId>
+    // Animation/Visuals
+    | UpdateActiveAnimations of
+      animEntityId: Guid<EntityId> *
+      anims: IndexList<Animation.AnimationState>
+    | UpdatePose of poseEntityId: Guid<EntityId> * pose: HashMap<string, Matrix>
+    | RemoveAnimationState of removeAnimEntityId: Guid<EntityId>
+    | UpdateModelConfig of modelEntityId: Guid<EntityId> * configId: string
 
   /// Apply a single command to the mutable world.
   let inline applyCommand (world: MutableWorld) (cmd: inref<Command>) =
@@ -618,6 +612,13 @@ module StateWrite =
       world.InCombatUntil[id] <- combatEndTime
     | AddEntity(id, sid) -> world.EntityScenario[id] <- sid
     | RemoveEntity id -> StateUpdate.Entity.removeEntity world id
+    // Animation/Visuals
+    | UpdateActiveAnimations(id, anims) -> world.ActiveAnimations[id] <- anims
+    | UpdatePose(id, pose) -> world.Poses[id] <- pose
+    | RemoveAnimationState id ->
+      world.ActiveAnimations.Remove id |> ignore
+      world.Poses.Remove id |> ignore
+    | UpdateModelConfig(id, configId) -> world.ModelConfigId[id] <- configId
 
   /// Mutable command buffer. Uses ResizeArray for simplicity.
   /// Can optimize with ArrayPool later if profiling shows it's needed.
@@ -657,6 +658,17 @@ module StateWrite =
 
         member _.UpdateInCombatTimer(id) =
           buffer.Enqueue(UpdateInCombatTimer id)
+
+        member _.UpdateActiveAnimations(id, anims) =
+          buffer.Enqueue(UpdateActiveAnimations(id, anims))
+
+        member _.UpdatePose(id, pose) = buffer.Enqueue(UpdatePose(id, pose))
+
+        member _.RemoveAnimationState(id) =
+          buffer.Enqueue(RemoveAnimationState id)
+
+        member _.UpdateModelConfig(id, configId) =
+          buffer.Enqueue(UpdateModelConfig(id, configId))
 
         member _.FlushWrites() =
           transact(fun () -> buffer.Flush(mutableWorld))
