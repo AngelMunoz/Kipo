@@ -113,6 +113,7 @@ module Collision =
     let (Core core) = env.CoreServices
     let (Stores stores) = env.StoreServices
     let (Gameplay gameplay) = env.GameplayServices
+    let stateWrite = env.CoreServices.StateWrite
 
     let spawnTerrainImpactEffect (vfxId: string) (pos: Vector2) =
       match stores.ParticleStore.tryFind vfxId with
@@ -482,12 +483,8 @@ module Collision =
                   GameEvent.State(EntityLifecycle(Removed entityId))
                 )
               | ValueNone ->
-                // Regular entity - apply position correction and sliding
-                core.EventBus.Publish(
-                  GameEvent.State(
-                    Physics(PositionChanged struct (entityId, currentPos))
-                  )
-                )
+                // Regular entity - apply position correction using StateWriteService
+                stateWrite.UpdatePosition(entityId, currentPos)
 
                 match lastCollidedObj with
                 | ValueSome obj ->

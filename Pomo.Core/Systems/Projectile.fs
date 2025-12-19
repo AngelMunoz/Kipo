@@ -12,6 +12,7 @@ open Pomo.Core.Domain.Projectile
 open Pomo.Core.Domain.Particles
 open Pomo.Core.Domain.Skill
 open Pomo.Core.Systems.Systems
+open Pomo.Core.Environment
 
 module Projectile =
 
@@ -168,15 +169,19 @@ module Projectile =
     struct (commEvents |> IndexList.ofSeq, stateEvents |> IndexList.ofSeq)
 
   /// Handles the in-flight movement of a horizontal projectile.
-  let private handleHorizontalFlight(ctx: ProjectileContext) =
+  /// Updates velocity via StateWriteService directly.
+  let private handleHorizontalFlight
+    (stateWrite: IStateWriteService)
+    (ctx: ProjectileContext)
+    =
     let direction = Vector2.Normalize(ctx.TargetPosition - ctx.Position)
     let velocity = direction * ctx.Projectile.Info.Speed
-
-    struct (IndexList.empty,
-            IndexList.single(Physics(VelocityChanged struct (ctx.Id, velocity))))
+    stateWrite.UpdateVelocity(ctx.Id, velocity)
+    struct (IndexList.empty, IndexList.empty)
 
   /// Processes a horizontal (standard) or chained projectile.
   let private processHorizontalProjectile
+    (stateWrite: IStateWriteService)
     (world: WorldContext)
     (ctx: ProjectileContext)
     =
@@ -186,9 +191,10 @@ module Projectile =
     if distance < threshold then
       handleHorizontalImpact world ctx
     else
-      handleHorizontalFlight ctx
+      handleHorizontalFlight stateWrite ctx
 
   let processProjectile
+    (stateWrite: IStateWriteService)
     (world: WorldContext)
     (dt: float32)
     (projectileId: Guid<EntityId>)
@@ -225,9 +231,9 @@ module Projectile =
       match projectile.Info.Variations with
       | ValueSome(Descending(currentAltitude, fallSpeed)) ->
         processDescendingProjectile dt ctx currentAltitude fallSpeed
-      | _ -> processHorizontalProjectile world ctx
+      | _ -> processHorizontalProjectile stateWrite world ctx
 
-  open Pomo.Core.Environment
+
   open Pomo.Core.Domain.Animation
   open Pomo.Core.EventBus
 
@@ -378,6 +384,7 @@ module Projectile =
     let (Core core) = env.CoreServices
     let (Gameplay gameplay) = env.GameplayServices
     let (Stores stores) = env.StoreServices
+    let stateWrite = core.StateWrite
 
     // Track which projectiles already have visual effects (O(1) lookup)
     let effectOwners = System.Collections.Generic.HashSet<Guid<EntityId>>()
@@ -439,7 +446,7 @@ module Projectile =
 
           // 2. Process projectile logic
           let struct (evs, states) =
-            processProjectile worldCtx dt projectileId projectile
+            processProjectile stateWrite worldCtx dt projectileId projectile
 
           sysEvents.AddRange evs
           stateEvents.AddRange states

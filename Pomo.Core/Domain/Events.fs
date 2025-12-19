@@ -247,9 +247,6 @@ type InputEvents =
   | ActiveActionSetChanged of aasChanged: struct (Guid<EntityId> * int)
 
 type PhysicsEvents =
-  | PositionChanged of posChanged: struct (Guid<EntityId> * Vector2)
-  | VelocityChanged of velChanged: struct (Guid<EntityId> * Vector2)
-  | RotationChanged of rotChanged: struct (Guid<EntityId> * float32)
   | MovementStateChanged of
     mStateChanged: struct (Guid<EntityId> * MovementState)
 

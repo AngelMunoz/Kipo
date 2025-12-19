@@ -507,12 +507,6 @@ module StateUpdate =
               Combat.activeActionSetChanged mutableWorld aasChanged
           | Physics event ->
             match event with
-            | PositionChanged posChanged ->
-              Entity.updatePosition mutableWorld posChanged
-            | VelocityChanged velChanged ->
-              Entity.updateVelocity mutableWorld velChanged
-            | RotationChanged rotChanged ->
-              Entity.updateRotation mutableWorld rotChanged
             | MovementStateChanged mStateChanged ->
               Entity.updateMovementState mutableWorld mStateChanged
           | Combat event ->
