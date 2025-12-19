@@ -541,7 +541,7 @@ module StateWrite =
         commands <- next
         lowUsageFrames <- 0
 #if DEBUG
-        Debug.WriteLine $"CommandBuffer resized to {newSize}"
+        Console.WriteLine $"CommandBuffer resized to {newSize}"
 #endif
 
       commands[count] <- cmd
@@ -561,7 +561,7 @@ module StateWrite =
           commands <- smaller
           lowUsageFrames <- 0
 #if DEBUG
-          Debug.WriteLine $"CommandBuffer resized to {commands.Length}"
+          Console.WriteLine $"CommandBuffer resized to {commands.Length}"
 #endif
       else
         lowUsageFrames <- 0
