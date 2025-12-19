@@ -6,7 +6,8 @@ Implement the "Seraphic Bombardment" skill, a complex offensive ability where th
 ## 2. Core Requirements
 
 ### 2.1 Domain Model Extensions
-- **Orbital System:** New `OrbitalConfig` and `ActiveOrbital` types to define and track objects orbiting an entity.
+- **Orbital Domain:** New `Domain/Orbital.fs` module to define generic orbital systems, located before `Skills.fs`.
+- **Orbital Configuration:** `OrbitalConfig` struct to define orbital behavior (radius, speed, visuals).
 - **Delivery Types:** New `ChargedProjectile` case in the `Delivery` Discriminated Union (DU) to support skills with a charge-up phase containing visuals.
 - **Projectile Logic:** Logic to handle the transition from "orbiting" to "launched" state.
 
@@ -23,8 +24,9 @@ Implement the "Seraphic Bombardment" skill, a complex offensive ability where th
 
 ### 3.1 Data Structures
 ```fsharp
-// Domain/Skill.fs extensions
+// Domain/Orbital.fs
 
+[<Struct>]
 type OrbitalConfig = {
   Count: int
   OrbitRadius: float32
@@ -33,6 +35,8 @@ type OrbitalConfig = {
   Duration: float32
   Visual: VisualManifest
 }
+
+// Domain/Skill.fs extensions
 
 type ChargeConfig = {
   Duration: float32

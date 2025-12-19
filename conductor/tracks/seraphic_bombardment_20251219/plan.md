@@ -1,12 +1,17 @@
 # Implementation Plan - Seraphic Bombardment
 
 ## Phase 1: Domain & Data Modeling
-- [ ] Task: Extend Domain Types
-  - Define `OrbitalConfig` and `ChargeConfig` in `Domain/Skill.fs`.
+- [ ] Task: Create Orbital Domain
+  - Create `Pomo.Core/Domain/Orbital.fs` with `OrbitalConfig` and `ActiveOrbital` types.
+  - Update `Pomo.Core.fsproj` to include `Domain/Orbital.fs` before `Domain/Skill.fs`.
+  - Use performant collections (e.g., arrays or structs) if `ActiveOrbital` requires storing per-frame changing data.
+- [ ] Task: Extend Skill Domain
+  - Define `ChargeConfig` in `Domain/Skill.fs`.
   - Extend `Delivery` DU with `ChargedProjectile`.
-  - Update `Domain/Combat.fs` or relevant files to support tracking active orbitals.
+- [ ] Task: Implement Serialization
+  - Add JSON decoders for `OrbitalConfig` and `ChargeConfig` in `Serialization.fs`.
 - [ ] Task: Verification
-  - Create a unit test to verify that the new JSON structure for `ChargedProjectile` can be deserialized correctly.
+  - Create a unit test to verify that the new JSON structure for `ChargedProjectile` (including nested `OrbitalConfig`) can be deserialized correctly.
 - [ ] Task: Conductor - User Manual Verification 'Domain & Data Modeling' (Protocol in workflow.md)
 
 ## Phase 2: Core Systems Implementation
