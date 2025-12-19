@@ -26,10 +26,20 @@ Implement the "Seraphic Bombardment" skill, a complex offensive ability where th
 ```fsharp
 // Domain/Orbital.fs
 
+open Microsoft.Xna.Framework
+
 [<Struct>]
 type OrbitalConfig = {
   Count: int
-  OrbitRadius: float32
+  /// Base radius of the orbit
+  Radius: float32
+  /// The local center of the orbit relative to the entity (e.g., Y=1.0 for chest height)
+  CenterOffset: Vector3
+  /// The axis around which the orbitals rotate (allows for tilted orbits, e.g., Vector3.Up for horizontal)
+  RotationAxis: Vector3
+  /// Scaling factors for the orbit shape relative to the rotation plane.
+  /// Use (1.0, 1.0) for a perfect circle, other values for ellipses.
+  PathScale: Vector2
   StartSpeed: float32
   EndSpeed: float32
   Duration: float32
