@@ -8,7 +8,8 @@
 
 The game uses an event-driven architecture where systems publish `StateChangeEvent` instances to an `EventBus`. The `StateUpdateSystem` subscribes and applies these changes to `MutableWorld`.
 
-**Problem:** Many events are *state-only* - they have only one consumer (StateUpdateSystem). This creates unnecessary overhead:
+**Problem:** Many events are _state-only_ - they have only one consumer (StateUpdateSystem). This creates unnecessary overhead:
+
 - Event allocation and GC pressure every frame
 - Observable/subscription dispatch overhead
 - Unnecessary indirection for simple state writes
@@ -17,104 +18,48 @@ The game uses an event-driven architecture where systems publish `StateChangeEve
 
 ---
 
-## What Was Completed
+### Phase 5-8: State-Only Event Elimination ✅
 
-### Phase 1: StateWriteService Infrastructure ✅
+Eliminated all identified state-only events. The `EventBus` now only carries events with multiple subscribers or complex lifecycle requirements.
 
-Created in `Pomo.Core/Systems/State.fs`:
-- `StateWrite.Command` struct union for all write command types
-- `StateWrite.CommandBuffer` class using `ResizeArray<Command>`
-- `StateWrite.create` function returning `IStateWriteService`
-- Flush component with `UpdateOrder = 1000`
+| Category        | Status        | Details                                                                                                              |
+| --------------- | ------------- | -------------------------------------------------------------------------------------------------------------------- |
+| **Inventory**   | ✅ Eliminated | All 7 events migrated to `StateWriteService` or removed as dead. `InventoryEvents` type removed.                     |
+| **AI**          | ✅ Eliminated | `ControllerUpdated` migrated to `UpdateAIController`. `AIStateChange` type removed.                                  |
+| **Combat**      | ✅ Eliminated | `ResourcesChanged`, `Cooldowns`, `InCombat`, `Effect*`, `PendingSkill*` migrated. `CombatEvents` type removed.       |
+| **Projectiles** | ✅ Eliminated | `CreateProjectile` migrated. `Projectile.fs` updated to use `RemoveEntity` direct write.                             |
+| **Input**       | 🔄 Partial    | `RawStateChanged`, `GameActionStatesChanged`, `ActiveActionSetChanged` KEPT (multi-subscriber). Dead events removed. |
 
-Added to `Pomo.Core/Environment.fs`:
-- `IStateWriteService` interface with all update methods
+### Events to Keep (Multi-Subscriber)
 
-Integrated in `Pomo.Core/CompositionRoot.fs`:
-- Service injection into `CoreServices`
-- Disposal handling
+These events represent true inter-system communication and will remain on the `EventBus`:
 
-### Phase 2-3: World.fs Dictionary Migration ❌ NOT DONE
-
-The original plan included migrating `Positions`, `Velocities`, `Rotations` from `cmap` to `Dictionary<>`. This was deferred - the current implementation still uses `cmap` but writes go through `StateWriteService`.
-
-### Phase 4: StateWriteService Injection ✅
-
-`IStateWriteService` is available via `core.StateWrite` in all systems.
-
-### Phase 5-6: Event Migration ✅ (Partial)
-
-**Events Removed (10 total):**
-
-| Category | Event | Replaced With |
-|----------|-------|---------------|
-| PhysicsEvents | `PositionChanged` | `UpdatePosition` |
-| PhysicsEvents | `VelocityChanged` | `UpdateVelocity` |
-| PhysicsEvents | `RotationChanged` | `UpdateRotation` |
-| CombatEvents | `ResourcesChanged` | `UpdateResources` |
-| CombatEvents | `CooldownsChanged` | `UpdateCooldowns` |
-| CombatEvents | `InCombatTimerRefreshed` | `UpdateInCombatTimer` |
-| AnimationEvents | `ActiveAnimationsChanged` | `UpdateActiveAnimations` |
-| AnimationEvents | `PoseChanged` | `UpdatePose` |
-| AnimationEvents | `AnimationStateRemoved` | `RemoveAnimationState` |
-| VisualsEvents | `ModelConfigChanged` | `UpdateModelConfig` |
-
-**Event Types Removed Entirely:**
-- `AnimationEvents` (all 3 events migrated)
-- `VisualsEvents` (single event migrated)
-- Removed `Visuals` and `Animation` cases from `StateChangeEvent`
-
-**Systems Updated:**
-- `Movement.fs`, `MovementLogic.fs`, `PlayerMovement.fs`, `UnitMovement.fs`
-- `Projectile.fs`, `Collision.fs`
-- `ResourceManager.fs`, `Combat.fs`, `AbilityActivation.fs`
-- `AnimationSystem.fs`, `MotionStateAnimation.fs`
-- `State.fs` (removed pattern matches for migrated events)
+- `MovementStateChanged`: Subscribed by `State.fs` (state) and `AbilityActivation.fs` (clear pending).
+- `RawStateChanged`: Subscribed by `State.fs` (input update) and `Targeting.fs` (mode/target resolution).
+- `GameActionStatesChanged`: Subscribed by `State.fs` and `ActionHandler.fs`.
+- `ActiveActionSetChanged`: Published by `ActionHandler.fs`, used by `State.fs`.
+- `EntityLifecycleEvents`: Complex spawning/removal workflows.
+- `LifecycleEvent.ProjectileImpacted`: Subscribed by `Combat.fs` for damage/effect resolution.
 
 ---
 
 ## What Remains
 
-### Pending General Plan Items
+### Infrastructure & Performance Optimization
 
-1. **World.fs Dictionary Migration** - Convert `Positions`, `Velocities`, `Rotations` from `cmap` to `Dictionary<>` for better performance
-2. **EntityExists HashSet** - Add tracking set for entity existence
-3. **Projections.fs Update** - Read from `IReadOnlyDictionary` instead of `AMap.force`
+1. **World.fs Dictionary Migration** (CRITICAL):
 
-### Pending State-Only Events
+   - Convert `Positions`, `Velocities`, `Rotations` from `cmap` to `System.Collections.Generic.Dictionary<Guid<EntityId>, _>`.
+   - Update `Projections.fs` to read from `IReadOnlyDictionary`.
+   - Goal: Fully eliminate FSharp.Adaptive overhead for core physical properties.
 
-Current `StateChangeEvent` structure:
-```fsharp
-type StateChangeEvent =
-  | EntityLifecycle of EntityLifecycleEvents  // Keep - complex spawn workflows
-  | Input of InputEvents                      // 5 events - candidates
-  | Physics of PhysicsEvents                  // 1 event (MovementStateChanged - has 2 subscribers, keep)
-  | Combat of CombatEvents                    // 9 events remaining
-  | Inventory of InventoryEvents              // 7 events - candidates
-  | AI of AIStateChange                       // 1 event (ControllerUpdated - candidate)
-  | CreateProjectile of ...                   // 1 event - candidate
-```
+2. **EntityExists HashSet**:
 
-**State-Only Candidates (verified via grep - only consumed by State.fs):**
+   - Add `HashSet<Guid<EntityId>>` for fast existence checks during `applyCommand`.
 
-| Event | Publisher | Migrate? |
-|-------|-----------|----------|
-| `FactionsChanged` | Not published anywhere | ✅ Can remove entirely |
-| `BaseStatsChanged` | Not published anywhere | ✅ Can remove entirely |
-| `StatsChanged` | Not published anywhere | ✅ Can remove entirely |
-| `EffectApplied` | EffectApplication.fs | ✅ Migrate |
-| `EffectExpired` | Check needed | Likely migrate |
-| `EffectRefreshed` | Check needed | Likely migrate |
-| `EffectStackChanged` | Check needed | Likely migrate |
-| `PendingSkillCastSet/Cleared` | Check needed | Likely migrate |
-| `ControllerUpdated` | AISystem.fs | ✅ Migrate |
-| `InputEvents` (all 5) | InputSystem | ✅ Migrate |
-| `InventoryEvents` (all 7) | Inventory systems | Needs verification |
-| `CreateProjectile` | Combat.fs | ✅ Migrate |
-
-**Events to Keep (multiple subscribers):**
-- `MovementStateChanged` - AbilityActivation subscribes to clear pending casts
-- `EntityLifecycleEvents` - Complex spawn/death workflows with multiple listeners
+3. **Batching & Buffering**:
+   - Evaluate if `CommandBuffer` needs further optimization (e.g., `ArrayPool` for `ResizeArray` backing).
+   - Currently using a fixed 2048 initial capacity which is sufficient for current scale.
 
 ---
 
@@ -139,12 +84,12 @@ type StateChangeEvent =
 
 ## Key Files
 
-| File | Purpose |
-|------|---------|
-| `Pomo.Core/Environment.fs` | `IStateWriteService` interface definition |
-| `Pomo.Core/Systems/State.fs` | StateWrite module + StateUpdateSystem handlers |
-| `Pomo.Core/Domain/Events.fs` | Event type definitions |
-| `Pomo.Core/CompositionRoot.fs` | Service injection |
+| File                           | Purpose                                        |
+| ------------------------------ | ---------------------------------------------- |
+| `Pomo.Core/Environment.fs`     | `IStateWriteService` interface definition      |
+| `Pomo.Core/Systems/State.fs`   | StateWrite module + StateUpdateSystem handlers |
+| `Pomo.Core/Domain/Events.fs`   | Event type definitions                         |
+| `Pomo.Core/CompositionRoot.fs` | Service injection                              |
 
 ---
 
