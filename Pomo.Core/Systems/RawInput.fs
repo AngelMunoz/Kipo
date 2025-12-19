@@ -76,10 +76,10 @@ module RawInput =
         PrevTouch = prevInputState.Touch
       }
 
+      core.StateWrite.UpdateRawInputState(entityId, newRawInputState)
+
       core.EventBus.Publish(
         GameEvent.State(
-          StateChangeEvent.Input(
-            InputEvents.RawStateChanged struct (entityId, newRawInputState)
-          )
+          Input(InputEvents.RawStateChanged struct (entityId, newRawInputState))
         )
       )

@@ -119,6 +119,8 @@ module InputMapping =
     override this.Update gameTime =
       match actionStates |> AVal.force with
       | Some states ->
+        core.StateWrite.UpdateGameActionStates(entityId, states)
+
         core.EventBus.Publish(
           GameEvent.State(
             Input(GameActionStatesChanged struct (entityId, states))

@@ -159,6 +159,7 @@ module CompositionRoot =
         ActionHandler.create(
           worldView,
           eventBus,
+          stateWriteService,
           targetingService,
           projections,
           cameraService,
@@ -166,7 +167,12 @@ module CompositionRoot =
         )
 
       let navigationService =
-        Navigation.create(eventBus, scope.Stores.MapStore, projections)
+        Navigation.create(
+          eventBus,
+          stateWriteService,
+          scope.Stores.MapStore,
+          projections
+        )
 
       let inventoryService =
         Inventory.create(
@@ -234,7 +240,6 @@ module CompositionRoot =
       baseComponents.Add(new AnimationSystem(game, pomoEnv))
       baseComponents.Add(new ParticleSystem.ParticleSystem(game, pomoEnv))
       baseComponents.Add(new MotionStateAnimationSystem(game, pomoEnv))
-      baseComponents.Add(new StateUpdateSystem(game, pomoEnv, mutableWorld))
 
       // Map Dependent Systems (Renderers)
       let mapDependentComponents = new ResizeArray<IGameComponent>()

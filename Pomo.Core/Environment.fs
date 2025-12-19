@@ -39,6 +39,16 @@ module Environment =
     abstract UpdateVelocity: Guid<EntityId> * Vector2 -> unit
     abstract UpdateRotation: Guid<EntityId> * float32 -> unit
     abstract RemoveEntity: Guid<EntityId> -> unit
+
+    abstract UpdateRawInputState:
+      Guid<EntityId> * RawInput.RawInputState -> unit
+
+    abstract UpdateGameActionStates:
+      Guid<EntityId> * HashMap<Action.GameAction, Action.InputActionState> ->
+        unit
+
+    abstract UpdateActiveActionSet: Guid<EntityId> * int -> unit
+    abstract UpdateMovementState: Guid<EntityId> * Events.MovementState -> unit
     abstract UpdateResources: Guid<EntityId> * Entity.Resource -> unit
 
     abstract UpdateCooldowns:

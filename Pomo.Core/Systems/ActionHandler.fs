@@ -78,6 +78,7 @@ module ActionHandler =
     (
       world: World,
       eventBus: EventBus,
+      stateWrite: IStateWriteService,
       targetingService: TargetingService,
       projections: Projections.ProjectionService,
       cameraService: CameraService,
@@ -143,6 +144,8 @@ module ActionHandler =
                 )
 
               handleActionSetChange actionSetChangeState (fun value ->
+                stateWrite.UpdateActiveActionSet(entityId, value)
+
                 eventBus.Publish(
                   GameEvent.State(
                     Input(ActiveActionSetChanged struct (entityId, value))

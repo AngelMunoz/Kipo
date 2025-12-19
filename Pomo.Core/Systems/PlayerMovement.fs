@@ -195,6 +195,7 @@ module PlayerMovement =
             MovementLogic.notifyWaypointReached
               playerId
               remainingWaypoints
+              stateWrite
               core.EventBus
           | MovementLogic.Moving finalVelocity ->
             lastVelocity <-

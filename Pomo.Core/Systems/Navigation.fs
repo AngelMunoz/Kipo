@@ -13,6 +13,7 @@ open Pomo.Core.Algorithms
 open Pomo.Core.Projections
 open Pomo.Core.Algorithms.Pathfinding
 open FSharp.Control.Reactive
+open Pomo.Core.Environment
 
 module Navigation =
   open Pomo.Core.Domain.Core
@@ -20,6 +21,7 @@ module Navigation =
   let create
     (
       eventBus: EventBus,
+      stateWrite: IStateWriteService,
       mapStore: MapStore,
       projections: Projections.ProjectionService
     ) =
@@ -50,6 +52,8 @@ module Navigation =
 
     let inline publishPath entityId path =
       if not(List.isEmpty path) then
+        stateWrite.UpdateMovementState(entityId, MovingAlongPath path)
+
         eventBus.Publish(
           GameEvent.State(
             Physics(
@@ -66,6 +70,8 @@ module Navigation =
       let distance = Vector2.Distance(currentPosition, targetPosition)
 
       if distance < freeMovementThreshold then
+        stateWrite.UpdateMovementState(entityId, MovingTo targetPosition)
+
         eventBus.Publish(
           GameEvent.State(
             Physics(

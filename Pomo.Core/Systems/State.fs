@@ -25,15 +25,8 @@ module StateUpdate =
   /// These functions must run within a transaction block as they mutate changeable values.
   /// </remarks>
   module Entity =
-    let addEntity (world: MutableWorld) (entity: Entity.EntitySnapshot) =
-      world.EntityExists.Add(entity.Id) |> ignore
-      world.Positions[entity.Id] <- entity.Position
-      world.Velocities[entity.Id] <- entity.Velocity
-      world.EntityScenario[entity.Id] <- entity.ScenarioId
-      // Remove from spawning entities if it was spawning
-      world.SpawningEntities.Remove entity.Id |> ignore
 
-    let inline removeEntity (world: MutableWorld) (entity: Guid<EntityId>) =
+    let removeEntity (world: MutableWorld) (entity: Guid<EntityId>) =
       world.EntityExists.Remove(entity) |> ignore
       world.Positions.Remove(entity) |> ignore
       world.Velocities.Remove(entity) |> ignore
@@ -123,17 +116,6 @@ module StateUpdate =
       bundle.AIController
       |> ValueOption.iter(fun ai -> world.AIControllers[entityId] <- ai)
 
-    let inline addSpawningEntity
-      (world: MutableWorld)
-      struct (entityId: Guid<EntityId>, scenarioId: Guid<ScenarioId>,
-              spawnType: SystemCommunications.SpawnType, position: Vector2)
-      =
-      // Capture current time for animation
-      let startTime = world.Time.Value.TotalGameTime
-
-      world.SpawningEntities[entityId] <-
-        struct (spawnType, position, startTime)
-
     let inline updatePosition
       (world: MutableWorld)
       struct (entity: Guid<EntityId>, position: Vector2)
@@ -173,19 +155,20 @@ module StateUpdate =
       // 3. Otherwise, spawn at caster position
       let startingPos =
         match startPos with
-        | ValueSome pos -> Some pos
+        | ValueSome pos -> ValueSome pos
         | ValueNone ->
           match projectile.Target with
-          | Projectile.PositionTarget targetPos -> Some targetPos
+          | Projectile.PositionTarget targetPos -> ValueSome targetPos
           | Projectile.EntityTarget _ ->
             match world.Positions.TryGetValue projectile.Caster with
-            | true, pos -> Some pos
-            | false, _ -> None
+            | true, pos -> ValueSome pos
+            | false, _ -> ValueNone
 
       match startingPos with
-      | Some pos ->
+      | ValueSome pos ->
         match world.EntityScenario.TryGetValue projectile.Caster with
         | Some scenarioId ->
+          world.EntityExists.Add(entityId) |> ignore
           world.Positions[entityId] <- pos
           world.Velocities[entityId] <- Vector2.Zero
           world.LiveProjectiles[entityId] <- projectile
@@ -198,7 +181,7 @@ module StateUpdate =
           world.ModelConfigId[entityId] <- modelConfig
           world.EntityScenario[entityId] <- scenarioId
         | None -> ()
-      | None -> ()
+      | ValueNone -> ()
 
   module RawInput =
     let inline updateState
@@ -209,12 +192,6 @@ module StateUpdate =
         world.RawInputStates[id] <- state
 
   module InputMapping =
-    let inline updateMap
-      (world: MutableWorld)
-      struct (id: Guid<EntityId>, map: InputMap)
-      =
-      if world.Positions.ContainsKey id then
-        world.InputMaps[id] <- map
 
     let inline updateActionStates
       (world: MutableWorld)
@@ -233,12 +210,20 @@ module StateUpdate =
       if world.Positions.ContainsKey id then
         world.Resources[id] <- resources
 
-    let inline updateFactions
+    let inline updateCooldowns
       (world: MutableWorld)
-      struct (id: Guid<EntityId>, factions: Domain.Entity.Faction HashSet)
+      struct (id: Guid<EntityId>, cooldowns: HashMap<int<SkillId>, TimeSpan>)
       =
       if world.Positions.ContainsKey id then
-        world.Factions[id] <- factions
+        world.AbilityCooldowns[id] <- cooldowns
+
+    let inline updateInCombatTimer
+      (world: MutableWorld)
+      (entityId: Guid<EntityId>)
+      =
+      if world.Positions.ContainsKey entityId then
+        let newTimestamp = world.Time.Value.TotalGameTime + COMBAT_DURATION
+        world.InCombatUntil[entityId] <- newTimestamp
 
     let inline updateActionSets
       (world: MutableWorld)
@@ -254,21 +239,6 @@ module StateUpdate =
       =
       if world.Positions.ContainsKey id then
         world.ActiveActionSets[id] <- activeSet
-
-    let inline updateCooldowns
-      (world: MutableWorld)
-      struct (id: Guid<EntityId>, cooldowns: HashMap<int<SkillId>, TimeSpan>)
-      =
-      if world.Positions.ContainsKey id then
-        world.AbilityCooldowns[id] <- cooldowns
-
-    let inline updateInCombatTimer
-      (world: MutableWorld)
-      (entityId: Guid<EntityId>)
-      =
-      if world.Positions.ContainsKey entityId then
-        let newTimestamp = world.Time.Value.TotalGameTime + COMBAT_DURATION
-        world.InCombatUntil[entityId] <- newTimestamp
 
     let inline setPendingSkillCast
       (world: MutableWorld)
@@ -286,19 +256,6 @@ module StateUpdate =
       world.PendingSkillCast.Remove entityId |> ignore
 
   module Attributes =
-    let inline updateBaseStats
-      (world: MutableWorld)
-      struct (id: Guid<EntityId>, stats: Domain.Entity.BaseStats)
-      =
-      if world.Positions.ContainsKey id then
-        world.BaseStats[id] <- stats
-
-    let inline updateDerivedStats
-      (world: MutableWorld)
-      (id: Guid<EntityId>, stats: Domain.Entity.DerivedStats)
-      =
-      if world.Positions.ContainsKey id then
-        world.DerivedStats[id] <- stats
 
     let inline applyEffect
       (world: MutableWorld)
@@ -363,19 +320,6 @@ module StateUpdate =
       | None -> ()
 
   module Inventory =
-    let inline alterItemInstance
-      (world: MutableWorld)
-      (itemInstanceId: Guid<ItemInstanceId>)
-      (itemInstance: Item.ItemInstance voption)
-      =
-      match itemInstance with
-      | ValueNone ->
-        match world.ItemInstances.TryRemove itemInstanceId with
-        | true, _ -> ()
-        | false, _ -> ()
-      | ValueSome itemInstance ->
-        world.ItemInstances[itemInstanceId] <- itemInstance
-
     let inline addItemToInventory
       (world: MutableWorld)
       struct (entityId: Guid<EntityId>, itemInstanceId: Guid<ItemInstanceId>)
@@ -387,18 +331,6 @@ module StateUpdate =
 
         world.EntityInventories[entityId] <-
           HashSet.add itemInstanceId currentInventory
-
-    let inline removeItemFromInventory
-      (world: MutableWorld)
-      struct (entityId: Guid<EntityId>, itemInstanceId: Guid<ItemInstanceId>)
-      =
-      if world.Positions.ContainsKey entityId then
-        let currentInventory =
-          world.EntityInventories.TryGetValue entityId
-          |> Option.defaultValue HashSet.empty
-
-        world.EntityInventories[entityId] <-
-          HashSet.remove itemInstanceId currentInventory
 
     let inline equipItem
       (world: MutableWorld)
@@ -415,10 +347,9 @@ module StateUpdate =
 
     let inline unequipItem
       (world: MutableWorld)
-      struct (entityId: Guid<EntityId>, slot: Item.Slot,
-              itemInstanceId: Guid<ItemInstanceId>)
+      struct (entityId: Guid<EntityId>, slot: Item.Slot)
       =
-      if world.Positions.ContainsKey entityId then
+      if world.EntityExists.Contains entityId then
         let currentEquipped =
           world.EquippedItems.TryGetValue entityId
           |> Option.defaultValue HashMap.empty
@@ -432,77 +363,6 @@ module StateUpdate =
       =
       if world.Positions.ContainsKey entityId then
         world.AIControllers[entityId] <- controller
-
-  module Animation =
-    let inline updateActiveAnimations
-      (world: MutableWorld)
-      struct (entityId: Guid<EntityId>,
-              anims: Animation.AnimationState IndexList)
-      =
-      if world.Positions.ContainsKey entityId then
-        world.ActiveAnimations[entityId] <- anims
-
-    let inline updatePose
-      (world: MutableWorld)
-      struct (entityId: Guid<EntityId>, pose: HashMap<string, Matrix>)
-      =
-      if world.Positions.ContainsKey entityId then
-        world.Poses[entityId] <- pose
-
-    let inline removeAnimationState
-      (world: MutableWorld)
-      (entityId: Guid<EntityId>)
-      =
-      world.ActiveAnimations.Remove entityId |> ignore
-      world.Poses.Remove entityId |> ignore
-
-  open Pomo.Core.Environment
-  open Pomo.Core.Environment.Patterns
-
-  type StateUpdateSystem
-    (game: Game, env: PomoEnvironment, mutableWorld: World.MutableWorld) =
-    inherit GameComponent(game)
-
-    let (Core core) = env.CoreServices
-    let eventBus = core.EventBus
-    let events = ConcurrentQueue<StateChangeEvent>()
-    let mutable sub: IDisposable = null
-
-    do
-      base.UpdateOrder <- 1000
-
-      sub <-
-        eventBus.Observable
-        |> Observable.choose(fun e ->
-          match e with
-          | GameEvent.State stateEvent -> Some stateEvent
-          | _ -> None)
-        |> Observable.subscribe(fun e -> events.Enqueue(e))
-
-    override _.Dispose(disposing: bool) : unit =
-      if disposing then
-        sub.Dispose()
-
-      base.Dispose disposing
-
-    override this.Update(gameTime) =
-      transact(fun () ->
-        let mutable event = Unchecked.defaultof<StateChangeEvent>
-
-        while events.TryDequeue(&event) do
-          match event with
-          | Input event ->
-            match event with
-            | RawStateChanged rawIChanged ->
-              RawInput.updateState mutableWorld rawIChanged
-            | GameActionStatesChanged gAChanged ->
-              InputMapping.updateActionStates mutableWorld gAChanged
-            | ActiveActionSetChanged aasChanged ->
-              Combat.activeActionSetChanged mutableWorld aasChanged
-          | Physics event ->
-            match event with
-            | MovementStateChanged mStateChanged ->
-              Entity.updateMovementState mutableWorld mStateChanged)
 
 /// High-performance state write service using command queue pattern.
 /// All state modifications go through this module to ensure consistent
@@ -518,6 +378,16 @@ module StateWrite =
     | UpdatePosition of posEntityId: Guid<EntityId> * position: Vector2
     | UpdateVelocity of velEntityId: Guid<EntityId> * velocity: Vector2
     | UpdateRotation of rotEntityId: Guid<EntityId> * rotation: float32
+    | UpdateRawInputState of
+      rawEntityId: Guid<EntityId> *
+      rawState: RawInput.RawInputState
+    | UpdateGameActionStates of
+      gasEntityId: Guid<EntityId> *
+      actionStates: HashMap<Action.GameAction, Action.InputActionState>
+    | UpdateActiveActionSet of aasEntityId: Guid<EntityId> * actionSet: int
+    | UpdateMovementState of
+      msEntityId: Guid<EntityId> *
+      movementState: Events.MovementState
     | UpdateResources of
       resEntityId: Guid<EntityId> *
       resources: Entity.Resource
@@ -533,7 +403,7 @@ module StateWrite =
       anims: IndexList<Animation.AnimationState>
     | UpdatePose of poseEntityId: Guid<EntityId> * pose: HashMap<string, Matrix>
     | RemoveAnimationState of removeAnimEntityId: Guid<EntityId>
-    | UpdateModelConfig of modelEntityId: Guid<EntityId> * configId: string
+    | UpdateModelConfig of id: Guid<EntityId> * configId: string
     // Effects
     | ApplyEffect of effectEntityId: Guid<EntityId> * effect: Skill.ActiveEffect
     | ExpireEffect of expireEntityId: Guid<EntityId> * effectId: Guid<EffectId>
@@ -574,29 +444,39 @@ module StateWrite =
   let inline applyCommand (world: MutableWorld) (cmd: inref<Command>) =
     match cmd with
     | UpdatePosition(id, pos) ->
-      if world.EntityExists.Contains id then
-        world.Positions[id] <- pos
+      StateUpdate.Entity.updatePosition world struct (id, pos)
     | UpdateVelocity(id, vel) ->
-      if world.EntityExists.Contains id then
-        world.Velocities[id] <- vel
+      StateUpdate.Entity.updateVelocity world struct (id, vel)
     | UpdateRotation(id, rot) ->
+      StateUpdate.Entity.updateRotation world struct (id, rot)
+    | UpdateRawInputState(id, rawState) ->
       if world.EntityExists.Contains id then
-        world.Rotations[id] <- rot
-    | UpdateResources(id, res) -> world.Resources[id] <- res
-    | UpdateCooldowns(id, cds) -> world.AbilityCooldowns[id] <- cds
-    | UpdateInCombatTimer id ->
-      let combatEndTime =
-        world.Time.Value.TotalGameTime + StateUpdate.COMBAT_DURATION
-
-      world.InCombatUntil[id] <- combatEndTime
-    | AddEntity(id, sid) -> world.EntityScenario[id] <- sid
+        StateUpdate.RawInput.updateState world struct (id, rawState)
+    | UpdateGameActionStates(id, actionStates) ->
+      if world.EntityExists.Contains id then
+        StateUpdate.InputMapping.updateActionStates
+          world
+          struct (id, actionStates)
+    | UpdateActiveActionSet(id, actionSet) ->
+      if world.EntityExists.Contains id then
+        StateUpdate.Combat.activeActionSetChanged world struct (id, actionSet)
+    | UpdateMovementState(id, mState) ->
+      StateUpdate.Entity.updateMovementState world struct (id, mState)
+    | UpdateResources(id, res) ->
+      StateUpdate.Combat.updateResources world struct (id, res)
+    | UpdateCooldowns(id, cds) ->
+      StateUpdate.Combat.updateCooldowns world struct (id, cds)
+    | UpdateInCombatTimer id -> StateUpdate.Combat.updateInCombatTimer world id
+    | RemoveAnimationState id ->
+      world.ActiveAnimations.Remove id |> ignore
+      world.Poses.Remove id |> ignore
+    | AddEntity(id, sid) ->
+      world.EntityExists.Add(id) |> ignore
+      world.EntityScenario[id] <- sid
     | RemoveEntity id -> StateUpdate.Entity.removeEntity world id
     // Animation/Visuals
     | UpdateActiveAnimations(id, anims) -> world.ActiveAnimations[id] <- anims
     | UpdatePose(id, pose) -> world.Poses[id] <- pose
-    | RemoveAnimationState id ->
-      world.ActiveAnimations.Remove id |> ignore
-      world.Poses.Remove id |> ignore
     | UpdateModelConfig(id, configId) -> world.ModelConfigId[id] <- configId
     // Effects
     | ApplyEffect(id, effect) ->
@@ -626,12 +506,7 @@ module StateWrite =
     | EquipItem(entityId, slot, instanceId) ->
       StateUpdate.Inventory.equipItem world struct (entityId, slot, instanceId)
     | UnequipItem(entityId, slot) ->
-      if world.EntityExists.Contains entityId then
-        let currentEquipped =
-          world.EquippedItems.TryGetValue entityId
-          |> Option.defaultValue HashMap.empty
-
-        world.EquippedItems[entityId] <- HashMap.remove slot currentEquipped
+      StateUpdate.Inventory.unequipItem world struct (entityId, slot)
     // AI
     | UpdateAIController(entityId, controller) ->
       StateUpdate.AI.updateController world (entityId, controller)
@@ -685,8 +560,20 @@ module StateWrite =
 
         member _.RemoveEntity(id) = buffer.Enqueue(RemoveEntity(id))
 
-        member _.UpdateResources(id, res) =
-          buffer.Enqueue(UpdateResources(id, res))
+        member _.UpdateRawInputState(entityId, rawState) =
+          buffer.Enqueue(UpdateRawInputState(entityId, rawState))
+
+        member _.UpdateGameActionStates(entityId, actionStates) =
+          buffer.Enqueue(UpdateGameActionStates(entityId, actionStates))
+
+        member _.UpdateActiveActionSet(entityId, actionSet) =
+          buffer.Enqueue(UpdateActiveActionSet(entityId, actionSet))
+
+        member _.UpdateMovementState(entityId, movementState) =
+          buffer.Enqueue(UpdateMovementState(entityId, movementState))
+
+        member _.UpdateResources(entityId, resources) =
+          buffer.Enqueue(UpdateResources(entityId, resources))
 
         member _.UpdateCooldowns(id, cds) =
           buffer.Enqueue(UpdateCooldowns(id, cds))

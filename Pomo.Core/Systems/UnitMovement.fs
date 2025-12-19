@@ -193,6 +193,7 @@ module UnitMovement =
                 MovementLogic.notifyWaypointReached
                   entityId
                   remaining
+                  stateWrite
                   core.EventBus
               | MovementLogic.Moving finalVel ->
                 let lastVel =

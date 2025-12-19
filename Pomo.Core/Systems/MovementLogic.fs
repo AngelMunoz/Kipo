@@ -31,8 +31,11 @@ module MovementLogic =
   let notifyWaypointReached
     (entityId: Guid<EntityId>)
     (remainingPath: Vector2 list)
+    (stateWrite: IStateWriteService)
     (eventBus: EventBus)
     =
+    stateWrite.UpdateMovementState(entityId, MovingAlongPath remainingPath)
+
     eventBus.Publish(
       GameEvent.State(
         Physics(
