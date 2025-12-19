@@ -60,3 +60,12 @@ type Delivery =
 - [ ] After charge, spheres launch toward the target area.
 - [ ] Projectiles fall from the sky (descending logic) and create a light column on impact.
 - [ ] Damage is calculated correctly based on the formula.
+
+## 5. Coordinate System Notes
+- **World Orientation:** The game world is isometric, but the 3D camera is positioned top-down (looking down the Y-axis).
+- **Axis Mapping:**
+  - Logic `X` (East-West) -> 3D `X`.
+  - Logic `Y` (North-South) -> 3D `Z`.
+  - Altitude (Up-Down) -> 3D `Y`.
+- **Orbital Implications:** A horizontal orbit should occur in the **X-Z plane** (3D coordinates). Due to the isometric projection, a perfectly circular orbit in 3D space will appear as an ellipse on screen. The `OrbitalSystem` should use 3D `Vector3` math, and the `Render` system will handle the projection.
+- **Descending Logic:** Projectiles using `Descending` logic move along the 3D `Y` axis toward `Y=0`.
