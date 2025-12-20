@@ -112,15 +112,12 @@ module JsonFileLoader =
       let json =
         Path.Combine(AppContext.BaseDirectory, filePath) |> File.ReadAllBytes
 
-      match deserializer.Deserialize<EmitterConfig list> json with
+      match deserializer.Deserialize<Map<string, EmitterConfig array>> json with
       | Ok result ->
-        let mutable newMap = HashMap.empty<string, EmitterConfig list>
+        let mutable newMap = HashMap.empty<string, EmitterConfig array>
 
-        // Group by Name
-        let grouped = result |> List.groupBy(fun config -> config.Name)
-
-        for (name, configs) in grouped do
-          newMap <- HashMap.add name configs newMap
+        for KeyValue(key, value) in result do
+          newMap <- HashMap.add key value newMap
 
         Ok newMap
       | Error decodeError -> Error $"Deserialization error: {decodeError}"
@@ -243,9 +240,9 @@ module Stores =
     abstract member all: unit -> seq<AnimationClip>
 
   type ParticleStore =
-    abstract member find: effectId: string -> EmitterConfig list
-    abstract member tryFind: effectId: string -> EmitterConfig list voption
-    abstract member all: unit -> seq<string * EmitterConfig list>
+    abstract member find: effectId: string -> EmitterConfig array
+    abstract member tryFind: effectId: string -> EmitterConfig array voption
+    abstract member all: unit -> seq<string * EmitterConfig array>
 
   type AIFamilyStore =
     abstract member find: family: string -> AI.AIFamilyConfig
@@ -374,7 +371,7 @@ module Stores =
 
   module Particle =
     let create
-      (loader: string -> Result<HashMap<string, EmitterConfig list>, string>)
+      (loader: string -> Result<HashMap<string, EmitterConfig array>, string>)
       =
       match loader "Content/Particles.json" with
       | Ok particleMap ->

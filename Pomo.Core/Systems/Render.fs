@@ -21,6 +21,7 @@ module Render =
   open Pomo.Core.Domain.Projectile
   open Microsoft.Xna.Framework.Input
   open Pomo.Core.Environment
+  open System.Collections.Generic
 
   // ============================================================================
   // DrawCommands (legacy 2D commands, kept for targeting indicator)
@@ -591,16 +592,6 @@ module Render =
       ctx.CamUp
     )
 
-  /// Renders a group of particles with the same texture
-  let private renderParticleGroup
-    (billboardBatch: BillboardBatch)
-    (ctx: ParticleRenderContext)
-    (group: seq<Particles.EmitterConfig * Particles.Particle * Vector3>)
-    =
-    for config, particle, effectPos in group do
-      drawParticleBillboard billboardBatch ctx config particle effectPos
-
-  /// Sets blend state based on blend mode
   let inline private setBlendState
     (device: GraphicsDevice)
     (blendMode: Particles.BlendMode)
@@ -609,6 +600,77 @@ module Render =
     | Particles.BlendMode.AlphaBlend ->
       device.BlendState <- BlendState.AlphaBlend
     | Particles.BlendMode.Additive -> device.BlendState <- BlendState.Additive
+
+  /// Particle data grouped by (textureId, blendMode) for batched rendering
+  [<Struct>]
+  type ParticleDrawData = {
+    Config: Particles.EmitterConfig
+    Particle: Particles.Particle
+    EffectPos: Vector3
+  }
+
+  type BillboardParticleGroups =
+    Dictionary<
+      struct (string * Particles.BlendMode),
+      ResizeArray<ParticleDrawData>
+     >
+
+  /// Groups billboard particles by (texture, blendMode) in a single pass
+  let private groupBillboardParticles
+    (visualEffects: ResizeArray<Particles.ActiveEffect>)
+    (positions: HashMap<Guid<EntityId>, Vector2>)
+    : BillboardParticleGroups =
+
+    let groups: BillboardParticleGroups = Dictionary()
+
+    for effect in visualEffects do
+      if effect.IsAlive.Value then
+        let effectPos =
+          computeEffectPosition effect.Owner positions effect.Position.Value
+
+        for emitter in effect.Emitters do
+          if emitter.Particles.Count > 0 then
+            match emitter.Config.RenderMode with
+            | Particles.Billboard tex ->
+              let key = struct (tex, emitter.Config.BlendMode)
+
+              let group =
+                match groups.TryGetValue(key) with
+                | true, existing -> existing
+                | false, _ ->
+                  let newGroup = ResizeArray()
+                  groups.[key] <- newGroup
+                  newGroup
+
+              for particle in emitter.Particles do
+                group.Add {
+                  Config = emitter.Config
+                  Particle = particle
+                  EffectPos = effectPos
+                }
+            | Particles.Mesh _ -> () // Skip mesh particles in billboard pass
+
+    groups
+
+  /// Renders a batch of particles with the given texture
+  let inline private renderParticleBatch
+    (billboardBatch: BillboardBatch)
+    (ctx: ParticleRenderContext)
+    (camera: Camera)
+    (texture: Texture2D)
+    (group: ResizeArray<ParticleDrawData>)
+    =
+    billboardBatch.Begin(camera.View, camera.Projection, texture)
+
+    for data in group do
+      drawParticleBillboard
+        billboardBatch
+        ctx
+        data.Config
+        data.Particle
+        data.EffectPos
+
+    billboardBatch.End()
 
   /// Renders all particles
   let private renderAllParticles
@@ -628,46 +690,29 @@ module Render =
       ModelScale = Core.Constants.Entity.ModelScale
     }
 
-    let particlesToDraw =
-      world.VisualEffects
-      |> Seq.filter(fun e -> e.IsAlive.Value)
-      |> Seq.collect(fun e ->
-        let effectPos =
-          computeEffectPosition
-            e.Owner
-            frame.Scenario.Snapshot.Positions
-            e.Position.Value
+    let particleGroups =
+      groupBillboardParticles
+        world.VisualEffects
+        frame.Scenario.Snapshot.Positions
 
-        e.Emitters
-        |> Seq.filter(fun em -> em.Particles.Count > 0)
-        |> Seq.collect(fun em ->
-          em.Particles |> Seq.map(fun p -> em.Config, p, effectPos)))
-      |> Seq.groupBy(fun (config, _, _) -> config.Texture, config.BlendMode)
+    for kvp in particleGroups do
+      let struct (textureId, blendMode) = kvp.Key
+      let group = kvp.Value
 
-    for (textureId, blendMode), group in particlesToDraw do
       match res.GetTexture textureId with
       | ValueSome tex ->
         setBlendState res.Game.GraphicsDevice blendMode
 
-        res.BillboardBatch.Begin(
-          frame.Camera.View,
-          frame.Camera.Projection,
-          tex
-        )
-
-        renderParticleGroup res.BillboardBatch ctx group
-        res.BillboardBatch.End()
+        renderParticleBatch res.BillboardBatch ctx frame.Camera tex group
       | ValueNone ->
         res.Game.GraphicsDevice.BlendState <- BlendState.Additive
 
-        res.BillboardBatch.Begin(
-          frame.Camera.View,
-          frame.Camera.Projection,
+        renderParticleBatch
+          res.BillboardBatch
+          ctx
+          frame.Camera
           res.FallbackTexture
-        )
-
-        renderParticleGroup res.BillboardBatch ctx group
-        res.BillboardBatch.End()
+          group
 
   /// Renders targeting indicator UI overlay
   let private renderTargetingIndicator

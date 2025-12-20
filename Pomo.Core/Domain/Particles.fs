@@ -4,6 +4,7 @@ open System
 open Microsoft.Xna.Framework
 open Microsoft.Xna.Framework.Graphics
 open FSharp.UMX
+open Pomo.Core
 open Pomo.Core.Domain.Units
 open Pomo.Core.Domain.Skill
 
@@ -34,6 +35,12 @@ module Particles =
     | Inward // Convergence: spawn at edge, flow inward
     | EdgeOnly // Ring: spawn only at outer edge
 
+  /// Determines how particles are rendered
+  [<Struct>]
+  type RenderMode =
+    | Billboard of texture: string
+    | Mesh of modelAsset: string
+
   [<Struct>]
   type ParticleConfig = {
     Lifetime: struct (float32 * float32)
@@ -49,7 +56,7 @@ module Particles =
 
   type EmitterConfig = {
     Name: string
-    Texture: string
+    RenderMode: RenderMode
     BlendMode: BlendMode
     SimulationSpace: SimulationSpace
     InheritVelocity: float32
@@ -97,6 +104,74 @@ module Particles =
     BurstDone: bool ref
   }
 
+  /// Mesh particle with 3D rotation for tumbling debris effects
+  [<Struct>]
+  type MeshParticle = {
+    Position: Vector3
+    Velocity: Vector3
+    Rotation: Quaternion
+    AngularVelocity: Vector3
+    Scale: float32
+    Life: float32
+    MaxLife: float32
+  }
+
+  module MeshParticle =
+    let inline withPosition (value: Vector3) (p: MeshParticle) = {
+      p with
+          Position = value
+    }
+
+    let inline withVelocity (value: Vector3) (p: MeshParticle) = {
+      p with
+          Velocity = value
+    }
+
+    let inline withRotation (value: Quaternion) (p: MeshParticle) = {
+      p with
+          Rotation = value
+    }
+
+    let inline withScale (value: float32) (p: MeshParticle) = {
+      p with
+          Scale = value
+    }
+
+    let inline withLife (value: float32) (p: MeshParticle) = {
+      p with
+          Life = value
+    }
+
+  type ActiveMeshEmitter = {
+    Config: EmitterConfig
+    Particles: ResizeArray<MeshParticle>
+    Accumulator: float32 ref
+    BurstDone: bool ref
+  }
+
+  /// Splits emitter configs by RenderMode in a single pass
+  /// Returns (billboardEmitters, meshEmitters)
+  let splitEmittersByRenderMode
+    (configs: EmitterConfig array)
+    : struct (ActiveEmitter array * ActiveMeshEmitter array) =
+    configs
+    |> Array.partitionMap(fun config ->
+      match config.RenderMode with
+      | Billboard _ ->
+        Choice1Of2 {
+          Config = config
+          Particles = ResizeArray<Particle>()
+          Accumulator = ref 0.0f
+          BurstDone = ref false
+        }
+      | Mesh _ ->
+        Choice2Of2 {
+          Config = config
+          Particles = ResizeArray<MeshParticle>()
+          Accumulator = ref 0.0f
+          BurstDone = ref false
+        })
+
   [<Struct>]
   type EffectOverrides = {
     Rotation: Quaternion voption
@@ -117,7 +192,8 @@ module Particles =
 
   type ActiveEffect = {
     Id: string
-    Emitters: ActiveEmitter list
+    Emitters: ActiveEmitter array
+    MeshEmitters: ActiveMeshEmitter array
     Position: Vector3 ref
     Rotation: Quaternion ref
     Scale: Vector3 ref
@@ -333,8 +409,19 @@ module Particles =
 
       let decoder: Decoder<EmitterConfig> =
         fun json -> decode {
-          let! name = Required.Property.get ("Name", Required.string) json
-          let! texture = Required.Property.get ("Texture", Required.string) json
+          let! name = VOptional.Property.get ("Name", Required.string) json
+
+          let! texture =
+            VOptional.Property.get ("Texture", Required.string) json
+
+          let! modelAsset =
+            VOptional.Property.get ("ModelAsset", Required.string) json
+
+          let renderMode =
+            match modelAsset, texture with
+            | ValueSome model, _ -> Mesh model
+            | ValueNone, ValueSome tex -> Billboard tex
+            | ValueNone, ValueNone -> Billboard "Particles/default"
 
           let! blendMode =
             Required.Property.get ("BlendMode", BlendModeCodec.decoder) json
@@ -350,7 +437,6 @@ module Particles =
           let! rate = Required.Property.get ("Rate", Required.int) json
           let! burst = VOptional.Property.get ("Burst", Required.int) json
 
-          // Decode shape from the SAME json object
           let! shape = EmitterShapeCodec.decoder json
 
           let! localOffset =
@@ -373,8 +459,11 @@ module Particles =
               json
 
           return {
-            Name = name
-            Texture = texture
+            Name =
+              match name with
+              | ValueSome n -> n
+              | ValueNone -> ""
+            RenderMode = renderMode
             BlendMode = blendMode
             SimulationSpace =
               match simulationSpace with

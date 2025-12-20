@@ -195,7 +195,193 @@ module ParticleSystem =
       SpeedOverride = ValueNone
     }
 
+  // ─────────────────────────────────────────────────────────────────────────
+  // Shared spawn helpers for both billboard and mesh particles
+  // ─────────────────────────────────────────────────────────────────────────
 
+  /// Computes spawn result based on emitter shape and skill area overrides
+  let inline computeShapeSpawnResult
+    (rng: Random)
+    (shape: EmitterShape)
+    (overrides: EffectOverrides)
+    (effectiveMode: EmissionMode)
+    : SpawnResult =
+    match shape with
+    | EmitterShape.Point -> spawnPointShape rng
+    | EmitterShape.Sphere configRadius ->
+      match overrides.Area with
+      | ValueSome(SkillArea.Circle(skillRadius, _)) ->
+        spawnSphereShape rng skillRadius effectiveMode
+      | ValueSome(SkillArea.Line(width, length, _)) ->
+        spawnLineShape rng width length
+      | _ -> spawnSphereShape rng configRadius effectiveMode
+    | EmitterShape.Cone(configAngle, configRadius) ->
+      let angle, length =
+        match overrides.Area with
+        | ValueSome(SkillArea.Cone(skillAngle, skillLength, _)) ->
+          skillAngle, skillLength
+        | ValueSome(SkillArea.AdaptiveCone(skillLength, _)) ->
+          configAngle, skillLength
+        | _ -> configAngle, configRadius * 10.0f
+
+      spawnConeShape rng angle length effectiveMode
+    | EmitterShape.Line(configWidth, configLength) ->
+      let width, length =
+        match overrides.Area with
+        | ValueSome(SkillArea.Line(skillWidth, skillLength, _)) ->
+          skillWidth, skillLength
+        | _ -> configWidth, configLength
+
+      spawnLineShape rng width length
+
+  /// Context for spawning a particle (shared between billboard and mesh)
+  [<Struct>]
+  type SpawnContext = {
+    FinalSpeed: float32
+    Direction: Vector3
+    SpawnOffset: Vector3
+    LocalOffsetRotated: Vector3
+    Velocity: Vector3
+    FinalPosition: Vector3
+    Lifetime: float32
+  }
+
+  /// Computes spawn context from emitter config and overrides
+  let inline computeSpawnContext
+    (rng: Random)
+    (config: EmitterConfig)
+    (particleConfig: ParticleConfig)
+    (worldPos: Vector3)
+    (ownerVelocity: Vector3)
+    (ownerRotation: Quaternion)
+    (overrides: EffectOverrides)
+    : SpawnContext =
+
+    let struct (lifetimeMin, lifetimeMax) = particleConfig.Lifetime
+
+    let lifetime =
+      lifetimeMin + (float32(rng.NextDouble()) * (lifetimeMax - lifetimeMin))
+
+    let struct (speedMin, speedMax) = particleConfig.Speed
+    let speed = speedMin + (float32(rng.NextDouble()) * (speedMax - speedMin))
+
+    let effectiveMode =
+      match overrides.EmissionMode with
+      | ValueSome m -> m
+      | ValueNone -> config.EmissionMode
+
+    let spawnResult =
+      computeShapeSpawnResult rng config.Shape overrides effectiveMode
+
+    let finalSpeed =
+      match spawnResult.SpeedOverride with
+      | ValueSome s -> s * (0.5f + float32(rng.NextDouble()) * 1.0f)
+      | ValueNone -> speed
+
+    // Apply rotation
+    let configRotEuler = config.EmissionRotation
+
+    let configRot =
+      Quaternion.CreateFromYawPitchRoll(
+        MathHelper.ToRadians(configRotEuler.Y),
+        MathHelper.ToRadians(configRotEuler.X),
+        MathHelper.ToRadians(configRotEuler.Z)
+      )
+
+    let baseRot =
+      match overrides.Rotation with
+      | ValueSome r -> r
+      | ValueNone -> ownerRotation
+
+    let totalRot = baseRot * configRot
+    let dir = Vector3.Transform(spawnResult.Direction, totalRot)
+    let spawnOffset = Vector3.Transform(spawnResult.SpawnOffset, totalRot)
+
+    let localOffsetRotated =
+      Vector3.Transform(config.LocalOffset, ownerRotation)
+
+    // Compute velocity
+    let baseVelocity = dir * finalSpeed
+    let inheritedVelocity = ownerVelocity * config.InheritVelocity
+
+    let randomVel =
+      let rx = (rng.NextDouble() * 2.0 - 1.0) |> float32
+      let ry = (rng.NextDouble() * 2.0 - 1.0) |> float32
+      let rz = (rng.NextDouble() * 2.0 - 1.0) |> float32
+      particleConfig.RandomVelocity * Vector3(rx, ry, rz)
+
+    let velocity = baseVelocity + inheritedVelocity + randomVel
+
+    // Final position
+    let finalPosition =
+      match config.SimulationSpace with
+      | World -> worldPos + localOffsetRotated + spawnOffset
+      | Local -> localOffsetRotated + spawnOffset
+
+    {
+      FinalSpeed = finalSpeed
+      Direction = dir
+      SpawnOffset = spawnOffset
+      LocalOffsetRotated = localOffsetRotated
+      Velocity = velocity
+      FinalPosition = finalPosition
+      Lifetime = lifetime
+    }
+
+  /// Applies physics to a particle (gravity, drag, floor collision)
+  /// Returns struct (newPosition, newVelocity)
+  let inline applyParticlePhysics
+    (dt: float32)
+    (gravity: float32)
+    (drag: float32)
+    (floorY: float32)
+    (pos: Vector3)
+    (vel: Vector3)
+    : struct (Vector3 * Vector3) =
+    // Gravity
+    let newVelY = vel.Y - (gravity * dt)
+    let mutable finalVel = Vector3(vel.X, newVelY, vel.Z)
+
+    // Drag
+    if drag > 0.0f then
+      let dragFactor = MathHelper.Clamp(1.0f - (drag * dt), 0.0f, 1.0f)
+      finalVel <- finalVel * dragFactor
+
+    // Floor collision
+    let mutable finalPos = pos
+
+    if finalPos.Y < floorY then
+      finalPos <- Vector3(finalPos.X, floorY, finalPos.Z)
+      finalVel <- Vector3(finalVel.X * 0.1f, 0.0f, finalVel.Z * 0.1f)
+
+    struct (finalPos, finalVel)
+
+  /// Handles burst/rate spawning logic
+  let inline processSpawning
+    (dt: float32)
+    (spawningEnabled: bool)
+    (burst: int)
+    (rate: int)
+    (burstDone: bool ref)
+    (accumulator: float32 ref)
+    (spawnOne: unit -> unit)
+    =
+    if spawningEnabled then
+      // Burst
+      if not burstDone.Value && burst > 0 then
+        for _ in 1..burst do
+          spawnOne()
+
+        burstDone.Value <- true
+
+      // Rate
+      if rate > 0 then
+        let rateInterval = 1.0f / float32 rate
+        accumulator.Value <- accumulator.Value + dt
+
+        while accumulator.Value > rateInterval do
+          accumulator.Value <- accumulator.Value - rateInterval
+          spawnOne()
 
   let updateParticle (dt: float32) (p: Particle) =
     let p = Particle.withLife (p.Life - dt) p
@@ -205,6 +391,37 @@ module ParticleSystem =
       Particle.withPosition newPos p
     else
       p
+
+  /// Updates a mesh particle with 3D rotation physics
+  /// Angular velocity is integrated into the rotation quaternion for tumbling effects
+  let updateMeshParticle (dt: float32) (p: MeshParticle) =
+    let newLife = p.Life - dt
+
+    if newLife > 0.0f then
+      // Update position with velocity
+      let newPos = p.Position + p.Velocity * dt
+
+      // Integrate angular velocity into rotation
+      // Create a quaternion from the angular velocity (axis-angle representation)
+      let angVelMag = p.AngularVelocity.Length()
+
+      let newRotation =
+        if angVelMag > 0.0001f then
+          let axis = Vector3.Normalize p.AngularVelocity
+          let angle = angVelMag * dt
+          let deltaRot = Quaternion.CreateFromAxisAngle(axis, angle)
+          Quaternion.Normalize(deltaRot * p.Rotation)
+        else
+          p.Rotation
+
+      {
+        p with
+            Position = newPos
+            Rotation = newRotation
+            Life = newLife
+      }
+    else
+      { p with Life = newLife }
 
   let updateEmitter
     (dt: float32)
@@ -236,38 +453,7 @@ module ParticleSystem =
         | ValueNone -> emitter.Config.EmissionMode
 
       let spawnResult =
-        match emitter.Config.Shape with
-        | EmitterShape.Point -> spawnPointShape rng
-        | EmitterShape.Sphere configRadius ->
-          // Check for skill-driven area override
-          match overrides.Area with
-          | ValueSome(SkillArea.Circle(skillRadius, _)) ->
-            spawnSphereShape rng skillRadius effectiveMode
-          | ValueSome(SkillArea.Line(width, length, _)) ->
-            spawnLineShape rng width length
-          | _ -> spawnSphereShape rng configRadius effectiveMode
-
-        | EmitterShape.Cone(configAngle, configRadius) ->
-          // Check for skill-driven area override
-          let angle, length =
-            match overrides.Area with
-            | ValueSome(SkillArea.Cone(skillAngle, skillLength, _)) ->
-              skillAngle, skillLength
-            | ValueSome(SkillArea.AdaptiveCone(skillLength, _)) ->
-              configAngle, skillLength
-            | _ -> configAngle, configRadius * 10.0f
-
-          spawnConeShape rng angle length effectiveMode
-
-        | EmitterShape.Line(configWidth, configLength) ->
-          // Check for skill-driven area override
-          let width, length =
-            match overrides.Area with
-            | ValueSome(SkillArea.Line(skillWidth, skillLength, _)) ->
-              skillWidth, skillLength
-            | _ -> configWidth, configLength
-
-          spawnLineShape rng width length
+        computeShapeSpawnResult rng emitter.Config.Shape overrides effectiveMode
 
       let dirLocal = spawnResult.Direction
       let spawnOffsetLocal = spawnResult.SpawnOffset
@@ -433,6 +619,104 @@ module ParticleSystem =
         particles.[i] <- p
         i <- i + 1
 
+  /// Updates a mesh emitter including spawning and updating mesh particles
+  let updateMeshEmitter
+    (dt: float32)
+    (rng: Random)
+    (emitter: ActiveMeshEmitter)
+    (worldPos: Vector3)
+    (ownerVelocity: Vector3)
+    (spawningEnabled: bool)
+    (ownerRotation: Quaternion)
+    (overrides: EffectOverrides)
+    =
+    let config = emitter.Config
+
+    // Spawn helper - uses shared computeSpawnContext
+    let spawnMeshParticle() =
+      let ctx =
+        computeSpawnContext
+          rng
+          config
+          config.Particle
+          worldPos
+          ownerVelocity
+          ownerRotation
+          overrides
+
+      // Random starting rotation for tumbling
+      let randomRotation =
+        Quaternion.CreateFromYawPitchRoll(
+          float32(rng.NextDouble()) * MathHelper.TwoPi,
+          float32(rng.NextDouble()) * MathHelper.TwoPi,
+          float32(rng.NextDouble()) * MathHelper.TwoPi
+        )
+
+      // Random angular velocity for tumbling
+      let angVelScale = 3.0f
+
+      let angularVelocity =
+        Vector3(
+          (float32(rng.NextDouble()) * 2.0f - 1.0f) * angVelScale,
+          (float32(rng.NextDouble()) * 2.0f - 1.0f) * angVelScale,
+          (float32(rng.NextDouble()) * 2.0f - 1.0f) * angVelScale
+        )
+
+      emitter.Particles.Add {
+        Position = ctx.FinalPosition
+        Velocity = ctx.Velocity
+        Rotation = randomRotation
+        AngularVelocity = angularVelocity
+        Scale = config.Particle.SizeStart
+        Life = ctx.Lifetime
+        MaxLife = ctx.Lifetime
+      }
+
+    // Use shared spawning logic
+    processSpawning
+      dt
+      spawningEnabled
+      config.Burst
+      config.Rate
+      emitter.BurstDone
+      emitter.Accumulator
+      spawnMeshParticle
+
+    // Update existing mesh particles
+    let particles = emitter.Particles
+    let mutable i = 0
+
+    while i < particles.Count do
+      let p = updateMeshParticle dt particles.[i]
+
+      if p.Life <= 0.0f then
+        particles.RemoveAt(i)
+      else
+        // Use shared physics
+        let struct (finalPos, finalVel) =
+          applyParticlePhysics
+            dt
+            config.Particle.Gravity
+            config.Particle.Drag
+            config.FloorHeight
+            p.Position
+            p.Velocity
+
+        // Scale lerp
+        let t = 1.0f - (p.Life / p.MaxLife)
+
+        let newScale =
+          MathHelper.Lerp(config.Particle.SizeStart, config.Particle.SizeEnd, t)
+
+        particles.[i] <- {
+          p with
+              Position = finalPos
+              Velocity = finalVel
+              Scale = newScale
+        }
+
+        i <- i + 1
+
   /// Context for particle system update operations
   type ParticleUpdateContext = {
     Dt: float32
@@ -461,25 +745,20 @@ module ParticleSystem =
       for gameplayEffect in effects do
         match gameplayEffect.SourceEffect.Visuals.VfxId with
         | ValueSome vfxId ->
-          currentFrameEffectIds.Add(gameplayEffect.Id) |> ignore
+          currentFrameEffectIds.Add gameplayEffect.Id |> ignore
 
-          if not(ctx.ActiveEffectVisuals.ContainsKey(gameplayEffect.Id)) then
+          if not(ctx.ActiveEffectVisuals.ContainsKey gameplayEffect.Id) then
             match ctx.ParticleStore.tryFind vfxId with
             | ValueSome emitterConfigs ->
               let particleEffectId = Guid.NewGuid().ToString()
 
-              let emitters =
-                emitterConfigs
-                |> List.map(fun config -> {
-                  Config = config
-                  Particles = ResizeArray<Particle>()
-                  Accumulator = ref 0.0f
-                  BurstDone = ref false
-                })
+              let struct (billboardEmitters, meshEmitters) =
+                splitEmittersByRenderMode emitterConfigs
 
               let newEffect: Particles.ActiveEffect = {
                 Id = particleEffectId
-                Emitters = emitters
+                Emitters = billboardEmitters
+                MeshEmitters = meshEmitters
                 Position = ref Vector3.Zero
                 Rotation = ref Quaternion.Identity
                 Scale = ref Vector3.One
@@ -555,6 +834,7 @@ module ParticleSystem =
     let shouldSpawn = effect.IsAlive.Value
     let mutable anyParticlesAlive = false
 
+    // Update billboard emitters
     for emitter in effect.Emitters do
       updateEmitter
         ctx.Dt
@@ -569,6 +849,21 @@ module ParticleSystem =
       if emitter.Particles.Count > 0 then
         anyParticlesAlive <- true
 
+    // Update mesh emitters
+    for meshEmitter in effect.MeshEmitters do
+      updateMeshEmitter
+        ctx.Dt
+        ctx.Rng
+        meshEmitter
+        effect.Position.Value
+        ownerVelocity
+        shouldSpawn
+        ownerRotation
+        effect.Overrides
+
+      if meshEmitter.Particles.Count > 0 then
+        anyParticlesAlive <- true
+
     // Determine if effect should be removed
     match effect.Owner with
     | ValueSome _ ->
@@ -577,14 +872,21 @@ module ParticleSystem =
     | ValueNone ->
       // Ownerless effects (combat VFX): remove when all spawning is done AND no particles
       // This handles cleanup without touching IsAlive (which would affect visual appearance)
-      let allSpawningDone =
+      let billboardSpawningDone =
         effect.Emitters
-        |> List.forall(fun emitter ->
+        |> Array.forall(fun emitter ->
           let burstDone = emitter.BurstDone.Value || emitter.Config.Burst = 0
           let noContinuousRate = emitter.Config.Rate = 0
           burstDone && noContinuousRate)
 
-      allSpawningDone && not anyParticlesAlive
+      let meshSpawningDone =
+        effect.MeshEmitters
+        |> Array.forall(fun emitter ->
+          let burstDone = emitter.BurstDone.Value || emitter.Config.Burst = 0
+          let noContinuousRate = emitter.Config.Rate = 0
+          burstDone && noContinuousRate)
+
+      billboardSpawningDone && meshSpawningDone && not anyParticlesAlive
 
   type ParticleSystem(game: Game, env: PomoEnvironment) =
     inherit GameSystem(game)

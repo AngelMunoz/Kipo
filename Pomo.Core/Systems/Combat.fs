@@ -370,23 +370,15 @@ module Combat =
       (rotation: Quaternion)
       (area: SkillArea)
       =
-      match ctx.ParticleStore.tryFind vfxId with
-      | ValueSome configs ->
-        let emitters =
-          configs
-          |> List.map(fun config ->
-            ({
-              Config = config
-              Particles = ResizeArray()
-              Accumulator = ref 0.0f
-              BurstDone = ref false
-            }
-            : Pomo.Core.Domain.Particles.ActiveEmitter))
-          |> ResizeArray
+      ctx.ParticleStore.tryFind vfxId
+      |> ValueOption.iter(fun configs ->
+        let struct (billboardEmitters, meshEmitters) =
+          Particles.splitEmittersByRenderMode configs
 
-        let effect: Pomo.Core.Domain.Particles.ActiveEffect = {
+        let effect: Particles.ActiveEffect = {
           Id = System.Guid.NewGuid().ToString()
-          Emitters = emitters |> Seq.toList
+          Emitters = billboardEmitters
+          MeshEmitters = meshEmitters
           Position = ref(Vector3(pos.X, 0.0f, pos.Y))
           Rotation = ref rotation
           Scale = ref Vector3.One
@@ -399,8 +391,7 @@ module Combat =
           }
         }
 
-        ctx.VisualEffects.Add(effect)
-      | ValueNone -> ()
+        ctx.VisualEffects.Add effect)
 
   module private Handlers =
 
