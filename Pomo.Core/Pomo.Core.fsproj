@@ -11,6 +11,7 @@
     <Compile Include="Domain/Input.fs" />
     <Compile Include="Domain/Entity.fs" />
     <Compile Include="Domain/Projectile.fs" />
+    <Compile Include="Domain/Orbital.fs" />
     <Compile Include="Domain/Skill.fs" />
     <Compile Include="Domain/Particles.fs" />
     <Compile Include="Domain/Item.fs" />

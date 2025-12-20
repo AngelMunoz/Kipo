@@ -10,15 +10,21 @@ Implement the "Seraphic Bombardment" skill, a complex offensive ability where th
 - **Orbital Configuration:** `OrbitalConfig` struct to define orbital behavior (radius, speed, visuals).
 - **Delivery Types:** New `ChargedProjectile` case in the `Delivery` Discriminated Union (DU) to support skills with a charge-up phase containing visuals.
 - **Projectile Logic:** Logic to handle the transition from "orbiting" to "launched" state.
+- **Mesh Particles:** Extend `ParticleSystem` to support rendering 3D Models (`RenderMode: Mesh`) for effects like Domes and Columns.
 
 ### 2.2 Visual Effects
 - **Charge Phase:** Particle effects for the gathering energy.
 - **Orbital Visuals:** Spheres (models) that rotate around the caster, accelerating over time.
 - **Impact:** Vertical light column effect upon impact.
+- **Explosion:** A "Dome of Light" (expanding hemisphere/sphere) symbolizing the explosion upon impact, implemented via Mesh Particles.
 
 ### 2.3 Game Content
 - **Skill Definition:** JSON configuration for "Seraphic Bombardment" (ID 20) in `Skills.json`.
-- **Assets:** Placeholder or procedural assets for the light spheres and column particles.
+- **Assets:**
+  - **Model:** `Coni_A.obj` (Placeholder for both Orbitals and Projectiles).
+  - **Orbital Particles:** Texture `Particles/jellyfish0-masks/3` (from `3.png`).
+  - **Projectile Particles:** Texture `Particles/jellyfish0-masks/8` (from `8.png`).
+  - **Note:** Ensure Orbitals and Projectiles can define their own particle effects, potentially using an override system if dynamic properties (like color/size) need to come from the Skill/Orbital config rather than the static Particle definition.
 
 ## 3. Technical Design
 
@@ -47,13 +53,14 @@ type OrbitalConfig = {
 }
 
 // Domain/Skill.fs extensions
-
+[<Struct>]
 type ChargeConfig = {
   Duration: float32
   ChargeVisuals: VisualManifest
   Orbitals: OrbitalConfig voption
 }
 
+[<Struct>]
 type Delivery =
   | ...
   | ChargedProjectile of charge: ChargeConfig * projectile: ProjectileInfo

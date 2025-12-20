@@ -4,5 +4,5 @@ This file tracks all major tracks for the project. Each track has its own detail
 
 ---
 
-## [ ] Track: Implement Seraphic Bombardment Skill
+## [~] Track: Implement Seraphic Bombardment Skill
 *Link: [./conductor/tracks/seraphic_bombardment_20251219/](./conductor/tracks/seraphic_bombardment_20251219/)*

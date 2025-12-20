@@ -256,6 +256,28 @@ module Particles =
               |> Error
         }
 
+    module RenderModeCodec =
+      let decoder: Decoder<RenderMode> =
+        fun json -> decode {
+          let! type' = Required.Property.get ("Type", Required.string) json
+
+          match type'.ToLowerInvariant() with
+          | "billboard" ->
+            let! texture =
+              Required.Property.get ("Texture", Required.string) json
+
+            return Billboard texture
+          | "mesh" ->
+            let! modelAsset =
+              Required.Property.get ("Model", Required.string) json
+
+            return Mesh modelAsset
+          | _ ->
+            return!
+              DecodeError.ofError(json.Clone(), $"Unknown RenderMode type: {type'}")
+              |> Error
+        }
+
     module Helper =
       let vec3FromDict: Decoder<Vector3> =
         fun json -> decode {
@@ -413,6 +435,9 @@ module Particles =
         fun json -> decode {
           let! name = VOptional.Property.get ("Name", Required.string) json
 
+          let! renderModeType =
+             VOptional.Property.get ("RenderMode", Required.string) json
+
           let! texture =
             VOptional.Property.get ("Texture", Required.string) json
 
@@ -421,10 +446,21 @@ module Particles =
             VOptional.Property.get ("Model", Required.string) json
 
           let renderMode =
-            match modelAsset, texture with
-            | ValueSome model, _ -> Mesh model
-            | ValueNone, ValueSome tex -> Billboard tex
-            | ValueNone, ValueNone -> Billboard "Particles/default"
+            match renderModeType with
+            | ValueSome "Mesh" ->
+                 match modelAsset with
+                 | ValueSome model -> Mesh model
+                 | ValueNone -> Billboard "Particles/error" // Fallback or error?
+            | ValueSome "Billboard" ->
+                 match texture with
+                 | ValueSome tex -> Billboard tex
+                 | ValueNone -> Billboard "Particles/default"
+            | _ ->
+              // Fallback / Inference logic
+              match modelAsset, texture with
+              | ValueSome model, _ -> Mesh model
+              | ValueNone, ValueSome tex -> Billboard tex
+              | ValueNone, ValueNone -> Billboard "Particles/default"
 
           // BlendMode is optional for mesh particles (defaults to AlphaBlend)
           let! blendModeOpt =

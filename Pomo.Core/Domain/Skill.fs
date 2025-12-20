@@ -175,9 +175,17 @@ module Skill =
     | TargetOffset of struct (float32 * float32)
 
   [<Struct>]
+  type ChargeConfig = {
+    Duration: float32
+    ChargeVisuals: VisualManifest
+    Orbitals: Orbital.OrbitalConfig voption
+  }
+
+  [<Struct>]
   type Delivery =
     | Instant
     | Projectile of projectile: ProjectileInfo
+    | ChargedProjectile of charge: ChargeConfig * projectile: ProjectileInfo
 
   [<Struct>]
   type ElementFormula = {
@@ -464,6 +472,7 @@ module Skill =
     open JDeck
     open JDeck.Decode
     open Pomo.Core.Domain.Projectile.Serialization
+    open Pomo.Core.Domain.Orbital.Serialization
 
     type DecodeBuilder with
 
@@ -475,6 +484,29 @@ module Skill =
 
 
     open Pomo.Core.Domain.Core.Serialization
+
+    module ChargeConfig =
+      let decoder: Decoder<ChargeConfig> =
+        fun json -> decode {
+          let! duration = Required.Property.get ("Duration", Required.float) json
+
+          and! visuals =
+            VOptional.Property.get ("ChargeVisuals", VisualManifest.decoder)
+              json
+
+          and! orbitals =
+            VOptional.Property.get ("Orbitals", Orbital.Serialization.decoder)
+              json
+
+          return {
+            Duration = float32 duration
+            ChargeVisuals =
+              match visuals with
+              | ValueSome v -> v
+              | ValueNone -> VisualManifest.empty
+            Orbitals = orbitals
+          }
+        }
 
     module Formula =
       /// Examples
@@ -973,6 +1005,8 @@ module Skill =
       /// { "Type": "Instant" }
       ///
       /// { "Type": "Projectile",  "Speed": 150.0, "CollisionMode": "IgnoreTerrain" }
+      ///
+      /// { "Type": "ChargedProjectile", "Charge": { ... }, "Projectile": { ... } }
       let decoder: Decoder<Delivery> =
         fun json -> decode {
           let! type' = Required.Property.get ("Type", Required.string) json
@@ -982,6 +1016,14 @@ module Skill =
           | "projectile" ->
             let! projectile = ProjectileInfo.decoder json
             return Projectile projectile
+          | "chargedprojectile" ->
+            let! charge =
+              Required.Property.get ("Charge", ChargeConfig.decoder) json
+
+            and! projectile =
+              Required.Property.get ("Projectile", ProjectileInfo.decoder) json
+
+            return ChargedProjectile(charge, projectile)
           | _ ->
             return!
               DecodeError.ofError(
