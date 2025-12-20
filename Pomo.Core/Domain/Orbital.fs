@@ -22,11 +22,17 @@ module Orbital =
   }
 
   [<Struct>]
+  type OrbitalCenter =
+    | EntityCenter of entityId: Guid<EntityId>
+    | PositionCenter of position: Vector2
+
+  [<Struct>]
   type ActiveOrbital = {
-    CasterId: Guid<EntityId>
+    Center: OrbitalCenter
     Config: OrbitalConfig
     StartTime: float32
   }
+
 
   module Serialization =
     open JDeck

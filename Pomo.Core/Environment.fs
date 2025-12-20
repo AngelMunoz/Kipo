@@ -69,6 +69,9 @@ module Environment =
 
     abstract ClearPendingSkillCast: Guid<EntityId> -> unit
 
+    abstract UpdateActiveCharge: Guid<EntityId> * ActiveCharge -> unit
+    abstract RemoveActiveCharge: Guid<EntityId> -> unit
+
   type IEffectsWriteService =
     abstract ApplyEffect: Guid<EntityId> * Skill.ActiveEffect -> unit
     abstract ExpireEffect: Guid<EntityId> * Guid<EffectId> -> unit
@@ -93,6 +96,10 @@ module Environment =
   type IAIWriteService =
     abstract UpdateAIController: Guid<EntityId> * AI.AIController -> unit
 
+  type IOrbitalWriteService =
+    abstract UpdateActiveOrbital: Guid<EntityId> * Orbital.ActiveOrbital -> unit
+    abstract RemoveActiveOrbital: Guid<EntityId> -> unit
+
   type IStateWriteService =
     inherit IDisposable
     inherit IPhysicsWriteService
@@ -104,6 +111,7 @@ module Environment =
     inherit IInventoryWriteService
     inherit IAnimationWriteService
     inherit IAIWriteService
+    inherit IOrbitalWriteService
     abstract FlushWrites: unit -> unit
 
   type CoreServices =

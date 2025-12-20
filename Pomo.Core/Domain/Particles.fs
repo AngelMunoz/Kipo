@@ -274,7 +274,10 @@ module Particles =
             return Mesh modelAsset
           | _ ->
             return!
-              DecodeError.ofError(json.Clone(), $"Unknown RenderMode type: {type'}")
+              DecodeError.ofError(
+                json.Clone(),
+                $"Unknown RenderMode type: {type'}"
+              )
               |> Error
         }
 
@@ -387,25 +390,25 @@ module Particles =
       let decoder: Decoder<ParticleConfig> =
         fun json -> decode {
           let! lifetime = Required.Property.get ("Lifetime", rangeDecoder) json
-          let! speed = Required.Property.get ("Speed", rangeDecoder) json
+          and! speed = Required.Property.get ("Speed", rangeDecoder) json
 
-          let! sizeStart =
+          and! sizeStart =
             Required.Property.get ("SizeStart", Required.float) json
 
-          let! sizeEnd = Required.Property.get ("SizeEnd", Required.float) json
+          and! sizeEnd = Required.Property.get ("SizeEnd", Required.float) json
 
-          let! colorStart =
+          and! colorStart =
             Required.Property.get ("ColorStart", Helper.colorFromHex) json
 
-          let! colorEnd =
+          and! colorEnd =
             Required.Property.get ("ColorEnd", Helper.colorFromHex) json
 
-          let! gravity = VOptional.Property.get ("Gravity", Required.float) json
+          and! gravity = VOptional.Property.get ("Gravity", Required.float) json
 
-          let! randomVelocity =
+          and! randomVelocity =
             VOptional.Property.get ("RandomVelocity", Helper.vec3FromDict) json
 
-          let! drag = VOptional.Property.get ("Drag", Required.float) json
+          and! drag = VOptional.Property.get ("Drag", Required.float) json
 
           return {
             Lifetime = lifetime
@@ -436,7 +439,7 @@ module Particles =
           let! name = VOptional.Property.get ("Name", Required.string) json
 
           let! renderModeType =
-             VOptional.Property.get ("RenderMode", Required.string) json
+            VOptional.Property.get ("RenderMode", Required.string) json
 
           let! texture =
             VOptional.Property.get ("Texture", Required.string) json
@@ -448,13 +451,13 @@ module Particles =
           let renderMode =
             match renderModeType with
             | ValueSome "Mesh" ->
-                 match modelAsset with
-                 | ValueSome model -> Mesh model
-                 | ValueNone -> Billboard "Particles/error" // Fallback or error?
+              match modelAsset with
+              | ValueSome model -> Mesh model
+              | ValueNone -> Billboard "Particles/error" // Fallback or error?
             | ValueSome "Billboard" ->
-                 match texture with
-                 | ValueSome tex -> Billboard tex
-                 | ValueNone -> Billboard "Particles/default"
+              match texture with
+              | ValueSome tex -> Billboard tex
+              | ValueNone -> Billboard "Particles/default"
             | _ ->
               // Fallback / Inference logic
               match modelAsset, texture with

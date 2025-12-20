@@ -35,6 +35,14 @@ module World =
     Previous: TimeSpan
   }
 
+  [<Struct>]
+  type ActiveCharge = {
+    SkillId: int<SkillId>
+    Target: SystemCommunications.SkillTarget
+    StartTime: TimeSpan
+    Duration: TimeSpan
+  }
+
   type MutableWorld = {
     Time: Time cval
     RawInputStates: cmap<Guid<EntityId>, RawInputState>
@@ -81,6 +89,9 @@ module World =
     // Animation
     Poses: cmap<Guid<EntityId>, HashMap<string, Matrix>>
     ActiveAnimations: cmap<Guid<EntityId>, AnimationState IndexList>
+    // Orbitals
+    ActiveOrbitals: cmap<Guid<EntityId>, Orbital.ActiveOrbital>
+    ActiveCharges: cmap<Guid<EntityId>, ActiveCharge>
     // VFX
     VisualEffects: ResizeArray<ActiveEffect>
   }
@@ -149,6 +160,10 @@ module World =
     abstract Poses: amap<Guid<EntityId>, HashMap<string, Matrix>>
     abstract ActiveAnimations: amap<Guid<EntityId>, AnimationState IndexList>
 
+    // Orbitals
+    abstract ActiveOrbitals: amap<Guid<EntityId>, Orbital.ActiveOrbital>
+    abstract ActiveCharges: amap<Guid<EntityId>, ActiveCharge>
+
     // VFX
     abstract VisualEffects: ResizeArray<ActiveEffect>
 
@@ -190,6 +205,8 @@ module World =
       ModelConfigId = cmap()
       Poses = cmap()
       ActiveAnimations = cmap()
+      ActiveOrbitals = cmap()
+      ActiveCharges = cmap()
       VisualEffects = ResizeArray()
     }
 
@@ -226,6 +243,8 @@ module World =
           member _.ModelConfigId = mutableWorld.ModelConfigId
           member _.Poses = mutableWorld.Poses
           member _.ActiveAnimations = mutableWorld.ActiveAnimations
+          member _.ActiveOrbitals = mutableWorld.ActiveOrbitals
+          member _.ActiveCharges = mutableWorld.ActiveCharges
           member _.VisualEffects = mutableWorld.VisualEffects
       }
 

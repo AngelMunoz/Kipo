@@ -710,17 +710,45 @@ module Combat =
         Execution.applyResourceCost ctx casterId activeSkill
         Execution.applyCooldown ctx casterId skillId activeSkill
 
-        match activeSkill.Delivery with
-        | Projectile projectileInfo ->
-          handleProjectileDelivery
-            ctx
-            casterId
-            skillId
-            target
-            activeSkill
-            projectileInfo
-        | Instant -> handleInstantDelivery ctx casterId target activeSkill
+        // Check if skill has a charge phase
+        match activeSkill.ChargePhase with
+        | ValueSome chargeConfig ->
+          // Create ActiveOrbital if needed
+          chargeConfig.Orbitals
+          |> ValueOption.iter(fun orbitalConfig ->
+            let activeOrbital: Orbital.ActiveOrbital = {
+              Center = Orbital.EntityCenter casterId
+              Config = orbitalConfig
+              StartTime = float32 ctx.Time.TotalGameTime.TotalSeconds
+            }
+
+
+            ctx.StateWrite.UpdateActiveOrbital(casterId, activeOrbital))
+
+          // Create ActiveCharge
+          let activeCharge: ActiveCharge = {
+            SkillId = skillId
+            Target = target
+            StartTime = ctx.Time.TotalGameTime
+            Duration = TimeSpan.FromSeconds(float chargeConfig.Duration)
+          }
+
+          ctx.StateWrite.UpdateActiveCharge(casterId, activeCharge)
+
+        | ValueNone ->
+          // No charge phase - execute delivery immediately
+          match activeSkill.Delivery with
+          | Projectile projectileInfo ->
+            handleProjectileDelivery
+              ctx
+              casterId
+              skillId
+              target
+              activeSkill
+              projectileInfo
+          | Instant -> handleInstantDelivery ctx casterId target activeSkill
       | _ -> ()
+
 
     let handleProjectileImpact
       (ctx: WorldContext)
@@ -849,6 +877,51 @@ module Combat =
       | _ -> () // Skill not found
 
 
+    let handleChargeCompleted
+      (ctx: WorldContext)
+      (completed: SystemCommunications.ChargeCompleted)
+      =
+      ctx.SkillStore.tryFind completed.SkillId
+      |> ValueOption.bind (function
+        | Skill.Active s -> ValueSome s
+        | _ -> ValueNone)
+      |> ValueOption.iter(fun skill ->
+        // Only spawn if skill has a ChargePhase and Projectile delivery
+        match skill.ChargePhase, skill.Delivery with
+        | ValueSome _, Projectile projectileInfo ->
+          let projectileId = Guid.NewGuid() |> UMX.tag<EntityId>
+
+          let baseTarget =
+            match completed.Target with
+            | SystemCommunications.TargetEntity tid ->
+              Projectile.EntityTarget tid
+            | SystemCommunications.TargetPosition pos ->
+              Projectile.PositionTarget pos
+            | SystemCommunications.TargetDirection pos ->
+              Projectile.PositionTarget pos
+            | SystemCommunications.TargetSelf ->
+              Projectile.EntityTarget completed.CasterId
+
+          let liveProjectile: Projectile.LiveProjectile = {
+            Caster = completed.CasterId
+            Target = baseTarget
+            SkillId = completed.SkillId
+            Info = projectileInfo
+          }
+
+          ctx.StateWrite.CreateProjectile(
+            projectileId,
+            liveProjectile,
+            ValueNone
+          )
+
+        | ValueSome _, Instant ->
+          // Charged instant skill - execute instant delivery
+          handleInstantDelivery ctx completed.CasterId completed.Target skill
+
+        | _ -> ())
+
+
   open Pomo.Core.Environment
   open Pomo.Core.Environment.Patterns
 
@@ -937,6 +1010,18 @@ module Combat =
       |> Observable.subscribe(fun event ->
         match createCtx event.CasterId with
         | ValueSome ctx -> Handlers.handleProjectileImpact ctx event
+        | ValueNone -> ())
+      |> subscriptions.Add
+
+      eventBus.Observable
+      |> Observable.choose(fun e ->
+        match e with
+        | GameEvent.Lifecycle(LifecycleEvent.ChargeCompleted completed) ->
+          Some completed
+        | _ -> None)
+      |> Observable.subscribe(fun event ->
+        match createCtx event.CasterId with
+        | ValueSome ctx -> Handlers.handleChargeCompleted ctx event
         | ValueNone -> ())
       |> subscriptions.Add
 

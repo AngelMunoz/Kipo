@@ -185,7 +185,6 @@ module Skill =
   type Delivery =
     | Instant
     | Projectile of projectile: ProjectileInfo
-    | ChargedProjectile of charge: ChargeConfig * projectile: ProjectileInfo
 
   [<Struct>]
   type ElementFormula = {
@@ -208,6 +207,7 @@ module Skill =
     Range: float32 voption
     Delivery: Delivery
     Area: SkillArea
+    ChargePhase: ChargeConfig voption
     Formula: Formula.MathExpr voption
     ElementFormula: ElementFormula voption
     Effects: Effect[]
@@ -488,14 +488,17 @@ module Skill =
     module ChargeConfig =
       let decoder: Decoder<ChargeConfig> =
         fun json -> decode {
-          let! duration = Required.Property.get ("Duration", Required.float) json
+          let! duration =
+            Required.Property.get ("Duration", Required.float) json
 
           and! visuals =
-            VOptional.Property.get ("ChargeVisuals", VisualManifest.decoder)
+            VOptional.Property.get
+              ("ChargeVisuals", VisualManifest.decoder)
               json
 
           and! orbitals =
-            VOptional.Property.get ("Orbitals", Orbital.Serialization.decoder)
+            VOptional.Property.get
+              ("Orbitals", Orbital.Serialization.decoder)
               json
 
           return {
@@ -1005,8 +1008,6 @@ module Skill =
       /// { "Type": "Instant" }
       ///
       /// { "Type": "Projectile",  "Speed": 150.0, "CollisionMode": "IgnoreTerrain" }
-      ///
-      /// { "Type": "ChargedProjectile", "Charge": { ... }, "Projectile": { ... } }
       let decoder: Decoder<Delivery> =
         fun json -> decode {
           let! type' = Required.Property.get ("Type", Required.string) json
@@ -1016,14 +1017,6 @@ module Skill =
           | "projectile" ->
             let! projectile = ProjectileInfo.decoder json
             return Projectile projectile
-          | "chargedprojectile" ->
-            let! charge =
-              Required.Property.get ("Charge", ChargeConfig.decoder) json
-
-            and! projectile =
-              Required.Property.get ("Projectile", ProjectileInfo.decoder) json
-
-            return ChargedProjectile(charge, projectile)
           | _ ->
             return!
               DecodeError.ofError(
@@ -1084,6 +1077,9 @@ module Skill =
           and! delivery =
             Required.Property.get ("Delivery", Delivery.decoder) json
 
+          and! chargePhase =
+            VOptional.Property.get ("Charge", ChargeConfig.decoder) json
+
           and! elementFormula =
             VOptional.Property.get
               ("ElementFormula", ElementFormula.decoder)
@@ -1123,6 +1119,7 @@ module Skill =
             Range = range
             Delivery = delivery
             Area = area
+            ChargePhase = chargePhase
             Formula = formula
             ElementFormula = elementFormula
             Effects = effects

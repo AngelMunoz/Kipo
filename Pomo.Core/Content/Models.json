@@ -40,5 +40,15 @@
     "AnimationBindings": {
       "Spin": ["Projectile_Spin"]
     }
+  },
+  "LightSphere": {
+    "Rig": {
+      "Root": { "Model": "Coin_A" }
+    }
+  },
+  "LightColumn": {
+    "Rig": {
+      "Root": { "Model": "Primitive_Beam" }
+    }
   }
 }

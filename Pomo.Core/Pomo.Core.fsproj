@@ -44,6 +44,7 @@
     <Compile Include="Systems/PlayerMovement.fs" />
     <Compile Include="Systems/Notification.fs" />
     <Compile Include="Systems/Projectile.fs" />
+    <Compile Include="Systems/OrbitalSystem.fs" />
     <Compile Include="Systems/Targeting.fs" />
     <Compile Include="Systems/AbilityActivation.fs" />
     <Compile Include="Systems/RawInput.fs" />

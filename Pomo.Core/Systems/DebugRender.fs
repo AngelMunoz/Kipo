@@ -899,7 +899,8 @@ module DebugRender =
                   struct (cmd, Core.Constants.Debug.TransientCommandDuration)
               | None -> ()
             | ValueNone -> ()
-          | Delivery.Projectile _ -> () // Don't show debug area for projectile skills on cast
+          | Delivery.Projectile _ -> ()
+
         | _ -> ())
       |> subscriptions.Add
 
