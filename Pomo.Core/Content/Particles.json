@@ -296,6 +296,27 @@
         "Gravity": 500,
         "Drag": 4.0
       }
+    },
+    {
+      "RenderMode": "Mesh",
+      "Model": "3d_models/kaykit_prototype/Primitive_Cube_Small",
+      "SimulationSpace": "World",
+      "Rate": 0,
+      "Burst": 8,
+      "Shape": "Sphere",
+      "Radius": 0.5,
+      "LocalOffset": { "X": 0.0, "Y": 0.2, "Z": 0.0 },
+      "FloorHeight": 0.0,
+      "Particle": {
+        "Lifetime": [1.5, 2.5],
+        "Speed": [100, 200],
+        "SizeStart": 0.15,
+        "SizeEnd": 0.1,
+        "ColorStart": "#8B7355FF",
+        "ColorEnd": "#654321FF",
+        "Gravity": 400,
+        "Drag": 1.0
+      }
     }
   ],
   "IceShatter": [

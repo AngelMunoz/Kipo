@@ -8,6 +8,7 @@ open Pomo.Core.Graphics
 open FSharp.UMX
 open FSharp.Data.Adaptive
 
+open Pomo.Core
 open Pomo.Core.Domain
 open Pomo.Core.Domain.Units
 open Pomo.Core.Domain.Camera
@@ -17,7 +18,6 @@ open Pomo.Core.Domain.Animation
 
 
 module Render =
-  open Pomo.Core
   open Pomo.Core.Domain.Projectile
   open Microsoft.Xna.Framework.Input
   open Pomo.Core.Environment
@@ -236,6 +236,7 @@ module Render =
     Game: Game
     BillboardBatch: BillboardBatch
     GetTexture: string -> Texture2D voption
+    GetModel: string -> Model voption
     FallbackTexture: Texture2D
   }
 
@@ -714,6 +715,44 @@ module Render =
           res.FallbackTexture
           group
 
+  /// Renders all mesh particles
+  let private renderAllMeshParticles
+    (res: ParticleRenderResources)
+    (world: World.World)
+    (frame: FrameRenderContext)
+    =
+    res.Game.GraphicsDevice.DepthStencilState <- DepthStencilState.Default
+    res.Game.GraphicsDevice.RasterizerState <- RasterizerState.CullNone
+    res.Game.GraphicsDevice.BlendState <- BlendState.AlphaBlend
+
+    let ppu = frame.Scenario.PixelsPerUnit
+    let modelScale = Core.Constants.Entity.ModelScale
+
+    for effect in world.VisualEffects do
+      let effectPos = effect.Position.Value
+
+      for meshEmitter in effect.MeshEmitters do
+        // ModelPath pre-extracted at creation - no hot-path branching
+        match res.GetModel meshEmitter.ModelPath with
+        | ValueSome model ->
+          for particle in meshEmitter.Particles do
+            let pWorldPos =
+              computeParticleWorldPosition
+                meshEmitter.Config
+                particle.Position
+                effectPos
+
+            let renderPos = particleToRenderPosition pWorldPos ppu
+            let scale = particle.Scale * modelScale
+
+            let worldMatrix =
+              Matrix.CreateScale(scale)
+              * Matrix.CreateFromQuaternion(particle.Rotation)
+              * Matrix.CreateTranslation(renderPos)
+
+            drawModel frame.Camera model worldMatrix
+        | ValueNone -> ()
+
   /// Renders targeting indicator UI overlay
   let private renderTargetingIndicator
     (res: UIRenderResources)
@@ -793,6 +832,23 @@ module Render =
           textureCache.[id] <- result
           result
 
+    // Mesh particle model cache (lazy-loaded like textures)
+    let particleModelCache = Dictionary<string, Model voption>()
+
+    let getParticleModel(id: string) =
+      match particleModelCache |> Dictionary.tryFindV id with
+      | ValueSome cached -> cached
+      | ValueNone ->
+        try
+          let loaded = game.Content.Load<Model>(id)
+          let result = ValueSome loaded
+          particleModelCache.[id] <- result
+          result
+        with _ ->
+          let result = ValueNone
+          particleModelCache.[id] <- result
+          result
+
     // Load Models (one-time at creation)
     let models =
       modelStore.all()
@@ -825,6 +881,7 @@ module Render =
       Game = game
       BillboardBatch = billboardBatch
       GetTexture = getTexture
+      GetModel = getParticleModel
       FallbackTexture = texture
     }
 
@@ -874,5 +931,6 @@ module Render =
               // === Render Passes (Orchestrator Style) ===
               renderAllEntities entityRes frame
               renderAllParticles particleRes world frame
+              renderAllMeshParticles particleRes world frame
               renderTargetingIndicator uiRes camera
     }

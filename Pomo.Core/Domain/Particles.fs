@@ -144,6 +144,7 @@ module Particles =
 
   type ActiveMeshEmitter = {
     Config: EmitterConfig
+    ModelPath: string // Pre-extracted from RenderMode at creation
     Particles: ResizeArray<MeshParticle>
     Accumulator: float32 ref
     BurstDone: bool ref
@@ -164,9 +165,10 @@ module Particles =
           Accumulator = ref 0.0f
           BurstDone = ref false
         }
-      | Mesh _ ->
+      | Mesh modelPath ->
         Choice2Of2 {
           Config = config
+          ModelPath = modelPath
           Particles = ResizeArray<MeshParticle>()
           Accumulator = ref 0.0f
           BurstDone = ref false
@@ -414,8 +416,9 @@ module Particles =
           let! texture =
             VOptional.Property.get ("Texture", Required.string) json
 
+          // Support both "Model" and "ModelAsset" for mesh particles
           let! modelAsset =
-            VOptional.Property.get ("ModelAsset", Required.string) json
+            VOptional.Property.get ("Model", Required.string) json
 
           let renderMode =
             match modelAsset, texture with
@@ -423,8 +426,14 @@ module Particles =
             | ValueNone, ValueSome tex -> Billboard tex
             | ValueNone, ValueNone -> Billboard "Particles/default"
 
-          let! blendMode =
-            Required.Property.get ("BlendMode", BlendModeCodec.decoder) json
+          // BlendMode is optional for mesh particles (defaults to AlphaBlend)
+          let! blendModeOpt =
+            VOptional.Property.get ("BlendMode", BlendModeCodec.decoder) json
+
+          let blendMode =
+            match blendModeOpt with
+            | ValueSome bm -> bm
+            | ValueNone -> AlphaBlend // Default for mesh particles
 
           let! simulationSpace =
             VOptional.Property.get
