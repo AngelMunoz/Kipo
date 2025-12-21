@@ -2,8 +2,7 @@
 
 This guide explains how to configure `Particles.json` to create visual effects. It connects the JSON properties to their artistic impact and code behavior.
 
-> [!IMPORTANT]
-> **Isometric Rendering Note**: Particles use the **Y-axis for altitude** in 3D space. The camera uses an orthographic projection looking down at an isometric angle. Particles are rendered as **camera-facing billboards** (quads that always face the camera) using the camera's right and up vectors from `BillboardBatch.fs`.
+> [!IMPORTANT] > **Isometric Rendering Note**: Particles use the **Y-axis for altitude** in 3D space. The camera uses an orthographic projection looking down at an isometric angle. Particles are rendered as **camera-facing billboards** (quads that always face the camera) using the camera's right and up vectors from `BillboardBatch.fs`.
 
 ---
 
@@ -23,6 +22,27 @@ These control _how_ and _where_ particles are born.
 
 - **Soft/Blurry** (e.g. `jellyfish0-masks/15`): Good for gas, fire, magic auras. Blends well.
 - **Sharp/Defined** (e.g. `jellyfish0-masks/40`): Good for debris, shrapnel, sparks.
+
+### `RenderMode` (Implicit: `Billboard` or `Mesh`)
+
+Particles can render as 2D billboards (default) or 3D meshes:
+
+- **Billboard** (default): Uses `Texture` property. Camera-facing quads. Good for smoke, fire, magic.
+- **Mesh**: Uses `Model` property. Full 3D models with physics rotation. Good for debris, pillars, projectiles.
+
+### `Model` (String) — Mesh Mode Only
+
+Path to 3D model file (no extension). Only used when `RenderMode: "Mesh"`.
+
+```json
+"Model": "3d_models/kaykit_prototype/Coin_A"
+```
+
+Available models are in `Content/3d_models/`. Common choices:
+
+- `Primitive_Cube`, `Primitive_Beam` — Simple shapes
+- `Coin_A`, `Coin_B` — Circular/coin shapes
+- `Boulder_A`, `Boulder_B` — Rock debris
 
 ### `BlendMode` (String: `AlphaBlend` | `Additive`)
 
@@ -123,6 +143,44 @@ These control _how_ and _where_ particles are born.
 
 ---
 
+## Mesh Particle Properties
+
+These properties only apply when using `RenderMode: "Mesh"`.
+
+### `MeshRotation` (String: `Fixed` | `Tumbling` | `RandomStatic`)
+
+Controls how mesh particles rotate:
+
+| Mode           | Behavior                             | Good For                        |
+| -------------- | ------------------------------------ | ------------------------------- |
+| `Fixed`        | No rotation, uses `EmissionRotation` | Pillars, beams, ground markers  |
+| `Tumbling`     | Random initial + continuous spin     | Flying debris, shrapnel         |
+| `RandomStatic` | Random initial, no spin              | Settled debris, scattered rocks |
+
+### `ScalePivot` (Vector3)
+
+Screen-space offset applied to mesh position. Use to anchor the mesh at a specific point.
+
+> [!IMPORTANT] > **ScalePivot operates in screen space** (after isometric correction):
+>
+> - `Y` = move **up on screen** (positive = higher)
+> - `X` = move **right on screen**
+> - `Z` = affects depth sorting
+
+Example: If a pillar model has its origin at the center, use `ScalePivot.Y` to shift it so the base appears at the spawn point.
+
+### `ScaleAxis` (Vector3)
+
+Controls which axes participate in size growth/shrink:
+
+| Value                        | Effect                              |
+| ---------------------------- | ----------------------------------- |
+| `{ "X": 1, "Y": 1, "Z": 1 }` | Uniform scaling (default)           |
+| `{ "X": 0, "Y": 1, "Z": 0 }` | Height-only growth (pillars rising) |
+| `{ "X": 1, "Y": 0, "Z": 1 }` | Width/depth only (expanding rings)  |
+
+---
+
 ## Particle Properties
 
 These control the _individual life_ of each particle. Nested under `"Particle": { ... }`.
@@ -148,8 +206,8 @@ These control the _individual life_ of each particle. Nested under `"Particle": 
 
 **Code Usage** (`ParticleSystem.fs` line 367): `Velocity.Y -= Gravity * dt`.
 
-> [!WARNING]
-> **Isometric Gotcha**: In our coordinate system, **positive Y is UP** in 3D space. Because the formula _subtracts_ gravity:
+> [!WARNING] > **Isometric Gotcha**: In our coordinate system, **positive Y is UP** in 3D space. Because the formula _subtracts_ gravity:
+>
 > - **Positive Gravity** = Particles fall **DOWN** (toward floor). Use for debris, rocks.
 > - **Negative Gravity** = Particles rise **UP** (into the sky). Use for fire, smoke, heat.
 > - **Zero Gravity** = Particles float evenly. Use for magic.
@@ -197,6 +255,44 @@ These control the _individual life_ of each particle. Nested under `"Particle": 
 
 ---
 
+## Coordinate Spaces
+
+Understanding coordinate spaces is essential for positioning particles and mesh effects correctly.
+
+### Logic Space (2D)
+
+The game's map coordinates. Used for entity positions, skill targeting, and gameplay logic.
+
+- **X** = horizontal (left/right)
+- **Y** = vertical on map (up/down in top-down view)
+
+### World Space (3D)
+
+The particle system's internal coordinates:
+
+- **X** = horizontal (same as Logic X)
+- **Y** = **altitude/height** (0 = floor, positive = higher)
+- **Z** = depth (same as Logic Y)
+
+> [!TIP]
+> To place something on the floor at Logic position (100, 200):
+> `Vector3(100, 0, 200)` — Y=0 means ground level.
+
+### Screen Space (After Isometric Projection)
+
+What you see on screen after the camera transforms everything:
+
+- The isometric camera looks down at ~45° angle
+- **ScalePivot Y** moves objects **straight up on screen**
+- **LocalOffset Y** moves objects **up in world space** (which appears diagonal on screen)
+
+> [!IMPORTANT] > **LocalOffset** = World Space (before isometric rotation)
+> **ScalePivot** = Screen Space (after isometric rotation)
+>
+> Use LocalOffset to position things in 3D. Use ScalePivot to fine-tune screen appearance.
+
+---
+
 ## Skills.json Integration
 
 Particle effects are spawned by skills via the `Visuals` and `ImpactVisuals` properties:
@@ -210,6 +306,7 @@ Particle effects are spawned by skills via the `Visuals` and `ImpactVisuals` pro
 ```
 
 **Effect Overrides**: When skills spawn particles, they can override emitter properties:
+
 - `Rotation`: Skill facing direction is applied to emission.
 - `Area`: Skill's `Circle`, `Cone`, or `Line` area overrides emitter's `Shape` dimensions.
 - `EmissionMode`: Can be overridden at spawn time.
