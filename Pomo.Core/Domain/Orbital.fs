@@ -33,8 +33,10 @@ module Orbital =
     let totalAngle = angle + indexOffset
 
     let x = MathF.Cos totalAngle * config.Radius * config.PathScale.X
-    let y = MathF.Sin totalAngle * config.Radius * config.PathScale.Y
-    let localPos2D = Vector3(x, y, 0.0f)
+    let z = MathF.Sin totalAngle * config.Radius * config.PathScale.Y
+    // Horizontal plane (X-Z): flat halo around entity
+    // RotationAxis tilts this to add verticalness
+    let localPos = Vector3(x, 0.0f, z)
 
     let rotation =
       if config.RotationAxis = Vector3.UnitZ then
@@ -53,7 +55,7 @@ module Orbital =
 
           Quaternion.CreateFromAxisAngle(Vector3.Normalize axis, angle)
 
-    Vector3.Transform(localPos2D, rotation)
+    Vector3.Transform(localPos, rotation)
 
   [<Struct>]
   type OrbitalCenter =

@@ -434,7 +434,7 @@
       "RenderMode": "Mesh",
       "Model": "3d_models/kaykit_prototype/Coin_A",
       "BlendMode": "Additive",
-      "SimulationSpace": "Local",
+      "SimulationSpace": "World",
       "Rate": 0,
       "Burst": 1,
       "Shape": "Point",

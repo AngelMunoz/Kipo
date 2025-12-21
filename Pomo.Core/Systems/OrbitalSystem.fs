@@ -191,7 +191,7 @@ module OrbitalSystem =
                 if effects.Length > 0 then
                   effectCache[casterId] <- effects
 
-              // Update positions
+              // Update positions (baseline: no rotation, just raw orbital positions)
               if not(isNull effects) then
                 for i = 0 to effects.Length - 1 do
                   let entry = effects[i]
@@ -202,12 +202,25 @@ module OrbitalSystem =
                       elapsed
                       entry.Index
 
+                  // The orbital's world position
                   let worldPos =
                     Vector3(casterPos.X, 0.0f, casterPos.Y)
                     + orbital.Config.CenterOffset
                     + localOffset
 
-                  entry.Effect.Position.Value <- worldPos)
+                  // Update effect position (for billboard particles)
+                  entry.Effect.Position.Value <- worldPos
+
+                  // Update mesh particles directly with world position
+                  // With SimulationSpace: World, particle.Position is used directly
+                  for meshEmitter in entry.Effect.MeshEmitters do
+                    for j = 0 to meshEmitter.Particles.Count - 1 do
+                      let p = meshEmitter.Particles.[j]
+
+                      meshEmitter.Particles.[j] <- {
+                        p with
+                            Position = worldPos
+                      })
 
       // Cleanup stale effect caches
       toRemove.Clear()
