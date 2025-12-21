@@ -990,17 +990,18 @@ module Combat =
               let casterPos =
                 Targeting.getPosition ctx.EntityContext completed.CasterId
 
+              // Calculate 3D world position same as OrbitalSystem does
               let spawnPos3D =
                 Vector3(casterPos.X, 0.0f, casterPos.Y)
                 + orbitalConfig.CenterOffset
                 + localOffset
 
-              // Origin for logic is 2D.
-              // In this isometric view (2:1 ratio),
-              // 3D vertical Y maps to logic Y with a 2x factor
-              // because logic Y maps to world Z, and rendering squishes Z by 0.5.
-              // To counteract the squish and match the visual height:
-              let spawnPos2D = Vector2(spawnPos3D.X, spawnPos3D.Z / 2.0f)
+              // 3D -> 2D logic: X stays X, Z becomes Y
+              // Compensate for altitude (3D Y) - in 2:1 isometric, altitude
+              // visually raises the coin on screen. To match that position with
+              // a grounded projectile, we subtract half the altitude from logic Y.
+              let spawnPos2D =
+                Vector2(spawnPos3D.X, spawnPos3D.Z - spawnPos3D.Y * 2.0f)
 
               // Determine specific target for this projectile
               let target =
