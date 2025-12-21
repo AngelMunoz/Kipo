@@ -21,6 +21,40 @@ module Orbital =
     Visual: VisualManifest
   }
 
+  let calculatePosition
+    (config: OrbitalConfig)
+    (elapsed: float32)
+    (index: int)
+    =
+    let accel = (config.EndSpeed - config.StartSpeed) / config.Duration
+    let angle = config.StartSpeed * elapsed + 0.5f * accel * elapsed * elapsed
+
+    let indexOffset = (MathHelper.TwoPi / float32 config.Count) * float32 index
+    let totalAngle = angle + indexOffset
+
+    let x = MathF.Cos totalAngle * config.Radius * config.PathScale.X
+    let y = MathF.Sin totalAngle * config.Radius * config.PathScale.Y
+    let localPos2D = Vector3(x, y, 0.0f)
+
+    let rotation =
+      if config.RotationAxis = Vector3.UnitZ then
+        Quaternion.Identity
+      else
+        let axis = Vector3.Cross(Vector3.UnitZ, config.RotationAxis)
+
+        if axis.LengthSquared() < 0.001f then
+          if Vector3.Dot(Vector3.UnitZ, config.RotationAxis) < 0.0f then
+            Quaternion.CreateFromAxisAngle(Vector3.UnitX, MathHelper.Pi)
+          else
+            Quaternion.Identity
+        else
+          let angle =
+            MathF.Acos(Vector3.Dot(Vector3.UnitZ, config.RotationAxis))
+
+          Quaternion.CreateFromAxisAngle(Vector3.Normalize axis, angle)
+
+    Vector3.Transform(localPos2D, rotation)
+
   [<Struct>]
   type OrbitalCenter =
     | EntityCenter of entityId: Guid<EntityId>

@@ -23,39 +23,6 @@ module OrbitalSystem =
     Index: int
   }
 
-  let inline calculateOrbitalPosition
-    (config: OrbitalConfig)
-    (elapsed: float32)
-    (index: int)
-    =
-    let accel = (config.EndSpeed - config.StartSpeed) / config.Duration
-    let angle = config.StartSpeed * elapsed + 0.5f * accel * elapsed * elapsed
-
-    let indexOffset = (MathHelper.TwoPi / float32 config.Count) * float32 index
-    let totalAngle = angle + indexOffset
-
-    let x = MathF.Cos totalAngle * config.Radius * config.PathScale.X
-    let y = MathF.Sin totalAngle * config.Radius * config.PathScale.Y
-    let localPos2D = Vector3(x, y, 0.0f)
-
-    let rotation =
-      if config.RotationAxis = Vector3.UnitZ then
-        Quaternion.Identity
-      else
-        let axis = Vector3.Cross(Vector3.UnitZ, config.RotationAxis)
-
-        if axis.LengthSquared() < 0.001f then
-          if Vector3.Dot(Vector3.UnitZ, config.RotationAxis) < 0.0f then
-            Quaternion.CreateFromAxisAngle(Vector3.UnitX, MathHelper.Pi)
-          else
-            Quaternion.Identity
-        else
-          let angle =
-            MathF.Acos(Vector3.Dot(Vector3.UnitZ, config.RotationAxis))
-
-          Quaternion.CreateFromAxisAngle(Vector3.Normalize axis, angle)
-
-    Vector3.Transform(localPos2D, rotation)
 
   let spawnOrbitalEffects
     (core: CoreServices)
@@ -75,7 +42,7 @@ module OrbitalSystem =
 
           let effectId = Guid.NewGuid().ToString()
 
-          let localOffset = calculateOrbitalPosition orbital.Config 0.0f i
+          let localOffset = Orbital.calculatePosition orbital.Config 0.0f i
 
           let worldPos =
             Vector3(casterPos.X, 0.0f, casterPos.Y)
@@ -213,7 +180,7 @@ module OrbitalSystem =
                   let entry = effects[i]
 
                   let localOffset =
-                    calculateOrbitalPosition orbital.Config elapsed entry.Index
+                    Orbital.calculatePosition orbital.Config elapsed entry.Index
 
                   let worldPos =
                     Vector3(casterPos.X, 0.0f, casterPos.Y)

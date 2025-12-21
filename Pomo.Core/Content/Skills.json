@@ -725,7 +725,7 @@
     "Range": [16, 16],
     "Area": {
       "Type": "MultiPoint",
-      "Radius": 200.0,
+      "Radius": 150.0,
       "Count": 8
     },
     "Delivery": {
