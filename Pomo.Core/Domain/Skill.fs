@@ -175,6 +175,13 @@ module Skill =
     | TargetOffset of struct (float32 * float32)
 
   [<Struct>]
+  type ChargeConfig = {
+    Duration: float32
+    ChargeVisuals: VisualManifest
+    Orbitals: Orbital.OrbitalConfig voption
+  }
+
+  [<Struct>]
   type Delivery =
     | Instant
     | Projectile of projectile: ProjectileInfo
@@ -200,6 +207,7 @@ module Skill =
     Range: float32 voption
     Delivery: Delivery
     Area: SkillArea
+    ChargePhase: ChargeConfig voption
     Formula: Formula.MathExpr voption
     ElementFormula: ElementFormula voption
     Effects: Effect[]
@@ -464,6 +472,7 @@ module Skill =
     open JDeck
     open JDeck.Decode
     open Pomo.Core.Domain.Projectile.Serialization
+    open Pomo.Core.Domain.Orbital.Serialization
 
     type DecodeBuilder with
 
@@ -475,6 +484,32 @@ module Skill =
 
 
     open Pomo.Core.Domain.Core.Serialization
+
+    module ChargeConfig =
+      let decoder: Decoder<ChargeConfig> =
+        fun json -> decode {
+          let! duration =
+            Required.Property.get ("Duration", Required.float) json
+
+          and! visuals =
+            VOptional.Property.get
+              ("ChargeVisuals", VisualManifest.decoder)
+              json
+
+          and! orbitals =
+            VOptional.Property.get
+              ("Orbitals", Orbital.Serialization.decoder)
+              json
+
+          return {
+            Duration = float32 duration
+            ChargeVisuals =
+              match visuals with
+              | ValueSome v -> v
+              | ValueNone -> VisualManifest.empty
+            Orbitals = orbitals
+          }
+        }
 
     module Formula =
       /// Examples
@@ -1042,6 +1077,9 @@ module Skill =
           and! delivery =
             Required.Property.get ("Delivery", Delivery.decoder) json
 
+          and! chargePhase =
+            VOptional.Property.get ("Charge", ChargeConfig.decoder) json
+
           and! elementFormula =
             VOptional.Property.get
               ("ElementFormula", ElementFormula.decoder)
@@ -1081,6 +1119,7 @@ module Skill =
             Range = range
             Delivery = delivery
             Area = area
+            ChargePhase = chargePhase
             Formula = formula
             ElementFormula = elementFormula
             Effects = effects

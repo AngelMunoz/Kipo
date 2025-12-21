@@ -167,6 +167,13 @@ module SystemCommunications =
   }
 
   [<Struct>]
+  type ChargeCompleted = {
+    CasterId: Guid<EntityId>
+    SkillId: int<SkillId>
+    Target: SkillTarget
+  }
+
+  [<Struct>]
   type PickUpItemIntent = {
     Picker: Guid<EntityId>
     Item: ItemInstance
@@ -274,6 +281,7 @@ type NotificationEvent =
 type LifecycleEvent =
   | EntityDied of died: SystemCommunications.EntityDied
   | ProjectileImpacted of impact: SystemCommunications.ProjectileImpacted
+  | ChargeCompleted of charge: SystemCommunications.ChargeCompleted
 
 // --- Spawning Events ---
 [<Struct>]

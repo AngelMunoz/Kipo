@@ -39,6 +39,7 @@ module Combat =
     SkillStore: Stores.SkillStore
     ParticleStore: Stores.ParticleStore
     VisualEffects: ResizeArray<Particles.ActiveEffect>
+    ActiveOrbitals: HashMap<Guid<EntityId>, Orbital.ActiveOrbital>
   }
 
   module private Targeting =
@@ -370,23 +371,15 @@ module Combat =
       (rotation: Quaternion)
       (area: SkillArea)
       =
-      match ctx.ParticleStore.tryFind vfxId with
-      | ValueSome configs ->
-        let emitters =
-          configs
-          |> List.map(fun config ->
-            ({
-              Config = config
-              Particles = ResizeArray()
-              Accumulator = ref 0.0f
-              BurstDone = ref false
-            }
-            : Pomo.Core.Domain.Particles.ActiveEmitter))
-          |> ResizeArray
+      ctx.ParticleStore.tryFind vfxId
+      |> ValueOption.iter(fun configs ->
+        let struct (billboardEmitters, meshEmitters) =
+          Particles.splitEmittersByRenderMode configs
 
-        let effect: Pomo.Core.Domain.Particles.ActiveEffect = {
+        let effect: Particles.ActiveEffect = {
           Id = System.Guid.NewGuid().ToString()
-          Emitters = emitters |> Seq.toList
+          Emitters = billboardEmitters
+          MeshEmitters = meshEmitters
           Position = ref(Vector3(pos.X, 0.0f, pos.Y))
           Rotation = ref rotation
           Scale = ref Vector3.One
@@ -399,8 +392,7 @@ module Combat =
           }
         }
 
-        ctx.VisualEffects.Add(effect)
-      | ValueNone -> ()
+        ctx.VisualEffects.Add effect)
 
   module private Handlers =
 
@@ -719,17 +711,45 @@ module Combat =
         Execution.applyResourceCost ctx casterId activeSkill
         Execution.applyCooldown ctx casterId skillId activeSkill
 
-        match activeSkill.Delivery with
-        | Projectile projectileInfo ->
-          handleProjectileDelivery
-            ctx
-            casterId
-            skillId
-            target
-            activeSkill
-            projectileInfo
-        | Instant -> handleInstantDelivery ctx casterId target activeSkill
+        // Check if skill has a charge phase
+        match activeSkill.ChargePhase with
+        | ValueSome chargeConfig ->
+          // Create ActiveOrbital if needed
+          chargeConfig.Orbitals
+          |> ValueOption.iter(fun orbitalConfig ->
+            let activeOrbital: Orbital.ActiveOrbital = {
+              Center = Orbital.EntityCenter casterId
+              Config = orbitalConfig
+              StartTime = float32 ctx.Time.TotalGameTime.TotalSeconds
+            }
+
+
+            ctx.StateWrite.UpdateActiveOrbital(casterId, activeOrbital))
+
+          // Create ActiveCharge
+          let activeCharge: ActiveCharge = {
+            SkillId = skillId
+            Target = target
+            StartTime = ctx.Time.TotalGameTime
+            Duration = TimeSpan.FromSeconds(float chargeConfig.Duration)
+          }
+
+          ctx.StateWrite.UpdateActiveCharge(casterId, activeCharge)
+
+        | ValueNone ->
+          // No charge phase - execute delivery immediately
+          match activeSkill.Delivery with
+          | Projectile projectileInfo ->
+            handleProjectileDelivery
+              ctx
+              casterId
+              skillId
+              target
+              activeSkill
+              projectileInfo
+          | Instant -> handleInstantDelivery ctx casterId target activeSkill
       | _ -> ()
+
 
     let handleProjectileImpact
       (ctx: WorldContext)
@@ -858,6 +878,202 @@ module Combat =
       | _ -> () // Skill not found
 
 
+    let handleChargeCompleted
+      (ctx: WorldContext)
+      (completed: SystemCommunications.ChargeCompleted)
+      =
+      ctx.SkillStore.tryFind completed.SkillId
+      |> ValueOption.bind (function
+        | Skill.Active s -> ValueSome s
+        | _ -> ValueNone)
+      |> ValueOption.iter(fun skill ->
+        // Only spawn if skill has a ChargePhase and Projectile delivery
+        match skill.ChargePhase, skill.Delivery with
+        | ValueSome chargeConfig, Projectile projectileInfo ->
+          let baseTargetPos =
+            match completed.Target with
+            | SystemCommunications.TargetPosition pos -> pos
+            | SystemCommunications.TargetDirection pos -> pos
+            | SystemCommunications.TargetEntity tid ->
+              Targeting.getPosition ctx.EntityContext tid
+            | SystemCommunications.TargetSelf ->
+              Targeting.getPosition ctx.EntityContext completed.CasterId
+
+          // If we have orbitals, we should spawn one projectile per orbital
+          // originating from the orbital's position
+          match
+            chargeConfig.Orbitals,
+            ctx.ActiveOrbitals.TryFindV completed.CasterId
+          with
+          | ValueSome orbitalConfig, ValueSome activeOrbital ->
+            let orbitalCount = orbitalConfig.Count
+            let totalTime = float32 ctx.Time.TotalGameTime.TotalSeconds
+            let elapsed = totalTime - activeOrbital.StartTime
+
+            // Find potential targets in the area to map projectiles to
+            let potentialTargets =
+              match skill.Area with
+              | Circle(radius, maxTargets) ->
+                Spatial.Search.findTargetsInCircle ctx.SearchContext {
+                  CasterId = completed.CasterId
+                  Circle = {
+                    Center = baseTargetPos
+                    Radius = radius
+                  }
+                  MaxTargets = Math.Max(maxTargets, orbitalCount)
+                }
+
+              | SkillArea.Line(width, length, maxTargets) ->
+                Spatial.Search.findTargetsInLine ctx.SearchContext {
+                  CasterId = completed.CasterId
+                  Line = {
+                    Start = baseTargetPos
+                    End = baseTargetPos + Vector2.UnitX * length
+                    Width = width
+                  }
+                  MaxTargets = Math.Max(maxTargets, orbitalCount)
+                }
+              | SkillArea.Cone(angle, length, maxTargets) ->
+                Spatial.Search.findTargetsInCone ctx.SearchContext {
+                  CasterId = completed.CasterId
+                  Cone =
+                    ({
+                      Origin = baseTargetPos
+                      Direction =
+                        match completed.Target with
+                        | SystemCommunications.TargetPosition pos -> pos
+                        | SystemCommunications.TargetDirection pos -> pos
+                        | SystemCommunications.TargetEntity tid ->
+                          Targeting.getPosition ctx.EntityContext tid
+                        | SystemCommunications.TargetSelf ->
+                          Targeting.getPosition
+                            ctx.EntityContext
+                            completed.CasterId
+                      AngleDegrees = angle
+                      Length = length
+                    })
+                  MaxTargets = Math.Max(maxTargets, orbitalCount)
+                }
+              | SkillArea.AdaptiveCone(length, maxTargets) ->
+                Spatial.Search.findTargetsInCone ctx.SearchContext {
+                  CasterId = completed.CasterId
+                  Cone =
+                    ({
+                      Origin = baseTargetPos
+                      Direction =
+                        match completed.Target with
+                        | SystemCommunications.TargetPosition pos -> pos
+                        | SystemCommunications.TargetDirection pos -> pos
+                        | SystemCommunications.TargetEntity tid ->
+                          Targeting.getPosition ctx.EntityContext tid
+                        | SystemCommunications.TargetSelf ->
+                          Targeting.getPosition
+                            ctx.EntityContext
+                            completed.CasterId
+                      AngleDegrees = 85.0f
+                      Length = length
+                    })
+                  MaxTargets = Math.Max(maxTargets, orbitalCount)
+                }
+              | Point
+              | MultiPoint _ -> IndexList.empty
+
+            let targetList = potentialTargets |> Seq.toArray
+
+            for i = 0 to orbitalCount - 1 do
+              let projectileId = Guid.NewGuid() |> UMX.tag<EntityId>
+
+              // Calculate orb position as origin
+              let localOffset =
+                Orbital.calculatePosition orbitalConfig elapsed i
+
+              let casterPos =
+                Targeting.getPosition ctx.EntityContext completed.CasterId
+
+              // Calculate 3D world position same as OrbitalSystem does
+              let spawnPos3D =
+                Vector3(casterPos.X, 0.0f, casterPos.Y)
+                + orbitalConfig.CenterOffset
+                + localOffset
+
+              // 3D -> 2D logic: X stays X, Z becomes Y
+              // Compensate for altitude (3D Y) - in 2:1 isometric, altitude
+              // visually raises the coin on screen. To match that position with
+              // a grounded projectile, we subtract half the altitude from logic Y.
+              let spawnPos2D =
+                Vector2(spawnPos3D.X, spawnPos3D.Z - spawnPos3D.Y * 2.0f)
+
+              // Determine specific target for this projectile
+              let target =
+                if i < targetList.Length then
+                  Projectile.EntityTarget targetList[i]
+                else
+                  // No more entity targets, fire at a random point in the area
+                  // TODO: us the shape to determine the right area
+                  // for point we should use the selected point
+                  // for multipoint we should select random points in the area
+                  match skill.Area with
+                  | Circle(radius, _)
+                  | MultiPoint(radius, _) ->
+                    let angle = float(ctx.Rng.NextDouble()) * 2.0 * Math.PI
+                    let dist = float(ctx.Rng.NextDouble()) * float radius
+                    let offsetX = cos angle * dist
+                    let offsetY = sin angle * dist
+
+                    Projectile.PositionTarget(
+                      baseTargetPos + Vector2(float32 offsetX, float32 offsetY)
+                    )
+                  | _ -> Projectile.PositionTarget baseTargetPos
+
+              let liveProjectile: Projectile.LiveProjectile = {
+                Caster = completed.CasterId
+                Target = target
+                SkillId = completed.SkillId
+                Info = projectileInfo
+              }
+
+              // Start projectile at calculated orb position
+              ctx.StateWrite.CreateProjectile(
+                projectileId,
+                liveProjectile,
+                ValueSome spawnPos2D
+              )
+
+          | _ ->
+            // Fallback to single projectile if no orbitals or config mismatch
+            let projectileId = Guid.NewGuid() |> UMX.tag<EntityId>
+
+            let baseTarget =
+              match completed.Target with
+              | SystemCommunications.TargetEntity tid ->
+                Projectile.EntityTarget tid
+              | SystemCommunications.TargetPosition pos ->
+                Projectile.PositionTarget pos
+              | SystemCommunications.TargetDirection pos ->
+                Projectile.PositionTarget pos
+              | SystemCommunications.TargetSelf ->
+                Projectile.EntityTarget completed.CasterId
+
+            let liveProjectile: Projectile.LiveProjectile = {
+              Caster = completed.CasterId
+              Target = baseTarget
+              SkillId = completed.SkillId
+              Info = projectileInfo
+            }
+
+            ctx.StateWrite.CreateProjectile(
+              projectileId,
+              liveProjectile,
+              ValueNone
+            )
+
+        | ValueSome _, Instant ->
+          // Charged instant skill - execute instant delivery
+          handleInstantDelivery ctx completed.CasterId completed.Target skill
+
+        | _ -> ())
+
+
   open Pomo.Core.Environment
   open Pomo.Core.Environment.Patterns
 
@@ -918,6 +1134,7 @@ module Combat =
             SkillStore = skillStore
             ParticleStore = stores.ParticleStore
             VisualEffects = core.World.VisualEffects
+            ActiveOrbitals = core.World.ActiveOrbitals |> AMap.force
           }
         | ValueNone -> ValueNone
 
@@ -946,6 +1163,18 @@ module Combat =
       |> Observable.subscribe(fun event ->
         match createCtx event.CasterId with
         | ValueSome ctx -> Handlers.handleProjectileImpact ctx event
+        | ValueNone -> ())
+      |> subscriptions.Add
+
+      eventBus.Observable
+      |> Observable.choose(fun e ->
+        match e with
+        | GameEvent.Lifecycle(LifecycleEvent.ChargeCompleted completed) ->
+          Some completed
+        | _ -> None)
+      |> Observable.subscribe(fun event ->
+        match createCtx event.CasterId with
+        | ValueSome ctx -> Handlers.handleChargeCompleted ctx event
         | ValueNone -> ())
       |> subscriptions.Add
 

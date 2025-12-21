@@ -18,6 +18,8 @@ module Systems =
     | ResourceManager
     | Collision
     | AI
+    | Orbital
+    | Charge
 
   type GameSystem(game: Game) =
     inherit GameComponent(game)

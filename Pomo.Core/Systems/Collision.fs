@@ -117,21 +117,15 @@ module Collision =
     let stateWrite = env.CoreServices.StateWrite
 
     let spawnTerrainImpactEffect (vfxId: string) (pos: Vector2) =
-      match stores.ParticleStore.tryFind vfxId with
-      | ValueSome configs ->
-        let emitters =
-          configs
-          |> List.map(fun config -> {
-            Config = config
-            Particles = ResizeArray()
-            Accumulator = ref 0.0f
-            BurstDone = ref false
-          })
-          |> ResizeArray
+      stores.ParticleStore.tryFind vfxId
+      |> ValueOption.iter(fun configs ->
+        let struct (billboardEmitters, meshEmitters) =
+          splitEmittersByRenderMode configs
 
         let effect = {
           Id = System.Guid.NewGuid().ToString()
-          Emitters = emitters |> Seq.toList
+          Emitters = billboardEmitters
+          MeshEmitters = meshEmitters
           Position = ref(Vector3(pos.X, 0.0f, pos.Y))
           Rotation = ref Quaternion.Identity
           Scale = ref Vector3.One
@@ -140,8 +134,7 @@ module Collision =
           Overrides = EffectOverrides.empty
         }
 
-        core.World.VisualEffects.Add(effect)
-      | ValueNone -> ()
+        core.World.VisualEffects.Add effect)
 
     // Cache for map object spatial grid
     // MapKey -> (Grid -> List of CacheKey)

@@ -711,5 +711,50 @@
         ]
       }
     ]
+  },
+  "25": {
+    "Kind": "Active",
+    "Id": 25,
+    "Name": "Seraphic Bombardment",
+    "Description": "Summons orbiting spheres of light that charge up and bombard enemies, causing a massive explosion of light.",
+    "Intent": "Offensive",
+    "DamageSource": "Magical",
+    "Cost": { "Type": "MP", "Amount": 40 },
+    "Cooldown": 10.0,
+    "Targeting": "TargetPosition",
+    "Range": [16, 16],
+    "Area": {
+      "Type": "Circle",
+      "Radius": 32.0,
+      "MaxTargets": 6
+    },
+    "Delivery": {
+      "Type": "Projectile",
+      "Speed": 400.0,
+      "CollisionMode": "IgnoreTerrain",
+      "Visuals": { "Model": "LightSphere", "Vfx": "SeraphicProjectile" }
+    },
+    "Charge": {
+      "Duration": 2.0,
+      "ChargeVisuals": { "Vfx": "JudgementCharge" },
+      "Orbitals": {
+        "Count": 6,
+        "Radius": 16.0,
+        "CenterOffset": { "X": 0, "Y": 4, "Z": -8 },
+        "RotationAxis": { "X": 0, "Y": 1, "Z": 0 },
+        "PathScale": [1.0, 1.0],
+        "StartSpeed": 2.0,
+        "EndSpeed": 40.0,
+        "Duration": 2.0,
+        "Visual": { "Vfx": "OrbitalGlow" }
+      }
+    },
+    "ImpactVisuals": { "Vfx": "LightDome" },
+    "ElementFormula": {
+      "Element": "Light",
+      "Formula": "(MA * 2.5) + (LightA * 4000)"
+    },
+    "Origin": "Caster",
+    "Effects": []
   }
 }
