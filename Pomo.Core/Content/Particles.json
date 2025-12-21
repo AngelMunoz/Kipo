@@ -473,12 +473,14 @@
     {
       "RenderMode": "Mesh",
       "Model": "3d_models/kaykit_prototype/Primitive_Beam",
+      "MeshRotation": "Fixed",
       "BlendMode": "Additive",
       "SimulationSpace": "World",
       "Rate": 0,
       "Burst": 1,
       "Shape": "Point",
       "LocalOffset": { "X": 0.0, "Y": 0.0, "Z": 0.0 },
+      "EmissionRotation": { "X": 90.0, "Y": 0.0, "Z": 0.0 },
       "Particle": {
         "Lifetime": [1.0, 1.0],
         "Speed": [0, 0],
@@ -495,21 +497,64 @@
     {
       "RenderMode": "Mesh",
       "Model": "3d_models/kaykit_prototype/Primitive_Beam",
+      "MeshRotation": "Fixed",
       "BlendMode": "Additive",
       "SimulationSpace": "World",
       "Rate": 0,
       "Burst": 1,
       "Shape": "Point",
       "LocalOffset": { "X": 0.0, "Y": 0.0, "Z": 0.0 },
+      "EmissionRotation": { "X": 0, "Y": 0.0, "Z": 90 },
+      "ScalePivot": { "X": 0.0, "Y": 2.0, "Z": 0.0 },
+      "ScaleAxis": { "X": 0.0, "Y": 1.0, "Z": 0.0 },
       "Particle": {
         "Lifetime": [0.8, 0.8],
         "Speed": [0, 0],
-        "SizeStart": 3.0,
-        "SizeEnd": 0.0,
+        "SizeStart": 0.0,
+        "SizeEnd": 2.0,
         "ColorStart": "#FFFFE0AA",
         "ColorEnd": "#FFFFE000",
         "Gravity": 0,
         "Drag": 0.0
+      }
+    },
+    {
+      "Texture": "Particles/jellyfish0-masks/15",
+      "BlendMode": "Additive",
+      "SimulationSpace": "World",
+      "Rate": 100,
+      "Burst": 20,
+      "Shape": "Sphere",
+      "Radius": 0.5,
+      "LocalOffset": { "X": 0.0, "Y": 0.0, "Z": 0.0 },
+      "Particle": {
+        "Lifetime": [0.3, 0.6],
+        "Speed": [0, 5],
+        "SizeStart": 2.0,
+        "SizeEnd": 0.0,
+        "ColorStart": "#FFFFE0FF",
+        "ColorEnd": "#FFFFE000",
+        "Gravity": -20,
+        "Drag": 2.0
+      }
+    },
+    {
+      "Texture": "Particles/jellyfish0-masks/3",
+      "BlendMode": "Additive",
+      "SimulationSpace": "World",
+      "Rate": 50,
+      "Burst": 10,
+      "Shape": "Point",
+      "LocalOffset": { "X": 0.0, "Y": 0.0, "Z": 0.0 },
+      "Particle": {
+        "Lifetime": [0.4, 0.8],
+        "Speed": [0, 2],
+        "SizeStart": 3.0,
+        "SizeEnd": 0.0,
+        "ColorStart": "#FFFFFFFF",
+        "ColorEnd": "#FFFFE000",
+        "Gravity": 0,
+        "Drag": 3.0
       }
     }
   ],

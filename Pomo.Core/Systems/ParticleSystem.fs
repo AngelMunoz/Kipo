@@ -644,28 +644,55 @@ module ParticleSystem =
           ownerRotation
           overrides
 
-      // Random starting rotation for tumbling
-      let randomRotation =
-        Quaternion.CreateFromYawPitchRoll(
-          float32(rng.NextDouble()) * MathHelper.TwoPi,
-          float32(rng.NextDouble()) * MathHelper.TwoPi,
-          float32(rng.NextDouble()) * MathHelper.TwoPi
-        )
+      // Rotation based on MeshRotationMode
+      let struct (initialRotation, angularVelocity) =
+        match config.MeshRotation with
+        | Particles.MeshRotationMode.Fixed ->
+          // Use EmissionRotation as static mesh orientation
+          let rot = config.EmissionRotation
 
-      // Random angular velocity for tumbling
-      let angVelScale = 3.0f
+          let baseRot =
+            Quaternion.CreateFromYawPitchRoll(
+              MathHelper.ToRadians(rot.Y),
+              MathHelper.ToRadians(rot.X),
+              MathHelper.ToRadians(rot.Z)
+            )
 
-      let angularVelocity =
-        Vector3(
-          (float32(rng.NextDouble()) * 2.0f - 1.0f) * angVelScale,
-          (float32(rng.NextDouble()) * 2.0f - 1.0f) * angVelScale,
-          (float32(rng.NextDouble()) * 2.0f - 1.0f) * angVelScale
-        )
+          struct (baseRot, Vector3.Zero)
+        | Particles.MeshRotationMode.Tumbling ->
+          // Random initial + angular velocity for tumbling debris
+          let randomRot =
+            Quaternion.CreateFromYawPitchRoll(
+              float32(rng.NextDouble()) * MathHelper.TwoPi,
+              float32(rng.NextDouble()) * MathHelper.TwoPi,
+              float32(rng.NextDouble()) * MathHelper.TwoPi
+            )
+
+          let angVelScale = 3.0f
+
+          let angVel =
+            Vector3(
+              (float32(rng.NextDouble()) * 2.0f - 1.0f) * angVelScale,
+              (float32(rng.NextDouble()) * 2.0f - 1.0f) * angVelScale,
+              (float32(rng.NextDouble()) * 2.0f - 1.0f) * angVelScale
+            )
+
+          struct (randomRot, angVel)
+        | Particles.MeshRotationMode.RandomStatic ->
+          // Random initial, no spinning (settled debris)
+          let randomRot =
+            Quaternion.CreateFromYawPitchRoll(
+              float32(rng.NextDouble()) * MathHelper.TwoPi,
+              float32(rng.NextDouble()) * MathHelper.TwoPi,
+              float32(rng.NextDouble()) * MathHelper.TwoPi
+            )
+
+          struct (randomRot, Vector3.Zero)
 
       emitter.Particles.Add {
         Position = ctx.FinalPosition
         Velocity = ctx.Velocity
-        Rotation = randomRotation
+        Rotation = initialRotation
         AngularVelocity = angularVelocity
         Scale = config.Particle.SizeStart
         Life = ctx.Lifetime

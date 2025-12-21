@@ -720,13 +720,13 @@
     "Intent": "Offensive",
     "DamageSource": "Magical",
     "Cost": { "Type": "MP", "Amount": 40 },
-    "Cooldown": 15.0,
+    "Cooldown": 10.0,
     "Targeting": "TargetPosition",
     "Range": [16, 16],
     "Area": {
-      "Type": "MultiPoint",
-      "Radius": 150.0,
-      "Count": 8
+      "Type": "Circle",
+      "Radius": 32.0,
+      "MaxTargets": 6
     },
     "Delivery": {
       "Type": "Projectile",
@@ -738,13 +738,13 @@
       "Duration": 2.0,
       "ChargeVisuals": { "Vfx": "JudgementCharge" },
       "Orbitals": {
-        "Count": 8,
-        "Radius": 12.0,
-        "CenterOffset": { "X": 0, "Y": 1.5, "Z": -15 },
-        "RotationAxis": { "X": 0, "Y": 0, "Z": 1 },
+        "Count": 6,
+        "Radius": 16.0,
+        "CenterOffset": { "X": 0, "Y": 4, "Z": -8 },
+        "RotationAxis": { "X": 0, "Y": 1, "Z": 0 },
         "PathScale": [1.0, 1.0],
         "StartSpeed": 2.0,
-        "EndSpeed": 16.0,
+        "EndSpeed": 40.0,
         "Duration": 2.0,
         "Visual": { "Vfx": "OrbitalGlow" }
       }

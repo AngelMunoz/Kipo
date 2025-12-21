@@ -41,6 +41,13 @@ module Particles =
     | Billboard of texture: string
     | Mesh of modelAsset: string
 
+  /// Controls rotation behavior for mesh particles
+  [<Struct>]
+  type MeshRotationMode =
+    | Fixed // No rotation - stays upright (pillars, beams)
+    | Tumbling // Random initial + angular velocity (flying debris)
+    | RandomStatic // Random initial, no spinning (settled debris)
+
   [<Struct>]
   type ParticleConfig = {
     Lifetime: struct (float32 * float32)
@@ -68,6 +75,9 @@ module Particles =
     FloorHeight: float32
     EmissionRotation: Vector3
     EmissionMode: EmissionMode
+    MeshRotation: MeshRotationMode
+    ScalePivot: Vector3 // Pivot point for mesh scaling (e.g., 0,-0.5,0 = bottom anchor)
+    ScaleAxis: Vector3 // Per-axis scale multiplier (e.g., 0,1,0 = height-only growth)
   }
 
   // Runtime Types
@@ -253,6 +263,24 @@ module Particles =
           | _ ->
             return!
               DecodeError.ofError(json.Clone(), $"Unknown EmissionMode: {str}")
+              |> Error
+        }
+
+    module MeshRotationModeCodec =
+      let decoder: Decoder<MeshRotationMode> =
+        fun json -> decode {
+          let! str = Required.string json
+
+          match str.ToLowerInvariant() with
+          | "fixed" -> return Fixed
+          | "tumbling" -> return Tumbling
+          | "randomstatic" -> return RandomStatic
+          | _ ->
+            return!
+              DecodeError.ofError(
+                json.Clone(),
+                $"Unknown MeshRotationMode: {str}"
+              )
               |> Error
         }
 
@@ -506,6 +534,17 @@ module Particles =
               ("EmissionMode", EmissionModeCodec.decoder)
               json
 
+          let! meshRotation =
+            VOptional.Property.get
+              ("MeshRotation", MeshRotationModeCodec.decoder)
+              json
+
+          let! scalePivot =
+            VOptional.Property.get ("ScalePivot", Helper.vec3FromDict) json
+
+          let! scaleAxis =
+            VOptional.Property.get ("ScaleAxis", Helper.vec3FromDict) json
+
           return {
             Name =
               match name with
@@ -544,5 +583,17 @@ module Particles =
               match emissionMode with
               | ValueSome m -> m
               | ValueNone -> Uniform
+            MeshRotation =
+              match meshRotation with
+              | ValueSome m -> m
+              | ValueNone -> Tumbling
+            ScalePivot =
+              match scalePivot with
+              | ValueSome v -> v
+              | ValueNone -> Vector3.Zero
+            ScaleAxis =
+              match scaleAxis with
+              | ValueSome v -> v
+              | ValueNone -> Vector3.One // Default: uniform scaling
           }
         }

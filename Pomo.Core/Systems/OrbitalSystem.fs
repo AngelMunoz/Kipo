@@ -213,10 +213,8 @@ module OrbitalSystem =
                       elapsed
                       entry.Index
 
-                  // Rotate both offsets to match entity facing
-                  let rotatedOffset =
-                    Vector3.Transform(localOffset, facingQuat)
-
+                  // Only rotate CenterOffset to track "behind" the character
+                  // localOffset stays unrotated so the X-Z orbit renders as isometric ellipse
                   let rotatedCenterOffset =
                     Vector3.Transform(orbital.Config.CenterOffset, facingQuat)
 
@@ -224,7 +222,7 @@ module OrbitalSystem =
                   let worldPos =
                     Vector3(casterPos.X, 0.0f, casterPos.Y)
                     + rotatedCenterOffset
-                    + rotatedOffset
+                    + localOffset
 
                   // Update effect position (for billboard particles)
                   entry.Effect.Position.Value <- worldPos

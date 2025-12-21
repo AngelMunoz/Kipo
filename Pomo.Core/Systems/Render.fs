@@ -737,6 +737,8 @@ module Render =
           // ModelPath pre-extracted at creation - no hot-path branching
           match res.GetModel meshEmitter.ModelPath with
           | ValueSome model ->
+            let squishFactor = ppu.X / ppu.Y
+
             for particle in meshEmitter.Particles do
               let pWorldPos =
                 computeParticleWorldPosition
@@ -745,11 +747,51 @@ module Render =
                   effectPos
 
               let renderPos = particleToRenderPosition pWorldPos ppu
-              let scale = particle.Scale * modelScale
+              let baseScale = particle.Scale * modelScale
+
+              // Apply non-uniform scaling via ScaleAxis
+              // ScaleAxis determines which axes participate in scaling
+              // (1,1,1) = uniform, (0,1,0) = height only, (1,0,1) = width/depth only
+              let axis = meshEmitter.Config.ScaleAxis
+              let scaleX = 1.0f + (baseScale - 1.0f) * axis.X
+              let scaleY = 1.0f + (baseScale - 1.0f) * axis.Y
+              let scaleZ = 1.0f + (baseScale - 1.0f) * axis.Z
+              let scaleMatrix = Matrix.CreateScale(scaleX, scaleY, scaleZ)
+
+              // Squish compensation for isometric view
+              let squishCompensation =
+                Matrix.CreateScale(1.0f, 1.0f, squishFactor)
+
+              // Isometric correction (same as used in RenderMath)
+              let isoRot =
+                Matrix.CreateLookAt(
+                  Vector3.Zero,
+                  Vector3.Normalize(Vector3(-1.0f, -1.0f, -1.0f)),
+                  Vector3.Up
+                )
+
+              let topDownRot =
+                Matrix.CreateLookAt(Vector3.Zero, Vector3.Down, Vector3.Forward)
+
+              let correction = isoRot * Matrix.Invert topDownRot
 
               let worldMatrix =
-                Matrix.CreateScale(scale)
-                * Matrix.CreateFromQuaternion(particle.Rotation)
+                // ScalePivot as GROWTH OFFSET in local oriented space
+                // Applied BEFORE iso correction so Y = height in mesh's frame
+                let pivot = meshEmitter.Config.ScalePivot
+
+                let growthOffset =
+                  Vector3(
+                    pivot.X * (scaleX - 1.0f),
+                    pivot.Y * (scaleY - 1.0f),
+                    pivot.Z * (scaleZ - 1.0f)
+                  )
+
+                Matrix.CreateFromQuaternion(particle.Rotation)
+                * scaleMatrix
+                * Matrix.CreateTranslation(growthOffset) // Growth offset in local space
+                * correction
+                * squishCompensation
                 * Matrix.CreateTranslation(renderPos)
 
               drawModel frame.Camera model worldMatrix
