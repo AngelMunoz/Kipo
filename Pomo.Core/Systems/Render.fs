@@ -776,23 +776,15 @@ module Render =
               let correction = isoRot * Matrix.Invert topDownRot
 
               let worldMatrix =
-                // ScalePivot as GROWTH OFFSET in SCREEN SPACE
-                // Applied AFTER iso correction so Y = up on screen, not transformed diagonally
-                // This keeps the pillar base at the impact position
+                // ScalePivot as SCREEN-SPACE offset (after iso correction)
+                // Y = screen vertical (up), X = screen horizontal (right)
                 let pivot = meshEmitter.Config.ScalePivot
-
-                let growthOffset =
-                  Vector3(
-                    pivot.X * (scaleX - 1.0f),
-                    pivot.Y * (scaleY - 1.0f),
-                    pivot.Z * (scaleZ - 1.0f)
-                  )
 
                 Matrix.CreateFromQuaternion(particle.Rotation)
                 * scaleMatrix
                 * correction
                 * squishCompensation
-                * Matrix.CreateTranslation(growthOffset) // Growth offset in screen space
+                * Matrix.CreateTranslation(pivot) // Now: Y = screen up
                 * Matrix.CreateTranslation(renderPos)
 
               drawModel frame.Camera model worldMatrix
@@ -975,7 +967,7 @@ module Render =
 
               // === Render Passes (Orchestrator Style) ===
               renderAllEntities entityRes frame
-              renderAllParticles particleRes world frame
               renderAllMeshParticles particleRes world frame
+              renderAllParticles particleRes world frame
               renderTargetingIndicator uiRes camera
     }

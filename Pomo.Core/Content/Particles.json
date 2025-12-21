@@ -496,23 +496,20 @@
   "LightDome": [
     {
       "RenderMode": "Mesh",
-      "Model": "3d_models/kaykit_prototype/Primitive_Beam",
+      "Model": "3d_models/kaykit_prototype/Coin_A",
       "MeshRotation": "Fixed",
       "BlendMode": "Additive",
       "SimulationSpace": "World",
       "Rate": 0,
       "Burst": 1,
       "Shape": "Point",
-      "LocalOffset": { "X": 0.0, "Y": 0.0, "Z": 0.0 },
-      "EmissionRotation": { "X": 0, "Y": 0.0, "Z": 90 },
-      "ScalePivot": { "X": 0.0, "Y": 2.0, "Z": 0.0 },
-      "ScaleAxis": { "X": 0.0, "Y": 1.0, "Z": 0.0 },
+      "ScaleAxis": { "X": 0, "Y": 1.0, "Z": 0 },
       "Particle": {
         "Lifetime": [0.8, 0.8],
         "Speed": [0, 0],
-        "SizeStart": 0.0,
-        "SizeEnd": 8.0,
-        "ColorStart": "#FFFFE0AA",
+        "SizeStart": 1.0,
+        "SizeEnd": 6.0,
+        "ColorStart": "#FFFFE0FF",
         "ColorEnd": "#FFFFE000",
         "Gravity": 0,
         "Drag": 0.0
@@ -525,17 +522,17 @@
       "Rate": 0,
       "Burst": 150,
       "Shape": "Cone",
-      "Angle": 20,
+      "Angle": 150,
       "Radius": 0.3,
       "LocalOffset": { "X": 0.0, "Y": 0.0, "Z": 0.0 },
       "Particle": {
-        "Lifetime": [0.5, 1.5],
+        "Lifetime": [0.5, 2.5],
         "Speed": [50, 800],
         "SizeStart": 1.5,
         "SizeEnd": 0.5,
         "ColorStart": "#FFFFE0FF",
         "ColorEnd": "#FFFFE000",
-        "Gravity": -600,
+        "Gravity": -10,
         "RandomVelocity": { "X": 5, "Y": 10, "Z": 5 },
         "Drag": 1.5
       }
@@ -545,7 +542,7 @@
       "BlendMode": "Additive",
       "SimulationSpace": "World",
       "Rate": 0,
-      "Burst": 50,
+      "Burst": 200,
       "Shape": "Cone",
       "Angle": 10,
       "Radius": 0.1,
@@ -553,11 +550,11 @@
       "Particle": {
         "Lifetime": [0.8, 2.0],
         "Speed": [100, 800],
-        "SizeStart": 2.5,
-        "SizeEnd": 0.5,
+        "SizeStart": 0,
+        "SizeEnd": 2.5,
         "ColorStart": "#FFFFFFFF",
         "ColorEnd": "#FFFFE000",
-        "Gravity": -400,
+        "Gravity": -150,
         "RandomVelocity": { "X": 3, "Y": 8, "Z": 3 },
         "Drag": 1.0
       }
