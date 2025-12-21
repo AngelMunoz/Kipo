@@ -39,19 +39,18 @@ module Orbital =
     let localPos = Vector3(x, 0.0f, z)
 
     let rotation =
-      if config.RotationAxis = Vector3.UnitZ then
+      if config.RotationAxis = Vector3.Up then
         Quaternion.Identity
       else
-        let axis = Vector3.Cross(Vector3.UnitZ, config.RotationAxis)
+        let axis = Vector3.Cross(Vector3.Up, config.RotationAxis)
 
         if axis.LengthSquared() < 0.001f then
-          if Vector3.Dot(Vector3.UnitZ, config.RotationAxis) < 0.0f then
+          if Vector3.Dot(Vector3.Up, config.RotationAxis) < 0.0f then
             Quaternion.CreateFromAxisAngle(Vector3.UnitX, MathHelper.Pi)
           else
             Quaternion.Identity
         else
-          let angle =
-            MathF.Acos(Vector3.Dot(Vector3.UnitZ, config.RotationAxis))
+          let angle = MathF.Acos(Vector3.Dot(Vector3.Up, config.RotationAxis))
 
           Quaternion.CreateFromAxisAngle(Vector3.Normalize axis, angle)
 

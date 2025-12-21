@@ -178,6 +178,17 @@ module OrbitalSystem =
               | EntityCenter entityId -> snapshot.Positions.TryFindV entityId
               | PositionCenter pos -> ValueSome pos
 
+            // Get entity facing rotation (only for entity-centered orbitals)
+            let entityRotation =
+              match orbital.Center with
+              | EntityCenter entityId ->
+                snapshot.Rotations.TryFindV entityId
+                |> ValueOption.defaultValue 0.0f
+              | PositionCenter _ -> 0.0f
+
+            let facingQuat =
+              Quaternion.CreateFromAxisAngle(Vector3.Up, entityRotation)
+
             centerPosOpt
             |> ValueOption.iter(fun casterPos ->
               let elapsed = totalTime - orbital.StartTime
@@ -191,7 +202,7 @@ module OrbitalSystem =
                 if effects.Length > 0 then
                   effectCache[casterId] <- effects
 
-              // Update positions (baseline: no rotation, just raw orbital positions)
+              // Update positions with entity facing rotation applied
               if not(isNull effects) then
                 for i = 0 to effects.Length - 1 do
                   let entry = effects[i]
@@ -202,11 +213,18 @@ module OrbitalSystem =
                       elapsed
                       entry.Index
 
+                  // Rotate both offsets to match entity facing
+                  let rotatedOffset =
+                    Vector3.Transform(localOffset, facingQuat)
+
+                  let rotatedCenterOffset =
+                    Vector3.Transform(orbital.Config.CenterOffset, facingQuat)
+
                   // The orbital's world position
                   let worldPos =
                     Vector3(casterPos.X, 0.0f, casterPos.Y)
-                    + orbital.Config.CenterOffset
-                    + localOffset
+                    + rotatedCenterOffset
+                    + rotatedOffset
 
                   // Update effect position (for billboard particles)
                   entry.Effect.Position.Value <- worldPos
