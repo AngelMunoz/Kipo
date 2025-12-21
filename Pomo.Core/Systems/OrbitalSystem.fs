@@ -125,6 +125,23 @@ module OrbitalSystem =
             stateWrite.RemoveActiveCharge(casterId)
             stateWrite.RemoveActiveOrbital(casterId)
 
+            // Immediately mark visual effects as dead and clear particles
+            match effectCache.TryGetValue(casterId) with
+            | true, effects ->
+              for i = 0 to effects.Length - 1 do
+                let effect = effects[i].Effect
+                effect.IsAlive.Value <- false
+
+                // Clear all particles to immediately remove visuals
+                for emitter in effect.Emitters do
+                  emitter.Particles.Clear()
+
+                for meshEmitter in effect.MeshEmitters do
+                  meshEmitter.Particles.Clear()
+
+              effectCache.Remove(casterId) |> ignore
+            | false, _ -> ()
+
       // === ORBITAL VISUAL UPDATE LOGIC ===
       // Clear and rebuild scenario grouping imperatively
       for KeyValue(_, list) in orbitalsByScenario do
@@ -180,7 +197,10 @@ module OrbitalSystem =
                   let entry = effects[i]
 
                   let localOffset =
-                    Orbital.calculatePosition orbital.Config elapsed entry.Index
+                    Orbital.calculatePosition
+                      orbital.Config
+                      elapsed
+                      entry.Index
 
                   let worldPos =
                     Vector3(casterPos.X, 0.0f, casterPos.Y)

@@ -729,29 +729,31 @@ module Render =
     let modelScale = Core.Constants.Entity.ModelScale
 
     for effect in world.VisualEffects do
-      let effectPos = effect.Position.Value
+      // Skip dead effects (same as billboard particles)
+      if effect.IsAlive.Value then
+        let effectPos = effect.Position.Value
 
-      for meshEmitter in effect.MeshEmitters do
-        // ModelPath pre-extracted at creation - no hot-path branching
-        match res.GetModel meshEmitter.ModelPath with
-        | ValueSome model ->
-          for particle in meshEmitter.Particles do
-            let pWorldPos =
-              computeParticleWorldPosition
-                meshEmitter.Config
-                particle.Position
-                effectPos
+        for meshEmitter in effect.MeshEmitters do
+          // ModelPath pre-extracted at creation - no hot-path branching
+          match res.GetModel meshEmitter.ModelPath with
+          | ValueSome model ->
+            for particle in meshEmitter.Particles do
+              let pWorldPos =
+                computeParticleWorldPosition
+                  meshEmitter.Config
+                  particle.Position
+                  effectPos
 
-            let renderPos = particleToRenderPosition pWorldPos ppu
-            let scale = particle.Scale * modelScale
+              let renderPos = particleToRenderPosition pWorldPos ppu
+              let scale = particle.Scale * modelScale
 
-            let worldMatrix =
-              Matrix.CreateScale(scale)
-              * Matrix.CreateFromQuaternion(particle.Rotation)
-              * Matrix.CreateTranslation(renderPos)
+              let worldMatrix =
+                Matrix.CreateScale(scale)
+                * Matrix.CreateFromQuaternion(particle.Rotation)
+                * Matrix.CreateTranslation(renderPos)
 
-            drawModel frame.Camera model worldMatrix
-        | ValueNone -> ()
+              drawModel frame.Camera model worldMatrix
+          | ValueNone -> ()
 
   /// Renders targeting indicator UI overlay
   let private renderTargetingIndicator
