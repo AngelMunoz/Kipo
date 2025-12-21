@@ -724,32 +724,27 @@
     "Targeting": "TargetPosition",
     "Range": [16, 16],
     "Area": {
-      "Type": "Circle",
-      "Radius": 48.0,
-      "MaxTargets": 8
+      "Type": "MultiPoint",
+      "Radius": 200.0,
+      "Count": 8
     },
     "Delivery": {
       "Type": "Projectile",
-      "Speed": 25.0,
+      "Speed": 400.0,
       "CollisionMode": "IgnoreTerrain",
-      "Kind": {
-        "Type": "Descending",
-        "StartAltitude": 200.0,
-        "FallSpeed": 300.0
-      },
-      "Visuals": { "Vfx": "SeraphicProjectile" }
+      "Visuals": { "Model": "LightSphere", "Vfx": "SeraphicProjectile" }
     },
     "Charge": {
       "Duration": 2.0,
       "ChargeVisuals": { "Vfx": "JudgementCharge" },
       "Orbitals": {
-        "Count": 5,
-        "Radius": 1.5,
-        "CenterOffset": { "X": 0.0, "Y": 1.0, "Z": 0.0 },
-        "RotationAxis": { "X": 0.0, "Y": 1.0, "Z": 0.0 },
-        "PathScale": [1.0, 1.0],
+        "Count": 8,
+        "Radius": 12.0,
+        "CenterOffset": { "X": 0, "Y": 25, "Z": 8 },
+        "RotationAxis": { "X": 75, "Y": 10, "Z": 0 },
+        "PathScale": [0.5, 1.0],
         "StartSpeed": 2.0,
-        "EndSpeed": 8.0,
+        "EndSpeed": 16.0,
         "Duration": 2.0,
         "Visual": { "Vfx": "OrbitalGlow" }
       }

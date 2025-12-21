@@ -149,6 +149,7 @@ module EntitySpawnerLogic =
       UseSlot3, Core.SlotProcessing.Skill %11 // Ice Shard
       UseSlot4, Core.SlotProcessing.Skill %12 // Piercing Bolt
       UseSlot5, Core.SlotProcessing.Skill %13 // Fan of Knives
+      UseSlot6, Core.SlotProcessing.Skill %25 // Seraph Bombardment
     ]
 
     let actionSets = [

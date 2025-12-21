@@ -431,6 +431,26 @@
   ],
   "OrbitalGlow": [
     {
+      "RenderMode": "Mesh",
+      "Model": "3d_models/kaykit_prototype/Coin_A",
+      "BlendMode": "Additive",
+      "SimulationSpace": "Local",
+      "Rate": 0,
+      "Burst": 1,
+      "Shape": "Point",
+      "LocalOffset": { "X": 0.0, "Y": 0.0, "Z": 0.0 },
+      "Particle": {
+        "Lifetime": [10.0, 10.0],
+        "Speed": [0, 0],
+        "SizeStart": 0.5,
+        "SizeEnd": 0.5,
+        "ColorStart": "#FFD700FF",
+        "ColorEnd": "#FFD700FF",
+        "Gravity": 0,
+        "Drag": 0.0
+      }
+    },
+    {
       "Texture": "Particles/jellyfish0-masks/3",
       "BlendMode": "Additive",
       "SimulationSpace": "Local",
@@ -474,26 +494,6 @@
   "LightDome": [
     {
       "RenderMode": "Mesh",
-      "Model": "3d_models/kaykit_prototype/Coin_A",
-      "BlendMode": "Additive",
-      "SimulationSpace": "World",
-      "Rate": 0,
-      "Burst": 1,
-      "Shape": "Point",
-      "LocalOffset": { "X": 0.0, "Y": 0.5, "Z": 0.0 },
-      "Particle": {
-        "Lifetime": [0.5, 0.5],
-        "Speed": [0, 0],
-        "SizeStart": 0.1,
-        "SizeEnd": 5.0,
-        "ColorStart": "#FFD700AA",
-        "ColorEnd": "#FFD70000",
-        "Gravity": 0,
-        "Drag": 0.0
-      }
-    },
-    {
-      "RenderMode": "Mesh",
       "Model": "3d_models/kaykit_prototype/Primitive_Beam",
       "BlendMode": "Additive",
       "SimulationSpace": "World",
@@ -504,9 +504,9 @@
       "Particle": {
         "Lifetime": [0.8, 0.8],
         "Speed": [0, 0],
-        "SizeStart": 2.0,
+        "SizeStart": 3.0,
         "SizeEnd": 0.0,
-        "ColorStart": "#FFFFE088",
+        "ColorStart": "#FFFFE0AA",
         "ColorEnd": "#FFFFE000",
         "Gravity": 0,
         "Drag": 0.0
@@ -522,14 +522,14 @@
       "Shape": "Point",
       "LocalOffset": { "X": 0.0, "Y": 0.0, "Z": 0.0 },
       "Particle": {
-        "Lifetime": [0.2, 0.4],
-        "Speed": [10, 20],
-        "SizeStart": 0.6,
+        "Lifetime": [0.3, 0.6],
+        "Speed": [10, 30],
+        "SizeStart": 1.5,
         "SizeEnd": 0.0,
         "ColorStart": "#FFFFE0FF",
         "ColorEnd": "#FFFFE000",
         "Gravity": 0,
-        "Drag": 0.0
+        "Drag": 0.5
       }
     }
   ]
