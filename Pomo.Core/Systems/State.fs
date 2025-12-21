@@ -51,6 +51,9 @@ module StateUpdate =
       world.EquippedItems.Remove(entity) |> ignore
       world.AIControllers.Remove(entity) |> ignore
       world.EntityScenario.Remove(entity) |> ignore
+      world.ActiveOrbitals.Remove(entity) |> ignore
+      world.ActiveCharges.Remove(entity) |> ignore
+
 
     /// Apply an EntitySpawnBundle atomically - all components set in one pass
     let applyEntitySpawnBundle
@@ -364,6 +367,34 @@ module StateUpdate =
       if world.Positions.ContainsKey entityId then
         world.AIControllers[entityId] <- controller
 
+  module Orbital =
+    let inline updateActiveOrbital
+      (world: MutableWorld)
+      (entityId: Guid<EntityId>, orbital: Orbital.ActiveOrbital)
+      =
+      if world.Positions.ContainsKey entityId then
+        world.ActiveOrbitals[entityId] <- orbital
+
+    let inline removeActiveOrbital
+      (world: MutableWorld)
+      (entityId: Guid<EntityId>)
+      =
+      world.ActiveOrbitals.Remove entityId |> ignore
+
+  module Charge =
+    let inline updateActiveCharge
+      (world: MutableWorld)
+      (entityId: Guid<EntityId>, charge: ActiveCharge)
+      =
+      if world.Positions.ContainsKey entityId then
+        world.ActiveCharges[entityId] <- charge
+
+    let inline removeActiveCharge
+      (world: MutableWorld)
+      (entityId: Guid<EntityId>)
+      =
+      world.ActiveCharges.Remove entityId |> ignore
+
 /// High-performance state write service using command queue pattern.
 /// All state modifications go through this module to ensure consistent
 /// frame timing and avoid GC pressure from adaptive collections.
@@ -454,6 +485,12 @@ module StateWrite =
       proj: Projectile.LiveProjectile *
       pos: Vector2 voption
     | ApplyEntitySpawnBundle of bundle: EntitySpawnBundle
+    | UpdateActiveOrbital of
+      orbEntityId: Guid<EntityId> *
+      orbital: Orbital.ActiveOrbital
+    | RemoveActiveOrbital of remOrbEntityId: Guid<EntityId>
+    | UpdateActiveCharge of chgEntityId: Guid<EntityId> * charge: ActiveCharge
+    | RemoveActiveCharge of remChgEntityId: Guid<EntityId>
 
   let inline applyAdaptiveCommand (world: MutableWorld) (cmd: AdaptiveCommand) =
     match cmd with
@@ -523,6 +560,14 @@ module StateWrite =
       StateUpdate.Entity.createProjectile world (entityId, proj, pos)
     | ApplyEntitySpawnBundle bundle ->
       StateUpdate.Entity.applyEntitySpawnBundle world bundle
+    | UpdateActiveOrbital(entityId, orbital) ->
+      StateUpdate.Orbital.updateActiveOrbital world (entityId, orbital)
+    | RemoveActiveOrbital entityId ->
+      StateUpdate.Orbital.removeActiveOrbital world entityId
+    | UpdateActiveCharge(entityId, charge) ->
+      StateUpdate.Charge.updateActiveCharge world (entityId, charge)
+    | RemoveActiveCharge entityId ->
+      StateUpdate.Charge.removeActiveCharge world entityId
 
   type CommandBuffer<'T>
     (initialCapacity: int, [<InlineIfLambda>] apply: MutableWorld -> 'T -> unit)
@@ -701,6 +746,22 @@ module StateWrite =
           adaptiveBuffer.Enqueue(
             AdaptiveCommand.UpdateAIController(entityId, controller)
           )
+
+        member _.UpdateActiveOrbital(entityId, orbital) =
+          adaptiveBuffer.Enqueue(
+            AdaptiveCommand.UpdateActiveOrbital(entityId, orbital)
+          )
+
+        member _.RemoveActiveOrbital(entityId) =
+          adaptiveBuffer.Enqueue(AdaptiveCommand.RemoveActiveOrbital entityId)
+
+        member _.UpdateActiveCharge(entityId, charge) =
+          adaptiveBuffer.Enqueue(
+            AdaptiveCommand.UpdateActiveCharge(entityId, charge)
+          )
+
+        member _.RemoveActiveCharge(entityId) =
+          adaptiveBuffer.Enqueue(AdaptiveCommand.RemoveActiveCharge entityId)
 
         member _.FlushWrites() =
           nonAdaptiveBuffer.Flush mutableWorld

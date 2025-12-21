@@ -189,6 +189,56 @@ module Core =
 
   module Serialization =
     open JDeck
+    open System.Globalization
+
+    module Helper =
+      let vec3FromDict: Decoder<Vector3> =
+        fun json -> decode {
+          let! x = VOptional.Property.get ("X", Required.float) json
+          let! y = VOptional.Property.get ("Y", Required.float) json
+          let! z = VOptional.Property.get ("Z", Required.float) json
+
+          let xVal =
+            match x with
+            | ValueSome v -> float32 v
+            | ValueNone -> 0.0f
+
+          let yVal =
+            match y with
+            | ValueSome v -> float32 v
+            | ValueNone -> 0.0f
+
+          let zVal =
+            match z with
+            | ValueSome v -> float32 v
+            | ValueNone -> 0.0f
+
+          return Vector3(xVal, yVal, zVal)
+        }
+
+      let colorFromHex: Decoder<Color> =
+        fun json -> decode {
+          let! hex = Required.string json
+
+          let parseHex(s: string) =
+            if s.Length = 9 && s.StartsWith("#") then
+              let r = Byte.Parse(s.Substring(1, 2), NumberStyles.HexNumber)
+              let g = Byte.Parse(s.Substring(3, 2), NumberStyles.HexNumber)
+              let b = Byte.Parse(s.Substring(5, 2), NumberStyles.HexNumber)
+              let a = Byte.Parse(s.Substring(7, 2), NumberStyles.HexNumber)
+              Ok(Color(int r, int g, int b, int a))
+            elif s.Length = 7 && s.StartsWith("#") then
+              let r = Byte.Parse(s.Substring(1, 2), NumberStyles.HexNumber)
+              let g = Byte.Parse(s.Substring(3, 2), NumberStyles.HexNumber)
+              let b = Byte.Parse(s.Substring(5, 2), NumberStyles.HexNumber)
+              Ok(Color(int r, int g, int b))
+            else
+              Error $"Invalid Hex Color: {s}"
+
+          match parseHex hex with
+          | Ok c -> return c
+          | Error e -> return! DecodeError.ofError(json.Clone(), e) |> Error
+        }
 
     module Element =
       let decoder: Decoder<Element> =

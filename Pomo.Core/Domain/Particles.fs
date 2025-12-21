@@ -4,6 +4,7 @@ open System
 open Microsoft.Xna.Framework
 open Microsoft.Xna.Framework.Graphics
 open FSharp.UMX
+open Pomo.Core
 open Pomo.Core.Domain.Units
 open Pomo.Core.Domain.Skill
 
@@ -34,6 +35,19 @@ module Particles =
     | Inward // Convergence: spawn at edge, flow inward
     | EdgeOnly // Ring: spawn only at outer edge
 
+  /// Determines how particles are rendered
+  [<Struct>]
+  type RenderMode =
+    | Billboard of texture: string
+    | Mesh of modelAsset: string
+
+  /// Controls rotation behavior for mesh particles
+  [<Struct>]
+  type MeshRotationMode =
+    | Fixed // No rotation - stays upright (pillars, beams)
+    | Tumbling // Random initial + angular velocity (flying debris)
+    | RandomStatic // Random initial, no spinning (settled debris)
+
   [<Struct>]
   type ParticleConfig = {
     Lifetime: struct (float32 * float32)
@@ -49,7 +63,7 @@ module Particles =
 
   type EmitterConfig = {
     Name: string
-    Texture: string
+    RenderMode: RenderMode
     BlendMode: BlendMode
     SimulationSpace: SimulationSpace
     InheritVelocity: float32
@@ -61,6 +75,9 @@ module Particles =
     FloorHeight: float32
     EmissionRotation: Vector3
     EmissionMode: EmissionMode
+    MeshRotation: MeshRotationMode
+    ScalePivot: Vector3 // Pivot point for mesh scaling (e.g., 0,-0.5,0 = bottom anchor)
+    ScaleAxis: Vector3 // Per-axis scale multiplier (e.g., 0,1,0 = height-only growth)
   }
 
   // Runtime Types
@@ -97,6 +114,76 @@ module Particles =
     BurstDone: bool ref
   }
 
+  /// Mesh particle with 3D rotation for tumbling debris effects
+  [<Struct>]
+  type MeshParticle = {
+    Position: Vector3
+    Velocity: Vector3
+    Rotation: Quaternion
+    AngularVelocity: Vector3
+    Scale: float32
+    Life: float32
+    MaxLife: float32
+  }
+
+  module MeshParticle =
+    let inline withPosition (value: Vector3) (p: MeshParticle) = {
+      p with
+          Position = value
+    }
+
+    let inline withVelocity (value: Vector3) (p: MeshParticle) = {
+      p with
+          Velocity = value
+    }
+
+    let inline withRotation (value: Quaternion) (p: MeshParticle) = {
+      p with
+          Rotation = value
+    }
+
+    let inline withScale (value: float32) (p: MeshParticle) = {
+      p with
+          Scale = value
+    }
+
+    let inline withLife (value: float32) (p: MeshParticle) = {
+      p with
+          Life = value
+    }
+
+  type ActiveMeshEmitter = {
+    Config: EmitterConfig
+    ModelPath: string // Pre-extracted from RenderMode at creation
+    Particles: ResizeArray<MeshParticle>
+    Accumulator: float32 ref
+    BurstDone: bool ref
+  }
+
+  /// Splits emitter configs by RenderMode in a single pass
+  /// Returns (billboardEmitters, meshEmitters)
+  let splitEmittersByRenderMode
+    (configs: EmitterConfig array)
+    : struct (ActiveEmitter array * ActiveMeshEmitter array) =
+    configs
+    |> Array.partitionMap(fun config ->
+      match config.RenderMode with
+      | Billboard _ ->
+        Choice1Of2 {
+          Config = config
+          Particles = ResizeArray<Particle>()
+          Accumulator = ref 0.0f
+          BurstDone = ref false
+        }
+      | Mesh modelPath ->
+        Choice2Of2 {
+          Config = config
+          ModelPath = modelPath
+          Particles = ResizeArray<MeshParticle>()
+          Accumulator = ref 0.0f
+          BurstDone = ref false
+        })
+
   [<Struct>]
   type EffectOverrides = {
     Rotation: Quaternion voption
@@ -117,7 +204,8 @@ module Particles =
 
   type ActiveEffect = {
     Id: string
-    Emitters: ActiveEmitter list
+    Emitters: ActiveEmitter array
+    MeshEmitters: ActiveMeshEmitter array
     Position: Vector3 ref
     Rotation: Quaternion ref
     Scale: Vector3 ref
@@ -175,6 +263,49 @@ module Particles =
           | _ ->
             return!
               DecodeError.ofError(json.Clone(), $"Unknown EmissionMode: {str}")
+              |> Error
+        }
+
+    module MeshRotationModeCodec =
+      let decoder: Decoder<MeshRotationMode> =
+        fun json -> decode {
+          let! str = Required.string json
+
+          match str.ToLowerInvariant() with
+          | "fixed" -> return Fixed
+          | "tumbling" -> return Tumbling
+          | "randomstatic" -> return RandomStatic
+          | _ ->
+            return!
+              DecodeError.ofError(
+                json.Clone(),
+                $"Unknown MeshRotationMode: {str}"
+              )
+              |> Error
+        }
+
+    module RenderModeCodec =
+      let decoder: Decoder<RenderMode> =
+        fun json -> decode {
+          let! type' = Required.Property.get ("Type", Required.string) json
+
+          match type'.ToLowerInvariant() with
+          | "billboard" ->
+            let! texture =
+              Required.Property.get ("Texture", Required.string) json
+
+            return Billboard texture
+          | "mesh" ->
+            let! modelAsset =
+              Required.Property.get ("Model", Required.string) json
+
+            return Mesh modelAsset
+          | _ ->
+            return!
+              DecodeError.ofError(
+                json.Clone(),
+                $"Unknown RenderMode type: {type'}"
+              )
               |> Error
         }
 
@@ -287,25 +418,25 @@ module Particles =
       let decoder: Decoder<ParticleConfig> =
         fun json -> decode {
           let! lifetime = Required.Property.get ("Lifetime", rangeDecoder) json
-          let! speed = Required.Property.get ("Speed", rangeDecoder) json
+          and! speed = Required.Property.get ("Speed", rangeDecoder) json
 
-          let! sizeStart =
+          and! sizeStart =
             Required.Property.get ("SizeStart", Required.float) json
 
-          let! sizeEnd = Required.Property.get ("SizeEnd", Required.float) json
+          and! sizeEnd = Required.Property.get ("SizeEnd", Required.float) json
 
-          let! colorStart =
+          and! colorStart =
             Required.Property.get ("ColorStart", Helper.colorFromHex) json
 
-          let! colorEnd =
+          and! colorEnd =
             Required.Property.get ("ColorEnd", Helper.colorFromHex) json
 
-          let! gravity = VOptional.Property.get ("Gravity", Required.float) json
+          and! gravity = VOptional.Property.get ("Gravity", Required.float) json
 
-          let! randomVelocity =
+          and! randomVelocity =
             VOptional.Property.get ("RandomVelocity", Helper.vec3FromDict) json
 
-          let! drag = VOptional.Property.get ("Drag", Required.float) json
+          and! drag = VOptional.Property.get ("Drag", Required.float) json
 
           return {
             Lifetime = lifetime
@@ -333,11 +464,43 @@ module Particles =
 
       let decoder: Decoder<EmitterConfig> =
         fun json -> decode {
-          let! name = Required.Property.get ("Name", Required.string) json
-          let! texture = Required.Property.get ("Texture", Required.string) json
+          let! name = VOptional.Property.get ("Name", Required.string) json
 
-          let! blendMode =
-            Required.Property.get ("BlendMode", BlendModeCodec.decoder) json
+          let! renderModeType =
+            VOptional.Property.get ("RenderMode", Required.string) json
+
+          let! texture =
+            VOptional.Property.get ("Texture", Required.string) json
+
+          // Support both "Model" and "ModelAsset" for mesh particles
+          let! modelAsset =
+            VOptional.Property.get ("Model", Required.string) json
+
+          let renderMode =
+            match renderModeType with
+            | ValueSome "Mesh" ->
+              match modelAsset with
+              | ValueSome model -> Mesh model
+              | ValueNone -> Billboard "Particles/error" // Fallback or error?
+            | ValueSome "Billboard" ->
+              match texture with
+              | ValueSome tex -> Billboard tex
+              | ValueNone -> Billboard "Particles/default"
+            | _ ->
+              // Fallback / Inference logic
+              match modelAsset, texture with
+              | ValueSome model, _ -> Mesh model
+              | ValueNone, ValueSome tex -> Billboard tex
+              | ValueNone, ValueNone -> Billboard "Particles/default"
+
+          // BlendMode is optional for mesh particles (defaults to AlphaBlend)
+          let! blendModeOpt =
+            VOptional.Property.get ("BlendMode", BlendModeCodec.decoder) json
+
+          let blendMode =
+            match blendModeOpt with
+            | ValueSome bm -> bm
+            | ValueNone -> AlphaBlend // Default for mesh particles
 
           let! simulationSpace =
             VOptional.Property.get
@@ -350,7 +513,6 @@ module Particles =
           let! rate = Required.Property.get ("Rate", Required.int) json
           let! burst = VOptional.Property.get ("Burst", Required.int) json
 
-          // Decode shape from the SAME json object
           let! shape = EmitterShapeCodec.decoder json
 
           let! localOffset =
@@ -372,9 +534,23 @@ module Particles =
               ("EmissionMode", EmissionModeCodec.decoder)
               json
 
+          let! meshRotation =
+            VOptional.Property.get
+              ("MeshRotation", MeshRotationModeCodec.decoder)
+              json
+
+          let! scalePivot =
+            VOptional.Property.get ("ScalePivot", Helper.vec3FromDict) json
+
+          let! scaleAxis =
+            VOptional.Property.get ("ScaleAxis", Helper.vec3FromDict) json
+
           return {
-            Name = name
-            Texture = texture
+            Name =
+              match name with
+              | ValueSome n -> n
+              | ValueNone -> ""
+            RenderMode = renderMode
             BlendMode = blendMode
             SimulationSpace =
               match simulationSpace with
@@ -407,5 +583,17 @@ module Particles =
               match emissionMode with
               | ValueSome m -> m
               | ValueNone -> Uniform
+            MeshRotation =
+              match meshRotation with
+              | ValueSome m -> m
+              | ValueNone -> Tumbling
+            ScalePivot =
+              match scalePivot with
+              | ValueSome v -> v
+              | ValueNone -> Vector3.Zero
+            ScaleAxis =
+              match scaleAxis with
+              | ValueSome v -> v
+              | ValueNone -> Vector3.One // Default: uniform scaling
           }
         }

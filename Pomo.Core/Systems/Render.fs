@@ -8,6 +8,7 @@ open Pomo.Core.Graphics
 open FSharp.UMX
 open FSharp.Data.Adaptive
 
+open Pomo.Core
 open Pomo.Core.Domain
 open Pomo.Core.Domain.Units
 open Pomo.Core.Domain.Camera
@@ -17,10 +18,10 @@ open Pomo.Core.Domain.Animation
 
 
 module Render =
-  open Pomo.Core
   open Pomo.Core.Domain.Projectile
   open Microsoft.Xna.Framework.Input
   open Pomo.Core.Environment
+  open System.Collections.Generic
 
   // ============================================================================
   // DrawCommands (legacy 2D commands, kept for targeting indicator)
@@ -235,6 +236,7 @@ module Render =
     Game: Game
     BillboardBatch: BillboardBatch
     GetTexture: string -> Texture2D voption
+    GetModel: string -> Model voption
     FallbackTexture: Texture2D
   }
 
@@ -591,16 +593,6 @@ module Render =
       ctx.CamUp
     )
 
-  /// Renders a group of particles with the same texture
-  let private renderParticleGroup
-    (billboardBatch: BillboardBatch)
-    (ctx: ParticleRenderContext)
-    (group: seq<Particles.EmitterConfig * Particles.Particle * Vector3>)
-    =
-    for config, particle, effectPos in group do
-      drawParticleBillboard billboardBatch ctx config particle effectPos
-
-  /// Sets blend state based on blend mode
   let inline private setBlendState
     (device: GraphicsDevice)
     (blendMode: Particles.BlendMode)
@@ -609,6 +601,77 @@ module Render =
     | Particles.BlendMode.AlphaBlend ->
       device.BlendState <- BlendState.AlphaBlend
     | Particles.BlendMode.Additive -> device.BlendState <- BlendState.Additive
+
+  /// Particle data grouped by (textureId, blendMode) for batched rendering
+  [<Struct>]
+  type ParticleDrawData = {
+    Config: Particles.EmitterConfig
+    Particle: Particles.Particle
+    EffectPos: Vector3
+  }
+
+  type BillboardParticleGroups =
+    Dictionary<
+      struct (string * Particles.BlendMode),
+      ResizeArray<ParticleDrawData>
+     >
+
+  /// Groups billboard particles by (texture, blendMode) in a single pass
+  let private groupBillboardParticles
+    (visualEffects: ResizeArray<Particles.ActiveEffect>)
+    (positions: HashMap<Guid<EntityId>, Vector2>)
+    : BillboardParticleGroups =
+
+    let groups: BillboardParticleGroups = Dictionary()
+
+    for effect in visualEffects do
+      if effect.IsAlive.Value then
+        let effectPos =
+          computeEffectPosition effect.Owner positions effect.Position.Value
+
+        for emitter in effect.Emitters do
+          if emitter.Particles.Count > 0 then
+            match emitter.Config.RenderMode with
+            | Particles.Billboard tex ->
+              let key = struct (tex, emitter.Config.BlendMode)
+
+              let group =
+                match groups.TryGetValue(key) with
+                | true, existing -> existing
+                | false, _ ->
+                  let newGroup = ResizeArray()
+                  groups.[key] <- newGroup
+                  newGroup
+
+              for particle in emitter.Particles do
+                group.Add {
+                  Config = emitter.Config
+                  Particle = particle
+                  EffectPos = effectPos
+                }
+            | Particles.Mesh _ -> () // Skip mesh particles in billboard pass
+
+    groups
+
+  /// Renders a batch of particles with the given texture
+  let inline private renderParticleBatch
+    (billboardBatch: BillboardBatch)
+    (ctx: ParticleRenderContext)
+    (camera: Camera)
+    (texture: Texture2D)
+    (group: ResizeArray<ParticleDrawData>)
+    =
+    billboardBatch.Begin(camera.View, camera.Projection, texture)
+
+    for data in group do
+      drawParticleBillboard
+        billboardBatch
+        ctx
+        data.Config
+        data.Particle
+        data.EffectPos
+
+    billboardBatch.End()
 
   /// Renders all particles
   let private renderAllParticles
@@ -628,46 +691,104 @@ module Render =
       ModelScale = Core.Constants.Entity.ModelScale
     }
 
-    let particlesToDraw =
-      world.VisualEffects
-      |> Seq.filter(fun e -> e.IsAlive.Value)
-      |> Seq.collect(fun e ->
-        let effectPos =
-          computeEffectPosition
-            e.Owner
-            frame.Scenario.Snapshot.Positions
-            e.Position.Value
+    let particleGroups =
+      groupBillboardParticles
+        world.VisualEffects
+        frame.Scenario.Snapshot.Positions
 
-        e.Emitters
-        |> Seq.filter(fun em -> em.Particles.Count > 0)
-        |> Seq.collect(fun em ->
-          em.Particles |> Seq.map(fun p -> em.Config, p, effectPos)))
-      |> Seq.groupBy(fun (config, _, _) -> config.Texture, config.BlendMode)
+    for kvp in particleGroups do
+      let struct (textureId, blendMode) = kvp.Key
+      let group = kvp.Value
 
-    for (textureId, blendMode), group in particlesToDraw do
       match res.GetTexture textureId with
       | ValueSome tex ->
         setBlendState res.Game.GraphicsDevice blendMode
 
-        res.BillboardBatch.Begin(
-          frame.Camera.View,
-          frame.Camera.Projection,
-          tex
-        )
-
-        renderParticleGroup res.BillboardBatch ctx group
-        res.BillboardBatch.End()
+        renderParticleBatch res.BillboardBatch ctx frame.Camera tex group
       | ValueNone ->
         res.Game.GraphicsDevice.BlendState <- BlendState.Additive
 
-        res.BillboardBatch.Begin(
-          frame.Camera.View,
-          frame.Camera.Projection,
+        renderParticleBatch
+          res.BillboardBatch
+          ctx
+          frame.Camera
           res.FallbackTexture
-        )
+          group
 
-        renderParticleGroup res.BillboardBatch ctx group
-        res.BillboardBatch.End()
+  /// Renders all mesh particles
+  let private renderAllMeshParticles
+    (res: ParticleRenderResources)
+    (world: World.World)
+    (frame: FrameRenderContext)
+    =
+    res.Game.GraphicsDevice.DepthStencilState <- DepthStencilState.Default
+    res.Game.GraphicsDevice.RasterizerState <- RasterizerState.CullNone
+    res.Game.GraphicsDevice.BlendState <- BlendState.AlphaBlend
+
+    let ppu = frame.Scenario.PixelsPerUnit
+    let modelScale = Core.Constants.Entity.ModelScale
+
+    for effect in world.VisualEffects do
+      // Skip dead effects (same as billboard particles)
+      if effect.IsAlive.Value then
+        let effectPos = effect.Position.Value
+
+        for meshEmitter in effect.MeshEmitters do
+          // ModelPath pre-extracted at creation - no hot-path branching
+          match res.GetModel meshEmitter.ModelPath with
+          | ValueSome model ->
+            let squishFactor = ppu.X / ppu.Y
+
+            for particle in meshEmitter.Particles do
+              let pWorldPos =
+                computeParticleWorldPosition
+                  meshEmitter.Config
+                  particle.Position
+                  effectPos
+
+              let renderPos = particleToRenderPosition pWorldPos ppu
+              let baseScale = particle.Scale * modelScale
+
+              // Apply non-uniform scaling via ScaleAxis
+              // ScaleAxis determines which axes participate in scaling
+              // (1,1,1) = uniform, (0,1,0) = height only, (1,0,1) = width/depth only
+              let axis = meshEmitter.Config.ScaleAxis
+              let scaleX = 1.0f + (baseScale - 1.0f) * axis.X
+              let scaleY = 1.0f + (baseScale - 1.0f) * axis.Y
+              let scaleZ = 1.0f + (baseScale - 1.0f) * axis.Z
+              let scaleMatrix = Matrix.CreateScale(scaleX, scaleY, scaleZ)
+
+              // Squish compensation for isometric view
+              let squishCompensation =
+                Matrix.CreateScale(1.0f, 1.0f, squishFactor)
+
+              // Isometric correction (same as used in RenderMath)
+              let isoRot =
+                Matrix.CreateLookAt(
+                  Vector3.Zero,
+                  Vector3.Normalize(Vector3(-1.0f, -1.0f, -1.0f)),
+                  Vector3.Up
+                )
+
+              let topDownRot =
+                Matrix.CreateLookAt(Vector3.Zero, Vector3.Down, Vector3.Forward)
+
+              let correction = isoRot * Matrix.Invert topDownRot
+
+              let worldMatrix =
+                // ScalePivot as SCREEN-SPACE offset (after iso correction)
+                // Y = screen vertical (up), X = screen horizontal (right)
+                let pivot = meshEmitter.Config.ScalePivot
+
+                Matrix.CreateFromQuaternion(particle.Rotation)
+                * scaleMatrix
+                * correction
+                * squishCompensation
+                * Matrix.CreateTranslation(pivot) // Now: Y = screen up
+                * Matrix.CreateTranslation(renderPos)
+
+              drawModel frame.Camera model worldMatrix
+          | ValueNone -> ()
 
   /// Renders targeting indicator UI overlay
   let private renderTargetingIndicator
@@ -748,6 +869,23 @@ module Render =
           textureCache.[id] <- result
           result
 
+    // Mesh particle model cache (lazy-loaded like textures)
+    let particleModelCache = Dictionary<string, Model voption>()
+
+    let getParticleModel(id: string) =
+      match particleModelCache |> Dictionary.tryFindV id with
+      | ValueSome cached -> cached
+      | ValueNone ->
+        try
+          let loaded = game.Content.Load<Model>(id)
+          let result = ValueSome loaded
+          particleModelCache.[id] <- result
+          result
+        with _ ->
+          let result = ValueNone
+          particleModelCache.[id] <- result
+          result
+
     // Load Models (one-time at creation)
     let models =
       modelStore.all()
@@ -780,6 +918,7 @@ module Render =
       Game = game
       BillboardBatch = billboardBatch
       GetTexture = getTexture
+      GetModel = getParticleModel
       FallbackTexture = texture
     }
 
@@ -828,6 +967,7 @@ module Render =
 
               // === Render Passes (Orchestrator Style) ===
               renderAllEntities entityRes frame
+              renderAllMeshParticles particleRes world frame
               renderAllParticles particleRes world frame
               renderTargetingIndicator uiRes camera
     }

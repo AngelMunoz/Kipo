@@ -281,19 +281,13 @@ module Projectile =
     =
     match particleStore.tryFind vfxId with
     | ValueSome configs ->
-      let emitters =
-        configs
-        |> List.map(fun config -> {
-          Config = config
-          Particles = ResizeArray()
-          Accumulator = ref 0.0f
-          BurstDone = ref false
-        })
-        |> ResizeArray
+      let struct (billboardEmitters, meshEmitters) =
+        splitEmittersByRenderMode configs
 
       let effect = {
         Id = System.Guid.NewGuid().ToString()
-        Emitters = emitters |> Seq.toList
+        Emitters = billboardEmitters
+        MeshEmitters = meshEmitters
         Position = ref(Vector3(pos.X, 0.0f, pos.Y))
         Rotation = ref rotation
         Scale = ref Vector3.One

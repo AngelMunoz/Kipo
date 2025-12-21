@@ -11,6 +11,7 @@
     <Compile Include="Domain/Input.fs" />
     <Compile Include="Domain/Entity.fs" />
     <Compile Include="Domain/Projectile.fs" />
+    <Compile Include="Domain/Orbital.fs" />
     <Compile Include="Domain/Skill.fs" />
     <Compile Include="Domain/Particles.fs" />
     <Compile Include="Domain/Item.fs" />
@@ -43,6 +44,7 @@
     <Compile Include="Systems/PlayerMovement.fs" />
     <Compile Include="Systems/Notification.fs" />
     <Compile Include="Systems/Projectile.fs" />
+    <Compile Include="Systems/OrbitalSystem.fs" />
     <Compile Include="Systems/Targeting.fs" />
     <Compile Include="Systems/AbilityActivation.fs" />
     <Compile Include="Systems/RawInput.fs" />
