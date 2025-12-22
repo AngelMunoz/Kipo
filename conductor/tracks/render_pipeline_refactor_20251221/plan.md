@@ -9,27 +9,27 @@
 
 _Goal: Create the single source of isometric truth._
 
-- [ ] **Create `Pomo.Core/Graphics/RenderMath.fs` (new)**
+- [x] **Create `Pomo.Core/Graphics/RenderMath.fs` (new)**
 
-  - [ ] Define `LogicToRender(logicPos, altitude, ppu) → Vector3`
-  - [ ] Define `GetViewMatrix(logicPos, ppu) → Matrix`
-  - [ ] Define `GetProjectionMatrix(viewport, zoom, ppu) → Matrix`
-  - [ ] Define `ScreenToLogic(screenPos, camera) → Vector2`
-  - [ ] Define `CreateMeshWorldMatrix(renderPos, facing, scale, squishFactor) → Matrix`
-  - [ ] Define `GetBillboardVectors(viewMatrix) → (right, up)`
-  - [ ] Centralize squish factor calculation: `squishFactor = ppu.X / ppu.Y`
-  - [ ] Move isometric correction matrix (`isoRot`, `topDownRot`, `correction`) here from old `RenderMath.fs`
+  - [x] Define `LogicToRender(logicPos, altitude, ppu) → Vector3`
+  - [x] Define `GetViewMatrix(logicPos, ppu) → Matrix`
+  - [x] Define `GetProjectionMatrix(viewport, zoom, ppu) → Matrix`
+  - [x] Define `ScreenToLogic(screenPos, camera) → Vector2`
+  - [x] Define `CreateMeshWorldMatrix(renderPos, facing, scale, squishFactor) → Matrix`
+  - [x] Define `GetBillboardVectors(viewMatrix) → (right, up)`
+  - [x] Centralize squish factor calculation: `squishFactor = ppu.X / ppu.Y`
+  - [x] Move isometric correction matrix (`isoRot`, `topDownRot`, `correction`) here from old `RenderMath.fs`
 
-- [ ] **Refactor `CameraSystem.fs` to use `RenderMath`**
+- [x] **Refactor `CameraSystem.fs` to use `RenderMath`**
 
-  - [ ] Replace inline View matrix computation (lines 88-98) with `RenderMath.GetViewMatrix`
-  - [ ] Replace inline Projection computation (lines 102-109) with `RenderMath.GetProjectionMatrix`
-  - [ ] Replace `ScreenToWorld` logic with `RenderMath.ScreenToLogic`
-  - [ ] Verify: ScreenToWorld now consistent with render positions
+  - [x] Replace inline View matrix computation (lines 88-98) with `RenderMath.GetViewMatrix`
+  - [x] Replace inline Projection computation (lines 102-109) with `RenderMath.GetProjectionMatrix`
+  - [x] Replace `ScreenToWorld` logic with `RenderMath.ScreenToLogic`
+  - [x] Verify: ScreenToWorld now consistent with render positions
 
-- [ ] **Verification: RenderMath Unit Tests**
-  - [ ] Test `LogicToRender` ↔ `ScreenToLogic` round-trip
-  - [ ] Test mesh world matrix produces expected depth ordering
+- [x] **Verification: RenderMath Unit Tests**
+  - [x] Test `LogicToRender` ↔ `ScreenToLogic` round-trip
+  - [x] Test mesh world matrix produces expected depth ordering
 
 ---
 

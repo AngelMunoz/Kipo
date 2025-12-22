@@ -99,6 +99,24 @@ module RenderMath =
     let logicDelta = deltaPixels / zoom
     cameraPosition + logicDelta
 
+  /// Converts Logic coordinates to Screen coordinates.
+  /// Inverse of ScreenToLogic.
+  let LogicToScreen
+    (logicPos: Vector2)
+    (viewport: Viewport)
+    (zoom: float32)
+    (cameraPosition: Vector2)
+    : Vector2 =
+    let screenCenter =
+      Vector2(
+        float32 viewport.X + float32 viewport.Width / 2.0f,
+        float32 viewport.Y + float32 viewport.Height / 2.0f
+      )
+
+    let logicDelta = logicPos - cameraPosition
+    let deltaPixels = logicDelta * zoom
+    screenCenter + deltaPixels
+
   module Legacy =
     /// Legacy support: Converts a Logic/Screen position (pixels) to Unified Render Space (3D Units) with explicit depth override.
     let LogicToRenderWithDepth

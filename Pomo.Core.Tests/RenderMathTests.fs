@@ -71,6 +71,21 @@ module ScreenToLogic =
     let result = RenderMath.ScreenToLogic screenPos viewport zoom cameraPos
     Assert.Equal(50.0f, result.X, 0.001f) // 100 / 2 = 50
 
+  [<Fact>]
+  let ``round-trip logic to screen to logic``() =
+    let viewport = Microsoft.Xna.Framework.Graphics.Viewport(0, 0, 800, 600)
+    let cameraPos = Vector2(1000.0f, 500.0f)
+    let zoom = 2.5f
+    let logicPos = Vector2(1100.0f, 400.0f)
+
+    let screenPos = RenderMath.LogicToScreen logicPos viewport zoom cameraPos
+
+    let actualLogicPos =
+      RenderMath.ScreenToLogic screenPos viewport zoom cameraPos
+
+    Assert.Equal(logicPos.X, actualLogicPos.X, 0.001f)
+    Assert.Equal(logicPos.Y, actualLogicPos.Y, 0.001f)
+
 // ============================================================================
 // Property-Based Tests
 // ============================================================================
