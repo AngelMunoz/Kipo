@@ -1041,7 +1041,7 @@ module DebugRender =
           yOffsets <- HashMap.empty
 
           let transform =
-            RenderMath.GetSpriteBatchTransform
+            RenderMath.Legacy.GetSpriteBatchTransform
               camera.Position
               camera.Zoom
               camera.Viewport.Width

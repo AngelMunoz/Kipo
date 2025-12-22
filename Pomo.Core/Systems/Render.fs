@@ -282,7 +282,7 @@ module Render =
     (altitude: float32)
     (pixelsPerUnit: Vector2)
     : Vector3 =
-    let basePos = RenderMath.LogicToRender logicPos pixelsPerUnit
+    let basePos = RenderMath.Legacy.LogicToRender logicPos pixelsPerUnit
     Vector3(basePos.X, basePos.Y + altitude, basePos.Z - altitude)
 
   /// Computes projectile tilt based on altitude (falling vs horizontal flight)
@@ -310,7 +310,7 @@ module Render =
     let tilt = computeProjectileTilt altitude
     let facing = computeProjectileFacing altitude context.Facing
 
-    RenderMath.GetTiltedEntityWorldMatrix
+    RenderMath.Legacy.GetTiltedEntityWorldMatrix
       renderPos
       facing
       tilt
@@ -322,9 +322,11 @@ module Render =
   /// Computes the world matrix for a regular entity
   let inline computeEntityWorldMatrix(context: EntityRenderContext) : Matrix =
     let renderPos =
-      RenderMath.LogicToRender context.LogicPosition context.PixelsPerUnit
+      RenderMath.Legacy.LogicToRender
+        context.LogicPosition
+        context.PixelsPerUnit
 
-    RenderMath.GetEntityWorldMatrix
+    RenderMath.Legacy.GetEntityWorldMatrix
       renderPos
       context.Facing
       MathHelper.PiOver4
@@ -358,7 +360,7 @@ module Render =
     (pixelsPerUnit: Vector2)
     : Vector3 =
     let logicPos = Vector2(pWorldPos.X, pWorldPos.Z)
-    let baseRenderPos = RenderMath.LogicToRender logicPos pixelsPerUnit
+    let baseRenderPos = RenderMath.Legacy.LogicToRender logicPos pixelsPerUnit
     let altitude = (pWorldPos.Y / pixelsPerUnit.Y) * 2.0f
 
     Vector3(
@@ -812,7 +814,7 @@ module Render =
     match targetingCmds with
     | ValueSome(DrawTargetingIndicator rect) ->
       let transform =
-        RenderMath.GetSpriteBatchTransform
+        RenderMath.Legacy.GetSpriteBatchTransform
           camera.Position
           camera.Zoom
           camera.Viewport.Width

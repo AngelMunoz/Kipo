@@ -84,29 +84,8 @@ module CameraSystem =
                 pos, ppu
               | ValueNone -> Vector2.Zero, Vector2(64.0f, 32.0f)
 
-            // 3D Camera Logic (axis-aligned top-down view)
-            let target =
-              Vector3(
-                position.X / pixelsPerUnit.X,
-                0.0f,
-                position.Y / pixelsPerUnit.Y
-              )
-
-            // Look straight down from above
-            let cameraPos = target + Vector3.Up * 100.0f
-            // Up vector is Forward (0, 0, -1) so that Z maps to screen Y (down)
-            let view = Matrix.CreateLookAt(cameraPos, target, Vector3.Forward)
-
-            // Orthographic Projection respecting zoom and unit scale
-            // We want 1 unit in 3D to correspond to pixelsPerUnit * Zoom pixels on screen
-            let viewWidth =
-              float32 viewport.Width / (defaultZoom * pixelsPerUnit.X)
-
-            let viewHeight =
-              float32 viewport.Height / (defaultZoom * pixelsPerUnit.Y)
-
-            let projection =
-              Matrix.CreateOrthographic(viewWidth, viewHeight, 0.1f, 5000.0f)
+            let view = RenderMath.GetViewMatrix position pixelsPerUnit
+            let projection = RenderMath.GetProjectionMatrix viewport defaultZoom pixelsPerUnit
 
             ValueSome {
               Position = position
@@ -139,26 +118,8 @@ module CameraSystem =
               && screenPos.Y >= float32 viewport.Y
               && screenPos.Y <= float32(viewport.Y + viewport.Height)
             then
-
-              // Transform
-              let transform =
-                RenderMath.GetSpriteBatchTransform
-                  camera.Position
-                  camera.Zoom
-                  viewport.Width
-                  viewport.Height
-
-              // Invert transform to go from Screen -> World
-              let inverse = Matrix.Invert(transform)
-
-              let viewportPos =
-                Vector2(
-                  screenPos.X - float32 viewport.X,
-                  screenPos.Y - float32 viewport.Y
-                )
-
-              let worldPos = Vector2.Transform(viewportPos, inverse)
-              ValueSome worldPos
+               let worldPos = RenderMath.ScreenToLogic screenPos viewport camera.Zoom camera.Position
+               ValueSome worldPos
             else
               ValueNone
           | ValueNone -> ValueNone

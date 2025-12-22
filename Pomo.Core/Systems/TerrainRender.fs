@@ -216,7 +216,7 @@ module TerrainRenderSystem =
                                 / pixelsPerUnit.Y
 
                               let worldPos =
-                                RenderMath.LogicToRenderWithDepth
+                                RenderMath.Legacy.LogicToRenderWithDepth
                                   (Vector2(drawX, drawY))
                                   depthY
                                   pixelsPerUnit
@@ -235,7 +235,7 @@ module TerrainRenderSystem =
             else
               // 2D SpriteBatch Rendering for Background (Ground)
               let transform =
-                RenderMath.GetSpriteBatchTransform
+                RenderMath.Legacy.GetSpriteBatchTransform
                   camera.Position
                   camera.Zoom
                   camera.Viewport.Width

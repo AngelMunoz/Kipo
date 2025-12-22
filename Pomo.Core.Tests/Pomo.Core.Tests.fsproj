@@ -22,6 +22,8 @@
   </ItemGroup>
 
   <ItemGroup>
+    <PackageReference Include="MonoGame.Framework.DesktopGL" Version="3.8.*" PrivateAssets="All" />
+
     <PackageReference Include="FsCheck.Xunit.v3" Version="3.3.2" />
     <PackageReference Include="Microsoft.NET.Test.Sdk" Version="18.0.1" />
     <PackageReference Include="xunit.v3" Version="3.2.1" />
