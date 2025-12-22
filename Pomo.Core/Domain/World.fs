@@ -93,7 +93,7 @@ module World =
     ActiveOrbitals: cmap<Guid<EntityId>, Orbital.ActiveOrbital>
     ActiveCharges: cmap<Guid<EntityId>, ActiveCharge>
     // VFX
-    VisualEffects: ResizeArray<ActiveEffect>
+    VisualEffects: ResizeArray<VisualEffect>
   }
 
   type World =
@@ -165,7 +165,7 @@ module World =
     abstract ActiveCharges: amap<Guid<EntityId>, ActiveCharge>
 
     // VFX
-    abstract VisualEffects: ResizeArray<ActiveEffect>
+    abstract VisualEffects: ResizeArray<VisualEffect>
 
 
   let create(rng: Random) =

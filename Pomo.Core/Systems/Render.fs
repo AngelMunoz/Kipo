@@ -620,7 +620,7 @@ module Render =
 
   /// Groups billboard particles by (texture, blendMode) in a single pass
   let private groupBillboardParticles
-    (visualEffects: ResizeArray<Particles.ActiveEffect>)
+    (visualEffects: ResizeArray<Particles.VisualEffect>)
     (positions: HashMap<Guid<EntityId>, Vector2>)
     : BillboardParticleGroups =
 

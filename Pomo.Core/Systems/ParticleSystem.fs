@@ -426,7 +426,7 @@ module ParticleSystem =
   let updateEmitter
     (dt: float32)
     (rng: Random)
-    (emitter: ActiveEmitter)
+    (emitter: VisualEmitter)
     (worldPos: Vector3)
     (ownerVelocity: Vector3)
     (spawningEnabled: bool)
@@ -623,7 +623,7 @@ module ParticleSystem =
   let updateMeshEmitter
     (dt: float32)
     (rng: Random)
-    (emitter: ActiveMeshEmitter)
+    (emitter: VisualMeshEmitter)
     (worldPos: Vector3)
     (ownerVelocity: Vector3)
     (spawningEnabled: bool)
@@ -748,9 +748,9 @@ module ParticleSystem =
   type ParticleUpdateContext = {
     Dt: float32
     Rng: Random
-    Effects: ResizeArray<Particles.ActiveEffect>
+    Effects: ResizeArray<Particles.VisualEffect>
     EffectsById:
-      System.Collections.Generic.Dictionary<string, Particles.ActiveEffect>
+      System.Collections.Generic.Dictionary<string, Particles.VisualEffect>
     ActiveEffectVisuals:
       System.Collections.Generic.Dictionary<Guid<EffectId>, string>
     ParticleStore: Stores.ParticleStore
@@ -782,7 +782,7 @@ module ParticleSystem =
               let struct (billboardEmitters, meshEmitters) =
                 splitEmittersByRenderMode emitterConfigs
 
-              let newEffect: Particles.ActiveEffect = {
+              let newEffect: Particles.VisualEffect = {
                 Id = particleEffectId
                 Emitters = billboardEmitters
                 MeshEmitters = meshEmitters
@@ -828,7 +828,7 @@ module ParticleSystem =
   /// Update a single visual effect - syncs owner state and updates emitters
   let inline updateSingleEffect
     (ctx: ParticleUpdateContext)
-    (effect: Particles.ActiveEffect)
+    (effect: Particles.VisualEffect)
     : bool =
     let mutable ownerVelocity = Vector3.Zero
     let mutable ownerRotation = Quaternion.Identity
@@ -927,7 +927,7 @@ module ParticleSystem =
       System.Collections.Generic.Dictionary<Guid<EffectId>, string>()
 
     let effectsById =
-      System.Collections.Generic.Dictionary<string, Particles.ActiveEffect>()
+      System.Collections.Generic.Dictionary<string, Particles.VisualEffect>()
 
     let dt = core.World.Time |> AVal.map(_.Delta.TotalSeconds >> float32)
 

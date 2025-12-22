@@ -107,7 +107,7 @@ module Particles =
     let inline withColor (value: Color) (p: Particle) = { p with Color = value }
     let inline withLife (value: float32) (p: Particle) = { p with Life = value }
 
-  type ActiveEmitter = {
+  type VisualEmitter = {
     Config: EmitterConfig
     Particles: ResizeArray<Particle>
     Accumulator: float32 ref
@@ -152,7 +152,7 @@ module Particles =
           Life = value
     }
 
-  type ActiveMeshEmitter = {
+  type VisualMeshEmitter = {
     Config: EmitterConfig
     ModelPath: string // Pre-extracted from RenderMode at creation
     Particles: ResizeArray<MeshParticle>
@@ -164,7 +164,7 @@ module Particles =
   /// Returns (billboardEmitters, meshEmitters)
   let splitEmittersByRenderMode
     (configs: EmitterConfig array)
-    : struct (ActiveEmitter array * ActiveMeshEmitter array) =
+    : struct (VisualEmitter array * VisualMeshEmitter array) =
     configs
     |> Array.partitionMap(fun config ->
       match config.RenderMode with
@@ -202,10 +202,10 @@ module Particles =
       EmissionMode = ValueNone
     }
 
-  type ActiveEffect = {
+  type VisualEffect = {
     Id: string
-    Emitters: ActiveEmitter array
-    MeshEmitters: ActiveMeshEmitter array
+    Emitters: VisualEmitter array
+    MeshEmitters: VisualMeshEmitter array
     Position: Vector3 ref
     Rotation: Quaternion ref
     Scale: Vector3 ref
