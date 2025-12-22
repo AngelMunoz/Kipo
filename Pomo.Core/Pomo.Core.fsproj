@@ -30,6 +30,8 @@
     <Compile Include="Stores.fs" />
     <Compile Include="MapSpawning.fs" />
     <Compile Include="Projections.fs" />
+    <Compile Include="Simulation/ParticleSimulator.fs" />
+    <Compile Include="Simulation/OrbitalSimulator.fs" />
     <Compile Include="Graphics/RenderMath.fs" />
     <Compile Include="Graphics/RenderCommands.fs" />
     <Compile Include="Graphics/CommandQueue.fs" />

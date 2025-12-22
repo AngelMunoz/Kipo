@@ -57,25 +57,25 @@ _Goal: Define the data structures for the command queue pattern._
 
 _Goal: Separate simulation state from render concerns. Work in logic space only._
 
-- [ ] **Rename `Particles.ActiveEffect` → `VisualEffect`**
+- [x] **Rename `Particles.ActiveEffect` → `VisualEffect`**
 
-  - [ ] Update all references in domain and systems
-  - [ ] Rename `world.VisualEffects` type accordingly
+  - [x] Update all references in domain and systems
+  - [x] Rename `world.VisualEffects` type accordingly
 
-- [ ] **Create `Pomo.Core/Simulation/ParticleSimulator.fs` (pure module)**
+- [x] **Create `Pomo.Core/Simulation/ParticleSimulator.fs` (pure module)**
 
-  - [ ] Define `VisualEffectState` (simulation state container, uses arrays not ResizeArray)
-  - [ ] Define `[<Struct>] SimulatedParticle = { LocalOffset: Vector3, Velocity, Color, Size, Life }`
-  - [ ] Implement `update: dt → VisualEffectState → VisualEffectState` (pure function)
-  - [ ] Design for `Array.Parallel.map` compatibility (no shared mutable state during update)
-  - [ ] Move simulation logic from `ParticleSystem.fs` here
-  - [ ] Remove all isometric/matrix code from simulation
+  - [x] Define `VisualEffectState` (simulation state container, uses arrays not ResizeArray)
+  - [x] Define `[<Struct>] SimulatedParticle = { LocalOffset: Vector3, Velocity, Color, Size, Life }`
+  - [x] Implement `update: dt → VisualEffectState → VisualEffectState` (pure function)
+  - [x] Design for `Array.Parallel.map` compatibility (no shared mutable state during update)
+  - [x] Move simulation logic from `ParticleSystem.fs` here
+  - [x] Remove all isometric/matrix code from simulation
 
-- [ ] **Create `Pomo.Core/Simulation/OrbitalSimulator.fs` (pure module)**
-  - [ ] Define `SimulatedOrbital = { LogicPosition: Vector2, Altitude: float32, ... }`
-  - [ ] Implement `update: dt → OrbitalState → OrbitalState`
-  - [ ] Move orbital position calculation from `OrbitalSystem.fs` here
-  - [ ] Remove direct `Effect.Position.Value` mutation
+- [x] **Create `Pomo.Core/Simulation/OrbitalSimulator.fs` (pure module)**
+  - [x] Define `SimulatedOrbital = { LogicPosition: Vector2, Altitude: float32, ... }`
+  - [x] Implement `update: dt → OrbitalState → OrbitalState`
+  - [x] Move orbital position calculation from `OrbitalSystem.fs` here
+  - [x] Remove direct `Effect.Position.Value` mutation
 
 ---
 
