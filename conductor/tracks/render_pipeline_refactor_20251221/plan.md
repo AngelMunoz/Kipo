@@ -37,19 +37,19 @@ _Goal: Create the single source of isometric truth._
 
 _Goal: Define the data structures for the command queue pattern._
 
-- [ ] **Create `Pomo.Core/Graphics/RenderCommands.fs`**
+- [x] **Create `Pomo.Core/Graphics/RenderCommands.fs`**
 
-  - [ ] Define `[<Struct>] MeshCommand = { Model, WorldMatrix }`
-  - [ ] Define `[<Struct>] BillboardCommand = { Texture, RenderPosition, Size, Color }`
-  - [ ] Define `[<Struct>] TerrainCommand = { Texture, RenderPosition, Size }`
+  - [x] Define `[<Struct>] MeshCommand = { Model, WorldMatrix }`
+  - [x] Define `[<Struct>] BillboardCommand = { Texture, RenderPosition, Size, Color }`
+  - [x] Define `[<Struct>] TerrainCommand = { Texture, RenderPosition, Size }`
 
-- [ ] **Create `Pomo.Core/Graphics/CommandQueue.fs`**
-  - [ ] Define `CommandQueue<'T when 'T : struct>` using `ArrayPool`
-  - [ ] Implement `add: 'T → CommandQueue<'T> → unit` (inline, byref)
-  - [ ] Implement `clear: CommandQueue<'T> → unit`
-  - [ ] Implement `create: unit → CommandQueue<'T>`
-  - [ ] Implement `iterate: (byref<'T> → unit) → CommandQueue<'T> → unit`
-  - [ ] Implement auto-shrink logic for low sustained usage
+- [x] **Create `Pomo.Core/Graphics/CommandQueue.fs`**
+  - [x] Define `CommandQueue<'T when 'T : struct>` using `ArrayPool`
+  - [x] Implement `add: 'T → CommandQueue<'T> → unit` (inline, byref)
+  - [x] Implement `clear: CommandQueue<'T> → unit`
+  - [x] Implement `create: unit → CommandQueue<'T>`
+  - [x] Implement `iterate: (byref<'T> → unit) → CommandQueue<'T> → unit`
+  - [x] Implement auto-shrink logic for low sustained usage
 
 ---
 

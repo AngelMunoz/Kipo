@@ -31,6 +31,8 @@
     <Compile Include="MapSpawning.fs" />
     <Compile Include="Projections.fs" />
     <Compile Include="Graphics/RenderMath.fs" />
+    <Compile Include="Graphics/RenderCommands.fs" />
+    <Compile Include="Graphics/CommandQueue.fs" />
     <Compile Include="Graphics/QuadBatch.fs" />
     <Compile Include="Graphics/BillboardBatch.fs" />
     <Compile Include="Environment.fs" />

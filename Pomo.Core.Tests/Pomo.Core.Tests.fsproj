@@ -19,6 +19,7 @@
 
   <ItemGroup>
     <Compile Include="RenderMathTests.fs" />
+    <Compile Include="CommandQueueTests.fs" />
   </ItemGroup>
 
   <ItemGroup>
