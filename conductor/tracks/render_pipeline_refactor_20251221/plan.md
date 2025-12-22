@@ -5,176 +5,164 @@
 
 ---
 
-## Phase 1: RenderMath Foundation
+## Phase 1: RenderMath Foundation [COMPLETE]
 
 _Goal: Create the single source of isometric truth._
 
-- [x] **Create `Pomo.Core/Graphics/RenderMath.fs` (new)**
+- [x] **Create `Pomo.Core/Graphics/RenderMath.fs`**
 
-  - [x] Define `LogicToRender(logicPos, altitude, ppu) → Vector3`
-  - [x] Define `GetViewMatrix(logicPos, ppu) → Matrix`
-  - [x] Define `GetProjectionMatrix(viewport, zoom, ppu) → Matrix`
-  - [x] Define `ScreenToLogic(screenPos, camera) → Vector2`
-  - [x] Define `CreateMeshWorldMatrix(renderPos, facing, scale, squishFactor) → Matrix`
-  - [x] Define `GetBillboardVectors(viewMatrix) → (right, up)`
-  - [x] Centralize squish factor calculation: `squishFactor = ppu.X / ppu.Y`
-  - [x] Move isometric correction matrix (`isoRot`, `topDownRot`, `correction`) here from old `RenderMath.fs`
+  - [x] `LogicToRender(logicPos, altitude, ppu) -> Vector3`
+  - [x] `GetViewMatrix(logicPos, ppu) -> Matrix`
+  - [x] `GetProjectionMatrix(viewport, zoom, ppu) -> Matrix`
+  - [x] `ScreenToLogic(screenPos, camera) -> Vector2`
+  - [x] `CreateMeshWorldMatrix(renderPos, facing, scale, squishFactor) -> Matrix`
+  - [x] `CreateProjectileWorldMatrix(renderPos, facing, tilt, scale, squishFactor) -> Matrix`
+  - [x] `CreateMeshParticleWorldMatrix(...)` for mesh particles
+  - [x] `ApplyRigNodeTransform(pivot, offset, animation) -> Matrix`
+  - [x] `GetBillboardVectors(viewMatrix) -> (right, up)`
+  - [x] `GetViewBounds(cameraPos, viewportW, viewportH, zoom)` for culling
+  - [x] `TileGridToLogic(orientation, stagger, ...)` for terrain tiles
+  - [x] Centralize squish factor: `ppu.X / ppu.Y`
+  - [x] Expose `IsometricCorrectionMatrix` (renamed from `correction`)
 
-- [x] **Refactor `CameraSystem.fs` to use `RenderMath`**
-
-  - [x] Replace inline View matrix computation (lines 88-98) with `RenderMath.GetViewMatrix`
-  - [x] Replace inline Projection computation (lines 102-109) with `RenderMath.GetProjectionMatrix`
-  - [x] Replace `ScreenToWorld` logic with `RenderMath.ScreenToLogic`
-  - [x] Verify: ScreenToWorld now consistent with render positions
-
-- [x] **Verification: RenderMath Unit Tests**
-  - [x] Test `LogicToRender` ↔ `ScreenToLogic` round-trip
-  - [x] Test mesh world matrix produces expected depth ordering
+- [x] **Verify no Matrix.Create\* calls outside RenderMath**
 
 ---
 
-## Phase 2: Command Queues & Struct Definitions
+## Phase 2: Command Queues & Struct Definitions [COMPLETE]
 
-_Goal: Define the data structures for the command queue pattern._
+_Goal: Define the data structures for the command pattern._
 
 - [x] **Create `Pomo.Core/Graphics/RenderCommands.fs`**
 
-  - [x] Define `[<Struct>] MeshCommand = { Model, WorldMatrix }`
-  - [x] Define `[<Struct>] BillboardCommand = { Texture, RenderPosition, Size, Color }`
-  - [x] Define `[<Struct>] TerrainCommand = { Texture, RenderPosition, Size }`
+  - [x] `[<Struct>] MeshCommand = { Model, WorldMatrix }`
+  - [x] `[<Struct>] BillboardCommand = { Texture, Position, Size, Color }`
+  - [x] `[<Struct>] TerrainCommand = { Texture, Position, Size }`
 
 - [x] **Create `Pomo.Core/Graphics/CommandQueue.fs`**
-  - [x] Define `CommandQueue<'T when 'T : struct>` using `ArrayPool`
-  - [x] Implement `add: 'T → CommandQueue<'T> → unit` (inline, byref)
-  - [x] Implement `clear: CommandQueue<'T> → unit`
-  - [x] Implement `create: unit → CommandQueue<'T>`
-  - [x] Implement `iterate: (byref<'T> → unit) → CommandQueue<'T> → unit`
-  - [x] Implement auto-shrink logic for low sustained usage
+  - [x] `ICommandQueue<'T>` interface for abstraction
+  - [x] ArrayPool-based implementation
 
 ---
 
-## Phase 3: Simulation Layer Refactor
+## Phase 3: Split Context Design [COMPLETE]
 
-_Goal: Separate simulation state from render concerns. Work in logic space only._
+_Goal: Create specialized render contexts instead of a god object._
 
-- [x] **Rename `Particles.ActiveEffect` → `VisualEffect`**
-
-  - [x] Update all references in domain and systems
-  - [x] Rename `world.VisualEffects` type accordingly
-
-- [x] **Create `Pomo.Core/Simulation/ParticleSimulator.fs` (pure module)**
-
-  - [x] Define `VisualEffectState` (simulation state container, uses arrays not ResizeArray)
-  - [x] Define `[<Struct>] SimulatedParticle = { LocalOffset: Vector3, Velocity, Color, Size, Life }`
-  - [x] Implement `update: dt → VisualEffectState → VisualEffectState` (pure function)
-  - [x] Design for `Array.Parallel.map` compatibility (no shared mutable state during update)
-  - [x] Move simulation logic from `ParticleSystem.fs` here
-  - [x] Remove all isometric/matrix code from simulation
-
-- [x] **Create `Pomo.Core/Simulation/OrbitalSimulator.fs` (pure module)**
-  - [x] Define `SimulatedOrbital = { LogicPosition: Vector2, Altitude: float32, ... }`
-  - [x] Implement `update: dt → OrbitalState → OrbitalState`
-  - [x] Move orbital position calculation from `OrbitalSystem.fs` here
-  - [x] Remove direct `Effect.Position.Value` mutation
+- [x] **Create `Pomo.Core/Rendering/EmitterContext.fs`**
+  - [x] `RenderCore` - shared minimal dependencies (PixelsPerUnit)
+  - [x] `EntityRenderData` - model store, poses, projectiles, squish/scale
+  - [x] `ParticleRenderData` - textures, models, entity positions
+  - [x] `TerrainRenderData` - tile texture lookup
 
 ---
 
-## Phase 4: Emitter Functions
+## Phase 4: Parallelizable Emitter Architecture [COMPLETE]
 
-_Goal: Create stateless emitter functions that convert simulation state to commands._
+_Goal: Emitters return arrays, enabling Array.Parallel.\* usage._
 
-- [ ] **Create `Pomo.Core/Rendering/EntityEmitter.fs`**
+### 4.1 Pre-Computed Poses
 
-  - [ ] Implement `emit: MovementSnapshot → RenderMath → MeshQueue → unit`
-  - [ ] Iterate entities, call `RenderMath.CreateMeshWorldMatrix`, push to queue
-  - [ ] Handle projectile altitude via `LiveProjectiles` lookup
+- [x] **Create `Pomo.Core/Rendering/PoseResolver.fs`**
+  - [x] `[<Struct>] ResolvedRigNode = { ModelAsset, WorldMatrix }`
+  - [x] `ResolvedEntity = { EntityId, Nodes: ResolvedRigNode[] }`
+  - [x] `resolveAll(core, data, snapshot, nodeTransformsPool) -> ResolvedEntity[]`
+  - [x] Sequential pass with shared `nodeTransformsPool`
+  - [x] Direct HashMap iteration (no `toArray`)
+  - [x] Reused `ResizeArray` buffers
+  - [x] `[<TailCall>]` on recursive functions
 
-- [ ] **Create `Pomo.Core/Rendering/ParticleEmitter.fs`**
+### 4.2 Entity Emitter
 
-  - [ ] Implement `emitBillboards: VisualEffectState → RenderMath → BillboardQueue → unit`
-  - [ ] Implement `emitMeshes: VisualEffectState → RenderMath → MeshQueue → unit`
-  - [ ] Group by (Texture, BlendMode) for batch efficiency
+- [x] **Refactor `Pomo.Core/Rendering/EntityEmitter.fs`**
+  - [x] Takes `ResolvedEntity[]` (pre-computed by PoseResolver)
+  - [x] Returns `MeshCommand[]`
+  - [x] Uses `Array.Parallel.collect`
+  - [x] Pure function, no shared state
 
-- [ ] **Create `Pomo.Core/Rendering/OrbitalEmitter.fs`**
+### 4.3 Particle Emitter
 
-  - [ ] Implement `emit: OrbitalState → RenderMath → MeshQueue → unit`
+- [x] **Refactor `Pomo.Core/Rendering/ParticleEmitter.fs`**
+  - [x] `emitBillboards(core, data, effects) -> BillboardCommand[]`
+  - [x] `emitMeshes(core, data, effects) -> MeshCommand[]`
+  - [x] Uses `Array.Parallel.collect`
+  - [x] Returns `Array.empty` for inactive effects
 
-- [ ] **Create `Pomo.Core/Rendering/TerrainEmitter.fs`**
-  - [ ] Implement `emitBackground: Map → Camera → RenderMath → TerrainQueue → unit`
-  - [ ] Implement `emitForeground: Map → Camera → RenderMath → TerrainQueue → unit`
-  - [ ] Respect RenderGroup layering (< 2 = background, >= 2 = foreground)
-  - [ ] Implement tile culling
+### 4.4 Terrain Emitter
+
+- [x] **Refactor `Pomo.Core/Rendering/TerrainEmitter.fs`**
+  - [x] `emitLayer(core, data, map, layer, viewBounds) -> TerrainCommand[]`
+  - [x] `emitForeground(core, data, map, layers, viewBounds) -> TerrainCommand[]`
+  - [x] Uses `Array.Parallel.choose`
+  - [x] Takes pre-computed `viewBounds` from `RenderMath.GetViewBounds`
+  - [x] Uses `RenderMath.TileGridToLogic` for tile positions
+
+### 4.5 Orbital Emitter [REMOVED]
+
+- [x] **Deleted `OrbitalEmitter.fs`**
+  - Orbitals are `VisualEffect`s rendered by `ParticleEmitter`
+  - No separate emitter needed
 
 ---
 
-## Phase 5: RenderOrchestrator
+## Phase 5: RenderOrchestrator [PENDING]
 
-_Goal: Single entry point that owns queues, calls emitters, flushes batches._
+_Goal: Single entry point that calls emitters and flushes to GPU._
 
-- [ ] **Create `Pomo.Core/Systems/RenderOrchestrator.fs` (new)**
+- [ ] **Create `Pomo.Core/Systems/RenderOrchestrator.fs`**
 
   - [ ] Inherit `DrawableGameComponent`
-  - [ ] Own: `MeshQueue`, `BillboardQueue`, `TerrainQueue`
-  - [ ] Own: `MeshBatch`, `BillboardBatch`, `QuadBatch`
-  - [ ] Own: `VisualEffectState`, `OrbitalState` (simulation state)
-  - [ ] Implement `Draw(gameTime)`:
-    1. Update simulations (call pure functions)
-    2. Clear queues
-    3. For each camera:
-       - `TerrainEmitter.emitBackground(...)`
-       - `EntityEmitter.emit(...)`
-       - `ParticleEmitter.emitBillboards(...)` + `emitMeshes(...)`
-       - `OrbitalEmitter.emit(...)`
-       - `TerrainEmitter.emitForeground(...)`
-    4. Sort queues by depth (Y component)
-    5. Flush batches
+  - [ ] Create contexts per frame (RenderCore, EntityRenderData, etc.)
+  - [ ] Call `PoseResolver.resolveAll` (sequential)
+  - [ ] Call emitters in parallel, collect command arrays
+  - [ ] Concatenate and sort commands by depth
+  - [ ] Flush to batch renderers
 
 - [ ] **Refactor Batch Renderers**
-  - [ ] Update `BillboardBatch` to consume `CommandQueue<BillboardCommand>`
-  - [ ] Create `MeshBatch` to consume `CommandQueue<MeshCommand>`
-  - [ ] Update `QuadBatch` to consume `CommandQueue<TerrainCommand>`
+  - [ ] Update to consume `Command[]` instead of queues
+  - [ ] Or: populate queues from arrays then flush
 
 ---
 
-## Phase 6: Cleanup & Delete Legacy
+## Phase 6: Cleanup & Delete Legacy [PENDING]
 
 _Goal: Remove old render code._
 
-- [ ] **Delete legacy files**
-
-  - [ ] Delete `Pomo.Core/Systems/Render.fs` (replaced by emitters + orchestrator)
-  - [ ] Delete old `Pomo.Core/Systems/RenderOrchestrator.fs`
-  - [ ] Delete `Pomo.Core/Systems/TerrainRender.fs` (replaced by `TerrainEmitter`)
-  - [ ] Delete `ParticleSystem.fs` GameComponent (replaced by `ParticleSimulator` module)
-  - [ ] Delete `OrbitalSystem.fs` GameComponent (replaced by `OrbitalSimulator` module)
-
-- [ ] **Update `PomoGame.fs` / scene setup**
-  - [ ] Register new `RenderOrchestrator` as the single drawable component
-  - [ ] Remove old render service registrations
+- [ ] Delete `Pomo.Core/Systems/Render.fs`
+- [ ] Delete `Pomo.Core/Systems/TerrainRender.fs`
+- [ ] Update scene setup to use new orchestrator
 
 ---
 
-## Phase 7: Verification
+## Phase 7: Verification [PENDING]
 
 _Goal: Confirm correctness and performance._
 
 - [ ] **Visual Verification**
 
-  - [ ] Entities render at correct positions
-  - [ ] Particles (billboard + mesh) render correctly
-  - [ ] Orbitals track entity facing
-  - [ ] Terrain layers respect RenderGroup ordering
-  - [ ] No depth sorting artifacts (z-fighting)
-
-- [ ] **Picking Verification**
-
-  - [ ] Click on entity → ScreenToWorld returns position matching entity's logic position
+  - [ ] Entities, particles, terrain render correctly
+  - [ ] Depth sorting works
+  - [ ] No visual regressions
 
 - [ ] **Performance Verification**
 
-  - [ ] Memory profiler: zero GC pressure during steady-state gameplay
-  - [ ] Frame time remains acceptable
+  - [ ] Memory profiler: minimal GC pressure
+  - [ ] Frame time acceptable
 
 - [ ] **Code Audit**
-  - [ ] Grep for `Matrix.Create` outside `RenderMath.fs` → should find none
-  - [ ] Grep for `squishFactor` outside `RenderMath.fs` → should find none
+  - [ ] No `Matrix.Create*` outside `RenderMath.fs`
+  - [ ] No `squishFactor` outside `RenderMath.fs`
+
+---
+
+## Summary
+
+| Phase | Status   | Description             |
+| ----- | -------- | ----------------------- |
+| 1     | COMPLETE | RenderMath foundation   |
+| 2     | COMPLETE | Command structs         |
+| 3     | COMPLETE | Split context design    |
+| 4     | COMPLETE | Parallelizable emitters |
+| 5     | PENDING  | RenderOrchestrator      |
+| 6     | PENDING  | Cleanup legacy          |
+| 7     | PENDING  | Verification            |

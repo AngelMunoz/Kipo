@@ -27,98 +27,173 @@ Subsystems work in **Logic Space** (simple 2D + altitude). The `RenderOrchestrat
 
 ---
 
-## Architecture
+## Architecture (Implemented)
 
 ```
-┌─────────────────────────────────────────────────────────────────────────┐
-│                    RenderOrchestrator : DrawableGameComponent           │
-│                    (THE single render entry point)                      │
-├─────────────────────────────────────────────────────────────────────────┤
-│  Owns:                                                                  │
-│    - Command queues (MeshQueue, BillboardQueue, TerrainQueue)           │
-│    - Batch renderers (MeshBatch, BillboardBatch, QuadBatch)             │
-│    - Simulation state (VisualEffectState for particles/orbitals)        │
-│                                                                         │
-│  Draw(gameTime):                                                        │
-│    1. Update simulations (pure functions, logic space)                  │
-│    2. Clear all command queues                                          │
-│    3. For each camera:                                                  │
-│       a. TerrainEmitter.emit() → TerrainQueue                           │
-│       b. EntityEmitter.emit() → MeshQueue                               │
-│       c. ParticleEmitter.emit() → BillboardQueue / MeshQueue            │
-│       d. OrbitalEmitter.emit() → MeshQueue                              │
-│    4. Sort queues by depth                                              │
-│    5. Flush batches to GPU                                              │
-└─────────────────────────────────────────────────────────────────────────┘
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                         Per Frame Flow                                       │
+├─────────────────────────────────────────────────────────────────────────────┤
+│                                                                             │
+│  ┌──────────────────┐                                                       │
+│  │ PoseResolver     │  Sequential: resolves rig hierarchies                 │
+│  │ (uses shared     │  Output: ResolvedEntity[]                             │
+│  │  nodeTransforms) │                                                       │
+│  └────────┬─────────┘                                                       │
+│           │                                                                 │
+│           ▼                                                                 │
+│  ┌─────────────────────────────────────────────────────────────────────┐    │
+│  │                    PARALLEL PHASE                                    │    │
+│  ├─────────────────────────────────────────────────────────────────────┤    │
+│  │  EntityEmitter.emit            → MeshCommand[]                       │    │
+│  │  ParticleEmitter.emitBillboards → BillboardCommand[]                 │    │
+│  │  ParticleEmitter.emitMeshes    → MeshCommand[]                       │    │
+│  │  TerrainEmitter.emitLayer      → TerrainCommand[]                    │    │
+│  └─────────────────────────────────────────────────────────────────────┘    │
+│                                                                             │
+│  ┌──────────────────┐                                                       │
+│  │ Batch Renderers  │  Consume command arrays, issue GPU draws              │
+│  └──────────────────┘                                                       │
+│                                                                             │
+└─────────────────────────────────────────────────────────────────────────────┘
 ```
 
-### Emitter Functions (Pure, No Isometric Knowledge)
+### Key Design Decision: Return Arrays, Not Mutate Queues
 
-Emitters are **module-level functions**, not classes. They receive:
+Emitters return `Command[]` instead of mutating queues. This enables:
 
-- World state (entities, particles, map)
-- A `RenderMath` service (for coordinate conversion)
-- A command queue to push to
-
-```fsharp
-module EntityEmitter =
-    let emit (snapshot: MovementSnapshot) (renderMath: RenderMath) (queue: MeshQueue) =
-        for entityId, logicPos in snapshot.Positions do
-            let cmd = renderMath.CreateMeshCommand(logicPos, altitude, facing, model)
-            queue.Add(cmd)
-```
-
-Emitters call `renderMath.CreateMeshCommand(...)` or `renderMath.CreateBillboardCommand(...)`. They never compute matrices.
-
-### RenderMath (The ONE Isometric Authority)
-
-All isometric logic lives here and **only here**:
-
-```fsharp
-module RenderMath =
-    // Camera helpers (used by CameraService)
-    let GetViewMatrix (logicPos: Vector2) (ppu: Vector2) : Matrix
-    let GetProjectionMatrix (viewport: Viewport) (zoom: float32) (ppu: Vector2) : Matrix
-    let ScreenToLogic (screenPos: Vector2) (camera: Camera) : Vector2
-
-    // Command creation (used by Emitters via RenderOrchestrator)
-    let CreateMeshCommand (logicPos: Vector2) (altitude: float32) (facing: float32) (model: Model) : MeshCommand
-    let CreateBillboardCommand (logicPos: Vector2) (altitude: float32) (size: float32) (texture: Texture) : BillboardCommand
-    let CreateTerrainCommand (tilePos: Vector2) (texture: Texture) (size: Vector2) : TerrainCommand
-```
-
-### CameraService (Unchanged Role, Uses RenderMath)
-
-```fsharp
-type CameraService =
-    abstract GetCamera: playerId -> Camera voption
-    abstract GetAllCameras: unit -> struct(Guid<PlayerId> * Camera)[]
-    abstract ScreenToWorld: screenPos * playerId -> Vector2 voption
-```
-
-`CameraService` delegates matrix computation to `RenderMath`:
-
-- `GetViewMatrix(logicPos, ppu)` for the view matrix
-- `GetProjectionMatrix(viewport, zoom, ppu)` for projection
-- `ScreenToLogic(screenPos, camera)` for picking
+- **Parallelization** via `Array.Parallel.collect` / `Array.Parallel.choose`
+- **Purity** - no side effects, easier to test
+- **Composability** - arrays can be concatenated, sorted, filtered
 
 ---
 
-## Simulation vs Rendering Split
+## Split Context Design (Implemented)
 
-### Current Problem
+Instead of one "god object" `EmitterContext`, we use specialized contexts:
 
-`Particles.ActiveEffect` mixes simulation state (positions, velocities) with render state (what to draw). Adding mesh particles required threading render concerns through simulation.
+```fsharp
+/// Shared by all emitters - minimal common dependencies
+type RenderCore = {
+  PixelsPerUnit: Vector2
+}
 
-### New Design
+/// Entity-specific render data
+type EntityRenderData = {
+  ModelStore: ModelStore
+  GetModelByAsset: string -> Model voption
+  EntityPoses: HashMap<Guid<EntityId>, HashMap<string, Matrix>>
+  LiveProjectiles: HashMap<Guid<EntityId>, LiveProjectile>
+  SquishFactor: float32
+  ModelScale: float32
+}
 
-| Layer          | Responsibility                                             | State                                                |
-| -------------- | ---------------------------------------------------------- | ---------------------------------------------------- |
-| **Simulation** | Update positions, velocities, lifetimes. Logic space only. | `VisualEffectState` (mutable, owned by orchestrator) |
-| **Emitters**   | Read simulation state, emit commands via `RenderMath`      | Stateless functions                                  |
-| **Batchers**   | Consume command queues, issue GPU draw calls               | Stateless                                            |
+/// Particle-specific render data
+type ParticleRenderData = {
+  GetTexture: string -> Texture2D voption
+  GetModelByAsset: string -> Model voption
+  EntityPositions: HashMap<Guid<EntityId>, Vector2>
+  SquishFactor: float32
+  ModelScale: float32
+}
 
-**Terminology change:** Rename `Particles.ActiveEffect` → `VisualEffect` to avoid confusion with `Skill.ActiveEffect`.
+/// Terrain-specific render data
+type TerrainRenderData = {
+  GetTileTexture: int -> Texture2D voption
+}
+```
+
+---
+
+## Pre-Computed Poses (Implemented)
+
+Entity rig traversal is sequential (uses shared `nodeTransformsPool`). Separated into `PoseResolver`:
+
+```fsharp
+/// Pre-resolved rig node for command emission
+[<Struct>]
+type ResolvedRigNode = {
+  ModelAsset: string
+  WorldMatrix: Matrix
+}
+
+/// Pre-resolved entity ready for parallel command emission
+type ResolvedEntity = {
+  EntityId: Guid<EntityId>
+  Nodes: ResolvedRigNode[]
+}
+
+module PoseResolver =
+  /// Sequential pass - resolves all entity rig hierarchies
+  let resolveAll
+    (core: RenderCore)
+    (data: EntityRenderData)
+    (snapshot: MovementSnapshot)
+    (nodeTransformsPool: Dictionary<string, Matrix>)
+    : ResolvedEntity[]
+```
+
+---
+
+## Emitter Signatures (Implemented)
+
+All emitters are **pure functions** that return arrays:
+
+```fsharp
+module EntityEmitter =
+  /// Parallel over entities via Array.Parallel.collect
+  let emit (getModelByAsset: string -> Model voption) (entities: ResolvedEntity[]) : MeshCommand[]
+
+module ParticleEmitter =
+  /// Parallel over effects via Array.Parallel.collect
+  let emitBillboards (core: RenderCore) (data: ParticleRenderData) (effects: VisualEffect[]) : BillboardCommand[]
+  let emitMeshes (core: RenderCore) (data: ParticleRenderData) (effects: VisualEffect[]) : MeshCommand[]
+
+module TerrainEmitter =
+  /// Parallel over tile indices via Array.Parallel.choose
+  let emitLayer (core: RenderCore) (data: TerrainRenderData) (map: MapDefinition) (layer: MapLayer) (viewBounds) : TerrainCommand[]
+  let emitForeground (core: RenderCore) (data: TerrainRenderData) (map: MapDefinition) (layers: MapLayer IndexList) (viewBounds) : TerrainCommand[]
+```
+
+---
+
+## RenderMath Functions (Implemented)
+
+All isometric logic centralized:
+
+```fsharp
+module RenderMath =
+  // Coordinate conversion
+  let inline LogicToRender (logicPos: Vector2) (altitude: float32) (ppu: Vector2) : Vector3
+  let inline GetSquishFactor (ppu: Vector2) : float32
+  let inline GetViewBounds (cameraPos: Vector2) (viewportWidth: float32) (viewportHeight: float32) (zoom: float32) : struct(l,r,t,b)
+
+  // World matrix creation
+  let CreateMeshWorldMatrix (renderPos: Vector3) (facing: float32) (scale: float32) (squishFactor: float32) : Matrix
+  let CreateProjectileWorldMatrix (renderPos: Vector3) (facing: float32) (tilt: float32) (scale: float32) (squishFactor: float32) : Matrix
+  let CreateMeshParticleWorldMatrix (renderPos: Vector3) (rotation: Quaternion) (baseScale: float32) (scaleAxis: Vector3) (pivot: Vector3) (squishFactor: float32) : Matrix
+  let inline ApplyRigNodeTransform (pivot: Vector3) (offset: Vector3) (animation: Matrix) : Matrix
+
+  // Tile coordinate conversion
+  let TileGridToLogic (orientation) (staggerAxis) (staggerIndex) (mapWidth) (x) (y) (tileW) (tileH) : struct(float32 * float32)
+
+  // Billboard helpers
+  let inline GetBillboardVectors (view: Matrix) : struct(Vector3 * Vector3)
+  let inline ScreenToLogic (screenPos: Vector2) (viewport: Viewport) (zoom: float32) (cameraPosition: Vector2) : Vector2
+  let inline LogicToScreen (logicPos: Vector2) (viewport: Viewport) (zoom: float32) (cameraPosition: Vector2) : Vector2
+
+  // Isometric correction (exposed for edge cases)
+  let IsometricCorrectionMatrix : Matrix
+```
+
+---
+
+## GC Optimization (Implemented)
+
+- **Direct HashMap iteration** - no `toArray` allocations
+- **Reused buffers** - `ResizeArray` for intermediate results
+- **`[<TailCall>]`** on recursive functions for stack safety
+- **`struct` tuples** in hot paths to avoid boxing
+- **Pre-allocated result buffers** with estimated capacity
 
 ---
 
@@ -129,63 +204,52 @@ Zero-allocation struct commands:
 ```fsharp
 [<Struct>]
 type MeshCommand = {
-    Model: Model
-    WorldMatrix: Matrix  // Pre-computed by RenderMath
-    // Optional: tint, animation frame, etc.
+  Model: Model
+  WorldMatrix: Matrix
 }
 
 [<Struct>]
 type BillboardCommand = {
-    Texture: Texture2D
-    Position: Vector3     // Render space (pre-computed)
-    Size: float32
-    Color: Color
-    // Billboard vectors computed at flush time from camera
+  Texture: Texture2D
+  Position: Vector3
+  Size: float32
+  Color: Color
 }
 
 [<Struct>]
 type TerrainCommand = {
-    Texture: Texture2D
-    Position: Vector3     // Render space
-    Size: Vector2
+  Texture: Texture2D
+  Position: Vector3
+  Size: Vector2
 }
 ```
 
 ---
 
-## Functional Requirements
+## Files Implemented
 
-1. **Single Entry Point:** `RenderOrchestrator.Draw()` is the only render call. No separate `TerrainRenderService`, `RenderService`.
-
-2. **Isometric Isolation:** Subsystems (particle simulation, orbital calculation, entity transforms) work in logic space. They never import/use `Matrix` or squish factors.
-
-3. **Command Queue Pattern:** All rendering goes through typed struct queues. Queues are cleared each frame.
-
-4. **Depth Sorting:** Commands are sorted by Y-component (depth bias) before flushing. RenderGroup layering (terrain background < entities < terrain foreground) is preserved.
-
-5. **Camera Consistency:** `CameraService` and emitters both use `RenderMath`, guaranteeing visual positions match picking positions.
-
----
-
-## Non-Functional Requirements
-
-- **Zero Allocations:** Struct commands, `ArrayPool` buffers, no boxing in hot path.
-- **Buffer Management:** Auto-shrink logic for sustained low usage.
-- **byref semantics:** if necessary, use byref semantics to avoid copying large structs.
-- **No GC pressure:** No allocations in hot path.
-- **high performance iterations:** where necessary use higher performance iteration techniques and single pass algorithms.
-- **low level primitives:** where necessary use low level primitives to avoid allocations like `Span<T>` and `ReadOnlySpan<T>` or `byref` semantics.
-- **Parallelization Ready:** Simulation uses pure functions over arrays (`SimulatedParticle[]`, `SimulatedOrbital[]`) enabling `Array.Parallel.map` for particle/orbital updates. Each particle/orbital update is independent with no shared mutable state.
+| File                           | Purpose                                        |
+| ------------------------------ | ---------------------------------------------- |
+| `Graphics/RenderMath.fs`       | All isometric math, coordinate conversion      |
+| `Graphics/RenderCommands.fs`   | Struct command definitions                     |
+| `Rendering/EmitterContext.fs`  | Split context types (RenderCore, \*RenderData) |
+| `Rendering/PoseResolver.fs`    | Sequential rig resolution → ResolvedEntity[]   |
+| `Rendering/EntityEmitter.fs`   | Parallel entity command emission               |
+| `Rendering/ParticleEmitter.fs` | Parallel particle command emission             |
+| `Rendering/TerrainEmitter.fs`  | Parallel terrain command emission              |
 
 ---
 
 ## Acceptance Criteria
 
-- [ ] Entities, particles, orbitals, terrain render correctly
-- [ ] No isometric math exists outside `RenderMath` module
-- [ ] Adding a new visual type requires only: (1) simulation logic, (2) an emitter function—no isometric knowledge needed
-- [ ] `CameraService.ScreenToWorld` returns positions that exactly match where entities render
-- [ ] Memory profiler shows zero GC pressure during steady-state gameplay
+- [x] All matrix math centralized in `RenderMath`
+- [x] Emitters return arrays (parallelizable)
+- [x] No `Matrix.Create*` calls in emitters
+- [x] Split context design (no god objects)
+- [x] GC-optimized with direct iteration and buffer reuse
+- [ ] RenderOrchestrator wired up (Phase 5)
+- [ ] Visual regression testing
+- [ ] Memory profiler validation
 
 ---
 

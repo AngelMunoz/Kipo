@@ -37,6 +37,11 @@
     <Compile Include="Graphics/CommandQueue.fs" />
     <Compile Include="Graphics/QuadBatch.fs" />
     <Compile Include="Graphics/BillboardBatch.fs" />
+    <Compile Include="Rendering/EmitterContext.fs" />
+    <Compile Include="Rendering/PoseResolver.fs" />
+    <Compile Include="Rendering/EntityEmitter.fs" />
+    <Compile Include="Rendering/ParticleEmitter.fs" />
+    <Compile Include="Rendering/TerrainEmitter.fs" />
     <Compile Include="Environment.fs" />
     <Compile Include="Systems/World.fs" />
     <Compile Include="Systems/FormulaEvaluator.fs" />
