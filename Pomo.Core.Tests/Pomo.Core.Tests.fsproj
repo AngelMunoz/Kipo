@@ -20,6 +20,7 @@
   <ItemGroup>
     <Compile Include="RenderMathTests.fs" />
     <Compile Include="CommandQueueTests.fs" />
+    <Compile Include="EmitterTests.fs" />
   </ItemGroup>
 
   <ItemGroup>

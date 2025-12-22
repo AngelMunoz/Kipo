@@ -140,3 +140,170 @@ module Properties =
     let expected = ppu.X / ppu.Y
     let actual = RenderMath.GetSquishFactor ppu
     abs(actual - expected) < 0.0001f
+
+// ============================================================================
+// GetViewBounds Tests
+// ============================================================================
+
+module GetViewBounds =
+
+  [<Fact>]
+  let ``centered camera has symmetric bounds``() =
+    let cameraPos = Vector2(0.0f, 0.0f)
+
+    let struct (left, right, top, bottom) =
+      RenderMath.GetViewBounds cameraPos 800.0f 600.0f 1.0f
+
+    Assert.Equal(-400.0f, left)
+    Assert.Equal(400.0f, right)
+    Assert.Equal(-300.0f, top)
+    Assert.Equal(300.0f, bottom)
+
+  [<Fact>]
+  let ``zoom shrinks visible area``() =
+    let cameraPos = Vector2(0.0f, 0.0f)
+
+    let struct (left, right, top, bottom) =
+      RenderMath.GetViewBounds cameraPos 800.0f 600.0f 2.0f
+    // 800 / (2 * 2) = 200 half-width
+    Assert.Equal(-200.0f, left)
+    Assert.Equal(200.0f, right)
+
+  [<Fact>]
+  let ``camera position offsets bounds``() =
+    let cameraPos = Vector2(100.0f, 50.0f)
+
+    let struct (left, right, top, bottom) =
+      RenderMath.GetViewBounds cameraPos 800.0f 600.0f 1.0f
+
+    Assert.Equal(-300.0f, left) // 100 - 400
+    Assert.Equal(500.0f, right) // 100 + 400
+    Assert.Equal(-250.0f, top) // 50 - 300
+    Assert.Equal(350.0f, bottom) // 50 + 300
+
+// ============================================================================
+// TileGridToLogic Tests
+// ============================================================================
+
+module TileGridToLogic =
+
+  open Pomo.Core.Domain.Map
+
+  [<Fact>]
+  let ``orthogonal layout is simple grid``() =
+    let struct (px, py) =
+      RenderMath.TileGridToLogic
+        Orthogonal
+        ValueNone
+        ValueNone
+        10
+        2
+        3
+        32.0f
+        32.0f
+
+    Assert.Equal(64.0f, px) // 2 * 32
+    Assert.Equal(96.0f, py) // 3 * 32
+
+  [<Fact>]
+  let ``isometric layout applies diamond projection``() =
+    let mapWidth = 10
+    let tileW, tileH = 64.0f, 32.0f
+
+    let struct (px, py) =
+      RenderMath.TileGridToLogic
+        Isometric
+        ValueNone
+        ValueNone
+        mapWidth
+        0
+        0
+        tileW
+        tileH
+    // Origin at center: mapWidth * tileW / 2 = 320
+    Assert.Equal(320.0f, px)
+    Assert.Equal(0.0f, py)
+
+  [<Fact>]
+  let ``isometric x+1 moves right and down``() =
+    let mapWidth = 10
+    let tileW, tileH = 64.0f, 32.0f
+
+    let struct (px0, py0) =
+      RenderMath.TileGridToLogic
+        Isometric
+        ValueNone
+        ValueNone
+        mapWidth
+        0
+        0
+        tileW
+        tileH
+
+    let struct (px1, py1) =
+      RenderMath.TileGridToLogic
+        Isometric
+        ValueNone
+        ValueNone
+        mapWidth
+        1
+        0
+        tileW
+        tileH
+    // x+1: px increases by tileW/2, py increases by tileH/2
+    Assert.Equal(px0 + 32.0f, px1)
+    Assert.Equal(py0 + 16.0f, py1)
+
+  [<Fact>]
+  let ``staggered X axis odd index offsets Y``() =
+    let struct (px0, py0) =
+      RenderMath.TileGridToLogic
+        Staggered
+        (ValueSome X)
+        (ValueSome Odd)
+        10
+        0
+        0
+        64.0f
+        32.0f
+
+    let struct (px1, py1) =
+      RenderMath.TileGridToLogic
+        Staggered
+        (ValueSome X)
+        (ValueSome Odd)
+        10
+        1
+        0
+        64.0f
+        32.0f
+    // x=1 is odd, should have Y offset of tileH/2
+    Assert.Equal(0.0f, py0)
+    Assert.Equal(16.0f, py1) // tileH / 2
+
+  [<Fact>]
+  let ``staggered Y axis odd index offsets X``() =
+    let struct (px0, py0) =
+      RenderMath.TileGridToLogic
+        Staggered
+        (ValueSome Y)
+        (ValueSome Odd)
+        10
+        0
+        0
+        64.0f
+        32.0f
+
+    let struct (px1, py1) =
+      RenderMath.TileGridToLogic
+        Staggered
+        (ValueSome Y)
+        (ValueSome Odd)
+        10
+        0
+        1
+        64.0f
+        32.0f
+    // y=1 is odd, should have X offset of tileW/2
+    Assert.Equal(0.0f, px0)
+    Assert.Equal(32.0f, px1) // tileW / 2
