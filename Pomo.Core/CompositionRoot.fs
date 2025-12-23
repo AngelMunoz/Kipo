@@ -240,6 +240,20 @@ module CompositionRoot =
       baseComponents.Add(new ParticleSystem.ParticleSystem(game, pomoEnv))
       baseComponents.Add(new MotionStateAnimationSystem(game, pomoEnv))
 
+      let cursorService = CursorSystem.create game
+
+      let hoverFeedbackSystem =
+        HoverFeedback.create
+          game
+          cameraService
+          cursorService
+          targetingService
+          projections
+          worldView
+          playerId
+
+      baseComponents.Add(hoverFeedbackSystem)
+
       // Map Dependent Systems (Renderers)
       let mapDependentComponents = new ResizeArray<IGameComponent>()
 

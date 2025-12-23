@@ -9,6 +9,7 @@
     <Compile Include="Domain/Core.fs" />
     <Compile Include="Domain/Camera.fs" />
     <Compile Include="Domain/Input.fs" />
+    <Compile Include="Domain/Cursor.fs" />
     <Compile Include="Domain/Entity.fs" />
     <Compile Include="Domain/Projectile.fs" />
     <Compile Include="Domain/Orbital.fs" />
@@ -32,6 +33,7 @@
     <Compile Include="Projections.fs" />
     <Compile Include="Graphics/RenderMath.fs" />
     <Compile Include="Graphics/RenderCommands.fs" />
+    <Compile Include="Graphics/Picking.fs" />
     <Compile Include="Graphics/CommandQueue.fs" />
     <Compile Include="Graphics/QuadBatch.fs" />
     <Compile Include="Graphics/BillboardBatch.fs" />
@@ -43,7 +45,9 @@
     <Compile Include="Rendering/TextEmitter.fs" />
     <Compile Include="Rendering/UIEmitter.fs" />
     <Compile Include="Rendering/LightEmitter.fs" />
+    <Compile Include="Rendering/EntityPicker.fs" />
     <Compile Include="Environment.fs" />
+    <Compile Include="Systems/GameLogic.fs" />
     <Compile Include="Systems/World.fs" />
     <Compile Include="Systems/FormulaEvaluator.fs" />
     <Compile Include="Systems/DamageCalculator.fs" />
@@ -78,6 +82,8 @@
     <Compile Include="Systems/WorldMapService.fs" />
     <Compile Include="Systems/UIService.fs" />
     <Compile Include="Systems/UISystem.fs" />
+    <Compile Include="Systems/CursorSystem.fs" />
+    <Compile Include="Systems/HoverFeedbackSystem.fs" />
     <Compile Include="Scenes.fs" />
     <Compile Include="CompositionRoot.fs" />
     <Compile Include="PomoGame.fs" />
