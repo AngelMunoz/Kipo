@@ -33,6 +33,7 @@ type ParticleRenderData = {
   EntityPositions: HashMap<Guid<EntityId>, Vector2>
   SquishFactor: float32
   ModelScale: float32
+  FallbackTexture: Texture2D
 }
 
 /// Terrain-specific rendering data

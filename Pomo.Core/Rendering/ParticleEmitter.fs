@@ -87,6 +87,7 @@ module ParticleEmitter =
                     Position = renderPos
                     Size = size
                     Color = particle.Color
+                    BlendMode = emitter.Config.BlendMode
                   })
               | ValueNone -> Array.empty
           | Mesh _ -> Array.empty))

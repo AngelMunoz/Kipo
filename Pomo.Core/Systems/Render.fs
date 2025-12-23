@@ -898,8 +898,7 @@ module Render =
       |> Seq.distinct
       |> Seq.choose(fun assetName ->
         try
-          let path = "3d_models/kaykit_prototype/" + assetName
-          Some(assetName, game.Content.Load<Model> path)
+          Some(assetName, game.Content.Load<Model> assetName)
         with _ ->
           None)
       |> HashMap.ofSeq

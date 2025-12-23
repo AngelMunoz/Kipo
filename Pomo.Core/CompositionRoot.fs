@@ -336,7 +336,9 @@ module CompositionRoot =
         mutableWorld.Scenarios[scenarioId] <- scenario
 
         // Recreate Renderers with new map key
+
         let renderOrchestrator =
+          // --- Legacy Render System ---
           new RenderOrchestratorSystem.RenderOrchestratorSystem(
             game,
             pomoEnv,
@@ -344,6 +346,14 @@ module CompositionRoot =
             playerId,
             DrawOrder = Render.Layer.TerrainBase
           )
+        // --- New Render System (V2) ---
+        // new RenderOrchestratorV2.RenderOrchestrator(
+        //   game,
+        //   pomoEnv,
+        //   newMapKey,
+        //   playerId,
+        //   DrawOrder = Render.Layer.TerrainBase
+        // )
 
         mapDependentComponents.Add(renderOrchestrator)
 
