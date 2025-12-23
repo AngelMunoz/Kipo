@@ -1,6 +1,7 @@
 namespace Pomo.Core.Rendering
 
 open System
+open System.Collections.Generic
 open Microsoft.Xna.Framework
 open Microsoft.Xna.Framework.Graphics
 open FSharp.UMX
@@ -39,6 +40,8 @@ type ParticleRenderData = {
 /// Terrain-specific rendering data
 type TerrainRenderData = {
   GetTileTexture: int -> Texture2D voption
+  /// Pre-computed tile render indices per layer (for correct staggered overlap order)
+  LayerRenderIndices: IReadOnlyDictionary<int, int[]>
 }
 
 module RenderCore =

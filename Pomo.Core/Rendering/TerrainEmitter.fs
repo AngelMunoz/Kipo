@@ -4,8 +4,10 @@ open System.Collections.Generic
 open Microsoft.Xna.Framework
 open Microsoft.Xna.Framework.Content
 open Microsoft.Xna.Framework.Graphics
+open FSharp.UMX
 open FSharp.Data.Adaptive
 open Pomo.Core.Domain.Map
+open Pomo.Core.Domain.Units
 open Pomo.Core.Graphics
 
 module TerrainEmitter =
@@ -34,6 +36,51 @@ module TerrainEmitter =
 
     cache
 
+  /// Computes the optimized tile render indices for a single layer
+  /// For staggered maps, this orders tiles so that evens then odds (or vice versa)
+  /// are rendered per row, ensuring correct visual overlap.
+  let private computeLayerIndices
+    (map: MapDefinition)
+    (layer: MapLayer)
+    : int[] =
+    let w = layer.Width
+    let h = layer.Height
+
+    let isStaggeredX =
+      match map.Orientation, map.StaggerAxis with
+      | Staggered, ValueSome X -> true
+      | _ -> false
+
+    if isStaggeredX then
+      // Precompute which phase each column belongs to
+      let isPass2 =
+        match map.StaggerIndex with
+        | ValueSome Odd -> fun x -> x % 2 = 1
+        | ValueSome Even -> fun x -> x % 2 = 0
+        | _ -> fun _ -> false
+
+      // Single allocation, stable sort by (y, phase, x)
+      Array.init (w * h) id
+      |> Array.sortBy(fun i ->
+        let x = i % w
+        let y = i / w
+        // Sort key: y first, then pass (0 or 1), then x
+        struct (y, (if isPass2 x then 1 else 0), x))
+    else
+      Array.init (w * h) id
+
+  /// Pre-computes render indices for all layers in the map (call once at load time)
+  let computeLayerRenderIndices
+    (map: MapDefinition)
+    : IReadOnlyDictionary<int, int[]> =
+    let dict = Dictionary<int, int[]>()
+
+    for layer in map.Layers do
+      let layerId = %layer.Id
+      dict[layerId] <- computeLayerIndices map layer
+
+    dict
+
   /// Gets RenderGroup from layer properties, defaults to 0
   let inline private getRenderGroup(layer: MapLayer) : int =
     match layer.Properties |> HashMap.tryFindV "RenderGroup" with
@@ -58,44 +105,13 @@ module TerrainEmitter =
       let tileH = float32 map.TileHeight
       let struct (viewLeft, viewRight, viewTop, viewBottom) = viewBounds
 
-      // Generate indices in legacy render order to ensure correct overlapping
-      // Legacy renderer split Staggered X rows into two passes (Evens then Odds, or vice-versa)
+      // Use pre-computed indices from TerrainRenderData (computed once at load time)
+      let layerId = %layer.Id
+
       let indices =
-        let w = layer.Width
-        let h = layer.Height
-
-        let isStaggeredX =
-          match map.Orientation, map.StaggerAxis with
-          | Staggered, ValueSome X -> true
-          | _ -> false
-
-        if isStaggeredX then
-          [|
-            for y in 0 .. h - 1 do
-              // Pass 1
-              for x in 0 .. w - 1 do
-                let includePass1 =
-                  match map.StaggerIndex with
-                  | ValueSome Odd -> x % 2 = 0
-                  | ValueSome Even -> x % 2 = 1
-                  | _ -> true
-
-                if includePass1 then
-                  yield x + y * w
-
-              // Pass 2
-              for x in 0 .. w - 1 do
-                let includePass2 =
-                  match map.StaggerIndex with
-                  | ValueSome Odd -> x % 2 = 1
-                  | ValueSome Even -> x % 2 = 0
-                  | _ -> false
-
-                if includePass2 then
-                  yield x + y * w
-          |]
-        else
-          Array.init (w * h) id
+        match data.LayerRenderIndices.TryGetValue(layerId) with
+        | true, arr -> arr
+        | false, _ -> Array.init (layer.Width * layer.Height) id
 
       indices
       |> Array.Parallel.choose(fun i ->

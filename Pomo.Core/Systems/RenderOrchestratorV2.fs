@@ -30,6 +30,8 @@ module RenderOrchestratorV2 =
     ModelCache: IReadOnlyDictionary<string, Model>
     TextureCache: IReadOnlyDictionary<string, Texture2D>
     TileTextureCache: Dictionary<int, Texture2D>
+    LayerRenderIndices:
+      System.Collections.Generic.IReadOnlyDictionary<int, int[]>
     FallbackTexture: Texture2D
   }
 
@@ -113,6 +115,8 @@ module RenderOrchestratorV2 =
     (poses: HashMap<Guid<EntityId>, HashMap<string, Matrix>>)
     (projectiles:
       HashMap<Guid<EntityId>, Pomo.Core.Domain.Projectile.LiveProjectile>)
+    (layerRenderIndices:
+      System.Collections.Generic.IReadOnlyDictionary<int, int[]>)
     =
     let ppu = Vector2(float32 map.TileWidth, float32 map.TileHeight)
     let renderCore = RenderCore.create ppu
@@ -138,6 +142,7 @@ module RenderOrchestratorV2 =
 
     let terrainData = {
       GetTileTexture = getTileTexture res.TileTextureCache
+      LayerRenderIndices = layerRenderIndices
     }
 
     struct (renderCore, entityData, particleData, terrainData)
@@ -271,6 +276,7 @@ module RenderOrchestratorV2 =
           snapshot
           (world.Poses |> AMap.force)
           (world.LiveProjectiles |> AMap.force)
+          res.LayerRenderIndices
 
       let resolvedEntities =
         PoseResolver.resolveAll
@@ -371,8 +377,9 @@ module RenderOrchestratorV2 =
             textureCache
             modelCache
 
-          // Use TerrainEmitter to load tile textures
+          // Use TerrainEmitter to load tile textures and pre-compute render indices
           let tileCache = TerrainEmitter.loadTileTextures game.Content map
+          let layerIndices = TerrainEmitter.computeLayerRenderIndices map
 
           res <-
             ValueSome {
@@ -385,6 +392,7 @@ module RenderOrchestratorV2 =
               ModelCache = modelCache
               TextureCache = textureCache
               TileTextureCache = tileCache
+              LayerRenderIndices = layerIndices
               FallbackTexture = fallback
             }
 
