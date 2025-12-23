@@ -35,21 +35,13 @@ module HoverFeedback =
       |> HashMap.tryFindV hoveredEntityId
       |> ValueOption.defaultValue HashSet.empty
 
-    // If they share any faction, they are allies. Otherwise enemies.
-    let isAlly =
-      if HashSet.isEmpty playerFactions || HashSet.isEmpty hoveredFactions then
-        false
-      else
-        let common = HashSet.intersect playerFactions hoveredFactions
-        not(HashSet.isEmpty common)
+    let relation = GameLogic.Faction.getRelation playerFactions hoveredFactions
 
-    let isEnemy = not isAlly
-
-    match targetingMode, isEnemy with
-    | ValueSome TargetEntity, true -> Attack
-    | ValueSome TargetEntity, false -> Hand
-    | ValueNone, true -> Attack
-    | ValueNone, false -> Hand
+    match targetingMode, relation with
+    | ValueSome TargetEntity, GameLogic.Faction.Enemy -> Attack
+    | ValueSome TargetEntity, _ -> Hand
+    | ValueNone, GameLogic.Faction.Enemy -> Attack
+    | ValueNone, _ -> Hand
     | _, _ -> Arrow
 
   let inline determineCursor

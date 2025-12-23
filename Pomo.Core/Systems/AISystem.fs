@@ -199,23 +199,12 @@ module Perception =
     (controllerFactions: Faction HashSet)
     (targetFactions: Faction HashSet)
     =
-    // Rule 1: Same faction NEVER attacks same faction
-    let hasOverlap = controllerFactions |> Seq.exists targetFactions.Contains
+    let relation =
+      GameLogic.Faction.getRelation controllerFactions targetFactions
 
-    if hasOverlap then
-      false
-    else
-      // Rule 2: Ally and Player don't attack each other
-      let isAllyOrPlayer =
-        controllerFactions.Contains Ally || controllerFactions.Contains Player
-
-      let targetIsAllyOrPlayer =
-        targetFactions.Contains Ally || targetFactions.Contains Player
-
-      if isAllyOrPlayer && targetIsAllyOrPlayer then
-        false
-      else
-        true // All other combinations are hostile
+    match relation with
+    | GameLogic.Faction.Enemy -> true
+    | _ -> false
 
   let isInFieldOfView
     (facingDir: Vector2)

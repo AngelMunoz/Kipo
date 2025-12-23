@@ -47,6 +47,7 @@
     <Compile Include="Rendering/LightEmitter.fs" />
     <Compile Include="Rendering/EntityPicker.fs" />
     <Compile Include="Environment.fs" />
+    <Compile Include="Systems/GameLogic.fs" />
     <Compile Include="Systems/World.fs" />
     <Compile Include="Systems/FormulaEvaluator.fs" />
     <Compile Include="Systems/DamageCalculator.fs" />
