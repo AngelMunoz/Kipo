@@ -2,7 +2,7 @@
 
 A production-grade RPG engine prototype, built as a playground for exploring functional game development patterns in F# and MonoGame.
 
-![Demo](2025-12-23%2009-10-54.mp4)
+![Demo](https://raw.githubusercontent.com/AngelMunoz/Kipo/refs/heads/main/2025-12-23%2009-10-54.mp4)
 
 ## What is This?
 
