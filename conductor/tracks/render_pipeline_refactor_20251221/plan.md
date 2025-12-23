@@ -105,22 +105,22 @@ _Goal: Emitters return arrays, enabling Array.Parallel.\* usage._
 
 ---
 
-## Phase 5: RenderOrchestrator [PENDING]
+## Phase 5: RenderOrchestrator [COMPLETE]
 
 _Goal: Single entry point that calls emitters and flushes to GPU._
 
-- [ ] **Create `Pomo.Core/Systems/RenderOrchestrator.fs`**
+- [x] **Create `Pomo.Core/Systems/RenderOrchestratorV2.fs`**
 
-  - [ ] Inherit `DrawableGameComponent`
-  - [ ] Create contexts per frame (RenderCore, EntityRenderData, etc.)
-  - [ ] Call `PoseResolver.resolveAll` (sequential)
-  - [ ] Call emitters in parallel, collect command arrays
-  - [ ] Concatenate and sort commands by depth
-  - [ ] Flush to batch renderers
+  - [x] Object expression factory returning `DrawableGameComponent`
+  - [x] Create contexts per frame (RenderCore, EntityRenderData, etc.)
+  - [x] Call `PoseResolver.resolveAll` (sequential)
+  - [x] Call emitters, collect command arrays
+  - [x] Flush to batch renderers with BlendMode grouping
+  - [x] Viewport save/restore
 
-- [ ] **Refactor Batch Renderers**
-  - [ ] Update to consume `Command[]` instead of queues
-  - [ ] Or: populate queues from arrays then flush
+- [x] **Placeholder Emitters**
+  - [x] `UIEmitter.fs` - Targeting indicator (deferred)
+  - [x] `LightEmitter.fs` - Dynamic lighting (deferred)
 
 ---
 
@@ -163,6 +163,6 @@ _Goal: Confirm correctness and performance._
 | 2     | COMPLETE | Command structs         |
 | 3     | COMPLETE | Split context design    |
 | 4     | COMPLETE | Parallelizable emitters |
-| 5     | PENDING  | RenderOrchestrator      |
+| 5     | COMPLETE | RenderOrchestrator      |
 | 6     | PENDING  | Cleanup legacy          |
 | 7     | PENDING  | Verification            |
