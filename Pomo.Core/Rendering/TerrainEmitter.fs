@@ -58,7 +58,44 @@ module TerrainEmitter =
       let tileH = float32 map.TileHeight
       let struct (viewLeft, viewRight, viewTop, viewBottom) = viewBounds
 
-      let indices = Array.init (layer.Width * layer.Height) id
+      // Generate indices in legacy render order to ensure correct overlapping
+      // Legacy renderer split Staggered X rows into two passes (Evens then Odds, or vice-versa)
+      let indices =
+        let w = layer.Width
+        let h = layer.Height
+
+        let isStaggeredX =
+          match map.Orientation, map.StaggerAxis with
+          | Staggered, ValueSome X -> true
+          | _ -> false
+
+        if isStaggeredX then
+          [|
+            for y in 0 .. h - 1 do
+              // Pass 1
+              for x in 0 .. w - 1 do
+                let includePass1 =
+                  match map.StaggerIndex with
+                  | ValueSome Odd -> x % 2 = 0
+                  | ValueSome Even -> x % 2 = 1
+                  | _ -> true
+
+                if includePass1 then
+                  yield x + y * w
+
+              // Pass 2
+              for x in 0 .. w - 1 do
+                let includePass2 =
+                  match map.StaggerIndex with
+                  | ValueSome Odd -> x % 2 = 1
+                  | ValueSome Even -> x % 2 = 0
+                  | _ -> false
+
+                if includePass2 then
+                  yield x + y * w
+          |]
+        else
+          Array.init (w * h) id
 
       indices
       |> Array.Parallel.choose(fun i ->

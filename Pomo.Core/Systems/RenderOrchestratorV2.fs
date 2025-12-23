@@ -26,6 +26,7 @@ module RenderOrchestratorV2 =
     Content: ContentManager
     BillboardBatch: BillboardBatch
     QuadBatch: QuadBatch
+    SpriteBatch: SpriteBatch
     NodeTransformsPool: Dictionary<string, Matrix>
     ModelCache: IReadOnlyDictionary<string, Model>
     TextureCache: IReadOnlyDictionary<string, Texture2D>
@@ -194,15 +195,38 @@ module RenderOrchestratorV2 =
         batch.End()
 
   let private renderTerrainBackground
-    (batch: QuadBatch)
-    (view: Matrix)
-    (projection: Matrix)
+    (batch: SpriteBatch)
+    (camera: Camera.Camera)
+    (map: Map.MapDefinition)
     (commands: TerrainCommand[])
     =
-    batch.Begin(view, projection)
+    // 2D SpriteBatch rendering for background - no depth buffer, no fighting
+    let transform =
+      RenderMath.Get2DViewMatrix camera.Position camera.Zoom camera.Viewport
+
+    batch.Begin(
+      SpriteSortMode.Deferred,
+      BlendState.AlphaBlend,
+      SamplerState.PointClamp,
+      DepthStencilState.None,
+      RasterizerState.CullNone,
+      transformMatrix = transform
+    )
 
     for cmd in commands do
-      batch.Draw(cmd.Texture, cmd.Position, cmd.Size)
+      // Convert 3D position back to pixel position for SpriteBatch
+      let drawX = cmd.Position.X * float32 map.TileWidth
+      let drawY = cmd.Position.Z * float32 map.TileHeight
+
+      let destRect =
+        Rectangle(
+          int drawX,
+          int drawY,
+          int(cmd.Size.X * float32 map.TileWidth),
+          int(cmd.Size.Y * float32 map.TileHeight)
+        )
+
+      batch.Draw(cmd.Texture, destRect, Color.White)
 
     batch.End()
 
@@ -288,7 +312,7 @@ module RenderOrchestratorV2 =
         // Render passes in correct order
         // 1. Background terrain (no depth to avoid tile fighting)
         res.GraphicsDevice.DepthStencilState <- DepthStencilState.None
-        renderTerrainBackground res.QuadBatch view projection terrainBG
+        renderTerrainBackground res.SpriteBatch camera map terrainBG
 
         // Clear depth buffer after background terrain
         // This ensures entities always render on top of background
@@ -357,6 +381,7 @@ module RenderOrchestratorV2 =
               Content = game.Content
               BillboardBatch = new BillboardBatch(game.GraphicsDevice)
               QuadBatch = new QuadBatch(game.GraphicsDevice)
+              SpriteBatch = new SpriteBatch(game.GraphicsDevice)
               NodeTransformsPool = Dictionary()
               ModelCache = modelCache
               TextureCache = textureCache

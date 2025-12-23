@@ -59,6 +59,21 @@ module RenderMath =
     let viewHeight = float32 viewport.Height / (zoom * pixelsPerUnit.Y)
     Matrix.CreateOrthographic(viewWidth, viewHeight, 0.1f, 5000.0f)
 
+  /// Calculates the 2D transform matrix for SpriteBatch rendering.
+  /// Used for background terrain and UI.
+  let Get2DViewMatrix
+    (cameraPos: Vector2)
+    (zoom: float32)
+    (viewport: Viewport)
+    : Matrix =
+    Matrix.CreateTranslation(-cameraPos.X, -cameraPos.Y, 0.0f)
+    * Matrix.CreateScale(zoom, zoom, 1.0f)
+    * Matrix.CreateTranslation(
+      float32 viewport.Width / 2.0f,
+      float32 viewport.Height / 2.0f,
+      0.0f
+    )
+
   // Pre-calculated matrices for 3D entity rendering (public for reuse)
 
   /// Look-at matrix for isometric view direction
