@@ -114,7 +114,6 @@ module CameraSystem =
           =
           match this.GetCamera playerId with
           | ValueSome camera ->
-            // Check if screenPos is within the viewport
             let viewport = camera.Viewport
 
             if
@@ -131,6 +130,30 @@ module CameraSystem =
                   camera.Position
 
               ValueSome worldPos
+            else
+              ValueNone
+          | ValueNone -> ValueNone
+
+        member this.CreatePickRay
+          (screenPos: Vector2, playerId: Guid<EntityId>)
+          =
+          match this.GetCamera playerId with
+          | ValueSome camera ->
+            let viewport = camera.Viewport
+
+            if
+              screenPos.X >= float32 viewport.X
+              && screenPos.X <= float32(viewport.X + viewport.Width)
+              && screenPos.Y >= float32 viewport.Y
+              && screenPos.Y <= float32(viewport.Y + viewport.Height)
+            then
+              ValueSome(
+                Picking.createPickRay
+                  screenPos
+                  viewport
+                  camera.View
+                  camera.Projection
+              )
             else
               ValueNone
           | ValueNone -> ValueNone

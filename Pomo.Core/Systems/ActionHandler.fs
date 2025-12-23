@@ -21,48 +21,59 @@ module ActionHandler =
   open Pomo.Core.Domain.Camera
   open Pomo.Core.Environment
 
+  open Pomo.Core.Rendering
+  open Pomo.Core.Domain.Entity
+
+  let inline private getPixelsPerUnit(scenario: Scenario voption) =
+    match scenario with
+    | ValueSome s -> Vector2(float32 s.Map.TileWidth, float32 s.Map.TileHeight)
+    | ValueNone -> Vector2(64.0f, 32.0f)
+
   let private findHoveredEntity
     (world: World)
     (positions: HashMap<Guid<EntityId>, Vector2>)
+    (rotations: HashMap<Guid<EntityId>, float32>)
     (cameraService: CameraService)
     (playerId: Guid<EntityId>)
     =
-    let mousePositionOpt =
+    let mouseStateOpt =
       world.RawInputStates
       |> AMap.tryFind playerId
       |> AVal.force
-      |> Option.bind(fun state ->
-        let ms = state.Mouse
-        let rawPos = Vector2(float32 ms.Position.X, float32 ms.Position.Y)
+      |> Option.map _.Mouse
 
-        cameraService.ScreenToWorld(rawPos, playerId) |> ValueOption.toOption)
+    match mouseStateOpt with
+    | Some ms ->
+      let rawPos = Vector2(float32 ms.Position.X, float32 ms.Position.Y)
 
-    positions
-    |> HashMap.fold
-      (fun (acc: _ option) entityId entityPos ->
-        if acc.IsSome then
-          acc
-        else
-          mousePositionOpt
-          |> Option.bind(fun mousePos ->
-            if entityId = playerId then
-              None
-            else
-              let clickAreaSize = Constants.UI.TargetingIndicatorSize
+      match cameraService.CreatePickRay(rawPos, playerId) with
+      | ValueSome ray ->
+        let entityScenarios = world.EntityScenario |> AMap.force
+        let scenarios = world.Scenarios |> AMap.force
 
-              let entityBounds =
-                Microsoft.Xna.Framework.Rectangle(
-                  int(entityPos.X - clickAreaSize.X / 2.0f),
-                  int(entityPos.Y - clickAreaSize.Y / 2.0f),
-                  int clickAreaSize.X,
-                  int clickAreaSize.Y
-                )
+        let pixelsPerUnit =
+          match entityScenarios |> HashMap.tryFindV playerId with
+          | ValueSome scenarioId ->
+            getPixelsPerUnit(scenarios |> HashMap.tryFindV scenarioId)
+          | ValueNone -> Vector2(64.0f, 32.0f)
 
-              if entityBounds.Contains mousePos then
-                Some entityId
-              else
-                None))
-      None
+        let squishFactor = pixelsPerUnit.X / pixelsPerUnit.Y
+        let modelScale = Constants.Entity.ModelScale
+
+        EntityPicker.pickEntity
+          ray
+          pixelsPerUnit
+          modelScale
+          squishFactor
+          positions
+          rotations
+          playerId
+        |> ValueOption.map Some
+        |> ValueOption.defaultValue None
+
+      | ValueNone -> None
+    | None -> None
+
 
   let private handleActionSetChange
     (actionSetChangeState: ValueOption<struct (InputActionState * int)>)
@@ -178,14 +189,23 @@ module ActionHandler =
                 // Get the entity under the cursor AT THIS MOMENT by forcing the projection.
                 let entityScenarios = projections.EntityScenarios |> AMap.force
 
-                let positions =
+                let positions, rotations =
                   match entityScenarios |> HashMap.tryFindV entityId with
                   | ValueSome scenarioId ->
-                    projections.ComputeMovementSnapshot(scenarioId).Positions
-                  | ValueNone -> HashMap.empty
+                    let snapshot =
+                      projections.ComputeMovementSnapshot(scenarioId)
+
+                    snapshot.Positions, snapshot.Rotations
+                  | ValueNone -> HashMap.empty, HashMap.empty
 
                 let clickedEntity =
-                  findHoveredEntity world positions cameraService entityId
+                  findHoveredEntity
+                    world
+                    positions
+                    rotations
+                    cameraService
+                    entityId
+
 
                 match targetingMode with
                 | ValueNone ->
