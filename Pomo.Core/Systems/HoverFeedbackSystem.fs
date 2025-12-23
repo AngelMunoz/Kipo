@@ -17,20 +17,7 @@ open Pomo.Core.Rendering
 
 module HoverFeedback =
   open Pomo.Core.Environment
-
-  let inline private isWithinViewport
-    (screenPos: Vector2)
-    (viewport: Microsoft.Xna.Framework.Graphics.Viewport)
-    =
-    screenPos.X >= float32 viewport.X
-    && screenPos.X <= float32(viewport.X + viewport.Width)
-    && screenPos.Y >= float32 viewport.Y
-    && screenPos.Y <= float32(viewport.Y + viewport.Height)
-
-  let inline private getPixelsPerUnit(scenario: Scenario voption) =
-    match scenario with
-    | ValueSome s -> Vector2(float32 s.Map.TileWidth, float32 s.Map.TileHeight)
-    | ValueNone -> Vector2(64.0f, 32.0f)
+  open Pomo.Core.Graphics
 
   let inline private determineCursorForEntity
     (hoveredEntityId: Guid<EntityId>)
@@ -102,7 +89,7 @@ module HoverFeedback =
           match cameraService.GetCamera playerId with
           | ValueNone -> cursorService.SetCursor Arrow
           | ValueSome camera ->
-            if not(isWithinViewport screenPos camera.Viewport) then
+            if not(camera.Viewport.Bounds.Contains screenPos) then
               cursorService.SetCursor Arrow
             else
               let entityScenarios = projections.EntityScenarios |> AMap.force
@@ -115,7 +102,10 @@ module HoverFeedback =
                 let snapshot = projections.ComputeMovementSnapshot scenarioId
 
                 let pixelsPerUnit =
-                  getPixelsPerUnit(scenarios |> HashMap.tryFindV scenarioId)
+                  match scenarios |> HashMap.tryFindV scenarioId with
+                  | ValueSome s ->
+                    Vector2(float32 s.Map.TileWidth, float32 s.Map.TileHeight)
+                  | ValueNone -> Constants.DefaultPixelsPerUnit
 
                 let squishFactor = pixelsPerUnit.X / pixelsPerUnit.Y
                 let modelScale = Constants.Entity.ModelScale

@@ -24,11 +24,6 @@ module ActionHandler =
   open Pomo.Core.Rendering
   open Pomo.Core.Domain.Entity
 
-  let inline private getPixelsPerUnit(scenario: Scenario voption) =
-    match scenario with
-    | ValueSome s -> Vector2(float32 s.Map.TileWidth, float32 s.Map.TileHeight)
-    | ValueNone -> Vector2(64.0f, 32.0f)
-
   let private findHoveredEntity
     (world: World)
     (positions: HashMap<Guid<EntityId>, Vector2>)
@@ -54,8 +49,11 @@ module ActionHandler =
         let pixelsPerUnit =
           match entityScenarios |> HashMap.tryFindV playerId with
           | ValueSome scenarioId ->
-            getPixelsPerUnit(scenarios |> HashMap.tryFindV scenarioId)
-          | ValueNone -> Vector2(64.0f, 32.0f)
+            match scenarios |> HashMap.tryFindV scenarioId with
+            | ValueSome s ->
+              Vector2(float32 s.Map.TileWidth, float32 s.Map.TileHeight)
+            | ValueNone -> Constants.DefaultPixelsPerUnit
+          | ValueNone -> Constants.DefaultPixelsPerUnit
 
         let squishFactor = pixelsPerUnit.X / pixelsPerUnit.Y
         let modelScale = Constants.Entity.ModelScale

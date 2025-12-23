@@ -9,23 +9,6 @@ open Pomo.Core.Graphics
 
 module EntityPicker =
 
-  [<Struct>]
-  type PickResult = {
-    EntityId: Guid<EntityId>
-    Distance: float32
-  }
-
-  let inline private computeEntityWorldMatrix
-    (logicPos: Vector2)
-    (facing: float32)
-    (pixelsPerUnit: Vector2)
-    (modelScale: float32)
-    (squishFactor: float32)
-    =
-    let renderPos = RenderMath.LogicRender.toRender logicPos 0.0f pixelsPerUnit
-
-    RenderMath.WorldMatrix.createMesh renderPos facing modelScale squishFactor
-
   let pickEntity
     (ray: Ray)
     (pixelsPerUnit: Vector2)
