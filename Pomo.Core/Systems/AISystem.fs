@@ -15,7 +15,8 @@ open Pomo.Core.Domain.World
 open Pomo.Core.Projections
 open Pomo.Core.Stores
 open Pomo.Core.EventBus
-
+open Pomo.Core.Environment
+open Pomo.Core.Graphics
 open Pomo.Core.Domain.Spatial
 open Systems
 
@@ -1176,9 +1177,39 @@ module AISystemLogic =
 
       struct (updatedController, result.Command, result.Ability)
 
+module private Culling =
+  /// Check if position is within expanded view bounds of any camera
+  let inline isInActiveZone
+    (cameras: struct (Guid<EntityId> * Camera.Camera)[])
+    (pos: Vector2)
+    : bool =
+    let mutable result = false
+    let mutable i = 0
 
-open Pomo.Core.Environment
-open Pomo.Core.Environment.Patterns
+    while i < cameras.Length && not result do
+      let struct (_, cam) = cameras.[i]
+
+      let struct (left, right, top, bottom) =
+        RenderMath.Camera.getViewBounds
+          cam.Position
+          (float32 cam.Viewport.Width)
+          (float32 cam.Viewport.Height)
+          cam.Zoom
+
+      let halfW = (right - left) / 2.0f * Constants.AI.ActiveZoneMargin
+      let halfH = (bottom - top) / 2.0f * Constants.AI.ActiveZoneMargin
+
+      if
+        pos.X >= cam.Position.X - halfW
+        && pos.X <= cam.Position.X + halfW
+        && pos.Y >= cam.Position.Y - halfH
+        && pos.Y <= cam.Position.Y + halfH
+      then
+        result <- true
+
+      i <- i + 1
+
+    result
 
 type AISystem(game: Game, env: PomoEnvironment) =
   inherit GameSystem(game)
@@ -1264,6 +1295,9 @@ type AISystem(game: Game, env: PomoEnvironment) =
         | ValueNone -> None)
       |> Seq.groupBy fst
 
+    // Snapshot cameras for culling
+    let cameras = gameplay.CameraService.GetAllCameras()
+
     for scenarioId, group in controllersByScenario do
       let mutable worldOpt: AIContext.WorldSnapshot voption = ValueNone
 
@@ -1304,7 +1338,10 @@ type AISystem(game: Game, env: PomoEnvironment) =
             getFactions() |> HashMap.tryFindV controller.controlledEntityId
 
           match posOpt, facOpt with
-          | ValueSome pos, ValueSome facs ->
+          // Skip if entity is outside active zone of all cameras
+          | ValueSome pos, ValueSome facs when
+            Culling.isInActiveZone cameras pos
+            ->
             let vel =
               getVelocities()
               |> HashMap.tryFindV controller.controlledEntityId

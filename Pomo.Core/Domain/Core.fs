@@ -106,6 +106,10 @@ module Core =
       [<Literal>]
       let WaypointReachedThreshold = 8.0f
 
+      /// Margin multiplier for AI active zone (1.3 = 30% beyond screen edges)
+      [<Literal>]
+      let ActiveZoneMargin = 1.3f
+
     module Debug =
       [<Literal>]
       let StatYOffset = -20.0f
