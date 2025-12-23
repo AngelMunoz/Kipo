@@ -165,6 +165,145 @@ module Properties =
     let actual = RenderMath.WorldMatrix.getSquishFactor ppu
     abs(actual - expected) < 0.0001f
 
+  [<Property>]
+  let ``ParticleSpace at ground equals LogicRender at zero altitude``
+    (x: int)
+    (z: int)
+    =
+    let ppu = Vector2(32.0f, 16.0f)
+    let particle = Vector3(float32 x, 0.0f, float32 z)
+    let logic = Vector2(float32 x, float32 z)
+    let fromParticle = RenderMath.ParticleSpace.toRender particle ppu
+    let fromLogic = RenderMath.LogicRender.toRender logic 0.0f ppu
+
+    abs(fromParticle.X - fromLogic.X) < 0.0001f
+    && abs(fromParticle.Y - fromLogic.Y) < 0.0001f
+    && abs(fromParticle.Z - fromLogic.Z) < 0.0001f
+
+  [<Property>]
+  let ``tileToRender X and Z match toRender X and Z`` (lx: int) (ly: int) =
+    let ppu = Vector2(32.0f, 16.0f)
+    let logicPos = Vector2(float32 lx, float32 ly)
+    let depthY = 5.0f
+    let tileResult = RenderMath.LogicRender.tileToRender logicPos depthY ppu
+    let renderResult = RenderMath.LogicRender.toRender logicPos 0.0f ppu
+    // X and Z should match (only Y differs)
+    abs(tileResult.X - renderResult.X) < 0.0001f
+    && abs(tileResult.Z - renderResult.Z) < 0.0001f
+    && abs(tileResult.Y - depthY) < 0.0001f
+
+  [<Property>]
+  let ``createMesh translation equals render position``
+    (x: int)
+    (y: int)
+    (z: int)
+    =
+    let renderPos = Vector3(float32 x, float32 y, float32 z)
+    let world = RenderMath.WorldMatrix.createMesh renderPos 0.0f 1.0f 2.0f
+    let translation = world.Translation
+
+    abs(translation.X - renderPos.X) < 0.0001f
+    && abs(translation.Y - renderPos.Y) < 0.0001f
+    && abs(translation.Z - renderPos.Z) < 0.0001f
+
+  [<Property>]
+  let ``createProjectile translation equals render position``
+    (x: int)
+    (y: int)
+    (z: int)
+    =
+    let renderPos = Vector3(float32 x, float32 y, float32 z)
+
+    let world =
+      RenderMath.WorldMatrix.createProjectile renderPos 0.0f 0.0f 1.0f 2.0f
+
+    let translation = world.Translation
+
+    abs(translation.X - renderPos.X) < 0.0001f
+    && abs(translation.Y - renderPos.Y) < 0.0001f
+    && abs(translation.Z - renderPos.Z) < 0.0001f
+
+  [<Property>]
+  let ``createMeshParticle translation includes pivot and position``
+    (x: int)
+    (y: int)
+    (z: int)
+    =
+    let renderPos = Vector3(float32 x, float32 y, float32 z)
+    let pivot = Vector3(1.0f, 2.0f, 3.0f)
+
+    let world =
+      RenderMath.WorldMatrix.createMeshParticle
+        renderPos
+        Quaternion.Identity
+        1.0f
+        Vector3.One
+        pivot
+        2.0f
+
+    let translation = world.Translation
+    // Translation should be renderPos + pivot (before other transforms)
+    abs(translation.X - (renderPos.X + pivot.X)) < 0.1f
+    && abs(translation.Y - (renderPos.Y + pivot.Y)) < 0.1f
+    && abs(translation.Z - (renderPos.Z + pivot.Z)) < 0.1f
+
+  [<Property>]
+  let ``applyNodeTransform with identity animation returns offset translation``
+    (ox: int)
+    (oy: int)
+    (oz: int)
+    =
+    let pivot = Vector3.Zero
+    let offset = Vector3(float32 ox, float32 oy, float32 oz)
+    let animation = Matrix.Identity
+    let result = RenderMath.Rig.applyNodeTransform pivot offset animation
+
+    abs(result.Translation.X - offset.X) < 0.0001f
+    && abs(result.Translation.Y - offset.Y) < 0.0001f
+    && abs(result.Translation.Z - offset.Z) < 0.0001f
+
+  [<Property>]
+  let ``getBillboardVectors returns orthogonal vectors``() =
+    let ppu = Vector2(32.0f, 16.0f)
+    let view = RenderMath.Camera.getViewMatrix Vector2.Zero ppu
+    let struct (right, up) = RenderMath.Billboard.getVectors view
+    // Right and Up should be orthogonal (dot product = 0)
+    let dot = Vector3.Dot(right, up)
+    abs(dot) < 0.0001f
+
+  [<Property>]
+  let ``getViewMatrix produces invertible matrix`` (x: int) (y: int) =
+    let ppu = Vector2(32.0f, 16.0f)
+    let pos = Vector2(float32 x, float32 y)
+    let view = RenderMath.Camera.getViewMatrix pos ppu
+    let det = view.Determinant()
+    // Invertible matrix has non-zero determinant
+    abs(det) > 0.0001f
+
+  [<Property>]
+  let ``getProjectionMatrix produces well-formed matrix``(zoom: int) =
+    let zoom = float32(abs zoom % 10 + 1)
+    let viewport = Microsoft.Xna.Framework.Graphics.Viewport(0, 0, 800, 600)
+    let ppu = Vector2(32.0f, 16.0f)
+    let proj = RenderMath.Camera.getProjectionMatrix viewport zoom ppu
+    // Orthographic matrices are not invertible, but should be well-formed
+    not(System.Single.IsNaN proj.M11) && not(System.Single.IsInfinity proj.M11)
+
+  [<Property>]
+  let ``get2DViewMatrix centers camera position on screen center``
+    (cx: int)
+    (cy: int)
+    =
+    let zoom = 1.0f
+    let viewport = Microsoft.Xna.Framework.Graphics.Viewport(0, 0, 800, 600)
+    let cameraPos = Vector2(float32 cx, float32 cy)
+    let matrix = RenderMath.Camera.get2DViewMatrix cameraPos zoom viewport
+    // Camera position should transform to screen center (400, 300)
+    let transformed = Vector2.Transform(cameraPos, matrix)
+
+    abs(transformed.X - 400.0f) < 0.0001f
+    && abs(transformed.Y - 300.0f) < 0.0001f
+
 
 module GetViewBounds =
 
