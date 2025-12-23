@@ -1483,6 +1483,20 @@
 /processorParam:TextureFormat=Compressed
 /build:Fonts/Hud.spritefont
 
+#begin Fonts/monogram-extended-italic.spritefont
+/importer:FontDescriptionImporter
+/processor:FontDescriptionProcessor
+/processorParam:PremultiplyAlpha=True
+/processorParam:TextureFormat=Compressed
+/build:Fonts/monogram-extended-italic.spritefont
+
+#begin Fonts/monogram-extended.spritefont
+/importer:FontDescriptionImporter
+/processor:FontDescriptionProcessor
+/processorParam:PremultiplyAlpha=True
+/processorParam:TextureFormat=Compressed
+/build:Fonts/monogram-extended.spritefont
+
 #begin Particles/jellyfish0-masks/1.png
 /importer:TextureImporter
 /processor:TextureProcessor
