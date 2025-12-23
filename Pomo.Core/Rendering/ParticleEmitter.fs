@@ -2,15 +2,48 @@ namespace Pomo.Core.Rendering
 
 open System
 open System.Buffers
+open System.Collections.Generic
 open Microsoft.Xna.Framework
+open Microsoft.Xna.Framework.Content
 open Microsoft.Xna.Framework.Graphics
 open FSharp.UMX
 open FSharp.Data.Adaptive
 open Pomo.Core.Domain.Units
 open Pomo.Core.Domain.Particles
 open Pomo.Core.Graphics
+open Pomo.Core.Stores
 
 module ParticleEmitter =
+
+  /// Pre-loads all particle textures and mesh models from ParticleStore
+  let loadAssets
+    (content: ContentManager)
+    (particleStore: ParticleStore)
+    : struct (IReadOnlyDictionary<string, Texture2D> *
+      IReadOnlyDictionary<string, Model>)
+    =
+    let textureCache = Dictionary<string, Texture2D>()
+    let modelCache = Dictionary<string, Model>()
+
+    for _, emitters in particleStore.all() do
+      for emitter in emitters do
+        match emitter.RenderMode with
+        | Billboard texturePath ->
+          if not(textureCache.ContainsKey texturePath) then
+            try
+              let texture = content.Load<Texture2D>(texturePath)
+              textureCache[texturePath] <- texture
+            with _ ->
+              ()
+        | Mesh modelPath ->
+          if not(modelCache.ContainsKey modelPath) then
+            try
+              let model = content.Load<Model>(modelPath)
+              modelCache[modelPath] <- model
+            with _ ->
+              ()
+
+    struct (textureCache, modelCache)
 
   let inline private computeEffectPosition
     (owner: Guid<EntityId> voption)

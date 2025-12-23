@@ -44,6 +44,14 @@ type TerrainRenderData = {
   LayerRenderIndices: IReadOnlyDictionary<int, int[]>
 }
 
+/// Render command for text (after culling and transform)
+[<Struct>]
+type TextCommand = {
+  Text: string
+  ScreenPosition: Vector2
+  Alpha: float32
+}
+
 module RenderCore =
   open Pomo.Core.Graphics
 

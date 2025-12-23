@@ -231,9 +231,7 @@ module CompositionRoot =
       baseComponents.Add(new MovementSystem(game, pomoEnv))
       baseComponents.Add(new CollisionSystem(game, pomoEnv))
 
-      baseComponents.Add(
-        new NotificationSystem(game, pomoEnv, DrawOrder = Render.Layer.UI)
-      )
+      baseComponents.Add(new NotificationSystem(game, pomoEnv))
 
       baseComponents.Add(new EffectProcessingSystem(game, pomoEnv))
       baseComponents.Add(new EntitySpawnerSystem(game, pomoEnv))

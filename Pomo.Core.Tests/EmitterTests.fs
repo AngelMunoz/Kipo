@@ -172,6 +172,7 @@ module TerrainEmitterTests =
 
     let data: TerrainRenderData = {
       GetTileTexture = fun _ -> ValueSome(fakeTexture())
+      LayerRenderIndices = readOnlyDict []
     }
 
     let map: MapDefinition = {

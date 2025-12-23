@@ -30,62 +30,15 @@ module RenderOrchestratorV2 =
     ModelCache: IReadOnlyDictionary<string, Model>
     TextureCache: IReadOnlyDictionary<string, Texture2D>
     TileTextureCache: Dictionary<int, Texture2D>
-    LayerRenderIndices:
-      System.Collections.Generic.IReadOnlyDictionary<int, int[]>
+    LayerRenderIndices: IReadOnlyDictionary<int, int[]>
     FallbackTexture: Texture2D
+    HudFont: SpriteFont
   }
 
   let private setBlendState (device: GraphicsDevice) (blend: BlendMode) =
     match blend with
     | BlendMode.AlphaBlend -> device.BlendState <- BlendState.AlphaBlend
     | BlendMode.Additive -> device.BlendState <- BlendState.Additive
-
-  /// Pre-loads all entity models from ModelStore at initialization
-  let private preloadEntityModels
-    (content: ContentManager)
-    (modelStore: Pomo.Core.Stores.ModelStore)
-    (cache: Dictionary<string, Model>)
-    =
-    for config in modelStore.all() do
-      for _, node in config.Rig do
-        if not(cache.ContainsKey node.ModelAsset) then
-
-          let loaded =
-            try
-              ValueSome(content.Load<Model>(node.ModelAsset))
-            with _ ->
-              ValueNone
-
-          loaded |> ValueOption.iter(fun m -> cache[node.ModelAsset] <- m)
-
-  /// Pre-loads all particle textures and mesh models from ParticleStore
-  let private preloadParticleAssets
-    (content: ContentManager)
-    (particleStore: Pomo.Core.Stores.ParticleStore)
-    (textureCache: Dictionary<string, Texture2D>)
-    (modelCache: Dictionary<string, Model>)
-    =
-    for _, emitters in particleStore.all() do
-      for emitter in emitters do
-        match emitter.RenderMode with
-        | Particles.Billboard texturePath ->
-          if not(textureCache.ContainsKey texturePath) then
-            let loaded =
-              try
-                ValueSome(content.Load<Texture2D>(texturePath))
-              with _ ->
-                ValueNone
-
-            loaded |> ValueOption.iter(fun t -> textureCache[texturePath] <- t)
-        | Particles.Mesh modelPath ->
-          if not(modelCache.ContainsKey modelPath) then
-            let loaded =
-              try
-                ValueSome(content.Load<Model>(modelPath))
-              with _ ->
-                ValueNone
-
-            loaded |> ValueOption.iter(fun m -> modelCache[modelPath] <- m)
 
   /// Pure lookup - no loading (all assets pre-loaded at init)
   let private getModel
@@ -247,6 +200,33 @@ module RenderOrchestratorV2 =
 
     batch.End()
 
+  let private renderText
+    (batch: SpriteBatch)
+    (font: SpriteFont)
+    (camera: Camera.Camera)
+    (commands: TextCommand[])
+    =
+    if commands.Length > 0 then
+      let transform =
+        RenderMath.Get2DViewMatrix camera.Position camera.Zoom camera.Viewport
+
+      batch.Begin(
+        SpriteSortMode.Deferred,
+        BlendState.AlphaBlend,
+        SamplerState.PointClamp,
+        DepthStencilState.None,
+        RasterizerState.CullNone,
+        transformMatrix = transform
+      )
+
+      for cmd in commands do
+        let color = Color.White * cmd.Alpha
+        let textSize = font.MeasureString(cmd.Text)
+        let textPosition = cmd.ScreenPosition - textSize / 2.0f
+        batch.DrawString(font, cmd.Text, textPosition, color)
+
+      batch.End()
+
   let private renderFrame
     (res: RenderResources)
     (env: PomoEnvironment)
@@ -278,15 +258,12 @@ module RenderOrchestratorV2 =
           (world.LiveProjectiles |> AMap.force)
           res.LayerRenderIndices
 
-      let resolvedEntities =
-        PoseResolver.resolveAll
+      let meshCommandsEntities =
+        EntityEmitter.emitAll
           renderCore
           entityData
           snapshot
           res.NodeTransformsPool
-
-      let meshCommandsEntities =
-        EntityEmitter.emit entityData.GetModelByAsset resolvedEntities
 
       let billboardCommandsParticles =
         ParticleEmitter.emitBillboards renderCore particleData visualEffects
@@ -340,6 +317,11 @@ module RenderOrchestratorV2 =
         res.GraphicsDevice.DepthStencilState <- DepthStencilState.Default
         renderTerrainForeground res.QuadBatch view projection terrainFG
 
+        // 5. World text (notifications, damage numbers - rendered in 2D)
+        let textCommands = TextEmitter.emit world.Notifications viewBounds
+
+        renderText res.SpriteBatch res.HudFont camera textCommands
+
     | None ->
       // Player died or removed - render nothing (black screen)
       // UI (higher DrawOrder) will still render on top showing main menu button
@@ -364,18 +346,23 @@ module RenderOrchestratorV2 =
           fallback.SetData [| Color.White |]
           let map = stores.MapStore.find mapKey
 
-          // Create mutable caches for pre-loading
+          // Load assets via domain emitters (each owns their loading logic)
+          let entityModelCache =
+            EntityEmitter.loadModels game.Content stores.ModelStore
+
+          let struct (particleTextureCache, particleModelCache) =
+            ParticleEmitter.loadAssets game.Content stores.ParticleStore
+
+          // Merge entity and particle model caches
           let modelCache = Dictionary<string, Model>()
-          let textureCache = Dictionary<string, Texture2D>()
 
-          // Pre-load all assets at initialization (sequential, thread-safe)
-          preloadEntityModels game.Content stores.ModelStore modelCache
+          for kvp in entityModelCache do
+            modelCache[kvp.Key] <- kvp.Value
 
-          preloadParticleAssets
-            game.Content
-            stores.ParticleStore
-            textureCache
-            modelCache
+          for kvp in particleModelCache do
+            modelCache[kvp.Key] <- kvp.Value
+
+          let textureCache = particleTextureCache
 
           // Use TerrainEmitter to load tile textures and pre-compute render indices
           let tileCache = TerrainEmitter.loadTileTextures game.Content map
@@ -394,6 +381,7 @@ module RenderOrchestratorV2 =
               TileTextureCache = tileCache
               LayerRenderIndices = layerIndices
               FallbackTexture = fallback
+              HudFont = TextEmitter.loadFont game.Content
             }
 
         override _.Draw _ =

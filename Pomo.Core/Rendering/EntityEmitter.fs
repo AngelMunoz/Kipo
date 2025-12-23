@@ -1,14 +1,33 @@
 namespace Pomo.Core.Rendering
 
+open System.Collections.Generic
 open Microsoft.Xna.Framework
+open Microsoft.Xna.Framework.Content
 open Microsoft.Xna.Framework.Graphics
 open FSharp.Data.Adaptive
 open Pomo.Core.Graphics
+open Pomo.Core.Projections
+open Pomo.Core.Stores
 
 module EntityEmitter =
 
-  /// Emits MeshCommands from pre-resolved entities.
-  /// Pure function - parallelizable with Array.Parallel.collect
+  let loadModels
+    (content: ContentManager)
+    (modelStore: ModelStore)
+    : IReadOnlyDictionary<string, Model> =
+    let cache = Dictionary<string, Model>()
+
+    for config in modelStore.all() do
+      for _, node in config.Rig do
+        if not(cache.ContainsKey node.ModelAsset) then
+          try
+            let model = content.Load<Model>(node.ModelAsset)
+            cache[node.ModelAsset] <- model
+          with _ ->
+            ()
+
+    cache
+
   let emit
     (getModelByAsset: string -> Model voption)
     (entities: ResolvedEntity[])
@@ -25,3 +44,14 @@ module EntityEmitter =
         |> function
           | ValueSome cmd -> Some cmd
           | ValueNone -> None))
+
+  let emitAll
+    (core: RenderCore)
+    (data: EntityRenderData)
+    (snapshot: MovementSnapshot)
+    (nodeTransformsPool: Dictionary<string, Matrix>)
+    : MeshCommand[] =
+    let resolvedEntities =
+      PoseResolver.resolveAll core data snapshot nodeTransformsPool
+
+    emit data.GetModelByAsset resolvedEntities
