@@ -22,7 +22,7 @@ For the moment this is not intended to be a fully fledged videogame that one can
 - **Advanced AI System:** Data-driven AI using archetypes and decision trees for complex entity behaviors.
 - **Adaptive Game State:** Utilization of `FSharp.Data.Adaptive` for efficient change propagation and derived computations.
 - **Core RPG Mechanics:** Deep implementation of stats, skills, damage calculations, and inventory systems.
-- **Isometric Rendering:** Optimized isometric visual presentation.
+- **High-Performance Rendering:** Parallelized, command-based rendering pipeline separating logic from isometric presentation.
 - **Advanced VFX System:** Support for hybrid particle systems including billboard textures and 3D mesh particles (e.g., domes, columns).
 - **Cross-Platform Architecture:** Shared core logic across Windows, Android, iOS, and DesktopGL.
 

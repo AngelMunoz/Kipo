@@ -491,6 +491,9 @@ module StateWrite =
     | RemoveActiveOrbital of remOrbEntityId: Guid<EntityId>
     | UpdateActiveCharge of chgEntityId: Guid<EntityId> * charge: ActiveCharge
     | RemoveActiveCharge of remChgEntityId: Guid<EntityId>
+    // Notifications
+    | AddNotification of notification: WorldText
+    | SetNotifications of notifications: WorldText[]
 
   let inline applyAdaptiveCommand (world: MutableWorld) (cmd: AdaptiveCommand) =
     match cmd with
@@ -568,6 +571,13 @@ module StateWrite =
       StateUpdate.Charge.updateActiveCharge world (entityId, charge)
     | RemoveActiveCharge entityId ->
       StateUpdate.Charge.removeActiveCharge world entityId
+    // Notifications
+    | AddNotification notification -> world.Notifications.Add notification
+    | SetNotifications notifications ->
+      world.Notifications.Clear()
+
+      for n in notifications do
+        world.Notifications.Add n
 
   type CommandBuffer<'T>
     (initialCapacity: int, [<InlineIfLambda>] apply: MutableWorld -> 'T -> unit)
@@ -762,6 +772,12 @@ module StateWrite =
 
         member _.RemoveActiveCharge(entityId) =
           adaptiveBuffer.Enqueue(AdaptiveCommand.RemoveActiveCharge entityId)
+
+        member _.AddNotification(notification) =
+          adaptiveBuffer.Enqueue(AdaptiveCommand.AddNotification notification)
+
+        member _.SetNotifications(notifications) =
+          adaptiveBuffer.Enqueue(AdaptiveCommand.SetNotifications notifications)
 
         member _.FlushWrites() =
           nonAdaptiveBuffer.Flush mutableWorld

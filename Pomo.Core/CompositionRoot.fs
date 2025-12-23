@@ -30,7 +30,6 @@ open Pomo.Core.Systems.UnitMovement
 open Pomo.Core.Systems.Combat
 open Pomo.Core.Systems.Notification
 open Pomo.Core.Systems.Projectile
-open Pomo.Core.Systems.DebugRender
 open Pomo.Core.Systems.ResourceManager
 open Pomo.Core.Systems.EntitySpawnerLogic
 open Pomo.Core.Systems.StateWrite
@@ -232,9 +231,7 @@ module CompositionRoot =
       baseComponents.Add(new MovementSystem(game, pomoEnv))
       baseComponents.Add(new CollisionSystem(game, pomoEnv))
 
-      baseComponents.Add(
-        new NotificationSystem(game, pomoEnv, DrawOrder = Render.Layer.UI)
-      )
+      baseComponents.Add(new NotificationSystem(game, pomoEnv))
 
       baseComponents.Add(new EffectProcessingSystem(game, pomoEnv))
       baseComponents.Add(new EntitySpawnerSystem(game, pomoEnv))
@@ -336,27 +333,23 @@ module CompositionRoot =
         mutableWorld.Scenarios[scenarioId] <- scenario
 
         // Recreate Renderers with new map key
+
+        // Create Scenario
+        let scenarioId = Guid.NewGuid() |> UMX.tag<ScenarioId>
+        let scenario: World.Scenario = { Id = scenarioId; Map = mapDef }
+        mutableWorld.Scenarios[scenarioId] <- scenario
+
+        // Recreate Renderers with new map key
         let renderOrchestrator =
-          new RenderOrchestratorSystem.RenderOrchestratorSystem(
+          RenderOrchestratorV2.create(
             game,
             pomoEnv,
             newMapKey,
             playerId,
-            DrawOrder = Render.Layer.TerrainBase
+            Render.Layer.TerrainBase
           )
 
         mapDependentComponents.Add(renderOrchestrator)
-
-        let debugRender =
-          new DebugRenderSystem(
-            game,
-            pomoEnv,
-            playerId,
-            newMapKey,
-            DrawOrder = Render.Layer.Debug
-          )
-
-        mapDependentComponents.Add(debugRender)
 
         spawnEntitiesForMap mapDef playerId scenarioId targetSpawn
 

@@ -38,7 +38,7 @@ module Combat =
     SearchContext: Spatial.Search.SearchContext
     SkillStore: Stores.SkillStore
     ParticleStore: Stores.ParticleStore
-    VisualEffects: ResizeArray<Particles.ActiveEffect>
+    VisualEffects: ResizeArray<Particles.VisualEffect>
     ActiveOrbitals: HashMap<Guid<EntityId>, Orbital.ActiveOrbital>
   }
 
@@ -376,7 +376,7 @@ module Combat =
         let struct (billboardEmitters, meshEmitters) =
           Particles.splitEmittersByRenderMode configs
 
-        let effect: Particles.ActiveEffect = {
+        let effect: Particles.VisualEffect = {
           Id = System.Guid.NewGuid().ToString()
           Emitters = billboardEmitters
           MeshEmitters = meshEmitters

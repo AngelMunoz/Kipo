@@ -245,7 +245,7 @@ module Projectile =
   type VisualEffectContext = {
     ParticleStore: Pomo.Core.Stores.ParticleStore
     SkillStore: Pomo.Core.Stores.SkillStore
-    VisualEffects: ResizeArray<Particles.ActiveEffect>
+    VisualEffects: ResizeArray<Particles.VisualEffect>
     Positions: HashMap<Guid<EntityId>, Vector2>
     EffectOwners: System.Collections.Generic.HashSet<Guid<EntityId>>
   }
@@ -272,7 +272,7 @@ module Projectile =
 
   let inline spawnEffect
     (particleStore: Pomo.Core.Stores.ParticleStore)
-    (visualEffects: ResizeArray<Particles.ActiveEffect>)
+    (visualEffects: ResizeArray<Particles.VisualEffect>)
     (vfxId: string)
     (pos: Vector2)
     (rotation: Quaternion)

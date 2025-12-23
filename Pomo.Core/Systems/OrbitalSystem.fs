@@ -19,7 +19,7 @@ module OrbitalSystem =
 
   [<Struct>]
   type OrbitalEffectEntry = {
-    Effect: Particles.ActiveEffect
+    Effect: Particles.VisualEffect
     Index: int
   }
 
@@ -49,7 +49,7 @@ module OrbitalSystem =
             + orbital.Config.CenterOffset
             + localOffset
 
-          let effect: Particles.ActiveEffect = {
+          let effect: Particles.VisualEffect = {
             Id = effectId
             Emitters = billboard
             MeshEmitters = mesh

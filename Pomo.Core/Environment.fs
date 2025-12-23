@@ -100,6 +100,10 @@ module Environment =
     abstract UpdateActiveOrbital: Guid<EntityId> * Orbital.ActiveOrbital -> unit
     abstract RemoveActiveOrbital: Guid<EntityId> -> unit
 
+  type INotificationWriteService =
+    abstract AddNotification: WorldText -> unit
+    abstract SetNotifications: WorldText[] -> unit
+
   type IStateWriteService =
     inherit IDisposable
     inherit IPhysicsWriteService
@@ -112,6 +116,7 @@ module Environment =
     inherit IAnimationWriteService
     inherit IAIWriteService
     inherit IOrbitalWriteService
+    inherit INotificationWriteService
     abstract FlushWrites: unit -> unit
 
   type CoreServices =

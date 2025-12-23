@@ -84,29 +84,13 @@ module CameraSystem =
                 pos, ppu
               | ValueNone -> Vector2.Zero, Vector2(64.0f, 32.0f)
 
-            // 3D Camera Logic (axis-aligned top-down view)
-            let target =
-              Vector3(
-                position.X / pixelsPerUnit.X,
-                0.0f,
-                position.Y / pixelsPerUnit.Y
-              )
-
-            // Look straight down from above
-            let cameraPos = target + Vector3.Up * 100.0f
-            // Up vector is Forward (0, 0, -1) so that Z maps to screen Y (down)
-            let view = Matrix.CreateLookAt(cameraPos, target, Vector3.Forward)
-
-            // Orthographic Projection respecting zoom and unit scale
-            // We want 1 unit in 3D to correspond to pixelsPerUnit * Zoom pixels on screen
-            let viewWidth =
-              float32 viewport.Width / (defaultZoom * pixelsPerUnit.X)
-
-            let viewHeight =
-              float32 viewport.Height / (defaultZoom * pixelsPerUnit.Y)
+            let view = RenderMath.Camera.getViewMatrix position pixelsPerUnit
 
             let projection =
-              Matrix.CreateOrthographic(viewWidth, viewHeight, 0.1f, 5000.0f)
+              RenderMath.Camera.getProjectionMatrix
+                viewport
+                defaultZoom
+                pixelsPerUnit
 
             ValueSome {
               Position = position
@@ -139,25 +123,13 @@ module CameraSystem =
               && screenPos.Y >= float32 viewport.Y
               && screenPos.Y <= float32(viewport.Y + viewport.Height)
             then
-
-              // Transform
-              let transform =
-                RenderMath.GetSpriteBatchTransform
-                  camera.Position
+              let worldPos =
+                RenderMath.ScreenLogic.toLogic
+                  screenPos
+                  viewport
                   camera.Zoom
-                  viewport.Width
-                  viewport.Height
+                  camera.Position
 
-              // Invert transform to go from Screen -> World
-              let inverse = Matrix.Invert(transform)
-
-              let viewportPos =
-                Vector2(
-                  screenPos.X - float32 viewport.X,
-                  screenPos.Y - float32 viewport.Y
-                )
-
-              let worldPos = Vector2.Transform(viewportPos, inverse)
               ValueSome worldPos
             else
               ValueNone

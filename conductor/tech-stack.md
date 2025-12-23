@@ -23,3 +23,9 @@
 
 - **Performance:** Strict focus on low-allocation and no-allocation operations (Structs, `ArrayPool`, `ValueOption`).
 - **Logic:** Separation of immutable data from pure transformation logic.
+
+## Rendering Engine
+
+- **Architecture:** Parallelized Command-Based Rendering (Emitters -> Command Arrays -> Batch Renderer).
+- **Coordinate System:** Strict separation of Logic Space (2D) and Render Space (Isometric 3D) via centralized `RenderMath`.
+- **Optimization:** Thread-safe parallel emission, zero-allocation command structs, and aggressive buffer reuse.

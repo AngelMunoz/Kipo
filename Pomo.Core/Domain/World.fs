@@ -43,6 +43,16 @@ module World =
     Duration: TimeSpan
   }
 
+  /// World-anchored text (notifications, damage numbers, etc.)
+  [<Struct>]
+  type WorldText = {
+    Text: string
+    Position: Vector2
+    Velocity: Vector2
+    Life: float32
+    MaxLife: float32
+  }
+
   type MutableWorld = {
     Time: Time cval
     RawInputStates: cmap<Guid<EntityId>, RawInputState>
@@ -93,7 +103,9 @@ module World =
     ActiveOrbitals: cmap<Guid<EntityId>, Orbital.ActiveOrbital>
     ActiveCharges: cmap<Guid<EntityId>, ActiveCharge>
     // VFX
-    VisualEffects: ResizeArray<ActiveEffect>
+    VisualEffects: ResizeArray<VisualEffect>
+    // World Text (notifications, damage numbers, etc.)
+    Notifications: ResizeArray<WorldText>
   }
 
   type World =
@@ -165,7 +177,9 @@ module World =
     abstract ActiveCharges: amap<Guid<EntityId>, ActiveCharge>
 
     // VFX
-    abstract VisualEffects: ResizeArray<ActiveEffect>
+    abstract VisualEffects: ResizeArray<VisualEffect>
+    // World Text (notifications, damage numbers, etc.)
+    abstract Notifications: IReadOnlyList<WorldText>
 
 
   let create(rng: Random) =
@@ -208,6 +222,7 @@ module World =
       ActiveOrbitals = cmap()
       ActiveCharges = cmap()
       VisualEffects = ResizeArray()
+      Notifications = ResizeArray()
     }
 
     let worldView =
@@ -246,6 +261,7 @@ module World =
           member _.ActiveOrbitals = mutableWorld.ActiveOrbitals
           member _.ActiveCharges = mutableWorld.ActiveCharges
           member _.VisualEffects = mutableWorld.VisualEffects
+          member _.Notifications = mutableWorld.Notifications
       }
 
     struct (mutableWorld, worldView)
