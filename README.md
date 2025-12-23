@@ -1,6 +1,6 @@
 # Kipo
 
-A production-grade RPG engine prototype, built as a playground for exploring functional game development patterns in F# and MonoGame.
+A production-grade ARPG engine prototype, built as a playground for exploring functional game development patterns in F# and MonoGame.
 
 ![Demo](./2025-12-23%2009-10-54.gif)
 
@@ -14,31 +14,31 @@ This isn't a finished game. It's a working prototype with real systems: combat, 
 
 ### Data-Oriented Programming
 
-State is separated from logic. Immutable data structures flow through pure transformation functions. The result is code that's easier to reason about, test, and parallelize.
+State is strictly separated from logic. We prioritize using immutable data structures that flow through pure transformation functions, aiming for code that is easier to reason about, test, and parallelize.
 
 ### Performance Engineering
 
-Critical paths are allocation-free. Struct discriminated unions, pooled array buffers, and explicit command queues minimize GC pressure. State writes are batched and flushed once per frame.
+The engine is built with a focus on minimizing GC pressure. We aim to keep critical paths low-allocation by using struct discriminated unions, pooled array buffers, and explicit command queues. State writes are designed to be batched and flushed once per frame.
 
 ### Custom Isometric Render Pipeline
 
-2D game logic is projected into 3D isometric space via a parallelized command-based renderer. Entities, terrain, and particles are emitted as render commands, then sorted and drawn efficiently.
+2D game logic is projected into 3D isometric space via a parallelized command-based renderer. Entities, terrain, and particles are submitted as render commands, which the engine attempts to sort and draw efficiently.
 
 ### Data-Driven AI
 
-Enemy behaviors are defined using archetypes and decision trees—all in JSON. Perception, memory, and skill selection are modular systems. No hardcoded enemy logic.
+Enemy behaviors are defined using archetypes and decision trees—all in JSON. The architecture supports modular perception, memory, and skill selection systems, avoiding hardcoded enemy logic.
 
 ### Hybrid VFX System
 
-Particles aren't just billboards. The VFX system supports both 2D textures and 3D mesh particles (spinning coins, rising pillars, tumbling debris) with full physics integration.
+Particles aren't just billboards. The VFX system is designed to support both 2D textures and 3D mesh particles (spinning coins, rising pillars, tumbling debris) with full physics integration.
 
-### Everything is JSON
+### Data-Driven Content
 
-Skills, items, AI archetypes, animations, model rigs, and particle effects are all configured in JSON files. Designers can iterate without touching code.
+Skills, items, AI archetypes, animations, model rigs, and particle effects are configured in JSON files. This structure allows designers to iterate without touching code.
 
 ### Cross-Platform
 
-The same `Pomo.Core` library runs on Windows (DirectX), Linux/macOS (DesktopGL), and Android. iOS scaffolding exists as well.
+The core library (`Pomo.Core`) is designed to run on Windows (DirectX), Linux/macOS (DesktopGL), and Android. iOS scaffolding is available but less tested.
 
 ## Project Structure
 
