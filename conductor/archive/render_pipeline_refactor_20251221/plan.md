@@ -124,34 +124,34 @@ _Goal: Single entry point that calls emitters and flushes to GPU._
 
 ---
 
-## Phase 6: Cleanup & Delete Legacy [PENDING]
+## Phase 6: Cleanup & Delete Legacy [COMPLETE]
 
 _Goal: Remove old render code._
 
-- [ ] Delete `Pomo.Core/Systems/Render.fs`
-- [ ] Delete `Pomo.Core/Systems/TerrainRender.fs`
-- [ ] Update scene setup to use new orchestrator
+- [x] Delete `Pomo.Core/Systems/Render.fs`
+- [x] Delete `Pomo.Core/Systems/TerrainRender.fs`
+- [x] Update scene setup to use new orchestrator
 
 ---
 
-## Phase 7: Verification [PENDING]
+## Phase 7: Verification [COMPLETE]
 
 _Goal: Confirm correctness and performance._
 
-- [ ] **Visual Verification**
+- [x] **Visual Verification**
 
-  - [ ] Entities, particles, terrain render correctly
-  - [ ] Depth sorting works
-  - [ ] No visual regressions
+  - [x] Entities, particles, terrain render correctly
+  - [x] Depth sorting works
+  - [x] No visual regressions
 
-- [ ] **Performance Verification**
+- [x] **Performance Verification**
 
-  - [ ] Memory profiler: minimal GC pressure
-  - [ ] Frame time acceptable
+  - [x] Memory profiler: minimal GC pressure
+  - [x] Frame time acceptable
 
-- [ ] **Code Audit**
-  - [ ] No `Matrix.Create*` outside `RenderMath.fs`
-  - [ ] No `squishFactor` outside `RenderMath.fs`
+- [x] **Code Audit**
+  - [x] No `Matrix.Create*` outside `RenderMath.fs`
+  - [x] No `squishFactor` outside `RenderMath.fs`
 
 ---
 
