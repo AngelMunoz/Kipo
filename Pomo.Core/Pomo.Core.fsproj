@@ -30,8 +30,6 @@
     <Compile Include="Stores.fs" />
     <Compile Include="MapSpawning.fs" />
     <Compile Include="Projections.fs" />
-    <Compile Include="Simulation/ParticleSimulator.fs" />
-    <Compile Include="Simulation/OrbitalSimulator.fs" />
     <Compile Include="Graphics/RenderMath.fs" />
     <Compile Include="Graphics/RenderCommands.fs" />
     <Compile Include="Graphics/CommandQueue.fs" />
@@ -66,11 +64,7 @@
     <Compile Include="Systems/Collision.fs" />
     <Compile Include="Systems/MapLoader.fs" />
     <Compile Include="Systems/CameraSystem.fs" />
-    <Compile Include="Systems/TerrainRender.fs" />
-    <Compile Include="Systems/Render.fs" />
-    <Compile Include="Systems/RenderOrchestrator.fs" />
     <Compile Include="Systems/RenderOrchestratorV2.fs" />
-    <Compile Include="Systems/DebugRender.fs" />
     <Compile Include="Systems/State.fs" />
     <Compile Include="Systems/Inventory.fs" />
     <Compile Include="Systems/Equipment.fs" />

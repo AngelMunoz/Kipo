@@ -17,7 +17,6 @@ open Pomo.Core.Domain.Units
 open Pomo.Core.Domain.Particles
 open Pomo.Core.Graphics
 open Pomo.Core.Rendering
-open Pomo.Core.Simulation
 
 module RenderOrchestratorV2 =
 

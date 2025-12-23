@@ -98,11 +98,7 @@ module Notification =
         game.GraphicsDevice.Viewport <- camera.Viewport
 
         let transform =
-          RenderMath.Legacy.GetSpriteBatchTransform
-            camera.Position
-            camera.Zoom
-            camera.Viewport.Width
-            camera.Viewport.Height
+          RenderMath.Get2DViewMatrix camera.Position camera.Zoom camera.Viewport
 
         sb.Begin(transformMatrix = transform)
 

@@ -30,7 +30,6 @@ open Pomo.Core.Systems.UnitMovement
 open Pomo.Core.Systems.Combat
 open Pomo.Core.Systems.Notification
 open Pomo.Core.Systems.Projectile
-open Pomo.Core.Systems.DebugRender
 open Pomo.Core.Systems.ResourceManager
 open Pomo.Core.Systems.EntitySpawnerLogic
 open Pomo.Core.Systems.StateWrite
@@ -337,16 +336,13 @@ module CompositionRoot =
 
         // Recreate Renderers with new map key
 
+        // Create Scenario
+        let scenarioId = Guid.NewGuid() |> UMX.tag<ScenarioId>
+        let scenario: World.Scenario = { Id = scenarioId; Map = mapDef }
+        mutableWorld.Scenarios[scenarioId] <- scenario
+
+        // Recreate Renderers with new map key
         let renderOrchestrator =
-          // --- Legacy Render System ---
-          // new RenderOrchestratorSystem.RenderOrchestratorSystem(
-          //   game,
-          //   pomoEnv,
-          //   newMapKey,
-          //   playerId,
-          //   DrawOrder = Render.Layer.TerrainBase
-          // )
-          // --- New Render System (V2) ---
           RenderOrchestratorV2.create(
             game,
             pomoEnv,
@@ -356,17 +352,6 @@ module CompositionRoot =
           )
 
         mapDependentComponents.Add(renderOrchestrator)
-
-        let debugRender =
-          new DebugRenderSystem(
-            game,
-            pomoEnv,
-            playerId,
-            newMapKey,
-            DrawOrder = Render.Layer.Debug
-          )
-
-        mapDependentComponents.Add(debugRender)
 
         spawnEntitiesForMap mapDef playerId scenarioId targetSpawn
 
