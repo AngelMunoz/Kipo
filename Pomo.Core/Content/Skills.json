@@ -740,7 +740,7 @@
       "Orbitals": {
         "Count": 6,
         "Radius": 16.0,
-        "CenterOffset": { "X": 0, "Y": 4, "Z": -8 },
+        "CenterOffset": { "X": 0, "Y": 1, "Z": -2 },
         "RotationAxis": { "X": 0, "Y": 1, "Z": 0 },
         "PathScale": [1.0, 1.0],
         "StartSpeed": 2.0,

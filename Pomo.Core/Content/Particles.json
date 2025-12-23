@@ -3,38 +3,38 @@
     {
       "Texture": "Particles/jellyfish0-masks/15",
       "BlendMode": "Additive",
-      "SimulationSpace": "World",
+      "SimulationSpace": "Local",
       "Rate": 150,
       "Shape": "Sphere",
-      "Radius": 0.5,
+      "Radius": 0.3,
       "LocalOffset": { "X": 0, "Y": 0.0, "Z": 0.0 },
       "Particle": {
-        "Lifetime": [0.5, 1.0],
-        "Speed": [10, 30],
-        "SizeStart": 1.5,
+        "Lifetime": [0.2, 0.4],
+        "Speed": [2, 5],
+        "SizeStart": 1.2,
         "SizeEnd": 0.0,
         "ColorStart": "#FF6400AA",
         "ColorEnd": "#32323200",
-        "Gravity": -10,
-        "Drag": 0.0
+        "Gravity": 0,
+        "Drag": 3.0
       }
     },
     {
       "Texture": "Particles/jellyfish0-masks/15",
       "BlendMode": "Additive",
       "SimulationSpace": "Local",
-      "Rate": 300,
+      "Rate": 200,
       "Shape": "Point",
       "LocalOffset": { "X": 0, "Y": 0.0, "Z": 0.0 },
       "Particle": {
-        "Lifetime": [0.1, 1],
-        "Speed": [10, 40],
-        "SizeStart": 1.0,
-        "SizeEnd": 1.5,
+        "Lifetime": [0.1, 0.3],
+        "Speed": [3, 8],
+        "SizeStart": 0.8,
+        "SizeEnd": 1.2,
         "ColorStart": "#FF6400FF",
         "ColorEnd": "#32323200",
-        "Gravity": -3,
-        "Drag": 0
+        "Gravity": 0,
+        "Drag": 2.5
       }
     }
   ],
@@ -66,38 +66,38 @@
     {
       "Texture": "Particles/jellyfish0-masks/43",
       "BlendMode": "AlphaBlend",
-      "SimulationSpace": "World",
+      "SimulationSpace": "Local",
       "Rate": 150,
       "Shape": "Sphere",
-      "Radius": 0.5,
+      "Radius": 0.3,
       "LocalOffset": { "X": 0, "Y": 0.0, "Z": 0.0 },
       "Particle": {
-        "Lifetime": [0.5, 1.0],
-        "Speed": [10, 30],
-        "SizeStart": 1.5,
+        "Lifetime": [0.2, 0.4],
+        "Speed": [2, 5],
+        "SizeStart": 1.2,
         "SizeEnd": 0.0,
         "ColorStart": "#300030FF",
         "ColorEnd": "#00000000",
-        "Gravity": -10,
-        "Drag": 0.0
+        "Gravity": 0,
+        "Drag": 3.0
       }
     },
     {
       "Texture": "Particles/jellyfish0-masks/15",
       "BlendMode": "AlphaBlend",
       "SimulationSpace": "Local",
-      "Rate": 300,
+      "Rate": 200,
       "Shape": "Point",
       "LocalOffset": { "X": 0, "Y": 0.0, "Z": 0.0 },
       "Particle": {
-        "Lifetime": [0.1, 1],
-        "Speed": [10, 40],
-        "SizeStart": 1.0,
-        "SizeEnd": 1.5,
+        "Lifetime": [0.1, 0.3],
+        "Speed": [3, 8],
+        "SizeStart": 0.8,
+        "SizeEnd": 1.2,
         "ColorStart": "#4B0082FF",
         "ColorEnd": "#00000000",
-        "Gravity": -3,
-        "Drag": 2
+        "Gravity": 0,
+        "Drag": 2.5
       }
     }
   ],
@@ -131,19 +131,21 @@
       "Texture": "Particles/jellyfish0-masks/43",
       "BlendMode": "AlphaBlend",
       "SimulationSpace": "Local",
-      "Rate": 75,
-      "Shape": "Sphere",
-      "Radius": 0.5,
-      "LocalOffset": { "X": 0.0, "Y": 0.5, "Z": 0.0 },
+      "Rate": 60,
+      "Shape": "Cone",
+      "Angle": 20,
+      "Radius": 0.3,
+      "EmissionMode": "Outward",
+      "LocalOffset": { "X": 0.0, "Y": 0.3, "Z": 0.0 },
       "Particle": {
-        "Lifetime": [0.5, 1.0],
-        "Speed": [10, 50],
-        "SizeStart": 1.5,
+        "Lifetime": [0.4, 0.8],
+        "Speed": [8, 15],
+        "SizeStart": 1.2,
         "SizeEnd": 0.0,
         "ColorStart": "#300030FF",
         "ColorEnd": "#00000000",
-        "Gravity": -50,
-        "Drag": 0.0
+        "Gravity": -3,
+        "Drag": 0.5
       }
     }
   ],
@@ -163,7 +165,7 @@
         "SizeEnd": 0.0,
         "ColorStart": "#00FF00FF",
         "ColorEnd": "#00FF0000",
-        "Gravity": -20,
+        "Gravity": -10,
         "Drag": 0.0
       }
     }
@@ -250,7 +252,7 @@
         "SizeEnd": 0.0,
         "ColorStart": "#0000FFFF",
         "ColorEnd": "#0000FF00",
-        "Gravity": -10,
+        "Gravity": -5,
         "Drag": 0.0
       }
     }
@@ -271,7 +273,7 @@
         "SizeEnd": 0.0,
         "ColorStart": "#300030FF",
         "ColorEnd": "#00000000",
-        "Gravity": -10,
+        "Gravity": -5,
         "Drag": 0.0
       }
     }
@@ -403,7 +405,7 @@
         "SizeEnd": 0.0,
         "ColorStart": "#0088FFFF",
         "ColorEnd": "#0088FF00",
-        "Gravity": -50,
+        "Gravity": -25,
         "Drag": 1.0
       }
     }
@@ -424,7 +426,7 @@
         "SizeEnd": 0.0,
         "ColorStart": "#FFD700FF",
         "ColorEnd": "#FFD70000",
-        "Gravity": -10,
+        "Gravity": -5,
         "Drag": 0.0
       }
     }
@@ -532,7 +534,7 @@
         "SizeEnd": 0.5,
         "ColorStart": "#FFFFE0FF",
         "ColorEnd": "#FFFFE000",
-        "Gravity": -10,
+        "Gravity": -2,
         "RandomVelocity": { "X": 5, "Y": 10, "Z": 5 },
         "Drag": 1.5
       }
@@ -554,7 +556,7 @@
         "SizeEnd": 2.5,
         "ColorStart": "#FFFFFFFF",
         "ColorEnd": "#FFFFE000",
-        "Gravity": -150,
+        "Gravity": -30,
         "RandomVelocity": { "X": 3, "Y": 8, "Z": 3 },
         "Drag": 1.0
       }

@@ -852,6 +852,9 @@ module ParticleSystem =
         ownerRotation <-
           Quaternion.CreateFromAxisAngle(Vector3.Up, -rot + MathHelper.PiOver2)
 
+        // Update effect rotation to match owner facing (for local-space particles)
+        effect.Rotation.Value <- ownerRotation
+
       | ValueNone ->
         // Owner doesn't exist - kill the effect
         effect.IsAlive.Value <- false

@@ -25,23 +25,27 @@ module ParticleEmitter =
     | ValueNone -> fallbackPos
 
   /// Computes particle world position based on simulation space
+  /// For Local space, particle position is rotated by effect rotation before adding effect position
   let inline private computeParticleWorldPosition
     (config: EmitterConfig)
     (particlePos: Vector3)
     (effectPos: Vector3)
+    (effectRotation: Quaternion)
     =
     match config.SimulationSpace with
     | SimulationSpace.World -> particlePos
-    | SimulationSpace.Local -> particlePos + effectPos
+    | SimulationSpace.Local ->
+      // Rotate local position by effect rotation, then add effect position
+      let rotatedLocal = Vector3.Transform(particlePos, effectRotation)
+      rotatedLocal + effectPos
 
   /// Transforms particle position to render space
+  /// Delegates to RenderMath.ParticleToRender which handles isometric scaling
   let inline private particleToRenderPosition
     (pWorldPos: Vector3)
     (pixelsPerUnit: Vector2)
     =
-    let logicPos = Vector2(pWorldPos.X, pWorldPos.Z)
-    let altitude = pWorldPos.Y
-    RenderMath.LogicToRender logicPos altitude pixelsPerUnit
+    RenderMath.ParticleToRender pWorldPos pixelsPerUnit
 
   /// Emits billboard particle commands (parallel over effects)
   let emitBillboards
@@ -76,6 +80,7 @@ module ParticleEmitter =
                       emitter.Config
                       particle.Position
                       effectPos
+                      effect.Rotation.Value
 
                   let renderPos =
                     particleToRenderPosition pWorldPos core.PixelsPerUnit
@@ -119,6 +124,7 @@ module ParticleEmitter =
                     meshEmitter.Config
                     particle.Position
                     effectPos
+                    effect.Rotation.Value
 
                 let renderPos =
                   particleToRenderPosition pWorldPos core.PixelsPerUnit

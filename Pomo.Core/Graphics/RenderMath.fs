@@ -8,17 +8,30 @@ module RenderMath =
 
   /// Converts a Logic position (pixels) and altitude to Unified Render Space (3D Units).
   /// X = LogicX / PPU.X
-  /// Z = LogicY / PPU.Y (Maps Screen Y to World Z)
-  /// Y = Altitude + Z (Depth Bias = Z)
+  /// Z = (LogicY / PPU.Y) - altitude (elevated objects sort behind ground objects)
+  /// Y = Altitude + Z_base (visual height includes altitude and depth bias)
   let inline LogicToRender
     (logicPos: Vector2)
     (altitude: float32)
     (pixelsPerUnit: Vector2)
     : Vector3 =
     let x = logicPos.X / pixelsPerUnit.X
-    let z = logicPos.Y / pixelsPerUnit.Y
-    let y = altitude + z
+    let zBase = logicPos.Y / pixelsPerUnit.Y
+    let y = altitude + zBase
+    let z = zBase - altitude
     Vector3(x, y, z)
+
+  /// Converts a 3D particle world position to Unified Render Space.
+  /// Particles simulate in 3D where: X/Z = horizontal plane (logic space), Y = altitude.
+  /// The altitude must be scaled by the isometric correction factor (Y / PPU.Y * 2.0)
+  /// to match the visual proportions of the 2:1 isometric projection.
+  let inline ParticleToRender
+    (particlePos: Vector3)
+    (pixelsPerUnit: Vector2)
+    : Vector3 =
+    let logicPos = Vector2(particlePos.X, particlePos.Z)
+    let altitude = (particlePos.Y / pixelsPerUnit.Y) * 2.0f
+    LogicToRender logicPos altitude pixelsPerUnit
 
   /// Converts a Tile position (pixels) with explicit depth to Unified Render Space (3D Units).
   /// Used for terrain tiles where depthY is pre-calculated from tile bottom edge.
@@ -94,6 +107,7 @@ module RenderMath =
   let IsometricCorrectionMatrix = isoRot * Matrix.Invert topDownRot
 
   /// Calculates the World Matrix for a 3D entity (Mesh).
+  /// Includes PiOver4 offset for isometric camera alignment.
   let CreateMeshWorldMatrix
     (renderPos: Vector3)
     (facing: float32)
@@ -103,7 +117,7 @@ module RenderMath =
     let squishCompensation = Matrix.CreateScale(1.0f, 1.0f, squishFactor)
     let scaleM = Matrix.CreateScale(scale)
 
-    Matrix.CreateRotationY(facing)
+    Matrix.CreateRotationY(facing + MathHelper.PiOver4)
     * IsometricCorrectionMatrix
     * squishCompensation
     * scaleM
@@ -111,6 +125,7 @@ module RenderMath =
 
   /// Calculates the World Matrix for a projectile with tilt (for descending/ascending).
   /// Tilt rotates around X axis before applying facing.
+  /// Includes PiOver4 offset for isometric camera alignment.
   let CreateProjectileWorldMatrix
     (renderPos: Vector3)
     (facing: float32)
@@ -122,7 +137,7 @@ module RenderMath =
     let scaleM = Matrix.CreateScale(scale)
 
     Matrix.CreateRotationX(tilt)
-    * Matrix.CreateRotationY(facing)
+    * Matrix.CreateRotationY(facing + MathHelper.PiOver4)
     * IsometricCorrectionMatrix
     * squishCompensation
     * scaleM

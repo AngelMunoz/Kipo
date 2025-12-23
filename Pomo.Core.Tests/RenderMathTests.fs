@@ -34,10 +34,17 @@ module LogicToRender =
 
   [<Fact>]
   let ``Y includes altitude and depth bias``() =
-    let logicPos = Vector2(0.0f, 16.0f) // Z = 1.0
+    let logicPos = Vector2(0.0f, 16.0f) // zBase = 1.0
     let altitude = 5.0f
     let result = RenderMath.LogicToRender logicPos altitude isoPpu
-    Assert.Equal(6.0f, result.Y) // altitude(5) + Z(1) = 6
+    Assert.Equal(6.0f, result.Y) // altitude(5) + zBase(1) = 6
+
+  [<Fact>]
+  let ``Z is reduced by altitude for depth sorting``() =
+    let logicPos = Vector2(0.0f, 16.0f) // zBase = 1.0
+    let altitude = 5.0f
+    let result = RenderMath.LogicToRender logicPos altitude isoPpu
+    Assert.Equal(-4.0f, result.Z) // zBase(1) - altitude(5) = -4
 
 module GetSquishFactor =
 
@@ -108,7 +115,7 @@ module Properties =
     abs(result.X - logicPos.X / ppu.X) < 0.0001f
 
   [<Property>]
-  let ``LogicToRender Z component is always logicY / ppu.Y``
+  let ``LogicToRender Z at zero altitude equals logicY / ppu.Y``
     (lx: int)
     (ly: int)
     (px: int)
@@ -133,6 +140,22 @@ module Properties =
     let resultA = RenderMath.LogicToRender logicPos altA ppu
     let resultB = RenderMath.LogicToRender logicPos altB ppu
     abs(resultB.Y - resultA.Y - 10.0f) < 0.0001f
+
+  [<Property>]
+  let ``altitude inversely contributes to Z``
+    (lx: int)
+    (ly: int)
+    (px: int)
+    (py: int)
+    =
+    let logicPos = Vector2(float32 lx, float32 ly)
+    let ppu = Vector2(float32(clampPpu px), float32(clampPpu py))
+    let altA = 0.0f
+    let altB = 10.0f
+    let resultA = RenderMath.LogicToRender logicPos altA ppu
+    let resultB = RenderMath.LogicToRender logicPos altB ppu
+    // Higher altitude = lower Z (sorts behind)
+    abs(resultA.Z - resultB.Z - 10.0f) < 0.0001f
 
   [<Property>]
   let ``GetSquishFactor is always ppu.X / ppu.Y`` (px: int) (py: int) =
