@@ -58,7 +58,7 @@ module RenderCore =
   /// Creates the shared RenderCore from map pixel settings
   let create(pixelsPerUnit: Vector2) : RenderCore =
     let toRenderPos (logicPos: Vector2) (altitude: float32) =
-      RenderMath.LogicToRender logicPos altitude pixelsPerUnit
+      RenderMath.LogicRender.toRender logicPos altitude pixelsPerUnit
 
     {
       PixelsPerUnit = pixelsPerUnit

@@ -84,8 +84,13 @@ module CameraSystem =
                 pos, ppu
               | ValueNone -> Vector2.Zero, Vector2(64.0f, 32.0f)
 
-            let view = RenderMath.GetViewMatrix position pixelsPerUnit
-            let projection = RenderMath.GetProjectionMatrix viewport defaultZoom pixelsPerUnit
+            let view = RenderMath.Camera.getViewMatrix position pixelsPerUnit
+
+            let projection =
+              RenderMath.Camera.getProjectionMatrix
+                viewport
+                defaultZoom
+                pixelsPerUnit
 
             ValueSome {
               Position = position
@@ -118,8 +123,14 @@ module CameraSystem =
               && screenPos.Y >= float32 viewport.Y
               && screenPos.Y <= float32(viewport.Y + viewport.Height)
             then
-               let worldPos = RenderMath.ScreenToLogic screenPos viewport camera.Zoom camera.Position
-               ValueSome worldPos
+              let worldPos =
+                RenderMath.ScreenLogic.toLogic
+                  screenPos
+                  viewport
+                  camera.Zoom
+                  camera.Position
+
+              ValueSome worldPos
             else
               ValueNone
           | ValueNone -> ValueNone

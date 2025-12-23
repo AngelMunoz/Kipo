@@ -73,7 +73,7 @@ module RenderOrchestratorV2 =
     =
     let ppu = Vector2(float32 map.TileWidth, float32 map.TileHeight)
     let renderCore = RenderCore.create ppu
-    let squish = RenderMath.GetSquishFactor ppu
+    let squish = RenderMath.WorldMatrix.getSquishFactor ppu
 
     let entityData = {
       ModelStore = stores.ModelStore
@@ -137,7 +137,7 @@ module RenderOrchestratorV2 =
       device.DepthStencilState <- DepthStencilState.None
       device.RasterizerState <- RasterizerState.CullNone
 
-      let struct (right, up) = RenderMath.GetBillboardVectors view
+      let struct (right, up) = RenderMath.Billboard.getVectors view
 
       let grouped =
         commands |> Array.groupBy(fun c -> struct (c.Texture, c.BlendMode))
@@ -159,7 +159,10 @@ module RenderOrchestratorV2 =
     =
     // 2D SpriteBatch rendering for background - no depth buffer, no fighting
     let transform =
-      RenderMath.Get2DViewMatrix camera.Position camera.Zoom camera.Viewport
+      RenderMath.Camera.get2DViewMatrix
+        camera.Position
+        camera.Zoom
+        camera.Viewport
 
     batch.Begin(
       SpriteSortMode.Deferred,
@@ -208,7 +211,10 @@ module RenderOrchestratorV2 =
     =
     if commands.Length > 0 then
       let transform =
-        RenderMath.Get2DViewMatrix camera.Position camera.Zoom camera.Viewport
+        RenderMath.Camera.get2DViewMatrix
+          camera.Position
+          camera.Zoom
+          camera.Viewport
 
       batch.Begin(
         SpriteSortMode.Deferred,
@@ -281,7 +287,7 @@ module RenderOrchestratorV2 =
         let projection = camera.Projection
 
         let viewBounds =
-          RenderMath.GetViewBounds
+          RenderMath.Camera.getViewBounds
             camera.Position
             (float32 camera.Viewport.Width)
             (float32 camera.Viewport.Height)

@@ -118,7 +118,7 @@ module PoseResolver =
       let localAnim = getNodeAnimation entityPose name
 
       let localWorld =
-        RenderMath.ApplyRigNodeTransform node.Pivot node.Offset localAnim
+        RenderMath.Rig.applyNodeTransform node.Pivot node.Offset localAnim
 
       let world = localWorld * currentParentWorld
       nodeTransforms.[name] <- world
@@ -149,21 +149,21 @@ module PoseResolver =
           computeAltitude data.LiveProjectiles entityId core.PixelsPerUnit.Y
 
         let renderPos =
-          RenderMath.LogicToRender logicPos altitude core.PixelsPerUnit
+          RenderMath.LogicRender.toRender logicPos altitude core.PixelsPerUnit
 
         let entityBaseMatrix =
           if isProjectile then
             let struct (tilt, projFacing) =
               getProjectileTiltAndFacing altitude facing
 
-            RenderMath.CreateProjectileWorldMatrix
+            RenderMath.WorldMatrix.createProjectile
               renderPos
               projFacing
               tilt
               data.ModelScale
               data.SquishFactor
           else
-            RenderMath.CreateMeshWorldMatrix
+            RenderMath.WorldMatrix.createMesh
               renderPos
               facing
               data.ModelScale

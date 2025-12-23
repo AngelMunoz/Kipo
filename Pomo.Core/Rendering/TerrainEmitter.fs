@@ -122,7 +122,7 @@ module TerrainEmitter =
         |> ValueOption.bind(fun tile -> data.GetTileTexture(int tile.TileId))
         |> ValueOption.bind(fun texture ->
           let struct (posX, posY) =
-            RenderMath.TileGridToLogic
+            RenderMath.TileGrid.toLogic
               map.Orientation
               map.StaggerAxis
               map.StaggerIndex
@@ -150,7 +150,7 @@ module TerrainEmitter =
               (drawY + float32 texture.Height) / core.PixelsPerUnit.Y
 
             let worldPos =
-              RenderMath.TileToRender
+              RenderMath.LogicRender.tileToRender
                 (Vector2(drawX, drawY))
                 depthY
                 core.PixelsPerUnit

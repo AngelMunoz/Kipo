@@ -86,7 +86,7 @@ module ParticleEmitter =
         effectPos
         effectRotation
 
-    let renderPos = RenderMath.ParticleToRender worldPos pixelsPerUnit
+    let renderPos = RenderMath.ParticleSpace.toRender worldPos pixelsPerUnit
 
     {
       Texture = texture
@@ -113,10 +113,10 @@ module ParticleEmitter =
         effectPos
         effectRotation
 
-    let renderPos = RenderMath.ParticleToRender worldPos pixelsPerUnit
+    let renderPos = RenderMath.ParticleSpace.toRender worldPos pixelsPerUnit
 
     let worldMatrix =
-      RenderMath.CreateMeshParticleWorldMatrix
+      RenderMath.WorldMatrix.createMeshParticle
         renderPos
         particle.Rotation
         (particle.Scale * modelScale)

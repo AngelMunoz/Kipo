@@ -33,7 +33,7 @@ let isoPpu = Vector2(32.0f, 16.0f)
 /// Creates a RenderCore with standard settings
 let createRenderCore() : RenderCore = {
   PixelsPerUnit = isoPpu
-  ToRenderPos = fun pos alt -> RenderMath.LogicToRender pos alt isoPpu
+  ToRenderPos = fun pos alt -> RenderMath.LogicRender.toRender pos alt isoPpu
 }
 
 // ============================================================================
