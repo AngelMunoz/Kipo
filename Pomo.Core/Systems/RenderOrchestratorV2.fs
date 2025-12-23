@@ -2,12 +2,14 @@ namespace Pomo.Core.Systems
 
 open System
 open System.Collections.Generic
+open System.Collections.Concurrent
 open Microsoft.Xna.Framework
 open Microsoft.Xna.Framework.Content
 open Microsoft.Xna.Framework.Graphics
 open FSharp.UMX
 open FSharp.Data.Adaptive
 
+open Pomo.Core
 open Pomo.Core.Environment
 open Pomo.Core.Environment.Patterns
 open Pomo.Core.Domain
@@ -25,7 +27,8 @@ module RenderOrchestratorV2 =
     BillboardBatch: BillboardBatch
     QuadBatch: QuadBatch
     NodeTransformsPool: Dictionary<string, Matrix>
-    ModelCache: Dictionary<string, Model voption>
+    ModelCache: IReadOnlyDictionary<string, Model>
+    TextureCache: IReadOnlyDictionary<string, Texture2D>
     TileTextureCache: Dictionary<int, Texture2D>
     FallbackTexture: Texture2D
   }
@@ -35,26 +38,72 @@ module RenderOrchestratorV2 =
     | BlendMode.AlphaBlend -> device.BlendState <- BlendState.AlphaBlend
     | BlendMode.Additive -> device.BlendState <- BlendState.Additive
 
-  let private getModel (res: RenderResources) (asset: string) =
-    match res.ModelCache.TryGetValue asset with
-    | true, m -> m
-    | _ ->
-      let loaded =
-        try
-          ValueSome(res.Content.Load<Model>(asset))
-        with _ ->
-          ValueNone
+  /// Pre-loads all entity models from ModelStore at initialization
+  let private preloadEntityModels
+    (content: ContentManager)
+    (modelStore: Pomo.Core.Stores.ModelStore)
+    (cache: Dictionary<string, Model>)
+    =
+    for config in modelStore.all() do
+      for _, node in config.Rig do
+        if not(cache.ContainsKey node.ModelAsset) then
 
-      res.ModelCache[asset] <- loaded
-      loaded
+          let loaded =
+            try
+              ValueSome(content.Load<Model>(node.ModelAsset))
+            with _ ->
+              ValueNone
+
+          loaded |> ValueOption.iter(fun m -> cache[node.ModelAsset] <- m)
+
+  /// Pre-loads all particle textures and mesh models from ParticleStore
+  let private preloadParticleAssets
+    (content: ContentManager)
+    (particleStore: Pomo.Core.Stores.ParticleStore)
+    (textureCache: Dictionary<string, Texture2D>)
+    (modelCache: Dictionary<string, Model>)
+    =
+    for _, emitters in particleStore.all() do
+      for emitter in emitters do
+        match emitter.RenderMode with
+        | Particles.Billboard texturePath ->
+          if not(textureCache.ContainsKey texturePath) then
+            let loaded =
+              try
+                ValueSome(content.Load<Texture2D>(texturePath))
+              with _ ->
+                ValueNone
+
+            loaded |> ValueOption.iter(fun t -> textureCache[texturePath] <- t)
+        | Particles.Mesh modelPath ->
+          if not(modelCache.ContainsKey modelPath) then
+            let loaded =
+              try
+                ValueSome(content.Load<Model>(modelPath))
+              with _ ->
+                ValueNone
+
+            loaded |> ValueOption.iter(fun m -> modelCache[modelPath] <- m)
+
+  /// Pure lookup - no loading (all assets pre-loaded at init)
+  let private getModel
+    (cache: IReadOnlyDictionary<string, Model>)
+    (asset: string)
+    =
+    cache |> Dictionary.tryFindV asset
+
+  /// Pure lookup - no loading (all assets pre-loaded at init)
+  let private getTexture
+    (cache: IReadOnlyDictionary<string, Texture2D>)
+    (asset: string)
+    =
+    cache |> Dictionary.tryFindV asset
 
   let inline private getTileTexture
     (cache: Dictionary<int, Texture2D>)
     (gid: int)
     : Texture2D voption =
-    match cache.TryGetValue gid with
-    | true, tex -> ValueSome tex
-    | _ -> ValueNone
+    cache |> Dictionary.tryFindV gid
 
   let private prepareContexts
     (res: RenderResources)
@@ -71,24 +120,19 @@ module RenderOrchestratorV2 =
 
     let entityData = {
       ModelStore = stores.ModelStore
-      GetModelByAsset = getModel res
+      GetModelByAsset = getModel res.ModelCache
       EntityPoses = poses
       LiveProjectiles = projectiles
       SquishFactor = squish
-      ModelScale = 1.0f
+      ModelScale = Core.Constants.Entity.ModelScale
     }
 
     let particleData = {
-      GetTexture =
-        fun asset ->
-          try
-            ValueSome(res.Content.Load<Texture2D>(asset))
-          with _ ->
-            ValueNone
-      GetModelByAsset = getModel res
+      GetTexture = getTexture res.TextureCache
+      GetModelByAsset = getModel res.ModelCache
       EntityPositions = snapshot.Positions
       SquishFactor = squish
-      ModelScale = 1.0f
+      ModelScale = Core.Constants.Entity.ModelScale
       FallbackTexture = res.FallbackTexture
     }
 
@@ -155,7 +199,6 @@ module RenderOrchestratorV2 =
     (projection: Matrix)
     (commands: TerrainCommand[])
     =
-    // Background terrain - no depth testing needed
     batch.Begin(view, projection)
 
     for cmd in commands do
@@ -165,13 +208,10 @@ module RenderOrchestratorV2 =
 
   let private renderTerrainForeground
     (batch: QuadBatch)
-    (device: GraphicsDevice)
     (view: Matrix)
     (projection: Matrix)
     (commands: TerrainCommand[])
     =
-    // Foreground terrain - needs depth testing for entity occlusion
-    device.DepthStencilState <- DepthStencilState.Default
     batch.Begin(view, projection)
 
     for cmd in commands do
@@ -246,14 +286,20 @@ module RenderOrchestratorV2 =
           TerrainEmitter.emitAll renderCore terrainData map viewBounds
 
         // Render passes in correct order
-        // 1. Background terrain (no depth testing)
+        // 1. Background terrain (no depth to avoid tile fighting)
+        res.GraphicsDevice.DepthStencilState <- DepthStencilState.None
         renderTerrainBackground res.QuadBatch view projection terrainBG
 
+        // Clear depth buffer after background terrain
+        // This ensures entities always render on top of background
+        res.GraphicsDevice.Clear(ClearOptions.DepthBuffer, Color.Black, 1.0f, 0)
+
         // 2. Entities and mesh particles (with depth testing)
+        res.GraphicsDevice.DepthStencilState <- DepthStencilState.Default
         let allMeshes = Array.append meshCommandsEntities meshCommandsParticles
         renderMeshes res.GraphicsDevice view projection allMeshes
 
-        // 3. Billboard particles (no depth testing)
+        // 3. Billboard particles
         renderBillboards
           res.BillboardBatch
           res.GraphicsDevice
@@ -262,31 +308,46 @@ module RenderOrchestratorV2 =
           billboardCommandsParticles
 
         // 4. Foreground terrain/decorations (with depth testing for occlusion)
-        renderTerrainForeground
-          res.QuadBatch
-          res.GraphicsDevice
-          view
-          projection
-          terrainFG
+        res.GraphicsDevice.DepthStencilState <- DepthStencilState.Default
+        renderTerrainForeground res.QuadBatch view projection terrainFG
 
-    | None -> ()
+    | None ->
+      // Player died or removed - render nothing (black screen)
+      // UI (higher DrawOrder) will still render on top showing main menu button
+      ()
 
   let create
-    (game: Game)
-    (env: PomoEnvironment)
-    (mapKey: string)
-    (playerId: Guid<EntityId>)
-    : DrawableGameComponent =
+    (
+      game: Game,
+      env: PomoEnvironment,
+      mapKey: string,
+      playerId: Guid<EntityId>,
+      drawOrder: int
+    ) : DrawableGameComponent =
 
     let mutable res: RenderResources voption = ValueNone
     let (Stores stores) = env.StoreServices
 
-    { new DrawableGameComponent(game) with
+    { new DrawableGameComponent(game, DrawOrder = drawOrder) with
         override _.Initialize() =
           base.Initialize()
           let fallback = new Texture2D(game.GraphicsDevice, 1, 1)
           fallback.SetData [| Color.White |]
           let map = stores.MapStore.find mapKey
+
+          // Create mutable caches for pre-loading
+          let modelCache = Dictionary<string, Model>()
+          let textureCache = Dictionary<string, Texture2D>()
+
+          // Pre-load all assets at initialization (sequential, thread-safe)
+          preloadEntityModels game.Content stores.ModelStore modelCache
+
+          preloadParticleAssets
+            game.Content
+            stores.ParticleStore
+            textureCache
+            modelCache
+
           // Use TerrainEmitter to load tile textures
           let tileCache = TerrainEmitter.loadTileTextures game.Content map
 
@@ -297,7 +358,8 @@ module RenderOrchestratorV2 =
               BillboardBatch = new BillboardBatch(game.GraphicsDevice)
               QuadBatch = new QuadBatch(game.GraphicsDevice)
               NodeTransformsPool = Dictionary()
-              ModelCache = Dictionary()
+              ModelCache = modelCache
+              TextureCache = textureCache
               TileTextureCache = tileCache
               FallbackTexture = fallback
             }

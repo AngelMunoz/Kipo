@@ -20,6 +20,18 @@ module RenderMath =
     let y = altitude + z
     Vector3(x, y, z)
 
+  /// Converts a Tile position (pixels) with explicit depth to Unified Render Space (3D Units).
+  /// Used for terrain tiles where depthY is pre-calculated from tile bottom edge.
+  /// X = LogicX / PPU.X, Z = LogicY / PPU.Y, Y = depthY (no addition)
+  let inline TileToRender
+    (logicPos: Vector2)
+    (depthY: float32)
+    (pixelsPerUnit: Vector2)
+    : Vector3 =
+    let x = logicPos.X / pixelsPerUnit.X
+    let z = logicPos.Y / pixelsPerUnit.Y
+    Vector3(x, depthY, z)
+
   /// Calculates the Squish Factor used for isometric correction.
   /// defined as PPU.X / PPU.Y
   let inline GetSquishFactor(pixelsPerUnit: Vector2) : float32 =

@@ -97,7 +97,7 @@ module TerrainEmitter =
               (drawY + float32 texture.Height) / core.PixelsPerUnit.Y
 
             let worldPos =
-              RenderMath.LogicToRender
+              RenderMath.TileToRender
                 (Vector2(drawX, drawY))
                 depthY
                 core.PixelsPerUnit

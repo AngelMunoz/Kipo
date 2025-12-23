@@ -339,21 +339,21 @@ module CompositionRoot =
 
         let renderOrchestrator =
           // --- Legacy Render System ---
-          new RenderOrchestratorSystem.RenderOrchestratorSystem(
+          // new RenderOrchestratorSystem.RenderOrchestratorSystem(
+          //   game,
+          //   pomoEnv,
+          //   newMapKey,
+          //   playerId,
+          //   DrawOrder = Render.Layer.TerrainBase
+          // )
+          // --- New Render System (V2) ---
+          RenderOrchestratorV2.create(
             game,
             pomoEnv,
             newMapKey,
             playerId,
-            DrawOrder = Render.Layer.TerrainBase
+            Render.Layer.TerrainBase
           )
-        // --- New Render System (V2) ---
-        // new RenderOrchestratorV2.RenderOrchestrator(
-        //   game,
-        //   pomoEnv,
-        //   newMapKey,
-        //   playerId,
-        //   DrawOrder = Render.Layer.TerrainBase
-        // )
 
         mapDependentComponents.Add(renderOrchestrator)
 

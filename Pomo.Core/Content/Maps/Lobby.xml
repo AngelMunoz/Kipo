@@ -224,7 +224,7 @@
  </layer>
  <layer id="2" name="Decorations" class="Decorations" width="10" height="10">
   <properties>
-   <property name="RenderGroup" type="int" value="1"/>
+   <property name="RenderGroup" type="int" value="2"/>
   </properties>
   <data encoding="csv">
 0,0,0,9,18,9,0,0,0,0,
