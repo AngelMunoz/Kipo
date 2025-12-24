@@ -70,7 +70,15 @@ Kipo/
 git clone https://github.com/AngelMunoz/Kipo.git
 cd Kipo
 
+# Restore .NET tools
+dotnet tool restore
+
+# Restore .NET workloads (aka android, wasm-tools, etc.)
+# run with `sudo` on Linux/macOS if necessary
+dotnet workload restore
+
 # Restore dependencies
+# Expected error on Linux: error NETSDK1178: The project depends on the following workload packs that do not exist in any of the workloads available in this installation: Microsoft.iOS.Sdk: .net10.0_26.2
 dotnet restore
 
 # Run the DesktopGL version
