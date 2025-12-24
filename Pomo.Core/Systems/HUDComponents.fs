@@ -4,6 +4,7 @@ open System
 open Microsoft.Xna.Framework
 open Myra.Graphics2D.UI
 open Myra.Graphics2D
+open FSharp.UMX
 open FSharp.Data.Adaptive
 open Pomo.Core.Domain.UI
 open Pomo.Core.Domain.Entity
@@ -16,7 +17,6 @@ open Pomo.Core.Stores
 open Pomo.Core.UI
 open Microsoft.Xna.Framework.Input
 
-// Alias to avoid conflict with Skill.GroundAreaKind.Rectangle
 type Rect = Microsoft.Xna.Framework.Rectangle
 
 module HUDComponents =
@@ -33,13 +33,11 @@ module HUDComponents =
     (resources: Resource aval)
     (derivedStats: DerivedStats aval)
     =
-    // Create HP avals
     let hpCurrent = resources |> AVal.map(_.HP >> float32)
     let hpMax = derivedStats |> AVal.map(_.HP >> float32)
     let hpColorFill = config |> AVal.map _.Theme.Colors.HealthFill
     let hpColorBg = config |> AVal.map _.Theme.Colors.HealthBackground
 
-    // Create MP avals
     let mpCurrent = resources |> AVal.map(_.MP >> float32)
     let mpMax = derivedStats |> AVal.map(_.MP >> float32)
     let mpColorFill = config |> AVal.map _.Theme.Colors.ManaFill
@@ -121,12 +119,11 @@ module HUDComponents =
 
 
   let private getKeyLabelForAction (inputMap: InputMap) (action: GameAction) =
-    // Reverse lookup: find the RawInput that maps to this action
     inputMap
     |> HashMap.fold
       (fun acc rawInput mappedAction ->
         match acc with
-        | Some _ -> acc // Already found
+        | Some _ -> acc
         | None ->
           if mappedAction = action then
             match rawInput with
@@ -134,7 +131,7 @@ module HUDComponents =
               let name = k.ToString()
 
               if name.StartsWith("D") && name.Length = 2 then
-                Some(name.Substring(1)) // D1 -> 1
+                Some(name.Substring(1))
               else
                 Some name
             | _ -> None
@@ -145,7 +142,7 @@ module HUDComponents =
 
 
   let createActionSlot (config: HUDConfig aval) (worldTime: Time aval) =
-    let bgColor = config |> AVal.map(fun c -> c.Theme.Colors.HealthBackground) // Using HealthBackground as placeholder if no slot bg
+    let bgColor = config |> AVal.map(fun c -> c.Theme.Colors.HealthBackground)
     let cdColor = config |> AVal.map(fun c -> c.Theme.CooldownOverlayColor)
 
     let abbrevLabel =
@@ -203,20 +200,17 @@ module HUDComponents =
 
       panel.Widgets.Add(container)
 
-      // 1. Bind Keybind Label
       let keyText =
         inputMap |> AVal.map(fun im -> getKeyLabelForAction im action)
 
       key |> W.bindText keyText |> ignore
 
-      // 2. Current Slot Processing State
       let slotProc =
         (actionSets, activeSetIndex)
         ||> AVal.map2(fun sets idx ->
           HashMap.tryFindV idx sets
           |> ValueOption.bind(HashMap.tryFindV action))
 
-      // 3. Bind Abbreviation
       let abbrevText =
         slotProc
         |> AVal.map (function
@@ -227,7 +221,6 @@ module HUDComponents =
 
       abbrev |> W.bindText abbrevText |> ignore
 
-      // 4. Bind Cooldown
       let cdEnd =
         (slotProc, cooldowns)
         ||> AVal.map2(fun proc cds ->
@@ -239,3 +232,230 @@ module HUDComponents =
       slot |> W.bindCooldownEndTime cdEnd |> ignore
 
     panel
+
+
+  let createStatusEffect
+    (config: HUDConfig aval)
+    (worldTime: Time aval)
+    (effect: ActiveEffect)
+    =
+    let theme = config |> AVal.map _.Theme
+    let colors = theme |> AVal.map _.Colors
+
+    let colorBuff = colors |> AVal.map _.BuffBorder
+    let colorDebuff = colors |> AVal.map _.DebuffBorder
+    let colorDot = colors |> AVal.map _.DotBorder
+    let cdColor = theme |> AVal.map _.CooldownOverlayColor
+
+    let abbrev =
+      let name = effect.SourceEffect.Name
+
+      if name.Length <= 2 then
+        name
+      else
+        name.Substring(0, 2).ToUpper()
+
+    let abbrevLabel =
+      Label.create abbrev
+      |> W.textColor Color.White
+      |> W.hAlign HorizontalAlignment.Center
+      |> W.vAlign VerticalAlignment.Center
+
+    let stackLabel =
+      let text = if effect.StackCount > 1 then $"{effect.StackCount}" else ""
+
+      Label.create text
+      |> W.textColor Color.Yellow
+      |> W.hAlign HorizontalAlignment.Right
+      |> W.vAlign VerticalAlignment.Bottom
+      |> W.margin4 0 0 2 0
+
+    let totalDuration =
+      match effect.SourceEffect.Duration with
+      | Timed t -> float32 t.TotalSeconds
+      | Loop(i, _) -> float32 i.TotalSeconds
+      | PermanentLoop i -> float32 i.TotalSeconds
+      | _ -> 0.0f
+
+    let endTime =
+      match effect.SourceEffect.Duration with
+      | Timed t -> effect.StartTime + t
+      | _ -> TimeSpan.Zero
+
+    let widget =
+      StatusEffect.create()
+      |> W.size 32 32
+      |> W.bindWorldTime worldTime
+      |> W.cooldownEndTime endTime
+      |> W.totalDurationSeconds totalDuration
+      |> W.effectKind effect.SourceEffect.Kind
+      |> W.bindColorBuff colorBuff
+      |> W.bindColorDebuff colorDebuff
+      |> W.bindColorDot colorDot
+      |> W.bindCooldownColor cdColor
+
+    Panel.sized 32 32 |> W.childrenP [ widget; abbrevLabel; stackLabel ]
+
+  let createStatusEffectsBar
+    (config: HUDConfig aval)
+    (worldTime: Time aval)
+    (activeEffects: IndexList<ActiveEffect> aval)
+    =
+    let container = HStack.spaced 4
+
+    let effectsWidgets =
+      activeEffects
+      |> AVal.map(fun effects ->
+        effects
+        |> IndexList.sortBy(fun e ->
+          let kindScore =
+            match e.SourceEffect.Kind with
+            | Buff -> 0
+            | DamageOverTime -> 1
+            | Debuff
+            | Stun
+            | Silence
+            | Taunt -> 2
+            | _ -> 3
+
+          struct (kindScore, e.StartTime))
+        |> IndexList.map(createStatusEffect config worldTime))
+
+    container |> HStack.bindIndexListChildren effectsWidgets
+
+  let createTargetFrame
+    (config: HUDConfig aval)
+    (worldTime: Time aval)
+    (selectedEntityId: Guid<EntityId> voption aval)
+    (allResources: amap<Guid<EntityId>, Resource>)
+    (allDerivedStats: amap<Guid<EntityId>, DerivedStats>)
+    (allFactions: amap<Guid<EntityId>, HashSet<Faction>>)
+    =
+    let configVal = config |> AVal.force
+    let colors = configVal.Theme.Colors
+
+    let targetResources =
+      selectedEntityId
+      |> AVal.bind(fun idOpt ->
+        match idOpt with
+        | ValueSome id -> allResources |> AMap.tryFind id
+        | ValueNone -> AVal.constant None)
+
+    let targetDerived =
+      selectedEntityId
+      |> AVal.bind(fun idOpt ->
+        match idOpt with
+        | ValueSome id -> allDerivedStats |> AMap.tryFind id
+        | ValueNone -> AVal.constant None)
+
+    let targetFaction =
+      selectedEntityId
+      |> AVal.bind(fun idOpt ->
+        match idOpt with
+        | ValueSome id -> allFactions |> AMap.tryFind id
+        | ValueNone -> AVal.constant None)
+
+    let visibility = selectedEntityId |> AVal.map ValueOption.isSome
+
+    let hpCurrent =
+      targetResources
+      |> AVal.map(Option.map(_.HP >> float32) >> Option.defaultValue 0.0f)
+
+    let hpMax =
+      targetDerived
+      |> AVal.map(Option.map(_.HP >> float32) >> Option.defaultValue 100.0f)
+
+    let hpBar =
+      ResourceBar.health()
+      |> W.size 150 12
+      |> W.bindCurrentValue hpCurrent
+      |> W.bindMaxValue hpMax
+      |> W.bindWorldTime worldTime
+      |> W.colorBackground colors.HealthBackground
+      |> W.colorFill colors.HealthFill
+
+    let nameText =
+      targetFaction
+      |> AVal.map(fun fOpt ->
+        match fOpt with
+        | Some f ->
+          if HashSet.contains Player f then "Player"
+          elif HashSet.contains Enemy f then "Enemy"
+          else "Target"
+        | None -> "Target")
+
+    let nameLabel =
+      Label.create ""
+      |> W.textColor Color.White
+      |> W.hAlign HorizontalAlignment.Left
+      |> W.bindText nameText
+
+    let frame =
+      VStack.spaced 2
+      |> W.childrenV [ nameLabel; hpBar ]
+      |> W.padding 8
+      |> W.bindOpacity(
+        visibility |> AVal.map(fun v -> if v then 1.0f else 0.0f)
+      )
+
+    frame
+
+  let createCastBar
+    (config: HUDConfig aval)
+    (worldTime: Time aval)
+    (activeCharges: amap<Guid<EntityId>, ActiveCharge>)
+    (playerId: Guid<EntityId>)
+    (skillStore: SkillStore)
+    =
+    let configVal = config |> AVal.force
+    let colors = configVal.Theme.Colors
+
+    let playerCharge = activeCharges |> AMap.tryFind playerId
+
+    let visibility = playerCharge |> AVal.map Option.isSome
+
+    let progress =
+      (playerCharge, worldTime)
+      ||> AVal.map2(fun chargeOpt time ->
+        match chargeOpt with
+        | Some c ->
+          let elapsed = (time.TotalGameTime - c.StartTime).TotalSeconds
+          let duration = c.Duration.TotalSeconds
+          if duration > 0.0 then float32(elapsed / duration) else 1.0f
+        | None -> 0.0f)
+
+    let skillName =
+      playerCharge
+      |> AVal.map(fun chargeOpt ->
+        match chargeOpt with
+        | Some c ->
+          match skillStore.tryFind c.SkillId with
+          | ValueSome(Skill.Active a) -> a.Name
+          | ValueSome(Skill.Passive p) -> p.Name
+          | ValueNone -> "Casting..."
+        | None -> "")
+
+    let bar =
+      ResourceBar.create()
+      |> W.size 250 14
+      |> W.colorFill colors.ManaFill
+      |> W.colorBackground colors.ManaBackground
+      |> W.bindCurrentValue progress
+      |> W.maxValue 1.0f
+      |> W.bindWorldTime worldTime
+      |> W.smoothSpeed 0.05f
+
+    let label =
+      Label.create ""
+      |> W.textColor Color.White
+      |> W.hAlign HorizontalAlignment.Center
+      |> W.bindText skillName
+
+    let container =
+      VStack.spaced 4
+      |> W.childrenV [ label; bar ]
+      |> W.bindOpacity(
+        visibility |> AVal.map(fun v -> if v then 1.0f else 0.0f)
+      )
+
+    container

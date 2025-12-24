@@ -20,6 +20,7 @@ open Pomo.Core.Domain.Core
 open Pomo.Core.Domain.Action
 open Pomo.Core.Systems.UIService // Required for GuiAction
 open Pomo.Core.Environment
+open Pomo.Core.UI
 
 module MainMenuUI =
   let build (game: Game) (publishGuiAction: GuiAction -> unit) =
@@ -122,7 +123,7 @@ module GameplayUI =
       |> AMap.tryFind playerId
       |> AVal.map(Option.defaultValue resourceZero)
 
-    let derivedStats =
+    let playerDerivedStats =
       derivedStats
       |> AMap.tryFind playerId
       |> AVal.map(Option.defaultValue derivedStatsZero)
@@ -133,7 +134,7 @@ module GameplayUI =
           config
           worldTime
           playerResources
-          derivedStats
+          playerDerivedStats
 
       let struct (hAlign, vAlign) = UIHelpers.mapAnchor layout.Anchor
       playerVitals.HorizontalAlignment <- hAlign
@@ -193,5 +194,71 @@ module GameplayUI =
       actionBar.Top <- actionBarLayout.OffsetY
 
       panel.Widgets.Add(actionBar)
+
+    // Status Effects Bar
+    let seLayout = (AVal.force config).Layout.StatusEffects
+
+    if seLayout.Visible then
+      let activeEffects =
+        core.World.ActiveEffects
+        |> AMap.tryFind playerId
+        |> AVal.map(Option.defaultValue IndexList.empty)
+
+      let statusEffectsBar =
+        HUDComponents.createStatusEffectsBar config worldTime activeEffects
+
+      let struct (hAlign, vAlign) = UIHelpers.mapAnchor seLayout.Anchor
+      statusEffectsBar.HorizontalAlignment <- hAlign
+      statusEffectsBar.VerticalAlignment <- vAlign
+      statusEffectsBar.Left <- seLayout.OffsetX
+      statusEffectsBar.Top <- seLayout.OffsetY
+
+      panel.Widgets.Add(statusEffectsBar)
+
+    // Target Frame
+    let tfLayout = (AVal.force config).Layout.TargetFrame
+
+    if tfLayout.Visible then
+      // Placeholder: Selected Target is not yet explicitly tracked in World/Projections
+      let selectedEntityId = AVal.constant ValueNone
+
+      let targetFrame =
+        HUDComponents.createTargetFrame
+          config
+          worldTime
+          selectedEntityId
+          core.World.Resources
+          derivedStats
+          core.World.Factions
+
+      let struct (hAlign, vAlign) = UIHelpers.mapAnchor tfLayout.Anchor
+      targetFrame.HorizontalAlignment <- hAlign
+      targetFrame.VerticalAlignment <- vAlign
+      targetFrame.Left <- tfLayout.OffsetX
+      targetFrame.Top <- tfLayout.OffsetY
+
+      panel.Widgets.Add(targetFrame)
+
+    // Cast Bar
+    let cbLayout = (AVal.force config).Layout.CastBar
+
+    if cbLayout.Visible then
+      let (Stores stores) = env.StoreServices
+
+      let castBar =
+        HUDComponents.createCastBar
+          config
+          worldTime
+          core.World.ActiveCharges
+          playerId
+          stores.SkillStore
+
+      let struct (hAlign, vAlign) = UIHelpers.mapAnchor cbLayout.Anchor
+      castBar.HorizontalAlignment <- hAlign
+      castBar.VerticalAlignment <- vAlign
+      castBar.Left <- cbLayout.OffsetX
+      castBar.Top <- cbLayout.OffsetY
+
+      panel.Widgets.Add(castBar)
 
     panel

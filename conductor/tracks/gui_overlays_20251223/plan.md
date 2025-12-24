@@ -27,7 +27,7 @@
 
 ### 2.1 Player Vitals
 
-- [ ] Task: Implement `PlayerVitals` Component
+- [x] Task: Implement `PlayerVitals` Component
     - Myra widget (VerticalStack or custom panel)
     - Bind to `world.Resources` for local player entity
     - Animated fill bars (not instant jumps) for HP/MP
@@ -36,7 +36,7 @@
 
 ### 2.2 Action Bar
 
-- [ ] Task: Implement `ActionBar` Component
+- [x] Task: Implement `ActionBar` Component
     - Horizontal row of 6 slots (UseSlot1-6)
     - **Data binding:**
       - `world.ActionSets[entityId]` → `HashMap<int, HashMap<GameAction, SlotProcessing>>`
@@ -47,13 +47,13 @@
       - **Item:** Show item abbreviation + uses remaining
     - Cooldown overlay: Radial sweep + seconds remaining text
     - Keybinding labels in corner ("1", "2", etc.)
-- [ ] Task: Implement Action Set Switcher
+- [x] Task: Implement Action Set Switcher
     - Visual indicator showing current set (1/2/3)
     - Allow switching via Tab or defined keybind
 
 ### 2.3 Status Effects Bar (Buffs/Debuffs)
 
-- [ ] Task: Implement `StatusEffectsBar` Component
+- [x] Task: Implement `StatusEffectsBar` Component
     - Bind to `world.ActiveEffects[entityId]` → `IndexList<ActiveEffect>`
     - Display as row of colored squares/circles
     - Color coding by EffectKind: Buff=green border, Debuff=red, DoT=orange pulse
@@ -64,7 +64,7 @@
 
 ### 2.4 Target Frame
 
-- [ ] Task: Implement `TargetFrame` Component
+- [x] Task: Implement `TargetFrame` Component
     - Bind to current selection state (from `CursorSystem` or targeting service)
     - Display target health bar (same style as player vitals)
     - Faction indicator (color-coded outline)
@@ -73,7 +73,7 @@
 
 ### 2.5 Cast Bar
 
-- [ ] Task: Implement `CastBar` Component
+- [x] Task: Implement `CastBar` Component
     - Bind to `world.ActiveCharges[entityId]`
     - Smooth progress bar fill animation
     - Skill name label (lookup from SkillStore via SkillId)

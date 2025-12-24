@@ -269,6 +269,25 @@ module W =
     WidgetSubs.get(w).Add(sub)
     w
 
+  let inline bindKind<'T
+    when 'T :> Widget
+    and 'T: (member set_Kind: Pomo.Core.Domain.Skill.EffectKind -> unit)>
+    (aval: aval<Pomo.Core.Domain.Skill.EffectKind>)
+    (w: 'T)
+    =
+    let sub = aval.AddWeakCallback(fun v -> w.set_Kind(v))
+    WidgetSubs.get(w).Add(sub)
+    w
+
+  let inline bindTotalDurationSeconds<'T
+    when 'T :> Widget and 'T: (member set_TotalDurationSeconds: float32 -> unit)>
+    (aval: aval<float32>)
+    (w: 'T)
+    =
+    let sub = aval.AddWeakCallback(fun v -> w.set_TotalDurationSeconds(v))
+    WidgetSubs.get(w).Add(sub)
+    w
+
   let inline bindWorldTime<'T
     when 'T :> Widget and 'T: (member set_WorldTime: Time -> unit)>
     (worldTime: Time aval)
@@ -276,6 +295,78 @@ module W =
     =
     let sub = worldTime.AddWeakCallback(fun v -> w.set_WorldTime(v))
     WidgetSubs.get(w).Add(sub)
+    w
+
+  let inline bindColorBuff<'T
+    when 'T :> Widget and 'T: (member set_ColorBuff: Color -> unit)>
+    (aval: aval<Color>)
+    (w: 'T)
+    =
+    let sub = aval.AddWeakCallback(fun v -> w.set_ColorBuff(v))
+    WidgetSubs.get(w).Add(sub)
+    w
+
+  let inline bindColorDebuff<'T
+    when 'T :> Widget and 'T: (member set_ColorDebuff: Color -> unit)>
+    (aval: aval<Color>)
+    (w: 'T)
+    =
+    let sub = aval.AddWeakCallback(fun v -> w.set_ColorDebuff(v))
+    WidgetSubs.get(w).Add(sub)
+    w
+
+  let inline bindColorDot<'T
+    when 'T :> Widget and 'T: (member set_ColorDot: Color -> unit)>
+    (aval: aval<Color>)
+    (w: 'T)
+    =
+    let sub = aval.AddWeakCallback(fun v -> w.set_ColorDot(v))
+    WidgetSubs.get(w).Add(sub)
+    w
+
+  let inline totalDurationSeconds<'T
+    when 'T: (member set_TotalDurationSeconds: float32 -> unit)>
+    (value: float32)
+    (w: 'T)
+    =
+    w.set_TotalDurationSeconds(value)
+    w
+
+  let inline effectKind<'T
+    when 'T: (member set_Kind: Pomo.Core.Domain.Skill.EffectKind -> unit)>
+    (value: Pomo.Core.Domain.Skill.EffectKind)
+    (w: 'T)
+    =
+    w.set_Kind(value)
+    w
+
+  let inline colorFill<'T when 'T: (member set_ColorFill: Color -> unit)>
+    (value: Color)
+    (w: 'T)
+    =
+    w.set_ColorFill(value)
+    w
+
+  let inline colorBackground<'T
+    when 'T: (member set_ColorBackground: Color -> unit)>
+    (value: Color)
+    (w: 'T)
+    =
+    w.set_ColorBackground(value)
+    w
+
+  let inline maxValue<'T when 'T: (member set_MaxValue: float32 -> unit)>
+    (value: float32)
+    (w: 'T)
+    =
+    w.set_MaxValue(value)
+    w
+
+  let inline smoothSpeed<'T when 'T: (member set_SmoothSpeed: float32 -> unit)>
+    (value: float32)
+    (w: 'T)
+    =
+    w.set_SmoothSpeed(value)
     w
 
 
@@ -297,6 +388,21 @@ module HStack =
   let inline create() = HorizontalStackPanel()
   let inline spaced(spacing: int) = HorizontalStackPanel(Spacing = spacing)
 
+
+  let inline bindIndexListChildren<'T, 'W
+    when 'T :> Widget and 'W :> HorizontalStackPanel>
+    (childrenAVal: aval<'T IndexList>)
+    (w: 'W)
+    =
+    let sub =
+      childrenAVal.AddWeakCallback(fun (children: 'T IndexList) ->
+        w.Widgets.Clear()
+
+        for child in children do
+          w.Widgets.Add(child))
+
+    WidgetSubs.get(w).Add(sub)
+    w
 
 module VStack =
   let inline create() = VerticalStackPanel()

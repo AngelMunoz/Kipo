@@ -134,5 +134,79 @@ type ActionSlot() =
     context.DrawRectangle(borderRect, Color.Gray, 1.0f)
 
 
+type StatusEffectWidget() =
+  inherit Widget()
+
+  let mutable lastTime = TimeSpan.Zero
+  let mutable pulse = Pulse.create()
+
+  // Properties
+  member val CooldownEndTime = TimeSpan.Zero with get, set
+  member val TotalDurationSeconds = 0.0f with get, set
+  member val Kind = Pomo.Core.Domain.Skill.EffectKind.Buff with get, set
+  member val ColorBuff = Color.Green with get, set
+  member val ColorDebuff = Color.Red with get, set
+  member val ColorDot = Color.Orange with get, set
+  member val CooldownColor = Color(0, 0, 0, 160) with get, set
+
+  member val WorldTime: Time =
+    {
+      Delta = TimeSpan.Zero
+      TotalGameTime = TimeSpan.Zero
+      Previous = TimeSpan.Zero
+    } with get, set
+
+  override this.InternalRender(context) =
+    let bounds = this.ActualBounds
+    let now = this.WorldTime.TotalGameTime
+
+    let dt =
+      if lastTime = TimeSpan.Zero then
+        0.016f
+      else
+        float32 (now - lastTime).TotalSeconds |> min 0.1f
+
+    lastTime <- now
+
+    // Background
+    context.FillRectangle(bounds, Color(20, 20, 20, 200))
+
+    // Duration sweep
+    if this.CooldownEndTime > now && this.TotalDurationSeconds > 0.0f then
+      let remaining = (this.CooldownEndTime - now).TotalSeconds
+      let pct = MathHelper.Clamp(float32 remaining / this.TotalDurationSeconds, 0.0f, 1.0f)
+      let overlayHeight = int(float32 bounds.Height * pct)
+
+      if overlayHeight > 0 then
+        let overlayRect =
+          Rectangle(
+            bounds.X,
+            bounds.Y + bounds.Height - overlayHeight,
+            bounds.Width,
+            overlayHeight
+          )
+
+        context.FillRectangle(overlayRect, this.CooldownColor)
+
+    // Kind-based border
+    let borderColor =
+      match this.Kind with
+      | Pomo.Core.Domain.Skill.EffectKind.Buff -> this.ColorBuff
+      | Pomo.Core.Domain.Skill.EffectKind.Debuff
+      | Pomo.Core.Domain.Skill.EffectKind.Stun
+      | Pomo.Core.Domain.Skill.EffectKind.Silence
+      | Pomo.Core.Domain.Skill.EffectKind.Taunt -> this.ColorDebuff
+      | Pomo.Core.Domain.Skill.EffectKind.DamageOverTime ->
+        pulse <- Pulse.update 3.0f dt pulse
+        Color.Lerp(this.ColorDot, Color.Yellow, pulse.Intensity)
+      | _ -> Color.Gray
+
+    context.DrawRectangle(bounds, borderColor, 2.0f)
+
+
+module StatusEffect =
+  let create() = StatusEffectWidget()
+
+
 module ActionSlot =
   let create() = ActionSlot()
