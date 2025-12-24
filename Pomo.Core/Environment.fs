@@ -19,6 +19,7 @@ open Pomo.Core.Domain
 open Pomo.Core.Domain.Events
 open Pomo.Core.Domain.Item
 open Pomo.Core.Domain.Projectile
+open Pomo.Core.Domain.UI
 
 
 module Environment =
@@ -125,6 +126,7 @@ module Environment =
     abstract StateWrite: IStateWriteService
     abstract Random: Random
     abstract UIService: IUIService
+    abstract HUDService: IHUDService
 
   type StoreServices =
     abstract SkillStore: SkillStore

@@ -203,6 +203,12 @@ module UI =
       Layout = HUDLayout.defaults
     }
 
+  type IHUDService =
+    abstract Config: HUDConfig aval
+    abstract GetFactionColor: Faction -> Color
+    abstract SetPanelVisible: panelName: string -> visible: bool -> unit
+    abstract IsPanelVisible: panelName: string -> bool
+
 
   module Serialization =
     open JDeck

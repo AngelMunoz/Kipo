@@ -35,12 +35,14 @@ open Pomo.Core.Systems.EntitySpawnerLogic
 open Pomo.Core.Systems.StateWrite
 
 open Pomo.Core.Domain.Scenes
+open Pomo.Core.Domain.UI
 
 type GlobalScope = {
   Stores: StoreServices
   MonoGame: MonoGameServices
   Random: Random
   UIService: IUIService
+  HUDService: IHUDService
 }
 
 
@@ -99,12 +101,14 @@ module CompositionRoot =
       }
 
     let uiService = UIService.create()
+    let hudService = HUDService.create "Content/HUDConfig.json"
 
     {
       Stores = stores
       MonoGame = monoGame
       Random = Random.Shared
       UIService = uiService
+      HUDService = hudService
     }
 
   module SceneFactory =
@@ -194,6 +198,7 @@ module CompositionRoot =
                   member _.StateWrite = stateWriteService
                   member _.Random = scope.Random
                   member _.UIService = scope.UIService
+                  member _.HUDService = scope.HUDService
               }
 
             member _.GameplayServices =
@@ -438,9 +443,15 @@ module CompositionRoot =
         }
 
       let hudDrawComponent =
-        { new DrawableGameComponent(game) with
+        { new DrawableGameComponent(game, DrawOrder = Render.Layer.UI) with
             override _.LoadContent() =
-              let root = Systems.GameplayUI.build game publishHudGuiAction
+              let root =
+                Systems.GameplayUI.build
+                  game
+                  pomoEnv
+                  playerId
+                  publishHudGuiAction
+
               hudDesktop <- ValueSome(new Desktop(Root = root))
 
             override _.Draw(gameTime) =

@@ -7,6 +7,7 @@ open Myra.Graphics2D
 open Myra.Graphics2D.UI
 open FSharp.UMX
 open FSharp.Data.Adaptive
+open Pomo.Core
 open Pomo.Core.Domain
 open Pomo.Core.Domain.Units
 open Pomo.Core.Domain.Events
@@ -16,6 +17,7 @@ open Pomo.Core.Environment.Patterns
 open Pomo.Core.EventBus
 open Pomo.Core.Stores
 open Pomo.Core.Systems.UIService // Required for GuiAction
+open Pomo.Core.Environment
 
 module MainMenuUI =
   let build (game: Game) (publishGuiAction: GuiAction -> unit) =
@@ -37,10 +39,37 @@ module MainMenuUI =
 
     panel
 
+module private UIHelpers =
+  let mapAnchor
+    (anchor: UI.HUDAnchor)
+    : struct (HorizontalAlignment * VerticalAlignment) =
+    match anchor with
+    | UI.TopLeft -> HorizontalAlignment.Left, VerticalAlignment.Top
+    | UI.TopCenter -> HorizontalAlignment.Center, VerticalAlignment.Top
+    | UI.TopRight -> HorizontalAlignment.Right, VerticalAlignment.Top
+    | UI.CenterLeft -> HorizontalAlignment.Left, VerticalAlignment.Center
+    | UI.Center -> HorizontalAlignment.Center, VerticalAlignment.Center
+    | UI.CenterRight -> HorizontalAlignment.Right, VerticalAlignment.Center
+    | UI.BottomLeft -> HorizontalAlignment.Left, VerticalAlignment.Bottom
+    | UI.BottomCenter -> HorizontalAlignment.Center, VerticalAlignment.Bottom
+    | UI.BottomRight -> HorizontalAlignment.Right, VerticalAlignment.Bottom
+
 module GameplayUI =
-  let build (game: Game) (publishGuiAction: GuiAction -> unit) =
+  let build
+    (game: Game)
+    (env: PomoEnvironment)
+    (playerId: Guid<EntityId>)
+    (publishGuiAction: GuiAction -> unit)
+    =
     let panel = new Panel()
 
+    let (Core core) = env.CoreServices
+    let (Gameplay gameplay) = env.GameplayServices
+    let hudService = core.HUDService
+    let resources = core.World.Resources
+    let derivedStats = gameplay.Projections.DerivedStats
+
+    // 1. Top Panel (Existing)
     let topPanel = new HorizontalStackPanel(Spacing = 8)
     topPanel.HorizontalAlignment <- HorizontalAlignment.Right
     topPanel.VerticalAlignment <- VerticalAlignment.Top
@@ -48,10 +77,68 @@ module GameplayUI =
 
     let backButton = new Button()
     backButton.Content <- new Label(Text = "Back to Main Menu")
-
     backButton.Click.Add(fun _ -> publishGuiAction GuiAction.BackToMainMenu)
 
     topPanel.Widgets.Add(backButton)
     panel.Widgets.Add(topPanel)
+
+    // 2. HUD Components
+    let config = hudService.Config
+    let worldTime = core.World.Time
+
+    // Player Vitals
+    let layout = (AVal.force config).Layout.PlayerVitals
+
+    let resourceZero: Entity.Resource = {
+      HP = 0
+      MP = 0
+      Status = Entity.Status.Dead
+    }
+
+    let derivedStatsZero: Entity.DerivedStats = {
+      AP = 0
+      AC = 0
+      DX = 0
+      MP = 0
+      MA = 0
+      MD = 0
+      WT = 0
+      DA = 0
+      LK = 0
+      HP = 0
+      DP = 0
+      HV = 0
+      MS = 0
+      HPRegen = 0
+      MPRegen = 0
+      ElementAttributes = HashMap.empty
+      ElementResistances = HashMap.empty
+    }
+
+    let playerResources =
+      resources
+      |> AMap.tryFind playerId
+      |> AVal.map(Option.defaultValue resourceZero)
+
+    let derivedStats =
+      derivedStats
+      |> AMap.tryFind playerId
+      |> AVal.map(Option.defaultValue derivedStatsZero)
+
+    if layout.Visible then
+      let playerVitals =
+        HUDComponents.createPlayerVitals
+          config
+          worldTime
+          playerResources
+          derivedStats
+
+      let struct (hAlign, vAlign) = UIHelpers.mapAnchor layout.Anchor
+      playerVitals.HorizontalAlignment <- hAlign
+      playerVitals.VerticalAlignment <- vAlign
+      playerVitals.Left <- layout.OffsetX
+      playerVitals.Top <- layout.OffsetY
+
+      panel.Widgets.Add(playerVitals)
 
     panel

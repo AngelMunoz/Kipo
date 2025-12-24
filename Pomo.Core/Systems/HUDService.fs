@@ -8,33 +8,20 @@ open JDeck
 open Pomo.Core.Domain.UI
 open Pomo.Core.Domain.Entity
 
-type IHUDService =
-  abstract Config: HUDConfig aval
-  abstract GetFactionColor: Faction -> Color
-  abstract SetPanelVisible: panelName: string -> visible: bool -> unit
-  abstract IsPanelVisible: panelName: string -> bool
-
 module HUDService =
 
-  let private loadConfig(contentPath: string) : HUDConfig =
-    let configPath = Path.Combine(contentPath, "HUDConfig.json")
+  let private loadConfig(filePath: string) : HUDConfig =
+    try
+      let json =
+        Path.Combine(AppContext.BaseDirectory, filePath) |> File.ReadAllText
 
-    if File.Exists(configPath) then
-      try
-        let json = File.ReadAllText(configPath)
-
-        match Decoding.fromString(json, Serialization.HUDConfig.decoder) with
-        | Ok config -> config
-        | Error err ->
-          printfn $"[HUDService] Failed to parse HUDConfig.json: {err}"
-          HUDConfig.defaults
-      with ex ->
-        printfn $"[HUDService] Error reading HUDConfig.json: {ex.Message}"
+      match Decoding.fromString(json, Serialization.HUDConfig.decoder) with
+      | Ok config -> config
+      | Error err ->
+        printfn $"[HUDService] Failed to parse HUDConfig.json: {err}"
         HUDConfig.defaults
-    else
-      printfn
-        $"[HUDService] HUDConfig.json not found at {configPath}, using defaults"
-
+    with ex ->
+      printfn $"[HUDService] Error loading HUDConfig.json: {ex.Message}"
       HUDConfig.defaults
 
   let create(contentPath: string) : IHUDService =

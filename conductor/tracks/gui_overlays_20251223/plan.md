@@ -8,15 +8,15 @@
 
 ## Phase 1: Infrastructure & Theming
 
-- [ ] Task: Define `HUDTheme` and `HUDLayout` types
+- [x] Task: Define `HUDTheme` and `HUDLayout` types
     - Create a module for UI definitions (`Pomo.Core/Domain/UI.fs` or similar)
     - `HUDTheme`: Record with color palette (gradients for HP/MP), fonts, texture region names
     - `HUDLayout`: Record defining position, anchor, and visibility for each HUD component
-- [ ] Task: Create `HUDService`
+- [x] Task: Create `HUDService`
     - Service to load/manage current layout and theme at runtime
     - Expose reactive observables for theme/layout changes
     - Provide helpers for common operations (color by faction, easing functions)
-- [ ] Task: Implement Animation/Transition Utilities
+- [x] Task: Implement Animation/Transition Utilities
     - Simple easing functions (ease-out for health changes, linear for cooldowns)
     - Value interpolation helpers for smooth bar fills
 - [ ] Task: Conductor - User Manual Verification 'Phase 1: Infrastructure & Theming' (Protocol in workflow.md)
