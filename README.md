@@ -56,6 +56,39 @@ Kipo/
 └── docs/                # Additional documentation
 ```
 
+## Feel curious? Give it a shot
+
+> [!NOTE]
+> These bindings are for testing and will likely change but overall this is how the keybindings are structured
+
+There's currently 3 action sets, you can change them by pressing 1, 2 or 3 in your keyboard
+The action sets span in a "square" in the keyboard
+
+Q, W, E, R
+A, S, D, F
+
+Those keys contain the skills.
+
+Action Set 1
+
+Q -> press Q then click anywhere, no need to select enemy entity
+W, E, R -> Press the Key, then click on an enemy entity 
+A, S -> press to "activate buffs"
+
+Action Set 2
+
+Q -> HP Potion
+W -> HP Regenerating potion
+
+Action Set 3
+Q, W -> Press Key then click in the direction you want to launch the attack
+E, R -> Press Key then click on enemy entity
+A -> Press Key then click in the direction you want to launch the attack
+S -> Press Key then click anywhere to launch a charged attack in the selected position
+
+I will add these to the readme so it is easier to poke around
+
+
 ## Getting Started
 
 ### Prerequisites
