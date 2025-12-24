@@ -48,6 +48,9 @@
     <Compile Include="Rendering/LightEmitter.fs" />
     <Compile Include="Rendering/EntityPicker.fs" />
     <Compile Include="Environment.fs" />
+    <Compile Include="UI/MyraExtensions.fs" />
+    <Compile Include="UI/HUDAnimation.fs" />
+    <Compile Include="UI/Widgets.fs" />
     <Compile Include="Systems/GameLogic.fs" />
     <Compile Include="Systems/World.fs" />
     <Compile Include="Systems/FormulaEvaluator.fs" />
@@ -81,7 +84,6 @@
     <Compile Include="Systems/AnimationSystem.fs" />
     <Compile Include="Systems/MotionStateAnimation.fs" />
     <Compile Include="Systems/WorldMapService.fs" />
-    <Compile Include="Systems/HUDAnimation.fs" />
     <Compile Include="Systems/HUDService.fs" />
     <Compile Include="Systems/HUDComponents.fs" />
     <Compile Include="Systems/UIService.fs" />

@@ -1,4 +1,4 @@
-namespace Pomo.Core.Systems
+namespace Pomo.Core.UI
 
 open System
 
