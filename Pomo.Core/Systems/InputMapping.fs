@@ -140,6 +140,7 @@ module InputMapping =
       Key Keys.A, UseSlot5
       Key Keys.S, UseSlot6
       Key Keys.D, UseSlot7
+      Key Keys.F, UseSlot8
       Key Keys.Z, ToggleJournal
       Key Keys.X, ToggleInventory
       Key Keys.C, ToggleAbilities

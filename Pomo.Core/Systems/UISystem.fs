@@ -16,6 +16,8 @@ open Pomo.Core.Systems
 open Pomo.Core.Environment.Patterns
 open Pomo.Core.EventBus
 open Pomo.Core.Stores
+open Pomo.Core.Domain.Core
+open Pomo.Core.Domain.Action
 open Pomo.Core.Systems.UIService // Required for GuiAction
 open Pomo.Core.Environment
 
@@ -140,5 +142,56 @@ module GameplayUI =
       playerVitals.Top <- layout.OffsetY
 
       panel.Widgets.Add(playerVitals)
+
+    // Action Bar
+    let actionBarLayout = (AVal.force config).Layout.ActionBar
+
+    if actionBarLayout.Visible then
+      let actionSetsEmpty =
+        HashMap.empty<int, HashMap<Action.GameAction, SlotProcessing>>
+
+      let actionSets =
+        core.World.ActionSets
+        |> AMap.tryFind playerId
+        |> AVal.map(Option.defaultValue actionSetsEmpty)
+
+      let activeSetIndex =
+        core.World.ActiveActionSets
+        |> AMap.tryFind playerId
+        |> AVal.map(Option.defaultValue 0)
+
+      let cooldownsEmpty = HashMap.empty<int<SkillId>, TimeSpan>
+
+      let cooldowns =
+        core.World.AbilityCooldowns
+        |> AMap.tryFind playerId
+        |> AVal.map(Option.defaultValue cooldownsEmpty)
+
+      let inputMapEmpty = HashMap.empty<RawInput, GameAction>
+
+      let inputMap =
+        core.World.InputMaps
+        |> AMap.tryFind playerId
+        |> AVal.map(Option.defaultValue inputMapEmpty)
+
+      let (Stores stores) = env.StoreServices
+
+      let actionBar =
+        HUDComponents.createActionBar
+          config
+          worldTime
+          actionSets
+          activeSetIndex
+          cooldowns
+          inputMap
+          stores.SkillStore
+
+      let struct (hAlign, vAlign) = UIHelpers.mapAnchor actionBarLayout.Anchor
+      actionBar.HorizontalAlignment <- hAlign
+      actionBar.VerticalAlignment <- vAlign
+      actionBar.Left <- actionBarLayout.OffsetX
+      actionBar.Top <- actionBarLayout.OffsetY
+
+      panel.Widgets.Add(actionBar)
 
     panel

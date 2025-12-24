@@ -8,7 +8,17 @@ open FSharp.Data.Adaptive
 open Pomo.Core.Domain.UI
 open Pomo.Core.Domain.Entity
 open Pomo.Core.Domain.World
+open Pomo.Core.Domain.Action
+open Pomo.Core.Domain.Core
+open Pomo.Core.Domain.Units
+open Pomo.Core.Domain.Skill
+open Pomo.Core.Domain.RawInput
+open Pomo.Core.Stores
 open Pomo.Core.Systems.HUDAnimation
+open Microsoft.Xna.Framework.Input
+
+// Alias to avoid conflict with Skill.GroundAreaKind.Rectangle
+type Rect = Microsoft.Xna.Framework.Rectangle
 
 module HUDComponents =
 
@@ -69,8 +79,7 @@ module HUDComponents =
             let fillWidth = int(float32 bounds.Width * fillPct)
 
             if fillWidth > 0 then
-              let fillRect =
-                Rectangle(bounds.X, bounds.Y, fillWidth, bounds.Height)
+              let fillRect = Rect(bounds.X, bounds.Y, fillWidth, bounds.Height)
 
               let isLowHealth = fillPct < 0.25f
 
@@ -137,6 +146,235 @@ module HUDComponents =
         updateHp (float32 hp) (float32 maxHp)
         updateMp (float32 mp) (float32 maxMp)
         hpLabel.Text <- $"{int hp} / {int maxHp}")
+
+    panel.Tag <- _subscription :> obj
+    panel
+
+
+  let private getSkillAbbreviation
+    (skillStore: SkillStore)
+    (skillId: int<SkillId>)
+    =
+    match skillStore.tryFind skillId with
+    | ValueSome(Skill.Active active) ->
+      let name = active.Name
+
+      if name.Length <= 2 then
+        name
+      elif name.Contains(" ") then
+        let words = name.Split(' ')
+        $"{words.[0].[0]}{words.[1].[0]}"
+      else
+        name.Substring(0, min 2 name.Length)
+    | ValueSome(Skill.Passive passive) ->
+      let name = passive.Name
+
+      if name.Length <= 2 then
+        name
+      else
+        name.Substring(0, min 2 name.Length)
+    | ValueNone -> "??"
+
+
+  let private slotActions = [|
+    GameAction.UseSlot1
+    GameAction.UseSlot2
+    GameAction.UseSlot3
+    GameAction.UseSlot4
+    GameAction.UseSlot5
+    GameAction.UseSlot6
+    GameAction.UseSlot7
+    GameAction.UseSlot8
+  |]
+
+  let private slotCount = slotActions.Length
+
+
+  let private getKeyLabelForAction (inputMap: InputMap) (action: GameAction) =
+    // Reverse lookup: find the RawInput that maps to this action
+    inputMap
+    |> HashMap.fold
+      (fun acc rawInput mappedAction ->
+        match acc with
+        | Some _ -> acc // Already found
+        | None ->
+          if mappedAction = action then
+            match rawInput with
+            | Key k ->
+              let name = k.ToString()
+
+              if name.StartsWith("D") && name.Length = 2 then
+                Some(name.Substring(1)) // D1 -> 1
+              else
+                Some name
+            | _ -> None
+          else
+            None)
+      None
+    |> Option.defaultValue "?"
+
+
+  let createActionSlot (config: HUDConfig aval) (worldTime: Time aval) =
+    let mutable skillAbbrev = ""
+    let mutable cooldownEndTime = TimeSpan.Zero
+    let mutable bgColor = Color.DarkSlateGray
+    let mutable cooldownColor = Color(0, 0, 0, 160)
+    let mutable lastTime = TimeSpan.Zero
+    let mutable keybindText = "?"
+
+    config.AddWeakCallback(fun cfg ->
+      cooldownColor <- cfg.Theme.CooldownOverlayColor)
+    |> ignore
+
+    let keyLabel = new Label()
+
+    let widget =
+      { new Widget() with
+          override this.InternalRender(context) =
+            let bounds = this.ActualBounds
+            let time = AVal.force worldTime
+            lastTime <- time.TotalGameTime
+
+            // Background
+            context.FillRectangle(bounds, bgColor)
+
+            // Cooldown overlay (vertical sweep from bottom)
+            if cooldownEndTime > time.TotalGameTime then
+              let remaining =
+                (cooldownEndTime - time.TotalGameTime).TotalSeconds
+
+              let cdPct =
+                MathHelper.Clamp(float32 remaining / 10.0f, 0.0f, 1.0f)
+
+              let overlayHeight = int(float32 bounds.Height * cdPct)
+
+              if overlayHeight > 0 then
+                let overlayRect =
+                  Rect(
+                    bounds.X,
+                    bounds.Y + bounds.Height - overlayHeight,
+                    bounds.Width,
+                    overlayHeight
+                  )
+
+                context.FillRectangle(overlayRect, cooldownColor)
+
+            // Border
+            let borderRect =
+              Rect(bounds.X, bounds.Y, bounds.Width, bounds.Height)
+
+            context.DrawRectangle(borderRect, Color.Gray, 1.0f)
+      }
+
+    widget.Width <- 40
+    widget.Height <- 40
+    widget.ClipToBounds <- true
+
+    // Overlay container for text
+    let container = new Panel()
+    container.Width <- 40
+    container.Height <- 40
+
+    container.Widgets.Add(widget)
+
+    // Skill abbreviation label
+    let abbrevLabel = new Label()
+    abbrevLabel.HorizontalAlignment <- HorizontalAlignment.Center
+    abbrevLabel.VerticalAlignment <- VerticalAlignment.Center
+    abbrevLabel.TextColor <- Color.White
+    container.Widgets.Add(abbrevLabel)
+
+    // Keybind label in corner
+    keyLabel.Text <- keybindText
+    keyLabel.HorizontalAlignment <- HorizontalAlignment.Right
+    keyLabel.VerticalAlignment <- VerticalAlignment.Top
+    keyLabel.TextColor <- Color.LightGray
+    keyLabel.Margin <- Thickness(0, 2, 4, 0)
+    container.Widgets.Add(keyLabel)
+
+    let updateSlot (abbrev: string) (cdEnd: TimeSpan) (keyLbl: string) =
+      skillAbbrev <- abbrev
+      cooldownEndTime <- cdEnd
+      abbrevLabel.Text <- abbrev
+
+      if keyLbl <> keybindText then
+        keybindText <- keyLbl
+        keyLabel.Text <- keyLbl
+
+    struct (container, updateSlot)
+
+
+  let createActionBar
+    (config: HUDConfig aval)
+    (worldTime: Time aval)
+    (actionSets: HashMap<int, HashMap<GameAction, SlotProcessing>> aval)
+    (activeSetIndex: int aval)
+    (cooldowns: HashMap<int<SkillId>, TimeSpan> aval)
+    (inputMap: InputMap aval)
+    (skillStore: SkillStore)
+    =
+    let panel = new HorizontalStackPanel(Spacing = 4)
+
+    // Action set indicator (shows which set is active: 1-8)
+    let setIndicator = new Label()
+    setIndicator.Text <- "1"
+    setIndicator.TextColor <- Color.Yellow
+    setIndicator.VerticalAlignment <- VerticalAlignment.Center
+    setIndicator.Margin <- Thickness(0, 0, 8, 0)
+    panel.Widgets.Add(setIndicator)
+
+    let slots = [|
+      for _ in 0 .. slotCount - 1 ->
+        let struct (widget, update) = createActionSlot config worldTime
+        panel.Widgets.Add(widget)
+        struct (widget, update)
+    |]
+
+    let updateAllSlots
+      (sets: HashMap<int, HashMap<GameAction, SlotProcessing>>)
+      (setIdx: int)
+      (cds: HashMap<int<SkillId>, TimeSpan>)
+      (imap: InputMap)
+      =
+      match HashMap.tryFindV setIdx sets with
+      | ValueSome activeSet ->
+        for i in 0 .. slotCount - 1 do
+          let action = slotActions.[i]
+          let struct (_widget, update) = slots.[i]
+          let keyLbl = getKeyLabelForAction imap action
+
+          match HashMap.tryFindV action activeSet with
+          | ValueSome(SlotProcessing.Skill skillId) ->
+            let abbrev = getSkillAbbreviation skillStore skillId
+
+            let cdEnd =
+              HashMap.tryFindV skillId cds
+              |> ValueOption.defaultValue TimeSpan.Zero
+
+            update abbrev cdEnd keyLbl
+          | ValueSome(SlotProcessing.Item _) ->
+            update "ITM" TimeSpan.Zero keyLbl
+          | ValueNone -> update "" TimeSpan.Zero keyLbl
+      | ValueNone ->
+        for i in 0 .. slotCount - 1 do
+          let struct (_widget, update) = slots.[i]
+          update "" TimeSpan.Zero "?"
+
+    let combinedData =
+      let sets_idx =
+        (actionSets, activeSetIndex) ||> AVal.map2(fun s i -> struct (s, i))
+
+      let cds_imap =
+        (cooldowns, inputMap) ||> AVal.map2(fun c im -> struct (c, im))
+
+      (sets_idx, cds_imap)
+      ||> AVal.map2(fun (struct (s, i)) (struct (c, im)) ->
+        struct (s, i, c, im))
+
+    let _subscription =
+      combinedData.AddWeakCallback(fun (struct (sets, idx, cds, imap)) ->
+        setIndicator.Text <- $"{idx}"
+        updateAllSlots sets idx cds imap)
 
     panel.Tag <- _subscription :> obj
     panel
