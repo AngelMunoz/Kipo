@@ -1,0 +1,75 @@
+{
+  "Theme": {
+    "Colors": {
+      "HealthFill": "#C83C3C",
+      "HealthLow": "#FF5050",
+      "HealthBackground": "#281414",
+      "ManaFill": "#3C50B4",
+      "ManaBackground": "#141428",
+      "BuffBorder": "#3CB450",
+      "DebuffBorder": "#B43C3C",
+      "DotBorder": "#DC8C28",
+      "FactionPlayer": "#64C8FF",
+      "FactionAlly": "#3CB464",
+      "FactionEnemy": "#C83C3C",
+      "FactionNPC": "#C8B464",
+      "FactionNeutral": "#8C8C8C"
+    },
+    "FontName": "monogram-extended",
+    "CooldownOverlayColor": "#000000A0",
+    "TooltipBackground": "#14141AF0",
+    "TooltipBorder": "#50505A",
+    "BarBorderWidth": 2,
+    "BarCornerRadius": 4
+  },
+  "Layout": {
+    "PlayerVitals": {
+      "Anchor": "BottomLeft",
+      "OffsetX": 20,
+      "OffsetY": -20,
+      "Visible": true
+    },
+    "ActionBar": {
+      "Anchor": "BottomCenter",
+      "OffsetX": 0,
+      "OffsetY": -20,
+      "Visible": true
+    },
+    "StatusEffects": {
+      "Anchor": "TopRight",
+      "OffsetX": -20,
+      "OffsetY": 80,
+      "Visible": true
+    },
+    "TargetFrame": {
+      "Anchor": "TopCenter",
+      "OffsetX": 0,
+      "OffsetY": 20,
+      "Visible": true
+    },
+    "CastBar": {
+      "Anchor": "BottomCenter",
+      "OffsetX": 0,
+      "OffsetY": -100,
+      "Visible": true
+    },
+    "CharacterSheet": {
+      "Anchor": "CenterLeft",
+      "OffsetX": 40,
+      "OffsetY": 0,
+      "Visible": false
+    },
+    "EquipmentPanel": {
+      "Anchor": "CenterRight",
+      "OffsetX": -40,
+      "OffsetY": 0,
+      "Visible": false
+    },
+    "MiniMap": {
+      "Anchor": "TopRight",
+      "OffsetX": -20,
+      "OffsetY": 20,
+      "Visible": true
+    }
+  }
+}

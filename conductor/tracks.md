@@ -9,5 +9,5 @@ This file tracks all major tracks for the project. Each track has its own detail
 
 ---
 
-## [ ] Track: GUI Overlays (ARPG Hud)
+## [~] Track: GUI Overlays (ARPG Hud)
 *Link: [./conductor/tracks/gui_overlays_20251223/](./conductor/tracks/gui_overlays_20251223/)*
