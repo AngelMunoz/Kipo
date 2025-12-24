@@ -35,41 +35,62 @@ module HUDService =
           let cfg = AVal.force config
           HUDColorPalette.getColorForFaction cfg.Theme.Colors faction
 
-        member _.SetPanelVisible (panelName: string) (visible: bool) =
+        member this.TogglePanelVisible(panelId: HUDPanelId) =
+          let current = this.IsPanelVisible panelId
+          this.SetPanelVisible panelId (not current)
+
+        member _.SetPanelVisible (panelId: HUDPanelId) (visible: bool) =
           transact(fun () ->
             let current = config.Value
 
-            let newLayout =
-              match panelName with
-              | "CharacterSheet" -> {
-                  current.Layout with
-                      CharacterSheet = {
-                        current.Layout.CharacterSheet with
-                            Visible = visible
-                      }
+            let newConfig =
+              match panelId with
+              | HUDPanelId.PlayerVitals -> {
+                  current with
+                      Layout.PlayerVitals.Visible = visible
                 }
-              | "EquipmentPanel" -> {
-                  current.Layout with
-                      EquipmentPanel = {
-                        current.Layout.EquipmentPanel with
-                            Visible = visible
-                      }
+              | HUDPanelId.ActionBar -> {
+                  current with
+                      Layout.ActionBar.Visible = visible
                 }
-              | _ -> current.Layout
+              | HUDPanelId.StatusEffects -> {
+                  current with
+                      Layout.StatusEffects.Visible = visible
+                }
+              | HUDPanelId.TargetFrame -> {
+                  current with
+                      Layout.TargetFrame.Visible = visible
+                }
+              | HUDPanelId.CastBar -> {
+                  current with
+                      Layout.CastBar.Visible = visible
+                }
+              | HUDPanelId.CharacterSheet -> {
+                  current with
+                      Layout.CharacterSheet.Visible = visible
+                }
+              | HUDPanelId.EquipmentPanel -> {
+                  current with
+                      Layout.EquipmentPanel.Visible = visible
+                }
+              | HUDPanelId.MiniMap ->
+                  {
+                    current with
+                        Layout.MiniMap.Visible = visible
+                  }
 
-            config.Value <- { current with Layout = newLayout })
+            config.Value <- newConfig)
 
-        member _.IsPanelVisible(panelName: string) =
+        member _.IsPanelVisible(panelId: HUDPanelId) =
           let cfg = AVal.force config
 
-          match panelName with
-          | "CharacterSheet" -> cfg.Layout.CharacterSheet.Visible
-          | "EquipmentPanel" -> cfg.Layout.EquipmentPanel.Visible
-          | "PlayerVitals" -> cfg.Layout.PlayerVitals.Visible
-          | "ActionBar" -> cfg.Layout.ActionBar.Visible
-          | "StatusEffects" -> cfg.Layout.StatusEffects.Visible
-          | "TargetFrame" -> cfg.Layout.TargetFrame.Visible
-          | "CastBar" -> cfg.Layout.CastBar.Visible
-          | "MiniMap" -> cfg.Layout.MiniMap.Visible
-          | _ -> false
+          match panelId with
+          | HUDPanelId.PlayerVitals -> cfg.Layout.PlayerVitals.Visible
+          | HUDPanelId.ActionBar -> cfg.Layout.ActionBar.Visible
+          | HUDPanelId.StatusEffects -> cfg.Layout.StatusEffects.Visible
+          | HUDPanelId.TargetFrame -> cfg.Layout.TargetFrame.Visible
+          | HUDPanelId.CastBar -> cfg.Layout.CastBar.Visible
+          | HUDPanelId.CharacterSheet -> cfg.Layout.CharacterSheet.Visible
+          | HUDPanelId.EquipmentPanel -> cfg.Layout.EquipmentPanel.Visible
+          | HUDPanelId.MiniMap -> cfg.Layout.MiniMap.Visible
     }

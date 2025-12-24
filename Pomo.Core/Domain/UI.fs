@@ -197,7 +197,7 @@ module UI =
       CharacterSheet = {
         Anchor = CenterLeft
         OffsetX = 40
-        OffsetY = 0
+        OffsetY = -100
         Visible = false
       }
       EquipmentPanel = {
@@ -223,11 +223,23 @@ module UI =
       Layout = HUDLayout.defaults
     }
 
+  [<Struct>]
+  type HUDPanelId =
+    | PlayerVitals
+    | ActionBar
+    | StatusEffects
+    | TargetFrame
+    | CastBar
+    | CharacterSheet
+    | EquipmentPanel
+    | MiniMap
+
   type IHUDService =
     abstract Config: HUDConfig aval
     abstract GetFactionColor: Faction -> Color
-    abstract SetPanelVisible: panelName: string -> visible: bool -> unit
-    abstract IsPanelVisible: panelName: string -> bool
+    abstract TogglePanelVisible: HUDPanelId -> unit
+    abstract SetPanelVisible: HUDPanelId -> bool -> unit
+    abstract IsPanelVisible: HUDPanelId -> bool
 
 
   module Serialization =

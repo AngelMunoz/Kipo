@@ -48,6 +48,9 @@ type ResourceBar() =
       Previous = TimeSpan.Zero
     } with get, set
 
+  // Make this widget click-through (display only)
+  override _.HitTest(_: Point) = null
+
 
   override this.InternalRender(context) =
     let bounds = this.ActualBounds
@@ -270,6 +273,9 @@ type CombatIndicator() =
       Previous = TimeSpan.Zero
     } with get, set
 
+  // Make this widget click-through by never accepting hits
+  override _.HitTest(_: Point) = null
+
   override this.InternalRender(context) =
     let bounds = this.ActualBounds
     let now = this.WorldTime.TotalGameTime
@@ -287,7 +293,7 @@ type CombatIndicator() =
 
     if visualAlpha > 0.01f then
       let color = this.Color * (visualAlpha * 0.4f)
-      let thickness = 60
+      let thickness = 10
 
       // Draw edge glow (simulated with 4 rectangles)
       // Top
@@ -416,3 +422,18 @@ type MiniMap() =
 
 module MiniMap =
   let create() = MiniMap()
+
+
+type EquipmentSlot() =
+  inherit Widget()
+
+  member val BgColor = Color.DarkSlateGray with get, set
+
+  override this.InternalRender(context) =
+    let bounds = this.ActualBounds
+    context.FillRectangle(bounds, this.BgColor)
+    context.DrawRectangle(bounds, Color.Gray, 1.0f)
+
+
+module EquipmentSlot =
+  let create() = EquipmentSlot()

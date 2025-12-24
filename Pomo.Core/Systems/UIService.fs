@@ -8,6 +8,8 @@ type GuiAction =
   | OpenSettings
   | ExitGame
   | BackToMainMenu
+  | ToggleCharacterSheet
+  | ToggleEquipment
 
 module UIService =
 

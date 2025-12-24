@@ -33,6 +33,7 @@ module W =
   open System.Collections.Generic
   open Pomo.Core.Domain.Units
   open Pomo.Core.Domain.Entity
+  open Myra.Graphics2D.Brushes
 
   let inline width<'T when 'T: (member set_Width: Nullable<int> -> unit)>
     (value: int)
@@ -73,6 +74,10 @@ module W =
     (w: 'T)
     : 'T =
     w.set_VerticalAlignment align
+    w
+
+  let inline enabled<'T when 'T :> Widget> (value: bool) (w: 'T) : 'T =
+    (w :> Widget).Enabled <- value
     w
 
   let inline margin<'T when 'T: (member set_Margin: Thickness -> unit)>
@@ -264,6 +269,22 @@ module W =
     let sub = aval.AddWeakCallback(fun v -> w.set_ColorBackground(v))
     WidgetSubs.get(w).Add(sub)
     w
+
+  let inline bindBackgroundBrush<'T
+    when 'T :> Widget and 'T: (member set_Backround: IBrush -> unit)>
+    (aval: aval<IBrush>)
+    (w: 'T)
+    =
+    let sub = aval.AddWeakCallback(fun v -> w.set_Backround(v))
+    WidgetSubs.get(w).Add(sub)
+    w
+
+  let inline bindBackground<'T
+    when 'T :> Widget and 'T: (member set_Backround: IBrush -> unit)>
+    (aval: aval<Color>)
+    (w: 'T)
+    =
+    w |> bindBackgroundBrush(aval |> AVal.map(fun c -> SolidBrush c :> IBrush))
 
   let inline bindCooldownEndTime<'T
     when 'T :> Widget and 'T: (member set_CooldownEndTime: TimeSpan -> unit)>
@@ -466,6 +487,7 @@ module Label =
 
 
 module Panel =
+  open Myra.Graphics2D.Brushes
   let inline create() = Panel()
 
   let inline sized (width: int) (height: int) =
@@ -485,6 +507,21 @@ module Panel =
     WidgetSubs.get(w).Add(sub)
     w
 
+  let inline bindBackgroundBrush<'T
+    when 'T :> Panel and 'T: (member set_Background: IBrush -> unit)>
+    (aval: aval<IBrush>)
+    (w: 'T)
+    =
+    let sub = aval.AddWeakCallback(fun v -> w.set_Background(v))
+    WidgetSubs.get(w).Add(sub)
+    w
+
+  let inline bindBackground<'T
+    when 'T :> Panel and 'T: (member set_Background: IBrush -> unit)>
+    (aval: aval<Color>)
+    (w: 'T)
+    =
+    w |> bindBackgroundBrush(aval |> AVal.map(fun c -> SolidBrush c :> IBrush))
 
 module HStack =
   let inline create() = HorizontalStackPanel()
@@ -508,6 +545,37 @@ module HStack =
 module VStack =
   let inline create() = VerticalStackPanel()
   let inline spaced(spacing: int) = VerticalStackPanel(Spacing = spacing)
+
+
+module Grid =
+  let inline create() = Grid()
+
+  let inline spaced (columnSpacing: int) (rowSpacing: int) =
+    Grid(ColumnSpacing = columnSpacing, RowSpacing = rowSpacing)
+
+  let inline columns (proportions: Proportion list) (grid: Grid) =
+    for p in proportions do
+      grid.ColumnsProportions.Add(p)
+
+    grid
+
+  let inline rows (proportions: Proportion list) (grid: Grid) =
+    for p in proportions do
+      grid.RowsProportions.Add(p)
+
+    grid
+
+  let inline autoColumns (count: int) (grid: Grid) =
+    for _ in 1..count do
+      grid.ColumnsProportions.Add(Proportion(ProportionType.Auto))
+
+    grid
+
+  let inline autoRows (count: int) (grid: Grid) =
+    for _ in 1..count do
+      grid.RowsProportions.Add(Proportion(ProportionType.Auto))
+
+    grid
 
 
 module Btn =

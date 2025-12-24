@@ -6,6 +6,7 @@ open Myra.Graphics2D.UI
 open Myra.Graphics2D
 open FSharp.UMX
 open FSharp.Data.Adaptive
+open Pomo.Core
 open Pomo.Core.Domain.UI
 open Pomo.Core.Domain.Entity
 open Pomo.Core.Domain.World
@@ -23,6 +24,7 @@ type Rect = Microsoft.Xna.Framework.Rectangle
 module HUDComponents =
   open Pomo.Core.UI.HUDAnimation
   open System.Collections.Generic
+  open Pomo.Core.Domain.Item
 
   /// Common functions shared across multiple components
   module Common =
@@ -541,6 +543,68 @@ module HUDComponents =
 
     frame
 
+  /// Functions for CharacterSheet component
+  module CharacterSheet =
+    /// Format a stat label with its derived source if applicable
+    let getStatLabel (label: string) (derivedFrom: string option) =
+      match derivedFrom with
+      | Some source -> $"{label} ({source})"
+      | None -> label
+
+    let createStatRow (label: string) (valueAVal: string aval) =
+      let lbl = Label.colored label Color.LightGray
+
+      let valLbl =
+        Label.colored "0" Color.White
+        |> W.hAlign HorizontalAlignment.Right
+        |> W.bindText valueAVal
+
+      Panel.create() |> W.height 20 |> W.childrenP [ lbl; valLbl ]
+
+    let createStatSection (title: string) (rows: Widget list) =
+      let titleLbl = Label.colored title Color.Yellow |> W.margin4 0 8 0 4
+
+      VStack.create() |> W.childrenV [ titleLbl :> Widget; yield! rows ]
+
+  /// Functions for Equipment component
+  module Equipment =
+    /// Get item abbreviation for an equipped slot
+    let getEquippedItemAbbreviation
+      (itemStore: ItemStore)
+      (itemInstances: IReadOnlyDictionary<Guid<ItemInstanceId>, ItemInstance>)
+      (items: HashMap<Slot, Guid<ItemInstanceId>>)
+      (slot: Slot)
+      =
+      items.TryFindV slot
+      |> ValueOption.bind(fun id -> itemInstances |> Dictionary.tryFindV id)
+      |> ValueOption.bind(fun inst -> itemStore.tryFind inst.ItemId)
+      |> ValueOption.map(fun def -> Common.extractAbbreviation def.Name)
+      |> ValueOption.defaultValue ""
+
+    let createSlot
+      (worldTime: Time aval)
+      (bgColor: Color aval)
+      (slotName: string)
+      (itemAbbrev: string aval)
+      =
+      let slot = EquipmentSlot.create() |> W.size 48 48 |> W.bindBgColor bgColor
+
+      let nameLabel =
+        Label.create slotName
+        |> W.textColor Color.Gray
+        |> W.hAlign HorizontalAlignment.Center
+        |> W.vAlign VerticalAlignment.Top
+        |> W.margin4 0 2 0 0
+
+      let abbrevLabel =
+        Label.create ""
+        |> W.textColor Color.White
+        |> W.hAlign HorizontalAlignment.Center
+        |> W.vAlign VerticalAlignment.Center
+        |> W.bindText itemAbbrev
+
+      Panel.sized 48 48 |> W.childrenP [ slot; nameLabel; abbrevLabel ]
+
   let createCastBar
     (config: HUDConfig aval)
     (worldTime: Time aval)
@@ -600,9 +664,253 @@ module HUDComponents =
       ||> AVal.map2(fun until time -> until > time.TotalGameTime)
 
     CombatIndicator.create()
+    |> W.hAlign HorizontalAlignment.Stretch
+    |> W.vAlign VerticalAlignment.Stretch
     |> W.bindIsInCombat isInCombat
     |> W.bindWorldTime worldTime
     |> W.bindColor combatColor
+
+
+  let createCharacterSheet
+    (config: HUDConfig aval)
+    (baseStats: BaseStats aval)
+    (derivedStats: DerivedStats aval)
+    =
+    // Base stats row
+    let baseSection =
+      CharacterSheet.createStatSection "Base Stats" [
+        CharacterSheet.createStatRow
+          "Power"
+          (baseStats |> AVal.map(fun s -> string s.Power))
+        CharacterSheet.createStatRow
+          "Charm"
+          (baseStats |> AVal.map(fun s -> string s.Charm))
+        CharacterSheet.createStatRow
+          "Magic"
+          (baseStats |> AVal.map(fun s -> string s.Magic))
+        CharacterSheet.createStatRow
+          "Sense"
+          (baseStats |> AVal.map(fun s -> string s.Sense))
+      ]
+
+    // Power column (left)
+    let powerColumn =
+      VStack.spaced 2
+      |> W.childrenV [
+        Label.colored "Power" Color.Yellow :> Widget
+        CharacterSheet.createStatRow
+          "AP"
+          (derivedStats |> AVal.map(fun s -> string s.AP))
+        CharacterSheet.createStatRow
+          "AC"
+          (derivedStats |> AVal.map(fun s -> string s.AC))
+        CharacterSheet.createStatRow
+          "DX"
+          (derivedStats |> AVal.map(fun s -> string s.DX))
+      ]
+
+    // Charm column
+    let charmColumn =
+      VStack.spaced 2
+      |> W.childrenV [
+        Label.colored "Charm" Color.Yellow :> Widget
+        CharacterSheet.createStatRow
+          "HP"
+          (derivedStats |> AVal.map(fun s -> string s.HP))
+        CharacterSheet.createStatRow
+          "DP"
+          (derivedStats |> AVal.map(fun s -> string s.DP))
+        CharacterSheet.createStatRow
+          "HV"
+          (derivedStats |> AVal.map(fun s -> string s.HV))
+      ]
+
+    // Magic column
+    let magicColumn =
+      VStack.spaced 2
+      |> W.childrenV [
+        Label.colored "Magic" Color.Yellow :> Widget
+        CharacterSheet.createStatRow
+          "MP"
+          (derivedStats |> AVal.map(fun s -> string s.MP))
+        CharacterSheet.createStatRow
+          "MA"
+          (derivedStats |> AVal.map(fun s -> string s.MA))
+        CharacterSheet.createStatRow
+          "MD"
+          (derivedStats |> AVal.map(fun s -> string s.MD))
+      ]
+
+    // Sense column (right)
+    let senseColumn =
+      VStack.spaced 2
+      |> W.childrenV [
+        Label.colored "Sense" Color.Yellow :> Widget
+        CharacterSheet.createStatRow
+          "WT"
+          (derivedStats |> AVal.map(fun s -> string s.WT))
+        CharacterSheet.createStatRow
+          "DA"
+          (derivedStats |> AVal.map(fun s -> string s.DA))
+        CharacterSheet.createStatRow
+          "LK"
+          (derivedStats |> AVal.map(fun s -> string s.LK))
+      ]
+
+    // 4-column derived stats row
+    let derivedGrid =
+      HStack.spaced 8
+      |> W.childrenH [ powerColumn; charmColumn; magicColumn; senseColumn ]
+
+    // General stats section (MS, Regen)
+    let generalSection =
+      CharacterSheet.createStatSection "General" [
+        CharacterSheet.createStatRow
+          "Move Speed"
+          (derivedStats |> AVal.map(fun s -> string s.MS))
+        CharacterSheet.createStatRow
+          "HP Regen"
+          (derivedStats |> AVal.map(fun s -> string s.HPRegen))
+        CharacterSheet.createStatRow
+          "MP Regen"
+          (derivedStats |> AVal.map(fun s -> string s.MPRegen))
+      ]
+
+    // Helper for element value display
+    let getElementValue (elements: HashMap<Element, float>) (elem: Element) =
+      elements.TryFindV elem
+      |> ValueOption.map(fun v -> $"{int(v * 100.0)}%%")
+      |> ValueOption.defaultValue "-"
+
+    // Elemental Attributes section
+    let elemAttrSection =
+      CharacterSheet.createStatSection "Elemental Attributes" [
+        CharacterSheet.createStatRow
+          "Fire"
+          (derivedStats
+           |> AVal.map(fun s -> getElementValue s.ElementAttributes Fire))
+        CharacterSheet.createStatRow
+          "Water"
+          (derivedStats
+           |> AVal.map(fun s -> getElementValue s.ElementAttributes Water))
+        CharacterSheet.createStatRow
+          "Earth"
+          (derivedStats
+           |> AVal.map(fun s -> getElementValue s.ElementAttributes Earth))
+        CharacterSheet.createStatRow
+          "Air"
+          (derivedStats
+           |> AVal.map(fun s -> getElementValue s.ElementAttributes Air))
+        CharacterSheet.createStatRow
+          "Lightning"
+          (derivedStats
+           |> AVal.map(fun s -> getElementValue s.ElementAttributes Lightning))
+        CharacterSheet.createStatRow
+          "Light"
+          (derivedStats
+           |> AVal.map(fun s -> getElementValue s.ElementAttributes Light))
+        CharacterSheet.createStatRow
+          "Dark"
+          (derivedStats
+           |> AVal.map(fun s -> getElementValue s.ElementAttributes Dark))
+      ]
+
+    // Elemental Resistances section
+    let elemResSection =
+      CharacterSheet.createStatSection "Resistances" [
+        CharacterSheet.createStatRow
+          "Fire"
+          (derivedStats
+           |> AVal.map(fun s -> getElementValue s.ElementResistances Fire))
+        CharacterSheet.createStatRow
+          "Water"
+          (derivedStats
+           |> AVal.map(fun s -> getElementValue s.ElementResistances Water))
+        CharacterSheet.createStatRow
+          "Earth"
+          (derivedStats
+           |> AVal.map(fun s -> getElementValue s.ElementResistances Earth))
+        CharacterSheet.createStatRow
+          "Air"
+          (derivedStats
+           |> AVal.map(fun s -> getElementValue s.ElementResistances Air))
+        CharacterSheet.createStatRow
+          "Lightning"
+          (derivedStats
+           |> AVal.map(fun s -> getElementValue s.ElementResistances Lightning))
+        CharacterSheet.createStatRow
+          "Light"
+          (derivedStats
+           |> AVal.map(fun s -> getElementValue s.ElementResistances Light))
+        CharacterSheet.createStatRow
+          "Dark"
+          (derivedStats
+           |> AVal.map(fun s -> getElementValue s.ElementResistances Dark))
+      ]
+
+    // Elemental sections side by side
+    let elemGrid =
+      HStack.spaced 16 |> W.childrenH [ elemAttrSection; elemResSection ]
+
+    let container =
+      VStack.spaced 8
+      |> W.padding 12
+      |> W.childrenV [ baseSection; derivedGrid; generalSection; elemGrid ]
+
+    // Background panel with border
+    Panel.create()
+    |> Panel.bindBackground(config |> AVal.map _.Theme.TooltipBackground)
+    |> W.childrenP [ container ]
+
+
+
+  let createEquipmentPanel
+    (config: HUDConfig aval)
+    (worldTime: Time aval)
+    (equippedItems: HashMap<Slot, Guid<ItemInstanceId>> aval)
+    (itemInstances: IReadOnlyDictionary<Guid<ItemInstanceId>, ItemInstance>)
+    (itemStore: ItemStore)
+    =
+    let colors = config |> AVal.map _.Theme.Colors
+    let bgColor = colors |> AVal.map _.HealthBackground
+
+    let createSlot(slot: Slot) =
+      let name =
+        match slot with
+        | Head -> "Head"
+        | Chest -> "Chest"
+        | Legs -> "Legs"
+        | Feet -> "Feet"
+        | Hands -> "Hands"
+        | Weapon -> "Weapon"
+        | Shield -> "Shield"
+        | Accessory -> "Acc"
+
+      let abbrev =
+        equippedItems
+        |> AVal.map(fun items ->
+          Equipment.getEquippedItemAbbreviation
+            itemStore
+            itemInstances
+            items
+            slot)
+
+      Equipment.createSlot worldTime bgColor name abbrev
+
+    let grid = Grid.spaced 4 4 |> W.padding 16 |> Grid.autoColumns 2
+
+    let slots = [ Head; Chest; Legs; Feet; Hands; Weapon; Shield; Accessory ]
+
+    for i in 0 .. slots.Length - 1 do
+      let widget = createSlot slots[i]
+      Grid.SetColumn(widget, i % 2)
+      Grid.SetRow(widget, i / 2)
+      grid.Widgets.Add(widget)
+
+    // Background panel
+    Panel.create()
+    |> Panel.bindBackground(config |> AVal.map _.Theme.TooltipBackground)
+    |> W.childrenP [ grid ]
 
 
   let createMiniMap

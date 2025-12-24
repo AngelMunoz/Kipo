@@ -187,6 +187,28 @@ module GameplayUI =
         | Some sid -> core.World.Scenarios |> AMap.tryFind sid
         | None -> AVal.constant None)
 
+    let playerBaseStats =
+      core.World.BaseStats
+      |> AMap.tryFind playerId
+      |> AVal.map(
+        Option.defaultValue {
+          Power = 0
+          Magic = 0
+          Sense = 0
+          Charm = 0
+        }
+      )
+
+    let playerEquipped =
+      core.World.EquippedItems
+      |> AMap.tryFind playerId
+      |> AVal.map(Option.defaultValue HashMap.empty)
+
+    let playerCamera =
+      worldTime
+      |> AVal.map(fun _ ->
+        gameplay.CameraService.GetCamera(playerId) |> ValueOption.toOption)
+
     // Target frame placeholder (deferred - always ValueNone for now)
     let selectedEntityId = AVal.constant ValueNone
 
@@ -235,11 +257,6 @@ module GameplayUI =
     let combatIndicator =
       HUDComponents.createCombatIndicator config worldTime inCombatUntil
 
-    let playerCamera =
-      worldTime
-      |> AVal.map(fun _ ->
-        gameplay.CameraService.GetCamera(playerId) |> ValueOption.toOption)
-
     let miniMap =
       HUDComponents.createMiniMap
         config
@@ -248,6 +265,20 @@ module GameplayUI =
         core.World.Positions
         core.World.Factions
         playerCamera
+
+    let characterSheet =
+      HUDComponents.createCharacterSheet
+        config
+        playerBaseStats
+        playerDerivedStats
+
+    let equipmentPanel =
+      HUDComponents.createEquipmentPanel
+        config
+        worldTime
+        playerEquipped
+        core.World.ItemInstances
+        stores.ItemStore
 
     // --- Build reactive children list based on layout visibility ---
     let layout = config |> AVal.map _.Layout
@@ -277,6 +308,12 @@ module GameplayUI =
 
         if l.MiniMap.Visible then
           applyLayout l.MiniMap miniMap
+
+        if l.CharacterSheet.Visible then
+          applyLayout l.CharacterSheet characterSheet
+
+        if l.EquipmentPanel.Visible then
+          applyLayout l.EquipmentPanel equipmentPanel
       ])
 
     panel |> Panel.bindChildren hudChildren |> ignore

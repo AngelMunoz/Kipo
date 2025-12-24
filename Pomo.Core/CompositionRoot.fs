@@ -237,6 +237,7 @@ module CompositionRoot =
       baseComponents.Add(new CollisionSystem(game, pomoEnv))
 
       baseComponents.Add(new NotificationSystem(game, pomoEnv))
+      baseComponents.Add(UIController.create game pomoEnv playerId)
 
       baseComponents.Add(new EffectProcessingSystem(game, pomoEnv))
       baseComponents.Add(new EntitySpawnerSystem(game, pomoEnv))
@@ -378,7 +379,13 @@ module CompositionRoot =
       let publishHudGuiAction(action: GuiAction) =
         match action with
         | GuiAction.BackToMainMenu -> sceneTransitionSubject.OnNext MainMenu
-        | _ -> ()
+        | GuiAction.ToggleCharacterSheet ->
+          scope.HUDService.TogglePanelVisible HUDPanelId.CharacterSheet
+        | GuiAction.ToggleEquipment ->
+          scope.HUDService.TogglePanelVisible HUDPanelId.EquipmentPanel
+        | GuiAction.StartNewGame
+        | GuiAction.OpenSettings
+        | GuiAction.ExitGame -> () // Not applicable in Gameplay
 
       // 6. Setup Listeners (Subs)
       let subs = new System.Reactive.Disposables.CompositeDisposable()
@@ -501,9 +508,11 @@ module CompositionRoot =
         match action with
         | StartNewGame ->
           sceneTransitionSubject.OnNext(Gameplay("Lobby", ValueNone))
-        | OpenSettings -> () // TODO: Implement settings menu
         | ExitGame -> game.Exit()
-        | BackToMainMenu -> () // Should not happen in MainMenu
+        | OpenSettings // TODO: Implement settings menu
+        | BackToMainMenu
+        | ToggleCharacterSheet
+        | ToggleEquipment -> () // Not applicable in MainMenu
 
       let uiComponent =
         { new DrawableGameComponent(game) with

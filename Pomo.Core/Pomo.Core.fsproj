@@ -86,6 +86,7 @@
     <Compile Include="Systems/WorldMapService.fs" />
     <Compile Include="Systems/HUDService.fs" />
     <Compile Include="Systems/HUDComponents.fs" />
+    <Compile Include="Systems/UIControllerSystem.fs" />
     <Compile Include="Systems/UIService.fs" />
     <Compile Include="Systems/UISystem.fs" />
     <Compile Include="Systems/CursorSystem.fs" />
