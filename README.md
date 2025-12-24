@@ -70,6 +70,9 @@ Kipo/
 git clone https://github.com/AngelMunoz/Kipo.git
 cd Kipo
 
+# Restore .NET tools
+dotnet tool restore
+
 # Restore dependencies
 dotnet restore
 
