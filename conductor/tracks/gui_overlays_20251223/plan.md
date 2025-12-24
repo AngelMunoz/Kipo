@@ -19,6 +19,14 @@
 - [x] Task: Implement Animation/Transition Utilities
     - Simple easing functions (ease-out for health changes, linear for cooldowns)
     - Value interpolation helpers for smooth bar fills
+- [x] Task: Implement Myra Widget DSL (`W` module)
+    - Fluent helpers for widget properties (`W.size`, `W.margin`, `W.hAlign`, etc.)
+    - Reactive bindings (`W.bindText`, `W.bindCurrentValue`, `W.bindWorldTime`, etc.)
+    - Panel.bindChildren for reactive layout-based visibility
+- [x] Task: Implement Item Projections (`ProjectService.ResolvedInventories`)
+    - Resolve `ItemDefinition` from `World.ItemInstances` and `ItemStore`
+    - Group instances by `ItemId` to provide counts and access `UsesLeft`
+    - Reactive `amap` for HUD binding
 - [ ] Task: Conductor - User Manual Verification 'Phase 1: Infrastructure & Theming' (Protocol in workflow.md)
 
 ---
@@ -37,14 +45,17 @@
 ### 2.2 Action Bar
 
 - [x] Task: Implement `ActionBar` Component
-    - Horizontal row of 6 slots (UseSlot1-6)
+    - Horizontal row of 8 slots (UseSlot1-8)
+    - **Refactored structure:** Helper logic extracted to semantic submodules (`Common`, `ActionBar`, etc.)
     - **Data binding:**
       - `world.ActionSets[entityId]` → `HashMap<int, HashMap<GameAction, SlotProcessing>>`
       - `world.ActiveActionSets[entityId]` → current set index
       - `world.AbilityCooldowns[entityId]` → cooldown timestamps
+      - `Projections.ResolvedInventories[entityId]` → item info (definitions, uses)
     - Per-slot display:
-      - **Skill:** Extract initials from SkillStore (e.g., "FB" for Fireball), tint by intent
-      - **Item:** Show item abbreviation + uses remaining
+      - **Skill:** Initials from SkillStore (e.g., "FB" for Fireball)
+      - **Intent Tinting:** Background color based on skill intent (Offensive=red-ish, Supportive=green-ish)
+      - **Item:** Name initials + `UsesLeft` badge in corner
     - Cooldown overlay: Radial sweep + seconds remaining text
     - Keybinding labels in corner ("1", "2", etc.)
 - [x] Task: Implement Action Set Switcher
@@ -59,7 +70,7 @@
     - Color coding by EffectKind: Buff=green border, Debuff=red, DoT=orange pulse
     - Stack count badge when `StackCount > 1`
     - Radial duration timer (like cooldowns)
-    - Flash animation when < 3s remaining
+    - Flash animation when < 5s remaining
     - Sort: Buffs left, Debuffs right, by remaining duration
 
 ### 2.4 Target Frame
@@ -69,13 +80,15 @@
     - Display target health bar (same style as player vitals)
     - Faction indicator (color-coded outline)
     - Name placeholder: Show "Target" or faction type until entity names exist
-    - Small summary of target's active effects (icons only)
+    - [ ] Deferred: Small summary of target's active effects (icons only)
+    - [ ] Deferred: Rework to world-space overlay for engaged entities
 
 ### 2.5 Cast Bar
 
 - [x] Task: Implement `CastBar` Component
     - Bind to `world.ActiveCharges[entityId]`
-    - Smooth progress bar fill animation
+    - Smooth progress bar fill animation (no pulsing via `PulseMode.NoPulse`)
+    - Dedicated cast bar colors in theme palette (`CastBarFill`, `CastBarBackground`)
     - Skill name label (lookup from SkillStore via SkillId)
     - Position: Center-bottom, prominent during casting
 

@@ -37,7 +37,7 @@ The player's primary interaction point for abilities.
 > [!NOTE]
 > **Data Source Constraints:** Action sets come from `world.ActionSets` keyed by entity → set index → `HashMap<GameAction, SlotProcessing>`. Each slot can be a `Skill` or `Item`. The active set is in `world.ActiveActionSets`.
 
-- **Slots (6 per set)** — UseSlot1 through UseSlot6 mapped to 1-6 keys
+- **Slots (8 per set)** — UseSlot1 through UseSlot8 mapped to 1-8 keys
 - **Skill Display:**
   - Skill initials (e.g., "FB" for Fireball) — extracted from `SkillStore`
   - Background color tint based on skill intent (Offensive = red-ish, Supportive = green-ish)
@@ -61,7 +61,7 @@ Clear visual communication of active effects on the player.
   - Stack count badge when `StackCount > 1`
 - **Duration Indicator:**
   - Radial timer sweep (like cooldowns)
-  - Flash when about to expire (< 3s remaining)
+  - Flash when about to expire (< 5s remaining)
 - **Grouping:** Buffs on left, debuffs on right, sorted by remaining duration
 - **Hover:** Effect name, source, time remaining, and description
 
@@ -173,6 +173,7 @@ Spatial awareness overlay.
 
 - **Component-Based:** Each HUD element is a self-contained Myra widget
 - **Reactive Binding:** Components subscribe to FDA values — updates only on change
+- **Item Projections:** `ResolvedInventories` projection maps instance data to UI-friendly info (definitions, counts, uses)
 - **HUD Layout Config:** JSON/F# record defining positions and anchor points
 - **Theme System:** Colors, fonts, textures abstracted into a Theme record
 - **Animation Support:** Built-in easing/tweening for smooth transitions

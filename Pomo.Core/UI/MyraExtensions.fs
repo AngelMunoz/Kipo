@@ -369,6 +369,13 @@ module W =
     w.set_SmoothSpeed(value)
     w
 
+  let inline pulseMode<'T when 'T: (member set_PulseMode: PulseMode -> unit)>
+    (mode: PulseMode)
+    (w: 'T)
+    =
+    w.set_PulseMode(mode)
+    w
+
 
 module Label =
   let inline create(text: string) = Label(Text = text)
@@ -383,11 +390,24 @@ module Panel =
   let inline sized (width: int) (height: int) =
     Panel(Width = Nullable width, Height = Nullable height)
 
+  let inline bindChildren<'W when 'W :> Panel>
+    (childrenAVal: aval<Widget list>)
+    (w: 'W)
+    =
+    let sub =
+      childrenAVal.AddWeakCallback(fun children ->
+        w.Widgets.Clear()
+
+        for child in children do
+          w.Widgets.Add(child))
+
+    WidgetSubs.get(w).Add(sub)
+    w
+
 
 module HStack =
   let inline create() = HorizontalStackPanel()
   let inline spaced(spacing: int) = HorizontalStackPanel(Spacing = spacing)
-
 
   let inline bindIndexListChildren<'T, 'W
     when 'T :> Widget and 'W :> HorizontalStackPanel>
@@ -413,5 +433,6 @@ module Btn =
   let inline create(text: string) = Button(Content = Label(Text = text))
 
   let inline onClick (handler: unit -> unit) (btn: Button) =
-    btn.Click.Add(fun _ -> handler())
+    let sub = btn.Click.Subscribe(fun _ -> handler())
+    WidgetSubs.get(btn).Add(sub)
     btn

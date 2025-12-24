@@ -8,6 +8,14 @@ open FSharp.Data.Adaptive
 open Pomo.Core.Domain.World
 open Pomo.Core.UI.HUDAnimation
 
+
+/// Controls when a ResourceBar pulses
+[<Struct>]
+type PulseMode =
+  | NoPulse
+  | PulseOnLow
+  | AlwaysPulse
+
 type ResourceBar() =
   inherit Widget()
 
@@ -25,6 +33,7 @@ type ResourceBar() =
   member val LowThreshold = 0.25f with get, set
   member val PulseSpeed = 2.0f with get, set
   member val SmoothSpeed = 0.15f with get, set
+  member val PulseMode = PulseOnLow with get, set
 
   member val WorldTime: Time =
     {
@@ -61,8 +70,14 @@ type ResourceBar() =
       let fillRect = Rectangle(bounds.X, bounds.Y, fillWidth, bounds.Height)
       let isLow = fillPct < this.LowThreshold
 
+      let shouldPulse =
+        match this.PulseMode with
+        | NoPulse -> false
+        | PulseOnLow -> isLow
+        | AlwaysPulse -> true
+
       let finalColor =
-        if isLow then
+        if shouldPulse then
           pulse <- Pulse.update this.PulseSpeed dt pulse
           Color.Lerp(this.ColorFill, this.ColorLow, pulse.Intensity)
         else
@@ -94,7 +109,7 @@ type ActionSlot() =
 
   // Properties
   member val CooldownEndTime = TimeSpan.Zero with get, set
-  member val CooldownColor = Color(0, 0, 0, 160) with get, set
+  member val CooldownColor = Color(0, 0, 0, 200) with get, set
   member val BgColor = Color.DarkSlateGray with get, set
 
   member val WorldTime: Time =
@@ -147,7 +162,7 @@ type StatusEffectWidget() =
   member val ColorBuff = Color.Green with get, set
   member val ColorDebuff = Color.Red with get, set
   member val ColorDot = Color.Orange with get, set
-  member val CooldownColor = Color(0, 0, 0, 160) with get, set
+  member val CooldownColor = Color(0, 0, 0, 200) with get, set
 
   member val WorldTime: Time =
     {
@@ -174,7 +189,14 @@ type StatusEffectWidget() =
     // Duration sweep
     if this.CooldownEndTime > now && this.TotalDurationSeconds > 0.0f then
       let remaining = (this.CooldownEndTime - now).TotalSeconds
-      let pct = MathHelper.Clamp(float32 remaining / this.TotalDurationSeconds, 0.0f, 1.0f)
+
+      let pct =
+        MathHelper.Clamp(
+          float32 remaining / this.TotalDurationSeconds,
+          0.0f,
+          1.0f
+        )
+
       let overlayHeight = int(float32 bounds.Height * pct)
 
       if overlayHeight > 0 then
@@ -189,7 +211,7 @@ type StatusEffectWidget() =
         context.FillRectangle(overlayRect, this.CooldownColor)
 
     // Kind-based border
-    let borderColor =
+    let baseBorderColor =
       match this.Kind with
       | Pomo.Core.Domain.Skill.EffectKind.Buff -> this.ColorBuff
       | Pomo.Core.Domain.Skill.EffectKind.Debuff
@@ -200,6 +222,19 @@ type StatusEffectWidget() =
         pulse <- Pulse.update 3.0f dt pulse
         Color.Lerp(this.ColorDot, Color.Yellow, pulse.Intensity)
       | _ -> Color.Gray
+
+    // Flash when < 5s remaining (distinct from DoT pulse)
+    let isExpiringSoon =
+      this.CooldownEndTime > now
+      && (this.CooldownEndTime - now).TotalSeconds < 5.0
+
+    let borderColor =
+      if isExpiringSoon then
+        let flashT = float32(now.TotalSeconds * 6.0) // 6Hz flash for more urgency
+        let flashIntensity = (sin flashT |> abs)
+        Color.Lerp(baseBorderColor, Color.White, flashIntensity * 0.7f)
+      else
+        baseBorderColor
 
     context.DrawRectangle(bounds, borderColor, 2.0f)
 

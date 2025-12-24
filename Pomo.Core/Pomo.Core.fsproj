@@ -48,9 +48,9 @@
     <Compile Include="Rendering/LightEmitter.fs" />
     <Compile Include="Rendering/EntityPicker.fs" />
     <Compile Include="Environment.fs" />
-    <Compile Include="UI/MyraExtensions.fs" />
     <Compile Include="UI/HUDAnimation.fs" />
     <Compile Include="UI/Widgets.fs" />
+    <Compile Include="UI/MyraExtensions.fs" />
     <Compile Include="Systems/GameLogic.fs" />
     <Compile Include="Systems/World.fs" />
     <Compile Include="Systems/FormulaEvaluator.fs" />

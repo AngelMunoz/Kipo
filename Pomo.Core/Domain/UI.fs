@@ -61,6 +61,10 @@ module UI =
     TeamCyan: Color
     TeamWhite: Color
     TeamBlack: Color
+    OffensiveSlot: Color
+    SupportiveSlot: Color
+    CastBarFill: Color
+    CastBarBackground: Color
   }
 
   module HUDColorPalette =
@@ -88,6 +92,10 @@ module UI =
       TeamCyan = Color(60, 180, 200)
       TeamWhite = Color(220, 220, 220)
       TeamBlack = Color(60, 60, 60)
+      OffensiveSlot = Color(80, 40, 40)
+      SupportiveSlot = Color(40, 80, 50)
+      CastBarFill = Color(220, 180, 60)
+      CastBarBackground = Color(40, 35, 20)
     }
 
     let getColorForFaction (palette: HUDColorPalette) (faction: Faction) =
@@ -333,6 +341,20 @@ module UI =
           and! teamBlack =
             VOptional.Property.get ("TeamBlack", Helper.colorFromHex) json
 
+          and! offensiveSlot =
+            VOptional.Property.get ("OffensiveSlot", Helper.colorFromHex) json
+
+          and! supportiveSlot =
+            VOptional.Property.get ("SupportiveSlot", Helper.colorFromHex) json
+
+          and! castBarFill =
+            VOptional.Property.get ("CastBarFill", Helper.colorFromHex) json
+
+          and! castBarBackground =
+            VOptional.Property.get
+              ("CastBarBackground", Helper.colorFromHex)
+              json
+
           return {
             HealthFill = healthFill |> ValueOption.defaultValue d.HealthFill
             HealthLow = healthLow |> ValueOption.defaultValue d.HealthLow
@@ -363,6 +385,13 @@ module UI =
             TeamCyan = teamCyan |> ValueOption.defaultValue d.TeamCyan
             TeamWhite = teamWhite |> ValueOption.defaultValue d.TeamWhite
             TeamBlack = teamBlack |> ValueOption.defaultValue d.TeamBlack
+            OffensiveSlot =
+              offensiveSlot |> ValueOption.defaultValue d.OffensiveSlot
+            SupportiveSlot =
+              supportiveSlot |> ValueOption.defaultValue d.SupportiveSlot
+            CastBarFill = castBarFill |> ValueOption.defaultValue d.CastBarFill
+            CastBarBackground =
+              castBarBackground |> ValueOption.defaultValue d.CastBarBackground
           }
         }
 

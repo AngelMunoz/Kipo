@@ -24,23 +24,27 @@ open Pomo.Core.UI
 
 module MainMenuUI =
   let build (game: Game) (publishGuiAction: GuiAction -> unit) =
-    let panel = new VerticalStackPanel(Spacing = 16)
-    panel.HorizontalAlignment <- HorizontalAlignment.Center
-    panel.VerticalAlignment <- VerticalAlignment.Center
-    panel.Widgets.Add(new Label(Text = "Selection Screen"))
+    let titleLabel = Label.create "Selection Screen"
 
-    let addButton text onClick =
-      let b = new Button(Width = 180)
-      b.Content <- new Label(Text = text)
-      b.Click.Add(onClick)
-      panel.Widgets.Add(b)
+    let newGameBtn =
+      Btn.create "New Game"
+      |> W.width 180
+      |> Btn.onClick(fun () -> publishGuiAction GuiAction.StartNewGame)
 
-    addButton "New Game" (fun _ -> publishGuiAction GuiAction.StartNewGame)
+    let settingsBtn =
+      Btn.create "Settings"
+      |> W.width 180
+      |> Btn.onClick(fun () -> publishGuiAction GuiAction.OpenSettings)
 
-    addButton "Settings" (fun _ -> publishGuiAction GuiAction.OpenSettings)
-    addButton "Exit" (fun _ -> publishGuiAction GuiAction.ExitGame)
+    let exitBtn =
+      Btn.create "Exit"
+      |> W.width 180
+      |> Btn.onClick(fun () -> publishGuiAction GuiAction.ExitGame)
 
-    panel
+    VStack.spaced 16
+    |> W.hAlign HorizontalAlignment.Center
+    |> W.vAlign VerticalAlignment.Center
+    |> W.childrenV [ titleLabel; newGameBtn; settingsBtn; exitBtn ]
 
 module private UIHelpers =
   let mapAnchor
@@ -58,40 +62,50 @@ module private UIHelpers =
     | UI.BottomRight -> HorizontalAlignment.Right, VerticalAlignment.Bottom
 
 module GameplayUI =
+  open UIHelpers
+
+  /// Apply layout properties to a widget using DSL
+  let private applyLayout (layout: UI.HUDComponentLayout) (widget: Widget) =
+    let struct (hAlign, vAlign) = mapAnchor layout.Anchor
+
+    widget
+    |> W.hAlign hAlign
+    |> W.vAlign vAlign
+    |> W.left layout.OffsetX
+    |> W.top layout.OffsetY
+
   let build
     (game: Game)
     (env: PomoEnvironment)
     (playerId: Guid<EntityId>)
     (publishGuiAction: GuiAction -> unit)
     =
-    let panel = new Panel()
+    let panel = Panel.create()
 
     let (Core core) = env.CoreServices
     let (Gameplay gameplay) = env.GameplayServices
+    let (Stores stores) = env.StoreServices
     let hudService = core.HUDService
+    let config = hudService.Config
+    let worldTime = core.World.Time
     let resources = core.World.Resources
     let derivedStats = gameplay.Projections.DerivedStats
 
-    // 1. Top Panel (Existing)
-    let topPanel = new HorizontalStackPanel(Spacing = 8)
-    topPanel.HorizontalAlignment <- HorizontalAlignment.Right
-    topPanel.VerticalAlignment <- VerticalAlignment.Top
-    topPanel.Padding <- Thickness(10)
+    // --- Fixed top panel (always visible) ---
+    let topPanel =
+      HStack.create()
+      |> W.hAlign HorizontalAlignment.Right
+      |> W.vAlign VerticalAlignment.Top
+      |> W.padding 10
+      |> W.spacing 8
 
-    let backButton = new Button()
-    backButton.Content <- new Label(Text = "Back to Main Menu")
-    backButton.Click.Add(fun _ -> publishGuiAction GuiAction.BackToMainMenu)
+    let backButton =
+      Btn.create "Back to Main Menu"
+      |> Btn.onClick(fun () -> publishGuiAction GuiAction.BackToMainMenu)
 
     topPanel.Widgets.Add(backButton)
-    panel.Widgets.Add(topPanel)
 
-    // 2. HUD Components
-    let config = hudService.Config
-    let worldTime = core.World.Time
-
-    // Player Vitals
-    let layout = (AVal.force config).Layout.PlayerVitals
-
+    // --- Prepare data sources ---
     let resourceZero: Entity.Resource = {
       HP = 0
       MP = 0
@@ -128,137 +142,108 @@ module GameplayUI =
       |> AMap.tryFind playerId
       |> AVal.map(Option.defaultValue derivedStatsZero)
 
-    if layout.Visible then
-      let playerVitals =
-        HUDComponents.createPlayerVitals
-          config
-          worldTime
-          playerResources
-          playerDerivedStats
+    let actionSetsEmpty =
+      HashMap.empty<int, HashMap<Action.GameAction, SlotProcessing>>
 
-      let struct (hAlign, vAlign) = UIHelpers.mapAnchor layout.Anchor
-      playerVitals.HorizontalAlignment <- hAlign
-      playerVitals.VerticalAlignment <- vAlign
-      playerVitals.Left <- layout.OffsetX
-      playerVitals.Top <- layout.OffsetY
+    let actionSets =
+      core.World.ActionSets
+      |> AMap.tryFind playerId
+      |> AVal.map(Option.defaultValue actionSetsEmpty)
 
-      panel.Widgets.Add(playerVitals)
+    let activeSetIndex =
+      core.World.ActiveActionSets
+      |> AMap.tryFind playerId
+      |> AVal.map(Option.defaultValue 0)
 
-    // Action Bar
-    let actionBarLayout = (AVal.force config).Layout.ActionBar
+    let cooldownsEmpty = HashMap.empty<int<SkillId>, TimeSpan>
 
-    if actionBarLayout.Visible then
-      let actionSetsEmpty =
-        HashMap.empty<int, HashMap<Action.GameAction, SlotProcessing>>
+    let cooldowns =
+      core.World.AbilityCooldowns
+      |> AMap.tryFind playerId
+      |> AVal.map(Option.defaultValue cooldownsEmpty)
 
-      let actionSets =
-        core.World.ActionSets
-        |> AMap.tryFind playerId
-        |> AVal.map(Option.defaultValue actionSetsEmpty)
+    let inputMapEmpty = HashMap.empty<RawInput, GameAction>
 
-      let activeSetIndex =
-        core.World.ActiveActionSets
-        |> AMap.tryFind playerId
-        |> AVal.map(Option.defaultValue 0)
+    let inputMap =
+      core.World.InputMaps
+      |> AMap.tryFind playerId
+      |> AVal.map(Option.defaultValue inputMapEmpty)
 
-      let cooldownsEmpty = HashMap.empty<int<SkillId>, TimeSpan>
+    let activeEffects =
+      core.World.ActiveEffects
+      |> AMap.tryFind playerId
+      |> AVal.map(Option.defaultValue IndexList.empty)
 
-      let cooldowns =
-        core.World.AbilityCooldowns
-        |> AMap.tryFind playerId
-        |> AVal.map(Option.defaultValue cooldownsEmpty)
+    // Target frame placeholder (deferred - always ValueNone for now)
+    let selectedEntityId = AVal.constant ValueNone
 
-      let inputMapEmpty = HashMap.empty<RawInput, GameAction>
+    // --- Create HUD components (unconditionally) ---
+    let playerVitals =
+      HUDComponents.createPlayerVitals
+        config
+        worldTime
+        playerResources
+        playerDerivedStats
 
-      let inputMap =
-        core.World.InputMaps
-        |> AMap.tryFind playerId
-        |> AVal.map(Option.defaultValue inputMapEmpty)
+    let actionBar: Widget =
+      let playerInventory =
+        gameplay.Projections.ResolvedInventories |> AMap.tryFind playerId
 
-      let (Stores stores) = env.StoreServices
+      HUDComponents.createActionBar
+        config
+        worldTime
+        actionSets
+        activeSetIndex
+        cooldowns
+        inputMap
+        playerInventory
+        stores.SkillStore
 
-      let actionBar =
-        HUDComponents.createActionBar
-          config
-          worldTime
-          actionSets
-          activeSetIndex
-          cooldowns
-          inputMap
-          stores.SkillStore
+    let statusEffectsBar: Widget =
+      HUDComponents.createStatusEffectsBar config worldTime activeEffects
 
-      let struct (hAlign, vAlign) = UIHelpers.mapAnchor actionBarLayout.Anchor
-      actionBar.HorizontalAlignment <- hAlign
-      actionBar.VerticalAlignment <- vAlign
-      actionBar.Left <- actionBarLayout.OffsetX
-      actionBar.Top <- actionBarLayout.OffsetY
+    let targetFrame: Widget =
+      HUDComponents.createTargetFrame
+        config
+        worldTime
+        selectedEntityId
+        resources
+        derivedStats
+        core.World.Factions
 
-      panel.Widgets.Add(actionBar)
+    let castBar: Widget =
+      HUDComponents.createCastBar
+        config
+        worldTime
+        core.World.ActiveCharges
+        playerId
+        stores.SkillStore
 
-    // Status Effects Bar
-    let seLayout = (AVal.force config).Layout.StatusEffects
+    // --- Build reactive children list based on layout visibility ---
+    let layout = config |> AVal.map _.Layout
 
-    if seLayout.Visible then
-      let activeEffects =
-        core.World.ActiveEffects
-        |> AMap.tryFind playerId
-        |> AVal.map(Option.defaultValue IndexList.empty)
+    let hudChildren =
+      layout
+      |> AVal.map(fun l -> [
+        // Top panel is always included
+        topPanel :> Widget
 
-      let statusEffectsBar =
-        HUDComponents.createStatusEffectsBar config worldTime activeEffects
+        if l.PlayerVitals.Visible then
+          applyLayout l.PlayerVitals playerVitals
 
-      let struct (hAlign, vAlign) = UIHelpers.mapAnchor seLayout.Anchor
-      statusEffectsBar.HorizontalAlignment <- hAlign
-      statusEffectsBar.VerticalAlignment <- vAlign
-      statusEffectsBar.Left <- seLayout.OffsetX
-      statusEffectsBar.Top <- seLayout.OffsetY
+        if l.ActionBar.Visible then
+          applyLayout l.ActionBar actionBar
 
-      panel.Widgets.Add(statusEffectsBar)
+        if l.StatusEffects.Visible then
+          applyLayout l.StatusEffects statusEffectsBar
 
-    // Target Frame
-    let tfLayout = (AVal.force config).Layout.TargetFrame
+        if l.TargetFrame.Visible then
+          applyLayout l.TargetFrame targetFrame
 
-    if tfLayout.Visible then
-      // Placeholder: Selected Target is not yet explicitly tracked in World/Projections
-      let selectedEntityId = AVal.constant ValueNone
+        if l.CastBar.Visible then
+          applyLayout l.CastBar castBar
+      ])
 
-      let targetFrame =
-        HUDComponents.createTargetFrame
-          config
-          worldTime
-          selectedEntityId
-          core.World.Resources
-          derivedStats
-          core.World.Factions
-
-      let struct (hAlign, vAlign) = UIHelpers.mapAnchor tfLayout.Anchor
-      targetFrame.HorizontalAlignment <- hAlign
-      targetFrame.VerticalAlignment <- vAlign
-      targetFrame.Left <- tfLayout.OffsetX
-      targetFrame.Top <- tfLayout.OffsetY
-
-      panel.Widgets.Add(targetFrame)
-
-    // Cast Bar
-    let cbLayout = (AVal.force config).Layout.CastBar
-
-    if cbLayout.Visible then
-      let (Stores stores) = env.StoreServices
-
-      let castBar =
-        HUDComponents.createCastBar
-          config
-          worldTime
-          core.World.ActiveCharges
-          playerId
-          stores.SkillStore
-
-      let struct (hAlign, vAlign) = UIHelpers.mapAnchor cbLayout.Anchor
-      castBar.HorizontalAlignment <- hAlign
-      castBar.VerticalAlignment <- vAlign
-      castBar.Left <- cbLayout.OffsetX
-      castBar.Top <- cbLayout.OffsetY
-
-      panel.Widgets.Add(castBar)
+    panel |> Panel.bindChildren hudChildren |> ignore
 
     panel
