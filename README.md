@@ -73,7 +73,7 @@ cd Kipo
 # Restore .NET tools
 dotnet tool restore
 
-# Restore .NET workloads (aka androind, wasm-tools, etc.)
+# Restore .NET workloads (aka android, wasm-tools, etc.)
 # run with `sudo` on Linux/macOS if necessary
 dotnet workload restore
 
