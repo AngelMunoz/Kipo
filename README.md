@@ -1,6 +1,6 @@
 # Kipo
 
-A production-grade ARPG engine prototype, built as a playground for exploring functional game development patterns in F# and MonoGame.
+An ARPG engine prototype, built as a playground for exploring functional game development patterns in F# and MonoGame.
 
 ![Demo](./2025-12-23%2009-10-54.gif)
 
