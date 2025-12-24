@@ -18,6 +18,7 @@ open Pomo.Core.Systems.Systems
 module ResourceManager =
   open System.Reactive.Disposables
   open Pomo.Core.Environment
+  open Pomo.Core.Domain.Events
 
   module private Handlers =
     let handleDamageDealt
@@ -103,6 +104,7 @@ module ResourceManager =
               let amount = event.Amount
               $"%d{amount} {event.ResourceType}"
             Position = position
+            Type = SystemCommunications.NotificationType.Heal
           }
         )
       )

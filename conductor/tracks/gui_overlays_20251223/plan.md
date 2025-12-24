@@ -27,7 +27,7 @@
     - Resolve `ItemDefinition` from `World.ItemInstances` and `ItemStore`
     - Group instances by `ItemId` to provide counts and access `UsesLeft`
     - Reactive `amap` for HUD binding
-- [ ] Task: Conductor - User Manual Verification 'Phase 1: Infrastructure & Theming' (Protocol in workflow.md)
+- [x] Task: Conductor - User Manual Verification 'Phase 1: Infrastructure & Theming' (Protocol in workflow.md)
 
 ---
 
@@ -81,7 +81,7 @@
     - Faction indicator (color-coded outline)
     - Name placeholder: Show "Target" or faction type until entity names exist
     - [ ] Deferred: Small summary of target's active effects (icons only)
-    - [ ] Deferred: Rework to world-space overlay for engaged entities
+    - [x] Deferred: Rework to world-space overlay for engaged entities (Integration deferred per user request: requires engaged entity tracking)
 
 ### 2.5 Cast Bar
 
@@ -92,7 +92,7 @@
     - Skill name label (lookup from SkillStore via SkillId)
     - Position: Center-bottom, prominent during casting
 
-- [ ] Task: Conductor - User Manual Verification 'Phase 2: Core HUD Components' (Protocol in workflow.md)
+- [x] Task: Conductor - User Manual Verification 'Phase 2: Core HUD Components' (Protocol in workflow.md)
 
 ---
 
@@ -100,7 +100,7 @@
 
 ### 3.1 Floating Combat Text
 
-- [ ] Task: Implement `FloatingCombatText` System
+- [x] Task: Implement `FloatingCombatText` System
     - Subscribe to `world.Notifications` (WorldText entries)
     - Project world positions → screen coordinates via `CameraService`
     - Styling: Damage=Red (scale by magnitude), Healing=Green, Status=Gray
@@ -109,14 +109,14 @@
 
 ### 3.2 Combat Indicator
 
-- [ ] Task: Implement `CombatIndicator`
+- [x] Task: Implement `CombatIndicator`
     - Bind to `world.InCombatUntil > world.Time.TotalGameTime`
     - Visual: Subtle screen-edge vignette or frame glow (red tint)
     - Smooth fade in/out transitions
 
 ### 3.3 Mini-Map
 
-- [ ] Task: Implement `MiniMap` Component
+- [x] Task: Implement `MiniMap` Component
     - Custom Myra widget rendering simplified `Scenario.Map`
     - Render entity dots from `world.Positions`:
       - Player = Green (centered)

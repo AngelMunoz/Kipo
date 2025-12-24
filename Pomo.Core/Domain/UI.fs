@@ -65,6 +65,12 @@ module UI =
     SupportiveSlot: Color
     CastBarFill: Color
     CastBarBackground: Color
+    TextNormal: Color
+    TextDamage: Color
+    TextCrit: Color
+    TextHeal: Color
+    TextStatus: Color
+    TextMiss: Color
   }
 
   module HUDColorPalette =
@@ -96,6 +102,12 @@ module UI =
       SupportiveSlot = Color(40, 80, 50)
       CastBarFill = Color(220, 180, 60)
       CastBarBackground = Color(40, 35, 20)
+      TextNormal = Color.White
+      TextDamage = Color.Red
+      TextCrit = Color(255, 200, 50)
+      TextHeal = Color.LightGreen
+      TextStatus = Color.LightGray
+      TextMiss = Color.Gray
     }
 
     let getColorForFaction (palette: HUDColorPalette) (faction: Faction) =
@@ -165,9 +177,9 @@ module UI =
         Visible = true
       }
       StatusEffects = {
-        Anchor = TopRight
-        OffsetX = -20
-        OffsetY = 80
+        Anchor = BottomLeft
+        OffsetX = 20
+        OffsetY = -80
         Visible = true
       }
       TargetFrame = {
@@ -197,7 +209,7 @@ module UI =
       MiniMap = {
         Anchor = TopRight
         OffsetX = -20
-        OffsetY = 20
+        OffsetY = 60
         Visible = true
       }
     }
@@ -355,6 +367,24 @@ module UI =
               ("CastBarBackground", Helper.colorFromHex)
               json
 
+          and! textNormal =
+            VOptional.Property.get ("TextNormal", Helper.colorFromHex) json
+
+          and! textDamage =
+            VOptional.Property.get ("TextDamage", Helper.colorFromHex) json
+
+          and! textCrit =
+            VOptional.Property.get ("TextCrit", Helper.colorFromHex) json
+
+          and! textHeal =
+            VOptional.Property.get ("TextHeal", Helper.colorFromHex) json
+
+          and! textStatus =
+            VOptional.Property.get ("TextStatus", Helper.colorFromHex) json
+
+          and! textMiss =
+            VOptional.Property.get ("TextMiss", Helper.colorFromHex) json
+
           return {
             HealthFill = healthFill |> ValueOption.defaultValue d.HealthFill
             HealthLow = healthLow |> ValueOption.defaultValue d.HealthLow
@@ -392,6 +422,12 @@ module UI =
             CastBarFill = castBarFill |> ValueOption.defaultValue d.CastBarFill
             CastBarBackground =
               castBarBackground |> ValueOption.defaultValue d.CastBarBackground
+            TextNormal = textNormal |> ValueOption.defaultValue d.TextNormal
+            TextDamage = textDamage |> ValueOption.defaultValue d.TextDamage
+            TextCrit = textCrit |> ValueOption.defaultValue d.TextCrit
+            TextHeal = textHeal |> ValueOption.defaultValue d.TextHeal
+            TextStatus = textStatus |> ValueOption.defaultValue d.TextStatus
+            TextMiss = textMiss |> ValueOption.defaultValue d.TextMiss
           }
         }
 

@@ -174,6 +174,19 @@ module GameplayUI =
       |> AMap.tryFind playerId
       |> AVal.map(Option.defaultValue IndexList.empty)
 
+    let inCombatUntil =
+      core.World.InCombatUntil
+      |> AMap.tryFind playerId
+      |> AVal.map(Option.defaultValue TimeSpan.Zero)
+
+    let currentScenario =
+      core.World.EntityScenario
+      |> AMap.tryFind playerId
+      |> AVal.bind(fun scenarioIdOpt ->
+        match scenarioIdOpt with
+        | Some sid -> core.World.Scenarios |> AMap.tryFind sid
+        | None -> AVal.constant None)
+
     // Target frame placeholder (deferred - always ValueNone for now)
     let selectedEntityId = AVal.constant ValueNone
 
@@ -219,6 +232,23 @@ module GameplayUI =
         playerId
         stores.SkillStore
 
+    let combatIndicator =
+      HUDComponents.createCombatIndicator config worldTime inCombatUntil
+
+    let playerCamera =
+      worldTime
+      |> AVal.map(fun _ ->
+        gameplay.CameraService.GetCamera(playerId) |> ValueOption.toOption)
+
+    let miniMap =
+      HUDComponents.createMiniMap
+        config
+        currentScenario
+        playerId
+        core.World.Positions
+        core.World.Factions
+        playerCamera
+
     // --- Build reactive children list based on layout visibility ---
     let layout = config |> AVal.map _.Layout
 
@@ -227,6 +257,8 @@ module GameplayUI =
       |> AVal.map(fun l -> [
         // Top panel is always included
         topPanel :> Widget
+
+        combatIndicator :> Widget
 
         if l.PlayerVitals.Visible then
           applyLayout l.PlayerVitals playerVitals
@@ -242,6 +274,9 @@ module GameplayUI =
 
         if l.CastBar.Visible then
           applyLayout l.CastBar castBar
+
+        if l.MiniMap.Visible then
+          applyLayout l.MiniMap miniMap
       ])
 
     panel |> Panel.bindChildren hudChildren |> ignore

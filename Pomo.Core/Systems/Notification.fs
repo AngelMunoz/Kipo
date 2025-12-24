@@ -22,10 +22,13 @@ module Notification =
     let mutable sub: IDisposable = null
 
     let handleEvent(event: SystemCommunications.ShowNotification) =
+      let drift = (float32(world.Rng.NextDouble()) * 20.0f) - 10.0f
+
       let newNotification: WorldText = {
         Text = event.Message
+        Type = event.Type
         Position = event.Position
-        Velocity = Vector2(0.0f, -20.0f)
+        Velocity = Vector2(drift, -20.0f)
         Life = 2.0f
         MaxLife = 2.0f
       }

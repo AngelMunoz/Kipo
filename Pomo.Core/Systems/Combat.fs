@@ -264,6 +264,7 @@ module Combat =
             NotificationEvent.ShowMessage {
               Message = "Miss"
               Position = targetPos
+              Type = SystemCommunications.Miss
             }
           )
         )
@@ -277,24 +278,22 @@ module Combat =
           )
         )
 
+        // Single notification with appropriate type for coloring
+        let notificationType =
+          if result.IsCritical then
+            SystemCommunications.Crit
+          else
+            SystemCommunications.Damage
+
         ctx.EventBus.Publish(
           GameEvent.Notification(
             NotificationEvent.ShowMessage {
-              Message = $"-{result.Amount}"
+              Message = $"{result.Amount}"
               Position = targetPos
+              Type = notificationType
             }
           )
         )
-
-        if result.IsCritical then
-          ctx.EventBus.Publish(
-            GameEvent.Notification(
-              NotificationEvent.ShowMessage {
-                Message = "Crit!"
-                Position = targetPos
-              }
-            )
-          )
 
         for effect in activeSkill.Effects do
           let intent: SystemCommunications.EffectApplicationIntent = {
@@ -469,8 +468,9 @@ module Combat =
           ctx.EventBus.Publish(
             GameEvent.Notification(
               NotificationEvent.ShowMessage {
-                Message = $"-{totalDamage}"
+                Message = $"{totalDamage}"
                 Position = targetPos
+                Type = SystemCommunications.Damage
               }
             )
           )
@@ -824,6 +824,7 @@ module Combat =
                 NotificationEvent.ShowMessage {
                   Message = "Miss"
                   Position = targetPos
+                  Type = SystemCommunications.Miss
                 }
               )
             )
@@ -846,21 +847,23 @@ module Combat =
 
             let finalMessage = baseMessage + debugText
 
-            ctx.EventBus.Publish(
-              GameEvent.Notification(
-                NotificationEvent.ShowMessage {
-                  Message = finalMessage
-                  Position = targetPos
-                }
-              )
-            )
-
             if result.IsCritical then
               ctx.EventBus.Publish(
                 GameEvent.Notification(
                   NotificationEvent.ShowMessage {
-                    Message = "Crit!"
+                    Message = finalMessage
                     Position = targetPos
+                    Type = SystemCommunications.Crit
+                  }
+                )
+              )
+            else
+              ctx.EventBus.Publish(
+                GameEvent.Notification(
+                  NotificationEvent.ShowMessage {
+                    Message = finalMessage
+                    Position = targetPos
+                    Type = SystemCommunications.Damage
                   }
                 )
               )

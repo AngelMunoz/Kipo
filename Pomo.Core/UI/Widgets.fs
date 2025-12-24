@@ -4,9 +4,15 @@ open System
 open Microsoft.Xna.Framework
 open Myra.Graphics2D
 open Myra.Graphics2D.UI
+open System.Collections.Generic
+open FSharp.UMX
 open FSharp.Data.Adaptive
+open Pomo.Core
 open Pomo.Core.Domain.World
 open Pomo.Core.UI.HUDAnimation
+open Pomo.Core.Domain.Map
+open Pomo.Core.Domain.Units
+open Pomo.Core.Domain.Entity
 
 
 /// Controls when a ResourceBar pulses
@@ -245,3 +251,168 @@ module StatusEffect =
 
 module ActionSlot =
   let create() = ActionSlot()
+
+
+type CombatIndicator() =
+  inherit Widget()
+
+  let mutable lastTime = TimeSpan.Zero
+  let mutable visualAlpha = 0.0f
+
+  member val IsInCombat = false with get, set
+  member val Color = Color.Red with get, set
+  member val FadeSpeed = 0.2f with get, set
+
+  member val WorldTime: Time =
+    {
+      Delta = TimeSpan.Zero
+      TotalGameTime = TimeSpan.Zero
+      Previous = TimeSpan.Zero
+    } with get, set
+
+  override this.InternalRender(context) =
+    let bounds = this.ActualBounds
+    let now = this.WorldTime.TotalGameTime
+
+    let dt =
+      if lastTime = TimeSpan.Zero then
+        0.016f
+      else
+        float32 (now - lastTime).TotalSeconds |> min 0.1f
+
+    lastTime <- now
+
+    let targetAlpha = if this.IsInCombat then 1.0f else 0.0f
+    visualAlpha <- Lerp.smoothDamp visualAlpha targetAlpha this.FadeSpeed dt
+
+    if visualAlpha > 0.01f then
+      let color = this.Color * (visualAlpha * 0.4f)
+      let thickness = 60
+
+      // Draw edge glow (simulated with 4 rectangles)
+      // Top
+      context.FillRectangle(
+        Rectangle(bounds.X, bounds.Y, bounds.Width, thickness),
+        color
+      )
+
+      // Bottom
+      context.FillRectangle(
+        Rectangle(
+          bounds.X,
+          bounds.Y + bounds.Height - thickness,
+          bounds.Width,
+          thickness
+        ),
+        color
+      )
+
+      // Left
+      context.FillRectangle(
+        Rectangle(bounds.X, bounds.Y, thickness, bounds.Height),
+        color
+      )
+
+      // Right
+      context.FillRectangle(
+        Rectangle(
+          bounds.X + bounds.Width - thickness,
+          bounds.Y,
+          thickness,
+          bounds.Height
+        ),
+        color
+      )
+
+
+module CombatIndicator =
+  let create() = CombatIndicator()
+
+
+type MiniMap() =
+  inherit Widget()
+
+  // Properties
+  member val Map: MapDefinition option = None with get, set
+  member val PlayerId: Guid<EntityId> = Guid.Empty |> UMX.tag with get, set
+
+  member val Positions: IReadOnlyDictionary<Guid<EntityId>, Vector2> =
+    Dictionary() with get, set
+
+  member val Factions: HashMap<Guid<EntityId>, HashSet<Faction>> =
+    HashMap.empty with get, set
+
+  member val Zoom = 0.05f with get, set
+
+  /// View bounds for frustum culling (left, right, top, bottom) in world coords
+  /// When set, only entities within these bounds (plus margin) will be rendered
+  member val ViewBounds: struct (float32 * float32 * float32 * float32) voption =
+    ValueNone with get, set
+
+  /// Margin to expand view bounds (fraction, e.g. 0.3 = 30% expansion)
+  member val CullMargin = 0.5f with get, set
+
+  override this.InternalRender(context) =
+    let bounds = this.ActualBounds
+    context.FillRectangle(bounds, Color(0, 0, 0, 180))
+
+    match this.Map with
+    | Some _ ->
+      let playerPos =
+        match this.Positions |> Dictionary.tryFindV this.PlayerId with
+        | ValueSome pos -> pos
+        | ValueNone -> Vector2.Zero
+
+      let mapCenter =
+        Vector2(
+          float32 bounds.X + float32 bounds.Width / 2.0f,
+          float32 bounds.Y + float32 bounds.Height / 2.0f
+        )
+
+      // Pre-filter with frustum culling if bounds are available
+      let inline isInViewBounds(pos: Vector2) =
+        match this.ViewBounds with
+        | ValueSome struct (left, right, top, bottom) ->
+          let marginX = (right - left) * this.CullMargin
+          let marginY = (bottom - top) * this.CullMargin
+
+          pos.X >= left - marginX
+          && pos.X <= right + marginX
+          && pos.Y >= top - marginY
+          && pos.Y <= bottom + marginY
+        | ValueNone -> true
+
+      for KeyValue(entityId, worldPos) in this.Positions do
+        // Skip entities outside view bounds
+        if isInViewBounds worldPos then
+          let relativePos = (worldPos - playerPos) * this.Zoom
+          let drawPos = mapCenter + relativePos
+
+          if bounds.Contains(int drawPos.X, int drawPos.Y) then
+            let color =
+              if entityId = this.PlayerId then
+                Color.Green
+              else
+                match this.Factions.TryFindV entityId with
+                | ValueSome f ->
+                  if HashSet.contains Enemy f then Color.Red
+                  elif HashSet.contains Ally f then Color.Blue
+                  else Color.Gray
+                | ValueNone -> Color.Gray
+
+            let size = if entityId = this.PlayerId then 4 else 3
+
+            context.FillRectangle(
+              Rectangle(
+                int drawPos.X - size / 2,
+                int drawPos.Y - size / 2,
+                size,
+                size
+              ),
+              color
+            )
+    | None -> ()
+
+
+module MiniMap =
+  let create() = MiniMap()

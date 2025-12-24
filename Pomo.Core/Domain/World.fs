@@ -47,6 +47,7 @@ module World =
   [<Struct>]
   type WorldText = {
     Text: string
+    Type: SystemCommunications.NotificationType
     Position: Vector2
     Velocity: Vector2
     Life: float32

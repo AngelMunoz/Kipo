@@ -35,12 +35,6 @@
       "OffsetY": -20,
       "Visible": true
     },
-    "StatusEffects": {
-      "Anchor": "TopRight",
-      "OffsetX": -20,
-      "OffsetY": 80,
-      "Visible": true
-    },
     "TargetFrame": {
       "Anchor": "TopCenter",
       "OffsetX": 0,
@@ -68,7 +62,7 @@
     "MiniMap": {
       "Anchor": "TopRight",
       "OffsetX": -20,
-      "OffsetY": 20,
+      "OffsetY": 60,
       "Visible": true
     }
   }

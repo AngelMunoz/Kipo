@@ -22,6 +22,7 @@ type Rect = Microsoft.Xna.Framework.Rectangle
 
 module HUDComponents =
   open Pomo.Core.UI.HUDAnimation
+  open System.Collections.Generic
 
   /// Common functions shared across multiple components
   module Common =
@@ -217,7 +218,9 @@ module HUDComponents =
   /// Functions for TargetFrame component
   module TargetFrame =
     /// Get display name for a faction set
-    let getFactionDisplayName(factions: HashSet<Faction> option) =
+    let getFactionDisplayName
+      (factions: FSharp.Data.Adaptive.HashSet<Faction> option)
+      =
       match factions with
       | Some f ->
         if HashSet.contains Player f then "Player"
@@ -476,7 +479,7 @@ module HUDComponents =
     (selectedEntityId: Guid<EntityId> voption aval)
     (allResources: amap<Guid<EntityId>, Resource>)
     (allDerivedStats: amap<Guid<EntityId>, DerivedStats>)
-    (allFactions: amap<Guid<EntityId>, HashSet<Faction>>)
+    (allFactions: amap<Guid<EntityId>, FSharp.Data.Adaptive.HashSet<Faction>>)
     =
     let colors = config |> AVal.map _.Theme.Colors
     let hpFill = colors |> AVal.map _.HealthFill
@@ -582,3 +585,57 @@ module HUDComponents =
       |> W.bindOpacity(visibility |> AVal.map Common.visibilityToOpacity)
 
     container
+
+
+  let createCombatIndicator
+    (config: HUDConfig aval)
+    (worldTime: Time aval)
+    (inCombatUntil: TimeSpan aval)
+    =
+    let colors = config |> AVal.map _.Theme.Colors
+    let combatColor = colors |> AVal.map _.TextDamage
+
+    let isInCombat =
+      (inCombatUntil, worldTime)
+      ||> AVal.map2(fun until time -> until > time.TotalGameTime)
+
+    CombatIndicator.create()
+    |> W.bindIsInCombat isInCombat
+    |> W.bindWorldTime worldTime
+    |> W.bindColor combatColor
+
+
+  let createMiniMap
+    (config: HUDConfig aval)
+    (scenario: Scenario option aval)
+    (playerId: Guid<EntityId>)
+    (positions: IReadOnlyDictionary<Guid<EntityId>, Vector2>)
+    (factions: amap<Guid<EntityId>, FSharp.Data.Adaptive.HashSet<Faction>>)
+    (camera: Pomo.Core.Domain.Camera.Camera option aval)
+    =
+    let mapDef = scenario |> AVal.map(Option.map _.Map)
+    let factMap = factions |> AMap.toAVal
+
+    // Compute view bounds from camera for frustum culling
+    let viewBounds =
+      camera
+      |> AVal.map(fun camOpt ->
+        match camOpt with
+        | Some cam ->
+          let bounds =
+            Pomo.Core.Graphics.RenderMath.Camera.getViewBounds
+              cam.Position
+              (float32 cam.Viewport.Width)
+              (float32 cam.Viewport.Height)
+              cam.Zoom
+
+          ValueSome bounds
+        | None -> ValueNone)
+
+    MiniMap.create()
+    |> W.size 150 150
+    |> W.bindMap mapDef
+    |> W.playerId playerId
+    |> W.mapPositions positions
+    |> W.bindMapFactions factMap
+    |> W.bindViewBounds viewBounds

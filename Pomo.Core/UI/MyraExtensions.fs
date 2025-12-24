@@ -6,6 +6,7 @@ open System.Reactive.Disposables
 open Microsoft.Xna.Framework
 open Myra.Graphics2D
 open Myra.Graphics2D.UI
+open FSharp.UMX
 open FSharp.Data.Adaptive
 open Pomo.Core.Domain.World
 
@@ -29,6 +30,9 @@ module WidgetSubs =
     | false, _ -> ()
 
 module W =
+  open System.Collections.Generic
+  open Pomo.Core.Domain.Units
+  open Pomo.Core.Domain.Entity
 
   let inline width<'T when 'T: (member set_Width: Nullable<int> -> unit)>
     (value: int)
@@ -59,7 +63,7 @@ module W =
     when 'T: (member set_HorizontalAlignment: HorizontalAlignment -> unit)>
     (align: HorizontalAlignment)
     (w: 'T)
-    : 'T when 'T: (member set_HorizontalAlignment: HorizontalAlignment -> unit) =
+    : 'T =
     w.set_HorizontalAlignment align
     w
 
@@ -67,14 +71,14 @@ module W =
     when 'T: (member set_VerticalAlignment: VerticalAlignment -> unit)>
     (align: VerticalAlignment)
     (w: 'T)
-    : 'T when 'T: (member set_VerticalAlignment: VerticalAlignment -> unit) =
+    : 'T =
     w.set_VerticalAlignment align
     w
 
   let inline margin<'T when 'T: (member set_Margin: Thickness -> unit)>
     (value: int)
     (w: 'T)
-    : 'T when 'T: (member set_Margin: Thickness -> unit) =
+    : 'T =
     w.set_Margin(Thickness(value))
     w
 
@@ -84,35 +88,35 @@ module W =
     (right: int)
     (bottom: int)
     (w: 'T)
-    : 'T when 'T: (member set_Margin: Thickness -> unit) =
+    : 'T =
     w.set_Margin(Thickness(left, top, right, bottom))
     w
 
   let inline padding<'T when 'T: (member set_Padding: Thickness -> unit)>
     (value: int)
     (w: 'T)
-    : 'T when 'T: (member set_Padding: Thickness -> unit) =
+    : 'T =
     w.set_Padding(Thickness(value))
     w
 
   let inline left<'T when 'T: (member set_Left: int -> unit)>
     (value: int)
     (w: 'T)
-    : 'T when 'T: (member set_Left: int -> unit) =
+    : 'T =
     w.set_Left(value)
     w
 
   let inline top<'T when 'T: (member set_Top: int -> unit)>
     (value: int)
     (w: 'T)
-    : 'T when 'T: (member set_Top: int -> unit) =
+    : 'T =
     w.set_Top(value)
     w
 
   let inline id<'T when 'T: (member set_Id: string -> unit)>
     (value: string)
     (w: 'T)
-    : 'T when 'T: (member set_Id: string -> unit) =
+    : 'T =
     w.set_Id(value)
     w
 
@@ -178,6 +182,16 @@ module W =
     w.set_CooldownEndTime(value)
     w
 
+  let inline mapPositions<'T
+    when 'T :> Widget
+    and 'T: (member set_Positions:
+      IReadOnlyDictionary<Guid<EntityId>, Vector2> -> unit)>
+    (positions: IReadOnlyDictionary<Guid<EntityId>, Vector2>)
+    (w: 'T)
+    =
+    w.set_Positions(positions)
+    w
+
   // Reactive bindings (subscriptions auto-stored via WidgetSubs)
   let inline bindText<'T
     when 'T :> Widget and 'T: (member set_Text: string -> unit)>
@@ -194,6 +208,15 @@ module W =
     (w: 'T)
     =
     let sub = aval.AddWeakCallback(fun v -> w.set_TextColor(v))
+    WidgetSubs.get(w).Add(sub)
+    w
+
+  let inline bindColor<'T
+    when 'T :> Widget and 'T: (member set_Color: Color -> unit)>
+    (aval: aval<Color>)
+    (w: 'T)
+    =
+    let sub = aval.AddWeakCallback(fun v -> w.set_Color(v))
     WidgetSubs.get(w).Add(sub)
     w
 
@@ -324,6 +347,57 @@ module W =
     WidgetSubs.get(w).Add(sub)
     w
 
+  let inline bindIsInCombat<'T
+    when 'T :> Widget and 'T: (member set_IsInCombat: bool -> unit)>
+    (aval: aval<bool>)
+    (w: 'T)
+    =
+    let sub = aval.AddWeakCallback(fun v -> w.set_IsInCombat(v))
+    WidgetSubs.get(w).Add(sub)
+    w
+
+  let inline bindMap<'T
+    when 'T :> Widget
+    and 'T: (member set_Map: Pomo.Core.Domain.Map.MapDefinition option -> unit)>
+    (aval: aval<Pomo.Core.Domain.Map.MapDefinition option>)
+    (w: 'T)
+    =
+    let sub = aval.AddWeakCallback(fun v -> w.set_Map(v))
+    WidgetSubs.get(w).Add(sub)
+    w
+
+  let inline playerId<'T
+    when 'T :> Widget and 'T: (member set_PlayerId: Guid<EntityId> -> unit)>
+    (value: Guid<EntityId>)
+    (w: 'T)
+    =
+    w.set_PlayerId(value)
+    w
+
+
+
+  let inline bindMapFactions<'T
+    when 'T :> Widget
+    and 'T: (member set_Factions:
+      HashMap<Guid<EntityId>, FSharp.Data.Adaptive.HashSet<Faction>> -> unit)>
+    (aval: aval<HashMap<Guid<EntityId>, FSharp.Data.Adaptive.HashSet<Faction>>>)
+    (w: 'T)
+    =
+    let sub = aval.AddWeakCallback(fun v -> w.set_Factions(v))
+    WidgetSubs.get(w).Add(sub)
+    w
+
+  let inline bindViewBounds<'T
+    when 'T :> Widget
+    and 'T: (member set_ViewBounds:
+      struct (float32 * float32 * float32 * float32) voption -> unit)>
+    (aval: aval<struct (float32 * float32 * float32 * float32) voption>)
+    (w: 'T)
+    =
+    let sub = aval.AddWeakCallback(fun v -> w.set_ViewBounds(v))
+    WidgetSubs.get(w).Add(sub)
+    w
+
   let inline totalDurationSeconds<'T
     when 'T: (member set_TotalDurationSeconds: float32 -> unit)>
     (value: float32)
@@ -338,6 +412,13 @@ module W =
     (w: 'T)
     =
     w.set_Kind(value)
+    w
+
+  let inline isInCombat<'T when 'T: (member set_IsInCombat: bool -> unit)>
+    (value: bool)
+    (w: 'T)
+    =
+    w.set_IsInCombat(value)
     w
 
   let inline colorFill<'T when 'T: (member set_ColorFill: Color -> unit)>
