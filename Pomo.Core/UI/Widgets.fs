@@ -72,7 +72,12 @@ type ResourceBar() =
     context.FillRectangle(bounds, this.ColorBackground)
 
     // Fill bar
-    let fillPct = MathHelper.Clamp(visualValue / this.MaxValue, 0.0f, 1.0f)
+    let fillPct =
+      if this.MaxValue > 0.0f then
+        MathHelper.Clamp(visualValue / this.MaxValue, 0.0f, 1.0f)
+      else
+        0.0f
+
     let fillWidth = int(float32 bounds.Width * fillPct)
 
     if fillWidth > 0 then
@@ -98,26 +103,13 @@ type ResourceBar() =
 module ResourceBar =
   let create() = ResourceBar()
 
-  let health() =
-    ResourceBar(
-      ColorFill = Color.Green,
-      ColorLow = Color.Red,
-      ColorBackground = Color.DarkGray
-    )
-
-  let mana() =
-    ResourceBar(
-      ColorFill = Color.Blue,
-      ColorLow = Color.Blue,
-      ColorBackground = Color.DarkGray
-    )
-
 
 type ActionSlot() =
   inherit Widget()
 
   // Properties
   member val CooldownEndTime = TimeSpan.Zero with get, set
+  member val CooldownDuration = 10.0f with get, set
   member val CooldownColor = Color(0, 0, 0, 200) with get, set
   member val BgColor = Color.DarkSlateGray with get, set
 
@@ -138,8 +130,10 @@ type ActionSlot() =
     // Cooldown overlay (vertical sweep from bottom)
     if this.CooldownEndTime > time then
       let remaining = (this.CooldownEndTime - time).TotalSeconds
-      // Assuming 10s default max for visual scaling for now, maybe expose this?
-      let cdPct = MathHelper.Clamp(float32 remaining / 10.0f, 0.0f, 1.0f)
+
+      let cdPct =
+        MathHelper.Clamp(float32 remaining / this.CooldownDuration, 0.0f, 1.0f)
+
       let overlayHeight = int(float32 bounds.Height * cdPct)
 
       if overlayHeight > 0 then

@@ -271,16 +271,16 @@ module W =
     w
 
   let inline bindBackgroundBrush<'T
-    when 'T :> Widget and 'T: (member set_Backround: IBrush -> unit)>
+    when 'T :> Widget and 'T: (member set_Background: IBrush -> unit)>
     (aval: aval<IBrush>)
     (w: 'T)
     =
-    let sub = aval.AddWeakCallback(fun v -> w.set_Backround(v))
+    let sub = aval.AddWeakCallback(fun v -> w.set_Background(v))
     WidgetSubs.get(w).Add(sub)
     w
 
   let inline bindBackground<'T
-    when 'T :> Widget and 'T: (member set_Backround: IBrush -> unit)>
+    when 'T :> Widget and 'T: (member set_Background: IBrush -> unit)>
     (aval: aval<Color>)
     (w: 'T)
     =
@@ -301,6 +301,15 @@ module W =
     (w: 'T)
     =
     let sub = aval.AddWeakCallback(fun v -> w.set_CooldownColor(v))
+    WidgetSubs.get(w).Add(sub)
+    w
+
+  let inline bindCooldownDuration<'T
+    when 'T :> Widget and 'T: (member set_CooldownDuration: float32 -> unit)>
+    (aval: aval<float32>)
+    (w: 'T)
+    =
+    let sub = aval.AddWeakCallback(fun v -> w.set_CooldownDuration(v))
     WidgetSubs.get(w).Add(sub)
     w
 

@@ -257,14 +257,15 @@ module Projections =
             match result |> HashMap.tryFindV inst.ItemId with
             | ValueSome existing -> {
                 existing with
-                  Count = existing.Count + 1
-                  Instances = resolvedInst :: existing.Instances
+                    Count = existing.Count + 1
+                    Instances = resolvedInst :: existing.Instances
               }
-            | ValueNone -> {
-                Definition = def
-                Count = 1
-                Instances = [resolvedInst]
-              }
+            | ValueNone ->
+                {
+                  Definition = def
+                  Count = 1
+                  Instances = [ resolvedInst ]
+                }
 
           result <- result |> HashMap.add inst.ItemId stack)
 
@@ -324,7 +325,7 @@ module Projections =
     abstract LiveEntities: aset<Guid<EntityId>>
     abstract CombatStatuses: amap<Guid<EntityId>, IndexList<CombatStatus>>
     abstract DerivedStats: amap<Guid<EntityId>, Entity.DerivedStats>
-    abstract EquipedItems: amap<Guid<EntityId>, HashMap<Slot, ItemDefinition>>
+    abstract EquippedItems: amap<Guid<EntityId>, HashMap<Slot, ItemDefinition>>
 
     abstract ResolvedInventories:
       amap<Guid<EntityId>, HashMap<int<ItemId>, ResolvedItemStack>>
@@ -452,7 +453,7 @@ module Projections =
         member _.LiveEntities = liveEntities world
         member _.CombatStatuses = calculateCombatStatuses world
         member _.DerivedStats = derivedStats
-        member _.EquipedItems = equippedItemDefs(world, itemStore)
+        member _.EquippedItems = equippedItemDefs(world, itemStore)
         member _.ResolvedInventories = resolvedInventories world itemStore
         member _.EntityScenarios = world.EntityScenario
         member _.ActionSets = activeActionSets world

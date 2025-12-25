@@ -37,6 +37,7 @@ type ActionSlotData = {
   AbbrevText: string aval
   CountText: string aval
   CooldownEnd: TimeSpan aval
+  CooldownDuration: float32 aval
 }
 
 module HUDComponents =
@@ -230,6 +231,22 @@ module HUDComponents =
         HashMap.tryFindV id cds |> ValueOption.defaultValue TimeSpan.Zero
       | _ -> TimeSpan.Zero
 
+    /// Get cooldown duration (in seconds) for a slot processing entry
+    let getSlotCooldownDuration
+      (skillStore: SkillStore)
+      (proc: SlotProcessing voption)
+      =
+      match proc with
+      | ValueSome(SlotProcessing.Skill id) ->
+        skillStore.tryFind id
+        |> ValueOption.bind(fun skill ->
+          match skill with
+          | Active a -> a.Cooldown
+          | _ -> ValueNone)
+        |> ValueOption.map(fun ts -> float32 ts.TotalSeconds)
+        |> ValueOption.defaultValue 10.0f // Fallback for skills without cooldown
+      | _ -> 10.0f
+
     /// Get abbreviation text for a slot processing entry
     let getSlotAbbreviation
       (skillStore: SkillStore)
@@ -383,7 +400,7 @@ module HUDComponents =
         Common.formatResourceText res.HP derived.HP)
 
     let hpWidget =
-      ResourceBar.health()
+      ResourceBar.create()
       |> W.height 20
       |> W.hAlign HorizontalAlignment.Stretch
       |> W.bindCurrentValue hpCurrent
@@ -393,7 +410,7 @@ module HUDComponents =
       |> W.bindWorldTime worldTime
 
     let mpWidget =
-      ResourceBar.mana()
+      ResourceBar.create()
       |> W.height 10
       |> W.hAlign HorizontalAlignment.Stretch
       |> W.margin4 0 4 0 0
@@ -466,6 +483,7 @@ module HUDComponents =
       |> W.bindBgColor data.BackgroundColor
       |> W.bindCooldownColor ctx.CooldownColor
       |> W.bindCooldownEndTime data.CooldownEnd
+      |> W.bindCooldownDuration data.CooldownDuration
 
     Panel.sized 48 48
     |> W.childrenP [ slot; abbrevLabel; keyLabel; countLabel ]
@@ -534,6 +552,8 @@ module HUDComponents =
           ||> AVal.map2(fun proc inv -> ActionBar.getSlotItemCount inv proc)
         CooldownEnd =
           (cooldowns, slotProc) ||> AVal.map2 ActionBar.getSlotCooldownEndTime
+        CooldownDuration =
+          slotProc |> AVal.map(ActionBar.getSlotCooldownDuration skillStore)
       }
 
       let slotWidget = createActionSlot barCtx slotData
@@ -665,7 +685,7 @@ module HUDComponents =
       |> AVal.map(Option.map(_.HP >> float32) >> Option.defaultValue 100.0f)
 
     let hpBar =
-      ResourceBar.health()
+      ResourceBar.create()
       |> W.size 150 12
       |> W.bindCurrentValue hpCurrent
       |> W.bindMaxValue hpMax
