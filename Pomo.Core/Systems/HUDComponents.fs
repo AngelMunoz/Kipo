@@ -21,6 +21,24 @@ open Microsoft.Xna.Framework.Input
 
 type Rect = Microsoft.Xna.Framework.Rectangle
 
+/// Shared context for all action slots in a bar
+[<Struct>]
+type ActionBarContext = {
+  WorldTime: Time aval
+  CooldownColor: Color aval
+}
+
+/// Per-slot reactive data for an action slot
+[<Struct>]
+type ActionSlotData = {
+  BackgroundColor: Color aval
+  TooltipText: string aval
+  KeyText: string aval
+  AbbrevText: string aval
+  CountText: string aval
+  CooldownEnd: TimeSpan aval
+}
+
 module HUDComponents =
   open Pomo.Core.UI.HUDAnimation
   open System.Collections.Generic
@@ -54,7 +72,119 @@ module HUDComponents =
     let inline formatResourceText (current: int) (max: int) =
       $"{current} / {max}"
 
-  /// Functions for ActionBar component
+  /// Tooltip text generators (formatted strings)
+  module Tooltips =
+    /// Format a skill as tooltip text
+    let formatSkill (skillStore: SkillStore) (skillId: int<SkillId>) =
+      skillStore.tryFind skillId
+      |> ValueOption.map(fun skill ->
+        match skill with
+        | Active a ->
+          let cost =
+            a.Cost
+            |> ValueOption.map(fun c ->
+              $"{c.Amount |> ValueOption.defaultValue 0} {c.ResourceType}")
+            |> ValueOption.defaultValue "Free"
+
+          let cd =
+            a.Cooldown
+            |> ValueOption.map(fun t -> $"{t.TotalSeconds:F1}s")
+            |> ValueOption.defaultValue "Instant"
+
+          $"{a.Name}\n{a.Description}\nCost: {cost}\nCooldown: {cd}"
+        | Passive p -> $"{p.Name} (Passive)\n{p.Description}")
+      |> ValueOption.defaultValue ""
+
+    /// Format an item as tooltip text
+    let formatItem(stack: ResolvedItemStack) =
+      let def = stack.Definition
+
+      let kindText =
+        match def.Kind with
+        | Wearable w -> $"[{w.Slot}]"
+        | Usable _ -> "[Usable]"
+        | NonUsable -> ""
+
+      let usesText =
+        stack.Instances
+        |> List.tryHead
+        |> Option.bind(fun i -> i.UsesLeft |> ValueOption.toOption)
+        |> Option.map(fun u -> $"\nUses: {u}")
+        |> Option.defaultValue ""
+
+      $"{def.Name} {kindText}\nWeight: {def.Weight}{usesText}"
+
+    /// Format an effect as tooltip text
+    let formatEffect (effect: ActiveEffect) (currentTime: TimeSpan) =
+      let remaining =
+        match effect.SourceEffect.Duration with
+        | Timed t -> effect.StartTime + t - currentTime
+        | _ -> TimeSpan.Zero
+
+      let timeText =
+        if remaining.TotalSeconds > 0.0 then
+          $" ({int remaining.TotalSeconds}s)"
+        else
+          ""
+
+      let stackText =
+        if effect.StackCount > 1 then
+          $"\nStacks: {effect.StackCount}"
+        else
+          ""
+
+      $"{effect.SourceEffect.Name}{timeText}\n[{effect.SourceEffect.Kind}]{stackText}"
+
+    /// Get tooltip text for a slot processing entry
+    let formatSlot
+      (skillStore: SkillStore)
+      (proc: SlotProcessing voption)
+      (inventory: HashMap<int<ItemId>, ResolvedItemStack> option)
+      =
+      match proc with
+      | ValueSome(SlotProcessing.Skill id) -> formatSkill skillStore id
+      | ValueSome(SlotProcessing.Item instanceId) ->
+        inventory
+        |> Option.bind(fun inv ->
+          inv
+          |> Seq.tryPick(fun (_, stack) ->
+            if
+              stack.Instances
+              |> List.exists(fun i -> i.InstanceId = instanceId)
+            then
+              Some(formatItem stack)
+            else
+              None))
+        |> Option.defaultValue ""
+      | ValueNone -> ""
+
+    let formatEquippedItem
+      (itemStore: ItemStore)
+      (itemInstances: IReadOnlyDictionary<Guid<ItemInstanceId>, ItemInstance>)
+      (equippedItems: HashMap<Slot, Guid<ItemInstanceId>>)
+      (slot: Slot)
+      =
+      equippedItems.TryFindV slot
+      |> ValueOption.bind(fun id -> itemInstances |> Dictionary.tryFindV id)
+      |> ValueOption.bind(fun inst ->
+        itemStore.tryFind inst.ItemId
+        |> ValueOption.map(fun def ->
+          let kindText =
+            match def.Kind with
+            | Wearable w ->
+              let stats =
+                w.Stats |> Array.map(fun s -> $"  {s}") |> String.concat "\n"
+
+              if stats.Length > 0 then
+                $"[{w.Slot}]\n{stats}"
+              else
+                $"[{w.Slot}]"
+            | Usable u -> $"[Usable] {u.Effect.Name}"
+            | NonUsable -> ""
+
+          $"{def.Name}\n{kindText}\nWeight: {def.Weight}"))
+      |> ValueOption.defaultValue ""
+
   module ActionBar =
     /// Get skill abbreviation from SkillStore
     let getSkillAbbreviation (skillStore: SkillStore) (skillId: int<SkillId>) =
@@ -254,8 +384,8 @@ module HUDComponents =
 
     let hpWidget =
       ResourceBar.health()
-      |> W.size 200 16
-      |> W.hAlign HorizontalAlignment.Left
+      |> W.height 20
+      |> W.hAlign HorizontalAlignment.Stretch
       |> W.bindCurrentValue hpCurrent
       |> W.bindMaxValue hpMax
       |> W.bindColorFill hpColorFill
@@ -264,8 +394,8 @@ module HUDComponents =
 
     let mpWidget =
       ResourceBar.mana()
-      |> W.size 200 8
-      |> W.hAlign HorizontalAlignment.Left
+      |> W.height 10
+      |> W.hAlign HorizontalAlignment.Stretch
       |> W.margin4 0 4 0 0
       |> W.bindCurrentValue mpCurrent
       |> W.bindMaxValue mpMax
@@ -278,10 +408,17 @@ module HUDComponents =
       |> W.textColor Color.White
       |> W.hAlign HorizontalAlignment.Center
       |> W.vAlign VerticalAlignment.Center
-      |> W.margin4 0 -20 0 0
       |> W.bindText hpText
 
-    VStack.create() |> W.childrenV [ hpWidget; mpWidget; hpLabel ]
+    // HP bar with overlayed label
+    let hpPanel =
+      Panel.create()
+      |> W.height 20
+      |> W.hAlign HorizontalAlignment.Stretch
+      |> W.childrenP [ hpWidget; hpLabel ]
+
+    // Container with fixed width for positioning, bars stretch inside
+    VStack.spaced 4 |> W.width 600 |> W.childrenV [ hpPanel; mpWidget ]
 
   // Action slot constants
   let private slotActions = [|
@@ -298,16 +435,13 @@ module HUDComponents =
   let private slotCount = slotActions.Length
 
 
-  let createActionSlot
-    (worldTime: Time aval)
-    (cdColor: Color aval)
-    (bgColor: Color aval)
-    =
+  let createActionSlot (ctx: ActionBarContext) (data: ActionSlotData) =
     let abbrevLabel =
       Label.create ""
       |> W.textColor Color.White
       |> W.hAlign HorizontalAlignment.Center
       |> W.vAlign VerticalAlignment.Center
+      |> W.bindText data.AbbrevText
 
     let keyLabel =
       Label.create ""
@@ -315,6 +449,7 @@ module HUDComponents =
       |> W.hAlign HorizontalAlignment.Right
       |> W.vAlign VerticalAlignment.Top
       |> W.margin4 0 2 4 0
+      |> W.bindText data.KeyText
 
     let countLabel =
       Label.create ""
@@ -322,19 +457,19 @@ module HUDComponents =
       |> W.hAlign HorizontalAlignment.Right
       |> W.vAlign VerticalAlignment.Bottom
       |> W.margin4 0 0 4 2
+      |> W.bindText data.CountText
 
     let slot =
       ActionSlot.create()
       |> W.size 48 48
-      |> W.bindWorldTime worldTime
-      |> W.bindBgColor bgColor
-      |> W.bindCooldownColor cdColor
+      |> W.bindWorldTime ctx.WorldTime
+      |> W.bindBgColor data.BackgroundColor
+      |> W.bindCooldownColor ctx.CooldownColor
+      |> W.bindCooldownEndTime data.CooldownEnd
 
-    let container =
-      Panel.sized 48 48
-      |> W.childrenP [ slot; abbrevLabel; keyLabel; countLabel ]
-
-    struct (container, slot, abbrevLabel, keyLabel, countLabel)
+    Panel.sized 48 48
+    |> W.childrenP [ slot; abbrevLabel; keyLabel; countLabel ]
+    |> W.bindTooltip data.TooltipText
 
 
   let createActionBar
@@ -350,16 +485,27 @@ module HUDComponents =
     let colors = config |> AVal.map _.Theme.Colors
     let cdColor = config |> AVal.map _.Theme.CooldownOverlayColor
 
+    let barCtx: ActionBarContext = {
+      WorldTime = worldTime
+      CooldownColor = cdColor
+    }
+
     let setIndicator =
       let idxText = activeSetIndex |> AVal.map string
 
       Label.create "1"
       |> W.textColor Color.Yellow
       |> W.vAlign VerticalAlignment.Center
-      |> W.margin4 0 0 8 0
+      |> W.hAlign HorizontalAlignment.Center
       |> W.bindText idxText
 
-    let panel = HStack.spaced 4 |> W.childrenH [ setIndicator ]
+    // Use Grid layout like Equipment panel for consistent tooltip behavior
+    let grid = Grid.spaced 4 4 |> Grid.autoColumns(1 + slotCount)
+
+    // Column 0: set indicator
+    Grid.SetColumn(setIndicator, 0)
+    Grid.SetRow(setIndicator, 0)
+    grid.Widgets.Add(setIndicator)
 
     for i in 0 .. slotCount - 1 do
       let action = slotActions[i]
@@ -370,39 +516,33 @@ module HUDComponents =
           HashMap.tryFindV idx sets
           |> ValueOption.bind(HashMap.tryFindV action))
 
-      let bgColor =
-        (slotProc, colors)
-        ||> AVal.map2(fun proc cs ->
-          ActionBar.getSlotBackgroundColor skillStore cs proc)
+      let slotData: ActionSlotData = {
+        BackgroundColor =
+          (slotProc, colors)
+          ||> AVal.map2(fun proc cs ->
+            ActionBar.getSlotBackgroundColor skillStore cs proc)
+        TooltipText =
+          (slotProc, playerInventory)
+          ||> AVal.map2(Tooltips.formatSlot skillStore)
+        KeyText = inputMap |> AVal.map(ActionBar.getKeyLabelForAction action)
+        AbbrevText =
+          (slotProc, playerInventory)
+          ||> AVal.map2(fun proc inv ->
+            ActionBar.getSlotAbbreviation skillStore inv proc)
+        CountText =
+          (slotProc, playerInventory)
+          ||> AVal.map2(fun proc inv -> ActionBar.getSlotItemCount inv proc)
+        CooldownEnd =
+          (cooldowns, slotProc) ||> AVal.map2 ActionBar.getSlotCooldownEndTime
+      }
 
-      let struct (container, slot, abbrev, key, count) =
-        createActionSlot worldTime cdColor bgColor
+      let slotWidget = createActionSlot barCtx slotData
+      Grid.SetColumn(slotWidget, i + 1) // +1 because column 0 is setIndicator
+      Grid.SetRow(slotWidget, 0)
+      grid.Widgets.Add(slotWidget)
 
-      panel.Widgets.Add(container)
-
-      let keyText = inputMap |> AVal.map(ActionBar.getKeyLabelForAction action)
-
-      key |> W.bindText keyText |> ignore
-
-      let abbrevText =
-        (slotProc, playerInventory)
-        ||> AVal.map2(fun proc inv ->
-          ActionBar.getSlotAbbreviation skillStore inv proc)
-
-      abbrev |> W.bindText abbrevText |> ignore
-
-      let countText =
-        (slotProc, playerInventory)
-        ||> AVal.map2(fun proc inv -> ActionBar.getSlotItemCount inv proc)
-
-      count |> W.bindText countText |> ignore
-
-      let cdEnd =
-        (cooldowns, slotProc) ||> AVal.map2 ActionBar.getSlotCooldownEndTime
-
-      slot |> W.bindCooldownEndTime cdEnd |> ignore
-
-    panel
+    // Wrap in Panel like Equipment panel for consistent tooltip behavior
+    Panel.create() |> W.childrenP [ grid ]
 
 
   let createStatusEffect
@@ -455,7 +595,13 @@ module HUDComponents =
       |> W.bindColorDot colorDot
       |> W.bindCooldownColor cdColor
 
-    Panel.sized 32 32 |> W.childrenP [ widget; abbrevLabel; stackLabel ]
+    let tooltipText =
+      worldTime
+      |> AVal.map(fun time -> Tooltips.formatEffect effect time.TotalGameTime)
+
+    Panel.sized 32 32
+    |> W.childrenP [ widget; abbrevLabel; stackLabel ]
+    |> W.bindTooltip tooltipText
 
   let createStatusEffectsBar
     (config: HUDConfig aval)
@@ -552,14 +698,15 @@ module HUDComponents =
       | None -> label
 
     let createStatRow (label: string) (valueAVal: string aval) =
-      let lbl = Label.colored label Color.LightGray
+      let lbl = Label.colored label Color.LightGray |> W.width 72
 
       let valLbl =
         Label.colored "0" Color.White
         |> W.hAlign HorizontalAlignment.Right
+        |> W.width 36
         |> W.bindText valueAVal
 
-      Panel.create() |> W.height 20 |> W.childrenP [ lbl; valLbl ]
+      HStack.spaced 12 |> W.height 16 |> W.childrenH [ lbl; valLbl ]
 
     let createStatSection (title: string) (rows: Widget list) =
       let titleLbl = Label.colored title Color.Yellow |> W.margin4 0 8 0 4
@@ -586,6 +733,7 @@ module HUDComponents =
       (bgColor: Color aval)
       (slotName: string)
       (itemAbbrev: string aval)
+      (tooltipText: string aval)
       =
       let slot = EquipmentSlot.create() |> W.size 48 48 |> W.bindBgColor bgColor
 
@@ -603,7 +751,9 @@ module HUDComponents =
         |> W.vAlign VerticalAlignment.Center
         |> W.bindText itemAbbrev
 
-      Panel.sized 48 48 |> W.childrenP [ slot; nameLabel; abbrevLabel ]
+      Panel.sized 48 48
+      |> W.childrenP [ slot; nameLabel; abbrevLabel ]
+      |> W.bindTooltip tooltipText
 
   let createCastBar
     (config: HUDConfig aval)
@@ -650,7 +800,6 @@ module HUDComponents =
 
     container
 
-
   let createCombatIndicator
     (config: HUDConfig aval)
     (worldTime: Time aval)
@@ -669,7 +818,6 @@ module HUDComponents =
     |> W.bindIsInCombat isInCombat
     |> W.bindWorldTime worldTime
     |> W.bindColor combatColor
-
 
   let createCharacterSheet
     (config: HUDConfig aval)
@@ -766,13 +914,13 @@ module HUDComponents =
     let generalSection =
       CharacterSheet.createStatSection "General" [
         CharacterSheet.createStatRow
-          "Move Speed"
+          "MS"
           (derivedStats |> AVal.map(fun s -> string s.MS))
         CharacterSheet.createStatRow
-          "HP Regen"
+          "HPReg"
           (derivedStats |> AVal.map(fun s -> string s.HPRegen))
         CharacterSheet.createStatRow
-          "MP Regen"
+          "MPReg"
           (derivedStats |> AVal.map(fun s -> string s.MPRegen))
       ]
 
@@ -862,8 +1010,6 @@ module HUDComponents =
     |> Panel.bindBackground(config |> AVal.map _.Theme.TooltipBackground)
     |> W.childrenP [ container ]
 
-
-
   let createEquipmentPanel
     (config: HUDConfig aval)
     (worldTime: Time aval)
@@ -895,7 +1041,12 @@ module HUDComponents =
             items
             slot)
 
-      Equipment.createSlot worldTime bgColor name abbrev
+      let tooltipText =
+        equippedItems
+        |> AVal.map(fun items ->
+          Tooltips.formatEquippedItem itemStore itemInstances items slot)
+
+      Equipment.createSlot worldTime bgColor name abbrev tooltipText
 
     let grid = Grid.spaced 4 4 |> W.padding 16 |> Grid.autoColumns 2
 

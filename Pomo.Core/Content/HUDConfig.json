@@ -13,7 +13,12 @@
       "FactionAlly": "#3CB464",
       "FactionEnemy": "#C83C3C",
       "FactionNPC": "#C8B464",
-      "FactionNeutral": "#8C8C8C"
+      "FactionNeutral": "#8C8C8C",
+      "CastBarFill": "#DCDC3C",
+      "CastBarBackground": "#282814",
+      "OffensiveSlot": "#5A2828",
+      "SupportiveSlot": "#285A28",
+      "TextDamage": "#C83C3C"
     },
     "FontName": "monogram-extended",
     "CooldownOverlayColor": "#000000A0",
@@ -24,15 +29,15 @@
   },
   "Layout": {
     "PlayerVitals": {
-      "Anchor": "BottomLeft",
-      "OffsetX": 20,
+      "Anchor": "BottomCenter",
+      "OffsetX": 0,
       "OffsetY": -20,
       "Visible": true
     },
     "ActionBar": {
-      "Anchor": "BottomCenter",
+      "Anchor": "TopCenter",
       "OffsetX": 0,
-      "OffsetY": -20,
+      "OffsetY": 20,
       "Visible": true
     },
     "TargetFrame": {
@@ -45,6 +50,12 @@
       "Anchor": "BottomCenter",
       "OffsetX": 0,
       "OffsetY": -100,
+      "Visible": true
+    },
+    "StatusEffects": {
+      "Anchor": "BottomLeft",
+      "OffsetX": 20,
+      "OffsetY": -130,
       "Visible": true
     },
     "CharacterSheet": {

@@ -286,10 +286,11 @@ module GameplayUI =
     let hudChildren =
       layout
       |> AVal.map(fun l -> [
-        // Top panel is always included
-        topPanel :> Widget
-
+        // Combat indicator first (rendered behind everything else)
         combatIndicator :> Widget
+
+        // Top panel
+        topPanel :> Widget
 
         if l.PlayerVitals.Visible then
           applyLayout l.PlayerVitals playerVitals

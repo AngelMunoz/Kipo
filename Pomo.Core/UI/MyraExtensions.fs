@@ -478,6 +478,18 @@ module W =
     w.set_PulseMode(mode)
     w
 
+  let inline tooltip<'T when 'T :> Widget> (text: string) (w: 'T) =
+    w.Tooltip <- text
+    w
+
+  let inline bindTooltip<'T
+    when 'T :> Widget and 'T: (member set_Tooltip: string -> unit)>
+    (textAVal: aval<string>)
+    (w: 'T)
+    =
+    let sub = textAVal.AddWeakCallback(fun v -> w.set_Tooltip(v))
+    WidgetSubs.get(w).Add(sub)
+    w
 
 module Label =
   let inline create(text: string) = Label(Text = text)

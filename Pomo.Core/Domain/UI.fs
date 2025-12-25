@@ -165,15 +165,15 @@ module UI =
   module HUDLayout =
     let defaults = {
       PlayerVitals = {
-        Anchor = BottomLeft
-        OffsetX = 20
+        Anchor = BottomCenter
+        OffsetX = 0
         OffsetY = -20
         Visible = true
       }
       ActionBar = {
-        Anchor = BottomCenter
+        Anchor = TopCenter
         OffsetX = 0
-        OffsetY = -20
+        OffsetY = 20
         Visible = true
       }
       StatusEffects = {
