@@ -124,7 +124,7 @@
       - Ally = Blue
     - Appropriate zoom level for spatial awareness
 
-- [ ] Task: Conductor - User Manual Verification 'Phase 3: World-Space & Secondary Overlays' (Protocol in workflow.md)
+- [x] Task: Conductor - User Manual Verification 'Phase 3: World-Space & Secondary Overlays' (Protocol in workflow.md)
 
 ---
 
@@ -132,7 +132,7 @@
 
 ### 4.1 Character Sheet
 
-- [ ] Task: Implement `CharacterSheet` Panel
+- [x] Task: Implement `CharacterSheet` Panel
     - Toggle visibility via hotkey (e.g., 'C')
     - **Base Stats Section:** Power, Magic, Sense, Charm
       - Bind to `world.BaseStats[entityId]`
@@ -145,7 +145,7 @@
 
 ### 4.2 Equipment Panel
 
-- [ ] Task: Implement `EquipmentPanel` Component
+- [x] Task: Implement `EquipmentPanel` Component
     - Bind to `world.EquippedItems[entityId]` → `HashMap<Slot, Guid<ItemInstanceId>>`
     - 8 slots: Head, Chest, Legs, Feet, Hands, Weapon, Shield, Accessory
     - Display item names (resolve via `world.ItemInstances` + `ItemStore`)
@@ -155,36 +155,36 @@
 
 ### 4.3 Tooltips System
 
-- [ ] Task: Implement Tooltip Infrastructure
+- [x] Task: Implement Tooltip Infrastructure
     - Shared tooltip rendering service
     - Smart positioning (avoid screen edges)
     - Slight hover delay (~200ms), instant hide on mouseout
-- [ ] Task: Implement Skill Tooltips
+- [x] Task: Implement Skill Tooltips
     - Name, Description, Cost, Cooldown, Cast Time, Range, Area, Effects
     - Source: `SkillStore.find(skillId)` → `ActiveSkill`
-- [ ] Task: Implement Item Tooltips
+- [x] Task: Implement Item Tooltips
     - Name, Weight, Equipment stats (if Wearable), Uses remaining
     - Source: `ItemStore.find(itemId)` → `ItemDefinition`
-- [ ] Task: Implement Effect Tooltips
+- [x] Task: Implement Effect Tooltips
     - Name, Kind, Time remaining, Description
     - Source: `ActiveEffect.SourceEffect`
 
-- [ ] Task: Conductor - User Manual Verification 'Phase 4: Detail Panels' (Protocol in workflow.md)
+- [x] Task: Conductor - User Manual Verification 'Phase 4: Detail Panels' (Protocol in workflow.md)
 
 ---
 
 ## Phase 5: Final Integration
 
-- [ ] Task: Assemble `GameplayHUD`
+- [x] Task: Assemble `GameplayHUD`
     - Combine all components into main HUD panel using `HUDLayout`
     - Integrate into existing `UISystem.fs` or create new `HUDSystem.fs`
-- [ ] Task: Resolution Scaling Verification
+- [x] Task: Resolution Scaling Verification
     - Ensure all elements scale correctly with different resolutions
     - Verify anchoring works at 1080p, 1440p, 4K
-- [ ] Task: Performance Profiling
+- [x] Task: Performance Profiling
     - Verify adaptive updates don't cause stuttering or allocation spikes
     - Confirm UI layer maintains 60 FPS
-- [ ] Task: Conductor - User Manual Verification 'Phase 5: Final Integration' (Protocol in workflow.md)
+- [x] Task: Conductor - User Manual Verification 'Phase 5: Final Integration' (Protocol in workflow.md)
 
 ---
 
