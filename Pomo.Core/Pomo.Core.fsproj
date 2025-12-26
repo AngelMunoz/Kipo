@@ -92,6 +92,7 @@
     <Compile Include="Systems/CursorSystem.fs" />
     <Compile Include="Systems/HoverFeedbackSystem.fs" />
     <Compile Include="Scenes.fs" />
+    <Compile Include="Scenes/GameplayScene.fs" />
     <Compile Include="CompositionRoot.fs" />
     <Compile Include="PomoGame.fs" />
   </ItemGroup>
