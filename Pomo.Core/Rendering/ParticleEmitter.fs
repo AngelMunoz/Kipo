@@ -2,6 +2,7 @@ namespace Pomo.Core.Rendering
 
 open System
 open System.Buffers
+open System.Collections.Concurrent
 open System.Collections.Generic
 open Microsoft.Xna.Framework
 open Microsoft.Xna.Framework.Content
@@ -15,6 +16,40 @@ open Pomo.Core.Graphics
 open Pomo.Core.Stores
 
 module ParticleEmitter =
+
+  /// Creates thread-safe lazy loaders for particle assets
+  let createLazyAssetLoaders
+    (content: ContentManager)
+    : struct ((string -> Texture2D voption) * (string -> Model voption)) =
+    
+    let textureCache = ConcurrentDictionary<string, Lazy<Texture2D voption>>()
+    let modelCache = ConcurrentDictionary<string, Lazy<Model voption>>()
+
+    let getTexture path =
+        let loader = textureCache.GetOrAdd(path, fun p ->
+            lazy (
+                try
+                    lock content (fun () ->
+                        let tex = content.Load<Texture2D>(p)
+                        ValueSome tex)
+                with _ -> ValueNone
+            )
+        )
+        loader.Value
+
+    let getModel path =
+        let loader = modelCache.GetOrAdd(path, fun p ->
+            lazy (
+                try
+                    lock content (fun () ->
+                        let model = content.Load<Model>(p)
+                        ValueSome model)
+                with _ -> ValueNone
+            )
+        )
+        loader.Value
+
+    struct (getTexture, getModel)
 
   /// Pre-loads all particle textures and mesh models from ParticleStore
   let loadAssets

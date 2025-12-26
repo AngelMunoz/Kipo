@@ -42,7 +42,7 @@ module LocalizationManager =
       try
         let resourceSet = resourceManager.GetResourceSet(culture, true, false)
 
-        if resourceSet <> null then
+        if not(isNull resourceSet) then
           supportedCultures.Add(culture)
       with :? MissingManifestResourceException ->
         ()

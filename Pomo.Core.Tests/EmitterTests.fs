@@ -245,7 +245,7 @@ module PoseResolverTests =
     {
       ModelStore = modelStore
       GetModelByAsset = fun _ -> ValueSome(fakeModel())
-      EntityPoses = HashMap.empty
+      EntityPoses = Dictionary.empty()
       LiveProjectiles = HashMap.empty
       SquishFactor = 2.0f
       ModelScale = 1.0f
@@ -335,7 +335,7 @@ module PoseResolverTests =
     let data = {
       ModelStore = modelStore
       GetModelByAsset = fun _ -> ValueSome(fakeModel())
-      EntityPoses = HashMap.empty
+      EntityPoses = Dictionary.empty()
       LiveProjectiles = HashMap.empty
       SquishFactor = 2.0f
       ModelScale = 1.0f

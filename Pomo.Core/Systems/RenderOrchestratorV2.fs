@@ -27,13 +27,19 @@ module RenderOrchestratorV2 =
     QuadBatch: QuadBatch
     SpriteBatch: SpriteBatch
     NodeTransformsPool: Dictionary<string, Matrix>
-    ModelCache: IReadOnlyDictionary<string, Model>
-    TextureCache: IReadOnlyDictionary<string, Texture2D>
+    ModelCache: Dictionary<string, Model>
+    TextureCache: Dictionary<string, Texture2D>
     TileTextureCache: Dictionary<int, Texture2D>
+    GetModel: string -> Model voption
+    GetTexture: string -> Texture2D voption
+    GetTileTexture: int -> Texture2D voption
     LayerRenderIndices: IReadOnlyDictionary<int, int[]>
     FallbackTexture: Texture2D
     HudFont: SpriteFont
     HudPalette: UI.HUDColorPalette
+    LoadQueue: ConcurrentQueue<(unit -> unit)>
+    PendingModels: ConcurrentDictionary<string, byte>
+    PendingTextures: ConcurrentDictionary<string, byte>
   }
 
   let private setBlendState (device: GraphicsDevice) (blend: BlendMode) =
@@ -43,14 +49,14 @@ module RenderOrchestratorV2 =
 
   /// Pure lookup - no loading (all assets pre-loaded at init)
   let private getModel
-    (cache: IReadOnlyDictionary<string, Model>)
+    (cache: Dictionary<string, Model>)
     (asset: string)
     =
     cache |> Dictionary.tryFindV asset
 
   /// Pure lookup - no loading (all assets pre-loaded at init)
   let private getTexture
-    (cache: IReadOnlyDictionary<string, Texture2D>)
+    (cache: Dictionary<string, Texture2D>)
     (asset: string)
     =
     cache |> Dictionary.tryFindV asset
@@ -82,7 +88,7 @@ module RenderOrchestratorV2 =
 
     let entityData = {
       ModelStore = stores.ModelStore
-      GetModelByAsset = getModel res.ModelCache
+      GetModelByAsset = res.GetModel
       EntityPoses = poses
       LiveProjectiles = projectiles
       SquishFactor = squish
@@ -90,8 +96,8 @@ module RenderOrchestratorV2 =
     }
 
     let particleData = {
-      GetTexture = getTexture res.TextureCache
-      GetModelByAsset = getModel res.ModelCache
+      GetTexture = res.GetTexture
+      GetModelByAsset = res.GetModel
       EntityPositions = snapshot.Positions
       SquishFactor = squish
       ModelScale = Core.Constants.Entity.ModelScale
@@ -99,7 +105,7 @@ module RenderOrchestratorV2 =
     }
 
     let terrainData = {
-      GetTileTexture = getTileTexture res.TileTextureCache
+      GetTileTexture = res.GetTileTexture
       LayerRenderIndices = layerRenderIndices
     }
 
@@ -387,11 +393,46 @@ module RenderOrchestratorV2 =
           for kvp in particleModelCache do
             modelCache[kvp.Key] <- kvp.Value
 
-          let textureCache = particleTextureCache
+          let textureCache = Dictionary<string, Texture2D>()
+          for kvp in particleTextureCache do
+            textureCache[kvp.Key] <- kvp.Value
 
           // Use TerrainEmitter to load tile textures and pre-compute render indices
           let tileCache = TerrainEmitter.loadTileTextures game.Content map
           let layerIndices = TerrainEmitter.computeLayerRenderIndices map
+
+          // Main-thread load queue and pending sets
+          let loadQueue = ConcurrentQueue<(unit -> unit)>()
+          let pendingModels = ConcurrentDictionary<string, byte>()
+          let pendingTextures = ConcurrentDictionary<string, byte>()
+
+          let enqueueUnique (pending: ConcurrentDictionary<string, byte>) (queue: ConcurrentQueue<unit -> unit>) (key: string) (work: unit -> unit) =
+            if pending.TryAdd(key, 0uy) then
+              queue.Enqueue(fun () ->
+                try
+                  work()
+                with _ -> ()
+                pending.TryRemove(key) |> ignore)
+
+          let getModel asset =
+            match modelCache |> Dictionary.tryFindV asset with
+            | ValueSome m -> ValueSome m
+            | ValueNone ->
+              enqueueUnique pendingModels loadQueue asset (fun () ->
+                if not (modelCache.ContainsKey asset) then
+                  let m = game.Content.Load<Model>(asset)
+                  modelCache[asset] <- m)
+              ValueNone
+
+          let getTexture asset =
+            match textureCache |> Dictionary.tryFindV asset with
+            | ValueSome t -> ValueSome t
+            | ValueNone ->
+              enqueueUnique pendingTextures loadQueue asset (fun () ->
+                if not (textureCache.ContainsKey asset) then
+                  let t = game.Content.Load<Texture2D>(asset)
+                  textureCache[asset] <- t)
+              ValueNone
 
           res <-
             ValueSome {
@@ -404,6 +445,9 @@ module RenderOrchestratorV2 =
               ModelCache = modelCache
               TextureCache = textureCache
               TileTextureCache = tileCache
+              GetModel = getModel
+              GetTexture = getTexture
+              GetTileTexture = getTileTexture tileCache
               LayerRenderIndices = layerIndices
               FallbackTexture = fallback
               HudFont = TextEmitter.loadFont game.Content
@@ -411,7 +455,18 @@ module RenderOrchestratorV2 =
                 env.CoreServices.HUDService.Config
                 |> AVal.map _.Theme.Colors
                 |> AVal.force
+              LoadQueue = loadQueue
+              PendingModels = pendingModels
+              PendingTextures = pendingTextures
             }
+
+        override _.Update _ =
+          // Drain the load queue on the main thread to keep Content.Load thread-safe
+          res
+          |> ValueOption.iter(fun r ->
+            let mutable work = Unchecked.defaultof<unit -> unit>
+            while r.LoadQueue.TryDequeue(&work) do
+              work())
 
         override _.Draw _ =
           res

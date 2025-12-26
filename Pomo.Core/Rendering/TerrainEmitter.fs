@@ -1,6 +1,7 @@
 namespace Pomo.Core.Rendering
 
 open System.Collections.Generic
+open System.Collections.Concurrent
 open Microsoft.Xna.Framework
 open Microsoft.Xna.Framework.Content
 open Microsoft.Xna.Framework.Graphics
@@ -15,6 +16,40 @@ module TerrainEmitter =
   /// Cleans asset path from Tiled format to ContentManager format
   let private cleanAssetPath(p: string) =
     p.Replace("../", "").Replace(".png", "").Replace(".jpg", "")
+
+  /// Creates a thread-safe lazy texture loader for map tiles
+  let createLazyTextureLoader
+    (content: ContentManager)
+    (map: MapDefinition)
+    : int -> Texture2D voption =
+    
+    // 1. Pre-compute GID -> AssetPath mapping (fast, lightweight)
+    let assetMap = Dictionary<int, string>()
+    for tileset in map.Tilesets do
+      for localId, tileDef in tileset.Tiles do
+        let globalId = tileset.FirstGid + localId
+        assetMap[globalId] <- cleanAssetPath tileDef.ImageSource
+
+    // 2. Thread-safe cache for loaded textures using Lazy to ensure single execution
+    let textureCache = ConcurrentDictionary<int, Lazy<Texture2D voption>>()
+
+    // 3. Loading function
+    fun gid ->
+        let loader = textureCache.GetOrAdd(gid, fun id ->
+            lazy (
+                match assetMap.TryGetValue(id) with
+                | true, assetPath ->
+                    try
+                        // Lock content to ensure thread safety of Content.Load
+                        lock content (fun () ->
+                            let tex = content.Load<Texture2D>(assetPath)
+                            ValueSome tex)
+                    with _ ->
+                        ValueNone
+                | false, _ -> ValueNone
+            )
+        )
+        loader.Value
 
   /// Pre-loads tile textures from map tilesets into a cache
   let loadTileTextures

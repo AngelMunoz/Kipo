@@ -310,7 +310,6 @@ module Projections =
     }
 
 
-
   [<Struct>]
   type EntityScenarioContext = {
     ScenarioId: Guid<ScenarioId>
@@ -350,70 +349,109 @@ module Projections =
         IndexList<struct (Guid<EntityId> * Vector2)>
 
 
-  let calculateMovementSnapshot
-    (time: TimeSpan)
-    (velocities: HashMap<Guid<EntityId>, Vector2>)
-    (positions: HashMap<Guid<EntityId>, Vector2>)
-    (rotations: HashMap<Guid<EntityId>, float32>)
-    (modelConfigIds: HashMap<Guid<EntityId>, string>)
-    (entityScenarios: HashMap<Guid<EntityId>, Guid<ScenarioId>>)
-    (scenarioId: Guid<ScenarioId>)
-    =
-    let dt = float32 time.TotalSeconds
+  module PhysicsCache =
 
-    // Phase 3: Use mutable builders instead of immutable HashMap.add loops
-    let positionsBuilder = Dictionary<Guid<EntityId>, Vector2>()
-    let rotationsBuilder = Dictionary<Guid<EntityId>, float32>()
-    let modelConfigBuilder = Dictionary<Guid<EntityId>, string>()
-    let gridBuilder = Dictionary<GridCell, ResizeArray<Guid<EntityId>>>()
+    type IService =
+      abstract GetMovementSnapshot: Guid<ScenarioId> -> MovementSnapshot
+      abstract RefreshAllCaches: unit -> unit
 
-    for (id, startPos) in positions do
-      match entityScenarios |> HashMap.tryFindV id with
-      | ValueSome sId when sId = scenarioId ->
-        // Calculate Position
-        let currentPos =
-          match velocities |> HashMap.tryFindV id with
-          | ValueSome v -> startPos + (v * dt)
-          | ValueNone -> startPos
+    let private calculateSnapshot
+      (time: TimeSpan)
+      (velocities: IReadOnlyDictionary<Guid<EntityId>, Vector2>)
+      (positions: IReadOnlyDictionary<Guid<EntityId>, Vector2>)
+      (rotations: IReadOnlyDictionary<Guid<EntityId>, float32>)
+      (modelConfigIds: HashMap<Guid<EntityId>, string>)
+      (entityScenarios: HashMap<Guid<EntityId>, Guid<ScenarioId>>)
+      (scenarioId: Guid<ScenarioId>)
+      =
+      let dt = float32 time.TotalSeconds
 
-        positionsBuilder[id] <- currentPos
+      let positionsBuilder = Dictionary<Guid<EntityId>, Vector2>()
+      let rotationsBuilder = Dictionary<Guid<EntityId>, float32>()
+      let modelConfigBuilder = Dictionary<Guid<EntityId>, string>()
+      let gridBuilder = Dictionary<GridCell, ResizeArray<Guid<EntityId>>>()
 
-        // Calculate Rotation (Derived from Velocity if moving, else keep existing)
-        let rotation =
-          match velocities |> HashMap.tryFindV id with
-          | ValueSome v when v <> Vector2.Zero ->
-            float32(Math.Atan2(float v.X, float v.Y))
-          | _ -> rotations |> HashMap.tryFind id |> Option.defaultValue 0.0f
+      for KeyValue(id, startPos) in positions do
+        match entityScenarios |> HashMap.tryFindV id with
+        | ValueSome sId when sId = scenarioId ->
+          // Calculate Position
+          let currentPos =
+            match velocities |> Dictionary.tryFindV id with
+            | ValueSome v -> startPos + (v * dt)
+            | ValueNone -> startPos
 
-        rotationsBuilder[id] <- rotation
+          positionsBuilder[id] <- currentPos
 
-        // Model Config
-        match modelConfigIds |> HashMap.tryFindV id with
-        | ValueSome configId -> modelConfigBuilder[id] <- configId
-        | ValueNone -> ()
+          // Calculate Rotation (Derived from Velocity if moving, else keep existing)
+          let rotation =
+            match velocities |> Dictionary.tryFindV id with
+            | ValueSome v when v <> Vector2.Zero ->
+              float32(Math.Atan2(float v.X, float v.Y))
+            | _ ->
+              rotations
+              |> Dictionary.tryFindV id
+              |> ValueOption.defaultValue 0.0f
 
-        // Calculate Grid Cell
-        let cell =
-          Spatial.getGridCell Core.Constants.Collision.GridCellSize currentPos
+          rotationsBuilder[id] <- rotation
 
-        // Add to Grid (O(1) amortized with ResizeArray)
-        match gridBuilder |> Dictionary.tryFindV cell with
-        | ValueSome list -> list.Add id
-        | ValueNone -> gridBuilder[cell] <- ResizeArray([| id |])
-      | _ -> ()
+          // Model Config
+          match modelConfigIds |> HashMap.tryFindV id with
+          | ValueSome configId -> modelConfigBuilder[id] <- configId
+          | ValueNone -> ()
 
-    // Return dictionaries directly as IReadOnlyDictionary (no conversion cost)
-    let spatialGrid = Dictionary<GridCell, Guid<EntityId>[]>()
+          // Calculate Grid Cell
+          let cell =
+            Spatial.getGridCell Core.Constants.Collision.GridCellSize currentPos
 
-    for kv in gridBuilder do
-      spatialGrid[kv.Key] <- kv.Value.ToArray()
+          // Add to Grid (O(1) amortized with ResizeArray)
+          match gridBuilder |> Dictionary.tryFindV cell with
+          | ValueSome list -> list.Add id
+          | ValueNone -> gridBuilder[cell] <- ResizeArray([| id |])
+        | _ -> ()
 
-    {
-      Positions = positionsBuilder
-      SpatialGrid = spatialGrid
-      Rotations = rotationsBuilder
-      ModelConfigIds = modelConfigBuilder
-    }
+      let spatialGrid = Dictionary<GridCell, Guid<EntityId>[]>()
+
+      for kv in gridBuilder do
+        spatialGrid[kv.Key] <- kv.Value.ToArray()
+
+      {
+        Positions = positionsBuilder
+        SpatialGrid = spatialGrid
+        Rotations = rotationsBuilder
+        ModelConfigIds = modelConfigBuilder
+      }
+
+    let create(world: World) : IService =
+      let snapshotCache = Dictionary<Guid<ScenarioId>, MovementSnapshot>()
+
+      { new IService with
+          member _.GetMovementSnapshot(scenarioId) =
+            match snapshotCache |> Dictionary.tryFindV scenarioId with
+            | ValueSome snapshot -> snapshot
+            | ValueNone -> MovementSnapshot.Empty
+
+          member _.RefreshAllCaches() =
+            let time = world.Time |> AVal.force |> _.Delta
+            let velocities = world.Velocities
+            let positions = world.Positions
+            let rotations = world.Rotations
+            let modelConfigIds = world.ModelConfigId |> AMap.force
+            let entityScenarios = world.EntityScenario |> AMap.force
+            let scenarios = world.Scenarios |> AMap.force
+
+            for (sId, _) in scenarios do
+              let snapshot =
+                calculateSnapshot
+                  time
+                  velocities
+                  positions
+                  rotations
+                  modelConfigIds
+                  entityScenarios
+                  sId
+
+              snapshotCache[sId] <- snapshot
+      }
 
   let private entityScenarioContexts(world: World) =
     world.EntityScenario
@@ -454,7 +492,13 @@ module Projections =
       }
     })
 
-  let create(itemStore: ItemStore, modelStore: ModelStore, world: World) =
+  let create
+    (
+      itemStore: ItemStore,
+      modelStore: ModelStore,
+      world: World,
+      physicsCache: PhysicsCache.IService
+    ) =
     let derivedStats = calculateDerivedStats itemStore world
 
 
@@ -471,21 +515,7 @@ module Projections =
         member _.AIControlledEntities = world.AIControllers |> AMap.keys
 
         member _.ComputeMovementSnapshot(scenarioId) =
-          let time = world.Time |> AVal.map _.Delta |> AVal.force
-          let velocities = world.Velocities |> Dictionary.toHashMap
-          let positions = world.Positions |> Dictionary.toHashMap
-          let rotations = world.Rotations |> Dictionary.toHashMap
-          let modelConfigIds = world.ModelConfigId |> AMap.force
-          let entityScenarios = world.EntityScenario |> AMap.force
-
-          calculateMovementSnapshot
-            time
-            velocities
-            positions
-            rotations
-            modelConfigIds
-            entityScenarios
-            scenarioId
+          physicsCache.GetMovementSnapshot(scenarioId)
 
         member _.GetNearbyEntitiesSnapshot
           (snapshot, liveEntities, center, radius)

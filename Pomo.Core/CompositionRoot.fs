@@ -131,11 +131,14 @@ module CompositionRoot =
       let stateWriteService = StateWrite.create mutableWorld
 
       // 2. Create Gameplay Services
+      let physicsCacheService = Projections.PhysicsCache.create worldView
+
       let projections =
         Projections.create(
           scope.Stores.ItemStore,
           scope.Stores.ModelStore,
-          worldView
+          worldView,
+          physicsCacheService
         )
 
       let cameraService =
@@ -468,7 +471,9 @@ module CompositionRoot =
       // Flush all queued state writes at the end of the frame (same timing as old StateUpdateSystem)
       let stateWriteFlushComponent =
         { new GameComponent(game, UpdateOrder = 1000) with
-            override _.Update(_) = stateWriteService.FlushWrites()
+            override _.Update(_) =
+              stateWriteService.FlushWrites()
+              physicsCacheService.RefreshAllCaches()
         }
 
       baseComponents.Add(worldUpdateComponent)
