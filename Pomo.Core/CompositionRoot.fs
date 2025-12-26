@@ -356,13 +356,6 @@ module CompositionRoot =
         mutableWorld.Scenarios[scenarioId] <- scenario
 
         // Recreate Renderers with new map key
-
-        // Create Scenario
-        let scenarioId = Guid.NewGuid() |> UMX.tag<ScenarioId>
-        let scenario: World.Scenario = { Id = scenarioId; Map = mapDef }
-        mutableWorld.Scenarios[scenarioId] <- scenario
-
-        // Recreate Renderers with new map key
         let renderOrchestrator =
           RenderOrchestrator.create(
             game,

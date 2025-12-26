@@ -90,34 +90,15 @@ module RenderOrchestrator =
 
         let struct (right, up) = RenderMath.Billboard.getVectors &view
 
-        let inline blendOrd(b: BlendMode) =
-          match b with
-          | BlendMode.Additive -> 0
-          | BlendMode.AlphaBlend -> 1
+        let grouped =
+          commands |> Array.groupBy(fun c -> struct (c.Texture, c.BlendMode))
 
-        commands
-        |> Array.sortInPlaceBy(fun c ->
-          struct (c.Texture.GetHashCode(), blendOrd c.BlendMode))
-
-        let mutable i = 0
-
-        while i < commands.Length do
-          let first = commands.[i]
-          let tex = first.Texture
-          let blend = first.BlendMode
-
+        for struct (tex, blend), cmds in grouped do
           setBlendState &device blend
           batch.Begin(&view, &projection, tex)
-          batch.Draw(first.Position, first.Size, 0.0f, first.Color, right, up)
-          i <- i + 1
 
-          // Continue drawing while same texture and blend
-          while i < commands.Length
-                && Object.ReferenceEquals(commands.[i].Texture, tex)
-                && commands.[i].BlendMode = blend do
-            let cmd = commands.[i]
+          for cmd in cmds do
             batch.Draw(cmd.Position, cmd.Size, 0.0f, cmd.Color, right, up)
-            i <- i + 1
 
           batch.End()
 
