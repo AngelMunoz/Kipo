@@ -27,8 +27,8 @@ module RenderOrchestrator =
     QuadBatch: QuadBatch
     SpriteBatch: SpriteBatch
     NodeTransformsPool: Dictionary<string, Matrix>
-    ModelCache: Dictionary<string, Model>
-    TextureCache: Dictionary<string, Texture2D>
+    ModelCache: ConcurrentDictionary<string, Lazy<Model>>
+    TextureCache: ConcurrentDictionary<string, Lazy<Texture2D>>
     TileTextureCache: Dictionary<int, Texture2D>
     GetModel: string -> Model voption
     GetTexture: string -> Texture2D voption
@@ -389,18 +389,18 @@ module RenderOrchestrator =
             ParticleEmitter.loadAssets game.Content stores.ParticleStore
 
           // Merge entity and particle model caches
-          let modelCache = Dictionary<string, Model>()
+          let modelCache = ConcurrentDictionary<string, Lazy<Model>>()
 
           for kvp in entityModelCache do
-            modelCache[kvp.Key] <- kvp.Value
+            modelCache[kvp.Key] <- Lazy<Model>(fun () -> kvp.Value)
 
           for kvp in particleModelCache do
-            modelCache[kvp.Key] <- kvp.Value
+            modelCache[kvp.Key] <- Lazy<Model>(fun () -> kvp.Value)
 
-          let textureCache = Dictionary<string, Texture2D>()
+          let textureCache = ConcurrentDictionary<string, Lazy<Texture2D>>()
 
           for kvp in particleTextureCache do
-            textureCache[kvp.Key] <- kvp.Value
+            textureCache[kvp.Key] <- Lazy<Texture2D>(fun () -> kvp.Value)
 
           // Use TerrainEmitter to load tile textures and pre-compute render indices
           let tileCache = TerrainEmitter.loadTileTextures game.Content map
@@ -427,24 +427,35 @@ module RenderOrchestrator =
                 pending.TryRemove(key) |> ignore)
 
           let getModel asset =
-            match modelCache |> Dictionary.tryFindV asset with
-            | ValueSome m -> ValueSome m
-            | ValueNone ->
+            match modelCache.TryGetValue asset with
+            | true, lazyModel -> ValueSome(lazyModel.Value)
+            | false, _ ->
               enqueueUnique pendingModels loadQueue asset (fun () ->
-                if not(modelCache.ContainsKey asset) then
-                  let m = game.Content.Load<Model>(asset)
-                  modelCache[asset] <- m)
+                let lazyModel =
+                  modelCache.GetOrAdd(
+                    asset,
+                    fun key ->
+                      Lazy<Model>(fun () -> game.Content.Load<Model>(key))
+                  )
+
+                lazyModel.Force() |> ignore)
 
               ValueNone
 
           let getTexture asset =
-            match textureCache |> Dictionary.tryFindV asset with
-            | ValueSome t -> ValueSome t
-            | ValueNone ->
+            match textureCache.TryGetValue asset with
+            | true, lazyTexture -> ValueSome(lazyTexture.Value)
+            | false, _ ->
               enqueueUnique pendingTextures loadQueue asset (fun () ->
-                if not(textureCache.ContainsKey asset) then
-                  let t = game.Content.Load<Texture2D>(asset)
-                  textureCache[asset] <- t)
+                let lazyTexture =
+                  textureCache.GetOrAdd(
+                    asset,
+                    fun key ->
+                      Lazy<Texture2D>(fun () ->
+                        game.Content.Load<Texture2D>(key))
+                  )
+
+                lazyTexture.Force() |> ignore)
 
               ValueNone
 
