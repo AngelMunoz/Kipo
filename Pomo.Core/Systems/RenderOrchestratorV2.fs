@@ -42,32 +42,159 @@ module RenderOrchestratorV2 =
     PendingTextures: ConcurrentDictionary<string, byte>
   }
 
-  let private setBlendState (device: GraphicsDevice) (blend: BlendMode) =
-    match blend with
-    | BlendMode.AlphaBlend -> device.BlendState <- BlendState.AlphaBlend
-    | BlendMode.Additive -> device.BlendState <- BlendState.Additive
+  module RenderPasses =
+    let inline private setBlendState
+      (device: inref<GraphicsDevice>)
+      (blend: BlendMode)
+      =
+      match blend with
+      | BlendMode.AlphaBlend -> device.BlendState <- BlendState.AlphaBlend
+      | BlendMode.Additive -> device.BlendState <- BlendState.Additive
 
-  /// Pure lookup - no loading (all assets pre-loaded at init)
-  let private getModel
-    (cache: Dictionary<string, Model>)
-    (asset: string)
-    =
-    cache |> Dictionary.tryFindV asset
+    let inline renderMeshes
+      (device: GraphicsDevice)
+      (view: inref<Matrix>)
+      (projection: inref<Matrix>)
+      (commands: MeshCommand[])
+      =
+      device.DepthStencilState <- DepthStencilState.Default
+      device.BlendState <- BlendState.Opaque
+      device.RasterizerState <- RasterizerState.CullNone
 
-  /// Pure lookup - no loading (all assets pre-loaded at init)
-  let private getTexture
-    (cache: Dictionary<string, Texture2D>)
-    (asset: string)
-    =
-    cache |> Dictionary.tryFindV asset
+      for cmd in commands do
+        let model = cmd.Model
+        let world = cmd.WorldMatrix
 
-  let inline private getTileTexture
-    (cache: Dictionary<int, Texture2D>)
-    (gid: int)
-    : Texture2D voption =
-    cache |> Dictionary.tryFindV gid
+        for mesh in model.Meshes do
+          for effect in mesh.Effects do
+            match effect with
+            | :? BasicEffect as be ->
+              be.World <- world
+              be.View <- view
+              be.Projection <- projection
+              LightEmitter.applyDefaultLighting &be
+            | _ -> ()
 
-  let private prepareContexts
+          mesh.Draw()
+
+    let inline renderBillboards
+      (batch: BillboardBatch)
+      (device: GraphicsDevice)
+      (view: inref<Matrix>)
+      (projection: inref<Matrix>)
+      (commands: BillboardCommand[])
+      =
+      if commands.Length > 0 then
+        device.DepthStencilState <- DepthStencilState.None
+        device.RasterizerState <- RasterizerState.CullNone
+
+        let struct (right, up) = RenderMath.Billboard.getVectors &view
+
+        let grouped =
+          commands |> Array.groupBy(fun c -> struct (c.Texture, c.BlendMode))
+
+        for struct (tex, blend), cmds in grouped do
+          setBlendState &device blend
+          batch.Begin(&view, &projection, tex)
+
+          for cmd in cmds do
+            batch.Draw(cmd.Position, cmd.Size, 0.0f, cmd.Color, right, up)
+
+          batch.End()
+
+    let inline renderTerrainBackground
+      (batch: SpriteBatch)
+      (camera: inref<Camera.Camera>)
+      (map: Map.MapDefinition)
+      (commands: TerrainCommand[])
+      =
+      // 2D SpriteBatch rendering for background - no depth buffer, no fighting
+      let transform =
+        RenderMath.Camera.get2DViewMatrix
+          camera.Position
+          camera.Zoom
+          camera.Viewport
+
+      batch.Begin(
+        SpriteSortMode.Deferred,
+        BlendState.AlphaBlend,
+        SamplerState.PointClamp,
+        DepthStencilState.None,
+        RasterizerState.CullNone,
+        transformMatrix = transform
+      )
+
+      for cmd in commands do
+        // Convert 3D position back to pixel position for SpriteBatch
+        let drawX = cmd.Position.X * float32 map.TileWidth
+        let drawY = cmd.Position.Z * float32 map.TileHeight
+
+        let destRect =
+          Rectangle(
+            int drawX,
+            int drawY,
+            int(cmd.Size.X * float32 map.TileWidth),
+            int(cmd.Size.Y * float32 map.TileHeight)
+          )
+
+        batch.Draw(cmd.Texture, destRect, Color.White)
+
+      batch.End()
+
+    let inline renderTerrainForeground
+      (batch: QuadBatch)
+      (view: inref<Matrix>)
+      (projection: inref<Matrix>)
+      (commands: TerrainCommand[])
+      =
+      batch.Begin(&view, &projection)
+
+      for cmd in commands do
+        batch.Draw(cmd.Texture, cmd.Position, cmd.Size)
+
+      batch.End()
+
+    let inline renderText
+      (batch: SpriteBatch)
+      (font: SpriteFont)
+      (camera: inref<Camera.Camera>)
+      (commands: TextCommand[])
+      =
+      if commands.Length > 0 then
+        let transform =
+          RenderMath.Camera.get2DViewMatrix
+            camera.Position
+            camera.Zoom
+            camera.Viewport
+
+        batch.Begin(
+          SpriteSortMode.Deferred,
+          BlendState.AlphaBlend,
+          SamplerState.PointClamp,
+          DepthStencilState.None,
+          RasterizerState.CullNone,
+          transformMatrix = transform
+        )
+
+        for cmd in commands do
+          let color = cmd.Color * cmd.Alpha
+          let origin = font.MeasureString(cmd.Text) / 2.0f
+
+          batch.DrawString(
+            font,
+            cmd.Text,
+            cmd.ScreenPosition,
+            color,
+            0.0f,
+            origin,
+            cmd.Scale,
+            SpriteEffects.None,
+            0.0f
+          )
+
+        batch.End()
+
+  let inline private prepareContexts
     (res: RenderResources)
     (stores: StoreServices)
     (map: Pomo.Core.Domain.Map.MapDefinition)
@@ -110,149 +237,6 @@ module RenderOrchestratorV2 =
     }
 
     struct (renderCore, entityData, particleData, terrainData)
-
-  let private renderMeshes
-    (device: GraphicsDevice)
-    (view: Matrix)
-    (projection: Matrix)
-    (commands: MeshCommand[])
-    =
-    device.DepthStencilState <- DepthStencilState.Default
-    device.BlendState <- BlendState.Opaque
-    device.RasterizerState <- RasterizerState.CullNone
-
-    for cmd in commands do
-      let model = cmd.Model
-      let world = cmd.WorldMatrix
-
-      for mesh in model.Meshes do
-        for effect in mesh.Effects do
-          match effect with
-          | :? BasicEffect as be ->
-            be.World <- world
-            be.View <- view
-            be.Projection <- projection
-            LightEmitter.applyDefaultLighting &be
-          | _ -> ()
-
-        mesh.Draw()
-
-  let private renderBillboards
-    (batch: BillboardBatch)
-    (device: GraphicsDevice)
-    (view: Matrix)
-    (projection: Matrix)
-    (commands: BillboardCommand[])
-    =
-    if commands.Length > 0 then
-      device.DepthStencilState <- DepthStencilState.None
-      device.RasterizerState <- RasterizerState.CullNone
-
-      let struct (right, up) = RenderMath.Billboard.getVectors view
-
-      let grouped =
-        commands |> Array.groupBy(fun c -> struct (c.Texture, c.BlendMode))
-
-      for struct (tex, blend), cmds in grouped do
-        setBlendState device blend
-        batch.Begin(view, projection, tex)
-
-        for cmd in cmds do
-          batch.Draw(cmd.Position, cmd.Size, 0.0f, cmd.Color, right, up)
-
-        batch.End()
-
-  let private renderTerrainBackground
-    (batch: SpriteBatch)
-    (camera: Camera.Camera)
-    (map: Map.MapDefinition)
-    (commands: TerrainCommand[])
-    =
-    // 2D SpriteBatch rendering for background - no depth buffer, no fighting
-    let transform =
-      RenderMath.Camera.get2DViewMatrix
-        camera.Position
-        camera.Zoom
-        camera.Viewport
-
-    batch.Begin(
-      SpriteSortMode.Deferred,
-      BlendState.AlphaBlend,
-      SamplerState.PointClamp,
-      DepthStencilState.None,
-      RasterizerState.CullNone,
-      transformMatrix = transform
-    )
-
-    for cmd in commands do
-      // Convert 3D position back to pixel position for SpriteBatch
-      let drawX = cmd.Position.X * float32 map.TileWidth
-      let drawY = cmd.Position.Z * float32 map.TileHeight
-
-      let destRect =
-        Rectangle(
-          int drawX,
-          int drawY,
-          int(cmd.Size.X * float32 map.TileWidth),
-          int(cmd.Size.Y * float32 map.TileHeight)
-        )
-
-      batch.Draw(cmd.Texture, destRect, Color.White)
-
-    batch.End()
-
-  let private renderTerrainForeground
-    (batch: QuadBatch)
-    (view: Matrix)
-    (projection: Matrix)
-    (commands: TerrainCommand[])
-    =
-    batch.Begin(view, projection)
-
-    for cmd in commands do
-      batch.Draw(cmd.Texture, cmd.Position, cmd.Size)
-
-    batch.End()
-
-  let private renderText
-    (batch: SpriteBatch)
-    (font: SpriteFont)
-    (camera: Camera.Camera)
-    (commands: TextCommand[])
-    =
-    if commands.Length > 0 then
-      let transform =
-        RenderMath.Camera.get2DViewMatrix
-          camera.Position
-          camera.Zoom
-          camera.Viewport
-
-      batch.Begin(
-        SpriteSortMode.Deferred,
-        BlendState.AlphaBlend,
-        SamplerState.PointClamp,
-        DepthStencilState.None,
-        RasterizerState.CullNone,
-        transformMatrix = transform
-      )
-
-      for cmd in commands do
-        let color = cmd.Color * cmd.Alpha
-        let origin = font.MeasureString(cmd.Text) / 2.0f
-
-        batch.DrawString(
-          font,
-          cmd.Text,
-          cmd.ScreenPosition,
-          color,
-          0.0f,
-          origin,
-          cmd.Scale,
-          SpriteEffects.None,
-          0.0f
-        )
-
-      batch.End()
 
   let private renderFrame
     (res: RenderResources)
@@ -321,7 +305,12 @@ module RenderOrchestratorV2 =
         // Render passes in correct order
         // 1. Background terrain (no depth to avoid tile fighting)
         res.GraphicsDevice.DepthStencilState <- DepthStencilState.None
-        renderTerrainBackground res.SpriteBatch camera map terrainBG
+
+        RenderPasses.renderTerrainBackground
+          res.SpriteBatch
+          &camera
+          map
+          terrainBG
 
         // Clear depth buffer after background terrain
         // This ensures entities always render on top of background
@@ -330,27 +319,32 @@ module RenderOrchestratorV2 =
         // 2. Entities and mesh particles (with depth testing)
         res.GraphicsDevice.DepthStencilState <- DepthStencilState.Default
         let allMeshes = Array.append meshCommandsEntities meshCommandsParticles
-        renderMeshes res.GraphicsDevice view projection allMeshes
+        RenderPasses.renderMeshes res.GraphicsDevice &view &projection allMeshes
 
         // 3. Billboard particles
-        renderBillboards
+        RenderPasses.renderBillboards
           res.BillboardBatch
           res.GraphicsDevice
-          view
-          projection
+          &view
+          &projection
           billboardCommandsParticles
 
         // 4. Foreground terrain/decorations (with depth testing for occlusion)
         res.GraphicsDevice.DepthStencilState <- DepthStencilState.Default
-        renderTerrainForeground res.QuadBatch view projection terrainFG
+
+        RenderPasses.renderTerrainForeground
+          res.QuadBatch
+          &view
+          &projection
+          terrainFG
 
         // 5. World text (notifications, damage numbers - rendered in 2D)
         let textCommands = TextEmitter.emit world.Notifications viewBounds
 
-        renderText
+        RenderPasses.renderText
           res.SpriteBatch
           res.HudFont
-          camera
+          &camera
           (textCommands res.HudPalette)
 
     | None ->
@@ -394,6 +388,7 @@ module RenderOrchestratorV2 =
             modelCache[kvp.Key] <- kvp.Value
 
           let textureCache = Dictionary<string, Texture2D>()
+
           for kvp in particleTextureCache do
             textureCache[kvp.Key] <- kvp.Value
 
@@ -406,12 +401,19 @@ module RenderOrchestratorV2 =
           let pendingModels = ConcurrentDictionary<string, byte>()
           let pendingTextures = ConcurrentDictionary<string, byte>()
 
-          let enqueueUnique (pending: ConcurrentDictionary<string, byte>) (queue: ConcurrentQueue<unit -> unit>) (key: string) (work: unit -> unit) =
+          let enqueueUnique
+            (pending: ConcurrentDictionary<string, byte>)
+            (queue: ConcurrentQueue<unit -> unit>)
+            (key: string)
+            (work: unit -> unit)
+            =
             if pending.TryAdd(key, 0uy) then
               queue.Enqueue(fun () ->
                 try
                   work()
-                with _ -> ()
+                with _ ->
+                  ()
+
                 pending.TryRemove(key) |> ignore)
 
           let getModel asset =
@@ -419,9 +421,10 @@ module RenderOrchestratorV2 =
             | ValueSome m -> ValueSome m
             | ValueNone ->
               enqueueUnique pendingModels loadQueue asset (fun () ->
-                if not (modelCache.ContainsKey asset) then
+                if not(modelCache.ContainsKey asset) then
                   let m = game.Content.Load<Model>(asset)
                   modelCache[asset] <- m)
+
               ValueNone
 
           let getTexture asset =
@@ -429,9 +432,10 @@ module RenderOrchestratorV2 =
             | ValueSome t -> ValueSome t
             | ValueNone ->
               enqueueUnique pendingTextures loadQueue asset (fun () ->
-                if not (textureCache.ContainsKey asset) then
+                if not(textureCache.ContainsKey asset) then
                   let t = game.Content.Load<Texture2D>(asset)
                   textureCache[asset] <- t)
+
               ValueNone
 
           res <-
@@ -447,7 +451,7 @@ module RenderOrchestratorV2 =
               TileTextureCache = tileCache
               GetModel = getModel
               GetTexture = getTexture
-              GetTileTexture = getTileTexture tileCache
+              GetTileTexture = fun gid -> tileCache |> Dictionary.tryFindV gid
               LayerRenderIndices = layerIndices
               FallbackTexture = fallback
               HudFont = TextEmitter.loadFont game.Content
@@ -465,6 +469,7 @@ module RenderOrchestratorV2 =
           res
           |> ValueOption.iter(fun r ->
             let mutable work = Unchecked.defaultof<unit -> unit>
+
             while r.LoadQueue.TryDequeue(&work) do
               work())
 

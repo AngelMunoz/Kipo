@@ -298,7 +298,7 @@ module RenderMath =
   /// Billboard rendering helpers
   module Billboard =
     /// Extracts billboard orientation vectors from view matrix
-    let inline getVectors(view: Matrix) : struct (Vector3 * Vector3) =
+    let inline getVectors(view: inref<Matrix>) : struct (Vector3 * Vector3) =
       let inverseView = Matrix.Invert(view)
       struct (inverseView.Right, inverseView.Up)
 

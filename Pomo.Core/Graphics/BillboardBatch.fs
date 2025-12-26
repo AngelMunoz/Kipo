@@ -80,7 +80,9 @@ type BillboardBatch(graphicsDevice: GraphicsDevice) =
 
       indexBuffer.SetData(indices)
 
-  member this.Begin(view: Matrix, projection: Matrix, texture: Texture2D) =
+  member this.Begin
+    (view: inref<Matrix>, projection: inref<Matrix>, texture: Texture2D)
+    =
     basicEffect.View <- view
     basicEffect.Projection <- projection
     basicEffect.TextureEnabled <- true

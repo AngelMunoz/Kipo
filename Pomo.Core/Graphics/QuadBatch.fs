@@ -24,7 +24,9 @@ type QuadBatch(graphicsDevice: GraphicsDevice) =
       indices.[iBase + 4] <- int16(vBase + 2)
       indices.[iBase + 5] <- int16(vBase + 3)
 
-  member _.Begin(view: Matrix, projection: Matrix, ?texture: Texture2D) =
+  member _.Begin
+    (view: inref<Matrix>, projection: inref<Matrix>, ?texture: Texture2D)
+    =
     if isStarted then
       failwith "Batch already started"
 
@@ -76,10 +78,14 @@ type QuadBatch(graphicsDevice: GraphicsDevice) =
     // Flush if texture changes or buffer full
     if not(isNull effect.Texture) && effect.Texture <> texture then
       this.End()
-      this.Begin(effect.View, effect.Projection, texture)
+      let mutable v = effect.View
+      let mutable p = effect.Projection
+      this.Begin(&v, &p, texture)
     elif quadCount >= 512 then
       this.End()
-      this.Begin(effect.View, effect.Projection, texture)
+      let mutable v = effect.View
+      let mutable p = effect.Projection
+      this.Begin(&v, &p, texture)
 
     if isNull effect.Texture then
       effect.Texture <- texture
