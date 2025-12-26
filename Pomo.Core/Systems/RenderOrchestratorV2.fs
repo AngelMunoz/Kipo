@@ -90,15 +90,34 @@ module RenderOrchestratorV2 =
 
         let struct (right, up) = RenderMath.Billboard.getVectors &view
 
-        let grouped =
-          commands |> Array.groupBy(fun c -> struct (c.Texture, c.BlendMode))
+        let inline blendOrd(b: BlendMode) =
+          match b with
+          | BlendMode.Additive -> 0
+          | BlendMode.AlphaBlend -> 1
 
-        for struct (tex, blend), cmds in grouped do
+        commands
+        |> Array.sortInPlaceBy(fun c ->
+          struct (c.Texture.GetHashCode(), blendOrd c.BlendMode))
+
+        let mutable i = 0
+
+        while i < commands.Length do
+          let first = commands.[i]
+          let tex = first.Texture
+          let blend = first.BlendMode
+
           setBlendState &device blend
           batch.Begin(&view, &projection, tex)
+          batch.Draw(first.Position, first.Size, 0.0f, first.Color, right, up)
+          i <- i + 1
 
-          for cmd in cmds do
+          // Continue drawing while same texture and blend
+          while i < commands.Length
+                && Object.ReferenceEquals(commands.[i].Texture, tex)
+                && commands.[i].BlendMode = blend do
+            let cmd = commands.[i]
             batch.Draw(cmd.Position, cmd.Size, 0.0f, cmd.Color, right, up)
+            i <- i + 1
 
           batch.End()
 
@@ -318,8 +337,18 @@ module RenderOrchestratorV2 =
 
         // 2. Entities and mesh particles (with depth testing)
         res.GraphicsDevice.DepthStencilState <- DepthStencilState.Default
-        let allMeshes = Array.append meshCommandsEntities meshCommandsParticles
-        RenderPasses.renderMeshes res.GraphicsDevice &view &projection allMeshes
+        // Render entity meshes and particle meshes separately to avoid Array.append allocation
+        RenderPasses.renderMeshes
+          res.GraphicsDevice
+          &view
+          &projection
+          meshCommandsEntities
+
+        RenderPasses.renderMeshes
+          res.GraphicsDevice
+          &view
+          &projection
+          meshCommandsParticles
 
         // 3. Billboard particles
         RenderPasses.renderBillboards
