@@ -487,6 +487,31 @@ module W =
     w.set_PulseMode(mode)
     w
 
+  let inline getUsesLeft<'T
+    when 'T: (member set_GetUsesLeft: (unit -> int voption) -> unit)>
+    (thunk: unit -> int voption)
+    (w: 'T)
+    =
+    w.set_GetUsesLeft(thunk)
+    w
+
+  let inline bindGetUsesLeft<'T
+    when 'T :> Widget
+    and 'T: (member set_GetUsesLeft: (unit -> int voption) -> unit)>
+    (thunkAVal: aval<unit -> int voption>)
+    (w: 'T)
+    =
+    let sub = thunkAVal.AddWeakCallback(fun v -> w.set_GetUsesLeft(v))
+    WidgetSubs.get(w).Add(sub)
+    w
+
+  let inline countLabel<'T when 'T: (member set_CountLabel: Label -> unit)>
+    (label: Label)
+    (w: 'T)
+    =
+    w.set_CountLabel(label)
+    w
+
   let inline tooltip<'T when 'T :> Widget> (text: string) (w: 'T) =
     w.Tooltip <- text
     w

@@ -250,6 +250,73 @@ module ActionSlot =
   let create() = ActionSlot()
 
 
+/// Widget for item slots - evaluates GetUsesLeft thunk on each render for live count
+type ItemSlot() =
+  inherit Widget()
+
+  member val CooldownEndTime = TimeSpan.Zero with get, set
+  member val CooldownDuration = 10.0f with get, set
+  member val CooldownColor = Color(0, 0, 0, 200) with get, set
+  member val BgColor = Color.DarkSlateGray with get, set
+
+  /// Reference to count label - updated each render with thunk result
+  member val CountLabel: Label = null with get, set
+
+  member val GetUsesLeft: unit -> int voption =
+    (fun () -> ValueNone) with get, set
+
+  member val WorldTime: Time =
+    {
+      Delta = TimeSpan.Zero
+      TotalGameTime = TimeSpan.Zero
+      Previous = TimeSpan.Zero
+    } with get, set
+
+  override this.InternalRender(context) =
+    let bounds = this.ActualBounds
+    let time = this.WorldTime.TotalGameTime
+
+    // Background
+    context.FillRectangle(bounds, this.BgColor)
+
+    // Cooldown overlay
+    if this.CooldownEndTime > time then
+      let remaining = (this.CooldownEndTime - time).TotalSeconds
+
+      let cdPct =
+        MathHelper.Clamp(float32 remaining / this.CooldownDuration, 0.0f, 1.0f)
+
+      let overlayHeight = int(float32 bounds.Height * cdPct)
+
+      if overlayHeight > 0 then
+        let overlayRect =
+          Rectangle(
+            bounds.X,
+            bounds.Y + bounds.Height - overlayHeight,
+            bounds.Width,
+            overlayHeight
+          )
+
+        context.FillRectangle(overlayRect, this.CooldownColor)
+
+    // Border
+    context.DrawRectangle(bounds, Color.Gray, 1.0f)
+
+    // Evaluate thunk and update count label directly (live update each render)
+    if not(isNull this.CountLabel) then
+      let newText =
+        match this.GetUsesLeft() with
+        | ValueSome count -> string count
+        | ValueNone -> ""
+
+      if this.CountLabel.Text <> newText then
+        this.CountLabel.Text <- newText
+
+
+module ItemSlot =
+  let create() = ItemSlot()
+
+
 type CombatIndicator() =
   inherit Widget()
 

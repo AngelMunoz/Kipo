@@ -109,7 +109,7 @@ module HUDComponents =
       let usesText =
         stack.Instances
         |> List.tryHead
-        |> Option.bind(fun i -> i.UsesLeft |> ValueOption.toOption)
+        |> Option.bind(fun i -> i.GetUsesLeft() |> ValueOption.toOption)
         |> Option.map(fun u -> $"\nUses: {u}")
         |> Option.defaultValue ""
 
@@ -285,9 +285,26 @@ module HUDComponents =
             stack.Instances
             |> List.tryFind(fun inst -> inst.InstanceId = instanceId)
             |> Option.bind(fun inst ->
-              inst.UsesLeft |> ValueOption.toOption |> Option.map string)))
+              inst.GetUsesLeft() |> ValueOption.toOption |> Option.map string)))
         |> Option.defaultValue ""
       | ValueNone -> ""
+
+    /// Get GetUsesLeft thunk for a slot (returns dummy thunk for skills)
+    let getSlotUsesLeftThunk
+      (inventory: HashMap<int<ItemId>, ResolvedItemStack> option)
+      (proc: SlotProcessing voption)
+      : unit -> int voption =
+      match proc with
+      | ValueSome(SlotProcessing.Item instanceId) ->
+        inventory
+        |> Option.bind(fun inv ->
+          inv
+          |> Seq.tryPick(fun (_, stack) ->
+            stack.Instances
+            |> List.tryFind(fun inst -> inst.InstanceId = instanceId)
+            |> Option.map _.GetUsesLeft))
+        |> Option.defaultValue(fun () -> ValueNone)
+      | _ -> (fun () -> ValueNone)
 
     /// Get background color for a slot based on skill intent
     let getSlotBackgroundColor
@@ -490,6 +507,51 @@ module HUDComponents =
     |> W.bindTooltip data.TooltipText
 
 
+  /// Create an item slot using ItemSlot widget with reactive GetUsesLeft thunk
+  let createItemSlot
+    (ctx: ActionBarContext)
+    (data: ActionSlotData)
+    (getUsesLeftAVal: aval<unit -> int voption>)
+    =
+    let abbrevLabel =
+      Label.create ""
+      |> W.textColor Color.White
+      |> W.hAlign HorizontalAlignment.Center
+      |> W.vAlign VerticalAlignment.Center
+      |> W.bindText data.AbbrevText
+
+    let keyLabel =
+      Label.create ""
+      |> W.textColor Color.LightGray
+      |> W.hAlign HorizontalAlignment.Right
+      |> W.vAlign VerticalAlignment.Top
+      |> W.margin4 0 2 4 0
+      |> W.bindText data.KeyText
+
+    // CountLabel - no reactive binding; ItemSlot updates it directly in render
+    let countLabel =
+      Label.create ""
+      |> W.textColor Color.Yellow
+      |> W.hAlign HorizontalAlignment.Right
+      |> W.vAlign VerticalAlignment.Bottom
+      |> W.margin4 0 0 4 2
+
+    let slot =
+      ItemSlot.create()
+      |> W.size 48 48
+      |> W.bindWorldTime ctx.WorldTime
+      |> W.bindBgColor data.BackgroundColor
+      |> W.bindCooldownColor ctx.CooldownColor
+      |> W.bindCooldownEndTime data.CooldownEnd
+      |> W.bindCooldownDuration data.CooldownDuration
+      |> W.bindGetUsesLeft getUsesLeftAVal
+      |> W.countLabel countLabel
+
+    Panel.sized 48 48
+    |> W.childrenP [ slot; abbrevLabel; keyLabel; countLabel ]
+    |> W.bindTooltip data.TooltipText
+
+
   let createActionBar
     (config: HUDConfig aval)
     (worldTime: Time aval)
@@ -556,7 +618,13 @@ module HUDComponents =
           slotProc |> AVal.map(ActionBar.getSlotCooldownDuration skillStore)
       }
 
-      let slotWidget = createActionSlot barCtx slotData
+      // Reactive thunk that updates when inventory or slot changes
+      let usesLeftAVal =
+        (playerInventory, slotProc) ||> AVal.map2 ActionBar.getSlotUsesLeftThunk
+
+      // Always use ItemSlot - it works for both items and skills
+      let slotWidget = createItemSlot barCtx slotData usesLeftAVal
+
       Grid.SetColumn(slotWidget, i + 1) // +1 because column 0 is setIndicator
       Grid.SetRow(slotWidget, 0)
       grid.Widgets.Add(slotWidget)

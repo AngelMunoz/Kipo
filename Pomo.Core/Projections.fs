@@ -221,14 +221,12 @@ module Projections =
       return finalStats
     })
 
-  /// Individual item instance with uses left
   [<Struct>]
   type ResolvedInstance = {
     InstanceId: Guid<ItemInstanceId>
-    UsesLeft: int voption
+    GetUsesLeft: unit -> int voption
   }
 
-  /// Resolved item stack with definition and instance details
   [<Struct>]
   type ResolvedItemStack = {
     Definition: ItemDefinition
@@ -248,9 +246,14 @@ module Projections =
           itemStore.tryFind inst.ItemId
           |> ValueOption.map(fun def -> struct (inst, def)))
         |> ValueOption.iter(fun struct (inst, def) ->
+          let getUsesLeft() =
+            world.ItemInstances
+            |> Dictionary.tryFindV instanceId
+            |> ValueOption.bind _.UsesLeft
+
           let resolvedInst = {
             InstanceId = instanceId
-            UsesLeft = inst.UsesLeft
+            GetUsesLeft = getUsesLeft
           }
 
           let stack =
