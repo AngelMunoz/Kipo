@@ -17,7 +17,7 @@ open Pomo.Core.Environment
 
 module Equipment =
 
-  let equipedItemsForEntity (entityId: Guid<EntityId>) (world: World) =
+  let equippedItemsForEntity (entityId: Guid<EntityId>) (world: World) =
     world.EquippedItems
     |> AMap.tryFind entityId
     |> AVal.map(Option.defaultValue HashMap.empty)

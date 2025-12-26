@@ -242,6 +242,7 @@ module AbilityActivation =
               NotificationEvent.ShowMessage {
                 Message = message
                 Position = casterPos
+                Type = SystemCommunications.Miss
               }
             )
           )
@@ -277,6 +278,7 @@ module AbilityActivation =
                   NotificationEvent.ShowMessage {
                     Message = "Target is out of range"
                     Position = casterPos
+                    Type = SystemCommunications.Miss
                   }
                 )
               )
@@ -465,7 +467,9 @@ module AbilityActivation =
           gameplay.Projections.ComputeMovementSnapshot(scenarioId)
         | ValueNone -> Pomo.Core.Projections.MovementSnapshot.Empty
 
-      let publishNotification(msg: string) =
+      let publishNotification
+        (msg: string, type': SystemCommunications.NotificationType)
+        =
         let casterPos =
           snapshot.Positions
           |> HashMap.tryFind playerId
@@ -476,6 +480,7 @@ module AbilityActivation =
             NotificationEvent.ShowMessage {
               Message = msg
               Position = casterPos
+              Type = type'
             }
           )
         )
@@ -542,12 +547,16 @@ module AbilityActivation =
                 | Stunned -> "Stunned!"
                 | Silenced -> "Silenced!"
 
-              publishNotification notificationMsg
+              publishNotification(notificationMsg, SystemCommunications.Crit)
           | ValueSome(Item itemInstanceId) ->
             match core.World.ItemInstances.TryGetValue itemInstanceId with
             | true, itemInstance ->
               match itemInstance.UsesLeft with
-              | ValueSome 0 -> publishNotification "Item has no uses left!"
+              | ValueSome 0 ->
+                publishNotification(
+                  "Item has no uses left!",
+                  SystemCommunications.Crit
+                )
               | ValueSome _ ->
                 core.EventBus.Publish(
                   GameEvent.ItemIntent(

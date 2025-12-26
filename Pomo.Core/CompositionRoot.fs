@@ -35,12 +35,14 @@ open Pomo.Core.Systems.EntitySpawnerLogic
 open Pomo.Core.Systems.StateWrite
 
 open Pomo.Core.Domain.Scenes
+open Pomo.Core.Domain.UI
 
 type GlobalScope = {
   Stores: StoreServices
   MonoGame: MonoGameServices
   Random: Random
   UIService: IUIService
+  HUDService: IHUDService
 }
 
 
@@ -99,12 +101,14 @@ module CompositionRoot =
       }
 
     let uiService = UIService.create()
+    let hudService = HUDService.create "Content/HUDConfig.json"
 
     {
       Stores = stores
       MonoGame = monoGame
       Random = Random.Shared
       UIService = uiService
+      HUDService = hudService
     }
 
   module SceneFactory =
@@ -194,6 +198,7 @@ module CompositionRoot =
                   member _.StateWrite = stateWriteService
                   member _.Random = scope.Random
                   member _.UIService = scope.UIService
+                  member _.HUDService = scope.HUDService
               }
 
             member _.GameplayServices =
@@ -232,6 +237,7 @@ module CompositionRoot =
       baseComponents.Add(new CollisionSystem(game, pomoEnv))
 
       baseComponents.Add(new NotificationSystem(game, pomoEnv))
+      baseComponents.Add(UIController.create game pomoEnv playerId)
 
       baseComponents.Add(new EffectProcessingSystem(game, pomoEnv))
       baseComponents.Add(new EntitySpawnerSystem(game, pomoEnv))
@@ -373,7 +379,13 @@ module CompositionRoot =
       let publishHudGuiAction(action: GuiAction) =
         match action with
         | GuiAction.BackToMainMenu -> sceneTransitionSubject.OnNext MainMenu
-        | _ -> ()
+        | GuiAction.ToggleCharacterSheet ->
+          scope.HUDService.TogglePanelVisible HUDPanelId.CharacterSheet
+        | GuiAction.ToggleEquipment ->
+          scope.HUDService.TogglePanelVisible HUDPanelId.EquipmentPanel
+        | GuiAction.StartNewGame
+        | GuiAction.OpenSettings
+        | GuiAction.ExitGame -> () // Not applicable in Gameplay
 
       // 6. Setup Listeners (Subs)
       let subs = new System.Reactive.Disposables.CompositeDisposable()
@@ -438,9 +450,15 @@ module CompositionRoot =
         }
 
       let hudDrawComponent =
-        { new DrawableGameComponent(game) with
+        { new DrawableGameComponent(game, DrawOrder = Render.Layer.UI) with
             override _.LoadContent() =
-              let root = Systems.GameplayUI.build game publishHudGuiAction
+              let root =
+                Systems.GameplayUI.build
+                  game
+                  pomoEnv
+                  playerId
+                  publishHudGuiAction
+
               hudDesktop <- ValueSome(new Desktop(Root = root))
 
             override _.Draw(gameTime) =
@@ -490,9 +508,11 @@ module CompositionRoot =
         match action with
         | StartNewGame ->
           sceneTransitionSubject.OnNext(Gameplay("Lobby", ValueNone))
-        | OpenSettings -> () // TODO: Implement settings menu
         | ExitGame -> game.Exit()
-        | BackToMainMenu -> () // Should not happen in MainMenu
+        | OpenSettings // TODO: Implement settings menu
+        | BackToMainMenu
+        | ToggleCharacterSheet
+        | ToggleEquipment -> () // Not applicable in MainMenu
 
       let uiComponent =
         { new DrawableGameComponent(game) with

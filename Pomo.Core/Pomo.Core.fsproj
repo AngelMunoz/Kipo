@@ -11,6 +11,7 @@
     <Compile Include="Domain/Input.fs" />
     <Compile Include="Domain/Cursor.fs" />
     <Compile Include="Domain/Entity.fs" />
+    <Compile Include="Domain/UI.fs" />
     <Compile Include="Domain/Projectile.fs" />
     <Compile Include="Domain/Orbital.fs" />
     <Compile Include="Domain/Skill.fs" />
@@ -47,6 +48,9 @@
     <Compile Include="Rendering/LightEmitter.fs" />
     <Compile Include="Rendering/EntityPicker.fs" />
     <Compile Include="Environment.fs" />
+    <Compile Include="UI/HUDAnimation.fs" />
+    <Compile Include="UI/Widgets.fs" />
+    <Compile Include="UI/MyraExtensions.fs" />
     <Compile Include="Systems/GameLogic.fs" />
     <Compile Include="Systems/World.fs" />
     <Compile Include="Systems/FormulaEvaluator.fs" />
@@ -80,6 +84,9 @@
     <Compile Include="Systems/AnimationSystem.fs" />
     <Compile Include="Systems/MotionStateAnimation.fs" />
     <Compile Include="Systems/WorldMapService.fs" />
+    <Compile Include="Systems/HUDService.fs" />
+    <Compile Include="Systems/HUDComponents.fs" />
+    <Compile Include="Systems/UIControllerSystem.fs" />
     <Compile Include="Systems/UIService.fs" />
     <Compile Include="Systems/UISystem.fs" />
     <Compile Include="Systems/CursorSystem.fs" />
@@ -126,6 +133,9 @@
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
     <Content Include="Content/Maps/Proto.ai-entities.json">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+    <Content Include="Content/HUDConfig.json">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
   </ItemGroup>

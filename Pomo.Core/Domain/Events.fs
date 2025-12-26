@@ -71,7 +71,20 @@ module SystemCommunications =
   }
 
   [<Struct>]
-  type ShowNotification = { Message: string; Position: Vector2 }
+  type NotificationType =
+    | Normal
+    | Damage
+    | Crit
+    | Heal
+    | Status
+    | Miss
+
+  [<Struct>]
+  type ShowNotification = {
+    Message: string
+    Position: Vector2
+    Type: NotificationType
+  }
 
   [<Struct>]
   type SlotActivated = {

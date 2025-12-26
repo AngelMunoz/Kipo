@@ -50,6 +50,8 @@ type TextCommand = {
   Text: string
   ScreenPosition: Vector2
   Alpha: float32
+  Color: Color
+  Scale: float32
 }
 
 module RenderCore =

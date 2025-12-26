@@ -8,18 +8,26 @@
 
 ## Phase 1: Infrastructure & Theming
 
-- [ ] Task: Define `HUDTheme` and `HUDLayout` types
+- [x] Task: Define `HUDTheme` and `HUDLayout` types
     - Create a module for UI definitions (`Pomo.Core/Domain/UI.fs` or similar)
     - `HUDTheme`: Record with color palette (gradients for HP/MP), fonts, texture region names
     - `HUDLayout`: Record defining position, anchor, and visibility for each HUD component
-- [ ] Task: Create `HUDService`
+- [x] Task: Create `HUDService`
     - Service to load/manage current layout and theme at runtime
     - Expose reactive observables for theme/layout changes
     - Provide helpers for common operations (color by faction, easing functions)
-- [ ] Task: Implement Animation/Transition Utilities
+- [x] Task: Implement Animation/Transition Utilities
     - Simple easing functions (ease-out for health changes, linear for cooldowns)
     - Value interpolation helpers for smooth bar fills
-- [ ] Task: Conductor - User Manual Verification 'Phase 1: Infrastructure & Theming' (Protocol in workflow.md)
+- [x] Task: Implement Myra Widget DSL (`W` module)
+    - Fluent helpers for widget properties (`W.size`, `W.margin`, `W.hAlign`, etc.)
+    - Reactive bindings (`W.bindText`, `W.bindCurrentValue`, `W.bindWorldTime`, etc.)
+    - Panel.bindChildren for reactive layout-based visibility
+- [x] Task: Implement Item Projections (`ProjectService.ResolvedInventories`)
+    - Resolve `ItemDefinition` from `World.ItemInstances` and `ItemStore`
+    - Group instances by `ItemId` to provide counts and access `UsesLeft`
+    - Reactive `amap` for HUD binding
+- [x] Task: Conductor - User Manual Verification 'Phase 1: Infrastructure & Theming' (Protocol in workflow.md)
 
 ---
 
@@ -27,7 +35,7 @@
 
 ### 2.1 Player Vitals
 
-- [ ] Task: Implement `PlayerVitals` Component
+- [x] Task: Implement `PlayerVitals` Component
     - Myra widget (VerticalStack or custom panel)
     - Bind to `world.Resources` for local player entity
     - Animated fill bars (not instant jumps) for HP/MP
@@ -36,50 +44,55 @@
 
 ### 2.2 Action Bar
 
-- [ ] Task: Implement `ActionBar` Component
-    - Horizontal row of 6 slots (UseSlot1-6)
+- [x] Task: Implement `ActionBar` Component
+    - Horizontal row of 8 slots (UseSlot1-8)
+    - **Refactored structure:** Helper logic extracted to semantic submodules (`Common`, `ActionBar`, etc.)
     - **Data binding:**
       - `world.ActionSets[entityId]` → `HashMap<int, HashMap<GameAction, SlotProcessing>>`
       - `world.ActiveActionSets[entityId]` → current set index
       - `world.AbilityCooldowns[entityId]` → cooldown timestamps
+      - `Projections.ResolvedInventories[entityId]` → item info (definitions, uses)
     - Per-slot display:
-      - **Skill:** Extract initials from SkillStore (e.g., "FB" for Fireball), tint by intent
-      - **Item:** Show item abbreviation + uses remaining
+      - **Skill:** Initials from SkillStore (e.g., "FB" for Fireball)
+      - **Intent Tinting:** Background color based on skill intent (Offensive=red-ish, Supportive=green-ish)
+      - **Item:** Name initials + `UsesLeft` badge in corner
     - Cooldown overlay: Radial sweep + seconds remaining text
     - Keybinding labels in corner ("1", "2", etc.)
-- [ ] Task: Implement Action Set Switcher
+- [x] Task: Implement Action Set Switcher
     - Visual indicator showing current set (1/2/3)
     - Allow switching via Tab or defined keybind
 
 ### 2.3 Status Effects Bar (Buffs/Debuffs)
 
-- [ ] Task: Implement `StatusEffectsBar` Component
+- [x] Task: Implement `StatusEffectsBar` Component
     - Bind to `world.ActiveEffects[entityId]` → `IndexList<ActiveEffect>`
     - Display as row of colored squares/circles
     - Color coding by EffectKind: Buff=green border, Debuff=red, DoT=orange pulse
     - Stack count badge when `StackCount > 1`
     - Radial duration timer (like cooldowns)
-    - Flash animation when < 3s remaining
+    - Flash animation when < 5s remaining
     - Sort: Buffs left, Debuffs right, by remaining duration
 
 ### 2.4 Target Frame
 
-- [ ] Task: Implement `TargetFrame` Component
+- [x] Task: Implement `TargetFrame` Component
     - Bind to current selection state (from `CursorSystem` or targeting service)
     - Display target health bar (same style as player vitals)
     - Faction indicator (color-coded outline)
     - Name placeholder: Show "Target" or faction type until entity names exist
-    - Small summary of target's active effects (icons only)
+    - [ ] Deferred: Small summary of target's active effects (icons only)
+    - [x] Deferred: Rework to world-space overlay for engaged entities (Integration deferred per user request: requires engaged entity tracking)
 
 ### 2.5 Cast Bar
 
-- [ ] Task: Implement `CastBar` Component
+- [x] Task: Implement `CastBar` Component
     - Bind to `world.ActiveCharges[entityId]`
-    - Smooth progress bar fill animation
+    - Smooth progress bar fill animation (no pulsing via `PulseMode.NoPulse`)
+    - Dedicated cast bar colors in theme palette (`CastBarFill`, `CastBarBackground`)
     - Skill name label (lookup from SkillStore via SkillId)
     - Position: Center-bottom, prominent during casting
 
-- [ ] Task: Conductor - User Manual Verification 'Phase 2: Core HUD Components' (Protocol in workflow.md)
+- [x] Task: Conductor - User Manual Verification 'Phase 2: Core HUD Components' (Protocol in workflow.md)
 
 ---
 
@@ -87,7 +100,7 @@
 
 ### 3.1 Floating Combat Text
 
-- [ ] Task: Implement `FloatingCombatText` System
+- [x] Task: Implement `FloatingCombatText` System
     - Subscribe to `world.Notifications` (WorldText entries)
     - Project world positions → screen coordinates via `CameraService`
     - Styling: Damage=Red (scale by magnitude), Healing=Green, Status=Gray
@@ -96,14 +109,14 @@
 
 ### 3.2 Combat Indicator
 
-- [ ] Task: Implement `CombatIndicator`
+- [x] Task: Implement `CombatIndicator`
     - Bind to `world.InCombatUntil > world.Time.TotalGameTime`
     - Visual: Subtle screen-edge vignette or frame glow (red tint)
     - Smooth fade in/out transitions
 
 ### 3.3 Mini-Map
 
-- [ ] Task: Implement `MiniMap` Component
+- [x] Task: Implement `MiniMap` Component
     - Custom Myra widget rendering simplified `Scenario.Map`
     - Render entity dots from `world.Positions`:
       - Player = Green (centered)
@@ -111,7 +124,7 @@
       - Ally = Blue
     - Appropriate zoom level for spatial awareness
 
-- [ ] Task: Conductor - User Manual Verification 'Phase 3: World-Space & Secondary Overlays' (Protocol in workflow.md)
+- [x] Task: Conductor - User Manual Verification 'Phase 3: World-Space & Secondary Overlays' (Protocol in workflow.md)
 
 ---
 
@@ -119,7 +132,7 @@
 
 ### 4.1 Character Sheet
 
-- [ ] Task: Implement `CharacterSheet` Panel
+- [x] Task: Implement `CharacterSheet` Panel
     - Toggle visibility via hotkey (e.g., 'C')
     - **Base Stats Section:** Power, Magic, Sense, Charm
       - Bind to `world.BaseStats[entityId]`
@@ -132,7 +145,7 @@
 
 ### 4.2 Equipment Panel
 
-- [ ] Task: Implement `EquipmentPanel` Component
+- [x] Task: Implement `EquipmentPanel` Component
     - Bind to `world.EquippedItems[entityId]` → `HashMap<Slot, Guid<ItemInstanceId>>`
     - 8 slots: Head, Chest, Legs, Feet, Hands, Weapon, Shield, Accessory
     - Display item names (resolve via `world.ItemInstances` + `ItemStore`)
@@ -142,36 +155,36 @@
 
 ### 4.3 Tooltips System
 
-- [ ] Task: Implement Tooltip Infrastructure
+- [x] Task: Implement Tooltip Infrastructure
     - Shared tooltip rendering service
     - Smart positioning (avoid screen edges)
     - Slight hover delay (~200ms), instant hide on mouseout
-- [ ] Task: Implement Skill Tooltips
+- [x] Task: Implement Skill Tooltips
     - Name, Description, Cost, Cooldown, Cast Time, Range, Area, Effects
     - Source: `SkillStore.find(skillId)` → `ActiveSkill`
-- [ ] Task: Implement Item Tooltips
+- [x] Task: Implement Item Tooltips
     - Name, Weight, Equipment stats (if Wearable), Uses remaining
     - Source: `ItemStore.find(itemId)` → `ItemDefinition`
-- [ ] Task: Implement Effect Tooltips
+- [x] Task: Implement Effect Tooltips
     - Name, Kind, Time remaining, Description
     - Source: `ActiveEffect.SourceEffect`
 
-- [ ] Task: Conductor - User Manual Verification 'Phase 4: Detail Panels' (Protocol in workflow.md)
+- [x] Task: Conductor - User Manual Verification 'Phase 4: Detail Panels' (Protocol in workflow.md)
 
 ---
 
 ## Phase 5: Final Integration
 
-- [ ] Task: Assemble `GameplayHUD`
+- [x] Task: Assemble `GameplayHUD`
     - Combine all components into main HUD panel using `HUDLayout`
     - Integrate into existing `UISystem.fs` or create new `HUDSystem.fs`
-- [ ] Task: Resolution Scaling Verification
+- [x] Task: Resolution Scaling Verification
     - Ensure all elements scale correctly with different resolutions
     - Verify anchoring works at 1080p, 1440p, 4K
-- [ ] Task: Performance Profiling
+- [x] Task: Performance Profiling
     - Verify adaptive updates don't cause stuttering or allocation spikes
     - Confirm UI layer maintains 60 FPS
-- [ ] Task: Conductor - User Manual Verification 'Phase 5: Final Integration' (Protocol in workflow.md)
+- [x] Task: Conductor - User Manual Verification 'Phase 5: Final Integration' (Protocol in workflow.md)
 
 ---
 

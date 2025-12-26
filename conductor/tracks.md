@@ -6,8 +6,3 @@ This file tracks all major tracks for the project. Each track has its own detail
 
 ## [ ] Track: Add comprehensible debug visual tools and relevant logs
 *Link: [./conductor/tracks/debug_visual_tools_20251223/](./conductor/tracks/debug_visual_tools_20251223/)*
-
----
-
-## [ ] Track: GUI Overlays (ARPG Hud)
-*Link: [./conductor/tracks/gui_overlays_20251223/](./conductor/tracks/gui_overlays_20251223/)*

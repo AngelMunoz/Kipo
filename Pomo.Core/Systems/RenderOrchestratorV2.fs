@@ -33,6 +33,7 @@ module RenderOrchestratorV2 =
     LayerRenderIndices: IReadOnlyDictionary<int, int[]>
     FallbackTexture: Texture2D
     HudFont: SpriteFont
+    HudPalette: UI.HUDColorPalette
   }
 
   let private setBlendState (device: GraphicsDevice) (blend: BlendMode) =
@@ -226,10 +227,20 @@ module RenderOrchestratorV2 =
       )
 
       for cmd in commands do
-        let color = Color.White * cmd.Alpha
-        let textSize = font.MeasureString(cmd.Text)
-        let textPosition = cmd.ScreenPosition - textSize / 2.0f
-        batch.DrawString(font, cmd.Text, textPosition, color)
+        let color = cmd.Color * cmd.Alpha
+        let origin = font.MeasureString(cmd.Text) / 2.0f
+
+        batch.DrawString(
+          font,
+          cmd.Text,
+          cmd.ScreenPosition,
+          color,
+          0.0f,
+          origin,
+          cmd.Scale,
+          SpriteEffects.None,
+          0.0f
+        )
 
       batch.End()
 
@@ -326,7 +337,11 @@ module RenderOrchestratorV2 =
         // 5. World text (notifications, damage numbers - rendered in 2D)
         let textCommands = TextEmitter.emit world.Notifications viewBounds
 
-        renderText res.SpriteBatch res.HudFont camera textCommands
+        renderText
+          res.SpriteBatch
+          res.HudFont
+          camera
+          (textCommands res.HudPalette)
 
     | None ->
       // Player died or removed - render nothing (black screen)
@@ -388,6 +403,10 @@ module RenderOrchestratorV2 =
               LayerRenderIndices = layerIndices
               FallbackTexture = fallback
               HudFont = TextEmitter.loadFont game.Content
+              HudPalette =
+                env.CoreServices.HUDService.Config
+                |> AVal.map _.Theme.Colors
+                |> AVal.force
             }
 
         override _.Draw _ =

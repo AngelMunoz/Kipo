@@ -221,17 +221,58 @@ module Projections =
       return finalStats
     })
 
-  let private inventoryDefs(world: World, itemStore: ItemStore) =
+  [<Struct>]
+  type ResolvedInstance = {
+    InstanceId: Guid<ItemInstanceId>
+    GetUsesLeft: unit -> int voption
+  }
+
+  [<Struct>]
+  type ResolvedItemStack = {
+    Definition: ItemDefinition
+    Count: int
+    Instances: ResolvedInstance list
+  }
+
+  let private resolvedInventories (world: World) (itemStore: ItemStore) =
     world.EntityInventories
-    |> AMap.map(fun _ itemIds ->
-      itemIds
-      |> HashSet.chooseV(fun itemId ->
-        match world.ItemInstances |> Dictionary.tryFindV itemId with
-        | ValueSome instance ->
-          match itemStore.tryFind instance.ItemId with
-          | ValueSome def -> ValueSome def
-          | ValueNone -> ValueNone
-        | ValueNone -> ValueNone))
+    |> AMap.map(fun _ itemInstanceIds ->
+      let mutable result = HashMap.empty
+
+      for instanceId in itemInstanceIds do
+        world.ItemInstances
+        |> Dictionary.tryFindV instanceId
+        |> ValueOption.bind(fun inst ->
+          itemStore.tryFind inst.ItemId
+          |> ValueOption.map(fun def -> struct (inst, def)))
+        |> ValueOption.iter(fun struct (inst, def) ->
+          let getUsesLeft() =
+            world.ItemInstances
+            |> Dictionary.tryFindV instanceId
+            |> ValueOption.bind _.UsesLeft
+
+          let resolvedInst = {
+            InstanceId = instanceId
+            GetUsesLeft = getUsesLeft
+          }
+
+          let stack =
+            match result |> HashMap.tryFindV inst.ItemId with
+            | ValueSome existing -> {
+                existing with
+                    Count = existing.Count + 1
+                    Instances = resolvedInst :: existing.Instances
+              }
+            | ValueNone ->
+                {
+                  Definition = def
+                  Count = 1
+                  Instances = [ resolvedInst ]
+                }
+
+          result <- result |> HashMap.add inst.ItemId stack)
+
+      result)
 
   let private equippedItemDefs(world: World, itemStore: ItemStore) =
     world.EquippedItems
@@ -287,8 +328,11 @@ module Projections =
     abstract LiveEntities: aset<Guid<EntityId>>
     abstract CombatStatuses: amap<Guid<EntityId>, IndexList<CombatStatus>>
     abstract DerivedStats: amap<Guid<EntityId>, Entity.DerivedStats>
-    abstract EquipedItems: amap<Guid<EntityId>, HashMap<Slot, ItemDefinition>>
-    abstract Inventories: amap<Guid<EntityId>, HashSet<ItemDefinition>>
+    abstract EquippedItems: amap<Guid<EntityId>, HashMap<Slot, ItemDefinition>>
+
+    abstract ResolvedInventories:
+      amap<Guid<EntityId>, HashMap<int<ItemId>, ResolvedItemStack>>
+
     abstract EntityScenarios: amap<Guid<EntityId>, Guid<ScenarioId>>
 
     abstract ActionSets:
@@ -412,8 +456,8 @@ module Projections =
         member _.LiveEntities = liveEntities world
         member _.CombatStatuses = calculateCombatStatuses world
         member _.DerivedStats = derivedStats
-        member _.EquipedItems = equippedItemDefs(world, itemStore)
-        member _.Inventories = inventoryDefs(world, itemStore)
+        member _.EquippedItems = equippedItemDefs(world, itemStore)
+        member _.ResolvedInventories = resolvedInventories world itemStore
         member _.EntityScenarios = world.EntityScenario
         member _.ActionSets = activeActionSets world
         member _.EntityScenarioContexts = entityScenarioContexts world

@@ -53,6 +53,10 @@ module StateUpdate =
       world.EntityScenario.Remove(entity) |> ignore
       world.ActiveOrbitals.Remove(entity) |> ignore
       world.ActiveCharges.Remove(entity) |> ignore
+      // Animation/Visuals - CRITICAL: these were missing and caused memory leaks
+      world.ActiveAnimations.Remove(entity) |> ignore
+      world.Poses.Remove(entity) |> ignore
+      world.ModelConfigId.Remove(entity) |> ignore
 
 
     /// Apply an EntitySpawnBundle atomically - all components set in one pass
