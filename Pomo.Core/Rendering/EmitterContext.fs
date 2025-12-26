@@ -21,7 +21,7 @@ type RenderCore = {
 type EntityRenderData = {
   ModelStore: ModelStore
   GetModelByAsset: string -> Model voption
-  EntityPoses: HashMap<Guid<EntityId>, HashMap<string, Matrix>>
+  EntityPoses: IReadOnlyDictionary<Guid<EntityId>, Dictionary<string, Matrix>>
   LiveProjectiles: HashMap<Guid<EntityId>, LiveProjectile>
   SquishFactor: float32
   ModelScale: float32

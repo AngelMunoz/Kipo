@@ -5,6 +5,7 @@ open System.Collections.Generic
 open Microsoft.Xna.Framework
 open FSharp.UMX
 open FSharp.Data.Adaptive
+open Pomo.Core
 open Pomo.Core.Domain.Units
 open Pomo.Core.Domain.Projectile
 open Pomo.Core.Domain.Animation
@@ -35,14 +36,22 @@ module PoseResolver =
     | true, r -> r
     | false, _ -> 0.0f
 
+  /// Cached empty pose to avoid per-frame allocations
+  let private emptyPose: System.Collections.Generic.Dictionary<string, Matrix> =
+    System.Collections.Generic.Dictionary()
+
   /// Gets entity pose or empty
   let inline private getEntityPose
-    (poses: HashMap<Guid<EntityId>, HashMap<string, Matrix>>)
+    (poses:
+      System.Collections.Generic.IReadOnlyDictionary<
+        Guid<EntityId>,
+        System.Collections.Generic.Dictionary<string, Matrix>
+       >)
     (entityId: Guid<EntityId>)
     =
-    match poses |> HashMap.tryFindV entityId with
+    match poses |> Dictionary.tryFindV entityId with
     | ValueSome pose -> pose
-    | ValueNone -> HashMap.empty
+    | ValueNone -> emptyPose
 
   /// Computes projectile altitude
   let inline private computeAltitude
@@ -70,10 +79,10 @@ module PoseResolver =
 
   /// Gets node animation matrix
   let inline private getNodeAnimation
-    (entityPose: HashMap<string, Matrix>)
+    (entityPose: IReadOnlyDictionary<string, Matrix>)
     (nodeName: string)
     =
-    match entityPose |> HashMap.tryFindV nodeName with
+    match entityPose |> Dictionary.tryFindV nodeName with
     | ValueSome m -> m
     | ValueNone -> Matrix.Identity
 
@@ -107,7 +116,7 @@ module PoseResolver =
   /// Applies transforms along rig hierarchy (tail-recursive)
   [<TailCall>]
   let rec private applyTransforms
-    (entityPose: HashMap<string, Matrix>)
+    (entityPose: IReadOnlyDictionary<string, Matrix>)
     (nodeTransforms: Dictionary<string, Matrix>)
     (struct (nodes, currentParentWorld):
       struct (struct (string * RigNode) list * Matrix))

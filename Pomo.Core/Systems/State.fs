@@ -450,8 +450,10 @@ module StateWrite =
     // Animation/Visuals
     | UpdateActiveAnimations of
       animEntityId: Guid<EntityId> *
-      anims: IndexList<Animation.AnimationState>
-    | UpdatePose of poseEntityId: Guid<EntityId> * pose: HashMap<string, Matrix>
+      anims: Animation.AnimationState[]
+    | UpdatePose of
+      poseEntityId: Guid<EntityId> *
+      pose: Dictionary<string, Matrix>
     | RemoveAnimationState of removeAnimEntityId: Guid<EntityId>
     | UpdateModelConfig of id: Guid<EntityId> * configId: string
     // Effects

@@ -66,7 +66,11 @@ module RenderOrchestratorV2 =
     (stores: StoreServices)
     (map: Pomo.Core.Domain.Map.MapDefinition)
     (snapshot: Pomo.Core.Projections.MovementSnapshot)
-    (poses: HashMap<Guid<EntityId>, HashMap<string, Matrix>>)
+    (poses:
+      System.Collections.Generic.IReadOnlyDictionary<
+        Guid<EntityId>,
+        System.Collections.Generic.Dictionary<string, Matrix>
+       >)
     (projectiles:
       HashMap<Guid<EntityId>, Pomo.Core.Domain.Projectile.LiveProjectile>)
     (layerRenderIndices:
@@ -271,7 +275,7 @@ module RenderOrchestratorV2 =
           stores
           map
           snapshot
-          (world.Poses |> AMap.force)
+          world.Poses
           (world.LiveProjectiles |> AMap.force)
           res.LayerRenderIndices
 

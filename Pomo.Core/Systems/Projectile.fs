@@ -304,10 +304,11 @@ module Projectile =
 
   let inline ensureProjectileAnimation
     (stateWrite: IStateWriteService)
-    (activeAnims: HashMap<Guid<EntityId>, IndexList<AnimationState>>)
+    (activeAnims:
+      Collections.Generic.IReadOnlyDictionary<Guid<EntityId>, AnimationState[]>)
     (projectileId: Guid<EntityId>)
     =
-    match activeAnims |> HashMap.tryFindV projectileId with
+    match activeAnims |> Dictionary.tryFindV projectileId with
     | ValueNone ->
       let spinAnim: AnimationState = {
         ClipId = "Projectile_Spin"
@@ -315,7 +316,7 @@ module Projectile =
         Speed = 1.0f
       }
 
-      stateWrite.UpdateActiveAnimations(projectileId, IndexList.single spinAnim)
+      stateWrite.UpdateActiveAnimations(projectileId, [| spinAnim |])
     | ValueSome _ -> ()
 
   /// Spawns flight visuals for a projectile if not already present
@@ -387,7 +388,7 @@ module Projectile =
       let liveEntities = gameplay.Projections.LiveEntities |> ASet.force
       let liveProjectiles = core.World.LiveProjectiles |> AMap.force
       let entityScenarios = core.World.EntityScenario |> AMap.force
-      let activeAnims = core.World.ActiveAnimations |> AMap.force
+      let activeAnims = core.World.ActiveAnimations
       let visualEffects = core.World.VisualEffects
 
       // Rebuild effectOwners set each frame for accuracy

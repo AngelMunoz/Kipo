@@ -12,6 +12,7 @@ open Pomo.Core.Domain.Entity
 open Pomo.Core.Environment
 open Pomo.Core.Stores
 open Pomo.Core.Domain.World
+open Pomo.Core
 
 module AnimationSystemLogic =
 
@@ -80,23 +81,26 @@ module AnimationSystemLogic =
     else
       ValueSome { animState with Time = newTime }
 
-  /// Processes all active animations for a single entity, returning updated animations and its pose.
-  let processEntityAnimations
-    (activeAnims: AnimationState IndexList)
+  /// Processes all active animations for a single entity, mutating the pose dictionary in-place.
+  /// Updates the animations array in-place if count matches, otherwise returns new array.
+  /// Returns: struct (updated:bool, newArrayNeeded:AnimationState[] voption)
+  let processEntityAnimationsInPlace
+    (activeAnims: AnimationState[])
     (animationStore: AnimationStore)
+    (poseDict: System.Collections.Generic.Dictionary<string, Matrix>)
     (gameTimeDelta: TimeSpan)
-    : (AnimationState IndexList * HashMap<string, Matrix>) voption =
+    : struct (bool * AnimationState[] voption) =
 
-    let mutable updatedAnims = IndexList.empty
-    let mutable entityPose = HashMap.empty<string, Matrix>
-    let mutable hasActiveAnims = false
+    poseDict.Clear()
+    let mutable writeIndex = 0
 
-    for animState in activeAnims do
+    for i = 0 to activeAnims.Length - 1 do
+      let animState = activeAnims[i]
+
       match animationStore.tryFind animState.ClipId with
       | ValueSome clip ->
         match updateAnimationState animState clip gameTimeDelta with
         | ValueSome newAnimState ->
-          // Calculate pose for this clip
           for track in clip.Tracks do
             let struct (rotation, position) =
               evaluateTrack track newAnimState.Time clip.Duration clip.IsLooping
@@ -105,18 +109,25 @@ module AnimationSystemLogic =
               Matrix.CreateFromQuaternion(rotation)
               * Matrix.CreateTranslation(position)
 
-            // For now, simple overwrite (last animation in list wins if tracks overlap)
-            entityPose <- HashMap.add track.NodeName matrix entityPose
+            poseDict[track.NodeName] <- matrix
 
-          updatedAnims <- IndexList.add newAnimState updatedAnims
-          hasActiveAnims <- true
-        | ValueNone -> () // Animation finished and removed
-      | ValueNone -> () // Clip not found, animation removed
+          // Write back to array at current write position
+          activeAnims[writeIndex] <- newAnimState
+          writeIndex <- writeIndex + 1
+        | ValueNone -> ()
+      | ValueNone -> ()
 
-    if hasActiveAnims then
-      ValueSome(updatedAnims, entityPose)
+    if writeIndex = 0 then
+      // All animations finished
+      struct (false, ValueNone)
+    elif writeIndex = activeAnims.Length then
+      // Same count - array was updated in-place, no new array needed
+      struct (true, ValueNone)
     else
-      ValueNone
+      // Fewer animations - need to return a right-sized array
+      let newArray = Array.zeroCreate writeIndex
+      System.Array.Copy(activeAnims, newArray, writeIndex)
+      struct (true, ValueSome newArray)
 
 type AnimationSystem(game: Game, env: PomoEnvironment) =
   inherit GameComponent(game)
@@ -126,36 +137,49 @@ type AnimationSystem(game: Game, env: PomoEnvironment) =
   let stateWrite = core.StateWrite
 
   override _.Update _ =
-    // Get the game time delta from the World's time source
     let gameTimeDelta = core.World.Time |> AVal.map _.Delta |> AVal.force
-    let currentAnims = core.World.ActiveAnimations |> AMap.force
+    let currentAnims = core.World.ActiveAnimations
+    let poses = core.World.Poses
 
-    // Collect updates and removals to apply
-    let updates =
+    let animUpdates = ResizeArray<struct (Guid<EntityId> * AnimationState[])>()
+
+    let newPoses =
       ResizeArray<
         struct (Guid<EntityId> *
-        AnimationState IndexList *
-        HashMap<string, Matrix>)
+        System.Collections.Generic.Dictionary<string, Matrix>)
        >()
 
     let removals = ResizeArray<Guid<EntityId>>()
 
-    // Iterate over snapshot
-    for entityId, anims in currentAnims do
-      match
-        AnimationSystemLogic.processEntityAnimations
+    for KeyValue(entityId, anims) in currentAnims do
+      let poseDict =
+        match poses |> Dictionary.tryFindV entityId with
+        | ValueSome existing -> existing
+        | ValueNone ->
+          let newDict = System.Collections.Generic.Dictionary<string, Matrix>()
+          newPoses.Add(struct (entityId, newDict))
+          newDict
+
+      let struct (hasActiveAnims, newArrayOpt) =
+        AnimationSystemLogic.processEntityAnimationsInPlace
           anims
           stores.AnimationStore
+          poseDict
           gameTimeDelta
-      with
-      | ValueSome(newAnims, newPose) ->
-        updates.Add((entityId, newAnims, newPose))
-      | ValueNone -> removals.Add entityId
 
-    // Apply state updates directly via StateWriteService
-    for entityId, newAnims, newPose in updates do
+      if hasActiveAnims then
+        match newArrayOpt with
+        | ValueSome newArray -> animUpdates.Add(struct (entityId, newArray))
+        | ValueNone -> () // Array was updated in-place, no storage update needed
+      else
+        removals.Add entityId
+
+    // Only update storage for entities that needed new arrays
+    for struct (entityId, newAnims) in animUpdates do
       stateWrite.UpdateActiveAnimations(entityId, newAnims)
-      stateWrite.UpdatePose(entityId, newPose)
+
+    for struct (entityId, poseDict) in newPoses do
+      stateWrite.UpdatePose(entityId, poseDict)
 
     for entityId in removals do
       stateWrite.RemoveAnimationState(entityId)

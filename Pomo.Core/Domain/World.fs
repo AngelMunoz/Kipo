@@ -6,6 +6,7 @@ open FSharp.Data.Adaptive
 open Microsoft.Xna.Framework
 open System.Collections.Generic
 open System.Collections.Concurrent
+open Pomo.Core
 open Pomo.Core.Domain.Units
 open Pomo.Core.Domain.Units
 open Pomo.Core.Domain.Item
@@ -98,8 +99,8 @@ module World =
     Rotations: Dictionary<Guid<EntityId>, float32>
     ModelConfigId: cmap<Guid<EntityId>, string>
     // Animation
-    Poses: cmap<Guid<EntityId>, HashMap<string, Matrix>>
-    ActiveAnimations: cmap<Guid<EntityId>, AnimationState IndexList>
+    Poses: Dictionary<Guid<EntityId>, Dictionary<string, Matrix>>
+    ActiveAnimations: Dictionary<Guid<EntityId>, AnimationState[]>
     // Orbitals
     ActiveOrbitals: cmap<Guid<EntityId>, Orbital.ActiveOrbital>
     ActiveCharges: cmap<Guid<EntityId>, ActiveCharge>
@@ -170,8 +171,11 @@ module World =
     abstract Rotations: IReadOnlyDictionary<Guid<EntityId>, float32>
     abstract ModelConfigId: amap<Guid<EntityId>, string>
 
-    abstract Poses: amap<Guid<EntityId>, HashMap<string, Matrix>>
-    abstract ActiveAnimations: amap<Guid<EntityId>, AnimationState IndexList>
+    abstract Poses:
+      IReadOnlyDictionary<Guid<EntityId>, Dictionary<string, Matrix>>
+
+    abstract ActiveAnimations:
+      IReadOnlyDictionary<Guid<EntityId>, AnimationState[]>
 
     // Orbitals
     abstract ActiveOrbitals: amap<Guid<EntityId>, Orbital.ActiveOrbital>
@@ -218,8 +222,8 @@ module World =
       EntityScenario = cmap()
       Rotations = Dictionary()
       ModelConfigId = cmap()
-      Poses = cmap()
-      ActiveAnimations = cmap()
+      Poses = Dictionary()
+      ActiveAnimations = Dictionary()
       ActiveOrbitals = cmap()
       ActiveCharges = cmap()
       VisualEffects = ResizeArray()
@@ -257,7 +261,9 @@ module World =
           member _.EntityScenario = mutableWorld.EntityScenario
           member _.Rotations = mutableWorld.Rotations
           member _.ModelConfigId = mutableWorld.ModelConfigId
+
           member _.Poses = mutableWorld.Poses
+
           member _.ActiveAnimations = mutableWorld.ActiveAnimations
           member _.ActiveOrbitals = mutableWorld.ActiveOrbitals
           member _.ActiveCharges = mutableWorld.ActiveCharges

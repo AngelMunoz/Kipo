@@ -24,7 +24,7 @@ module Dictionary =
   let inline filter
     ([<InlineIfLambda>] predicate: _ -> _ -> bool)
     (dict: IReadOnlyDictionary<_, _>)
-    =
+    : IReadOnlyDictionary<_, _> =
     let newd = Dictionary()
 
     for KeyValue(key, value) in dict do
@@ -36,7 +36,7 @@ module Dictionary =
   let inline chooseV
     ([<InlineIfLambda>] chooser: _ -> _ -> 'T voption)
     (dict: IReadOnlyDictionary<_, _>)
-    =
+    : IReadOnlyDictionary<_, _> =
     let newd = Dictionary()
 
     for KeyValue(key, value) in dict do
@@ -61,6 +61,17 @@ module Dictionary =
       d.Add(key, value)
 
     d
+
+  let inline mapValues
+    ([<InlineIfLambda>] mapping: _ -> _)
+    (dict: IReadOnlyDictionary<_, _>)
+    : IReadOnlyDictionary<_, _> =
+    let newd = Dictionary()
+
+    for KeyValue(key, value) in dict do
+      newd.Add(key, mapping value)
+
+    newd
 
   let empty() = Dictionary()
 
