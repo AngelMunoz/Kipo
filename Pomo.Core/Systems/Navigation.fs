@@ -47,7 +47,7 @@ module Navigation =
       let snapshot = projections.ComputeMovementSnapshot ctx.ScenarioId
 
       snapshot.Positions
-      |> HashMap.tryFindV entityId
+      |> Dictionary.tryFindV entityId
       |> ValueOption.map(fun pos -> struct (ctx, pos))
 
     let inline publishPath entityId path =

@@ -6,6 +6,7 @@ open FSharp.UMX
 open FSharp.Data.Adaptive
 open FSharp.Control.Reactive
 
+open Pomo.Core
 open Pomo.Core.Stores
 open Pomo.Core.Domain
 open Pomo.Core.EventBus
@@ -343,7 +344,7 @@ module AbilityActivation =
 
           handlePendingCast changeCtx.AbilityActivationContext {
             ValidationContext = validationContext
-            Positions = snapshot.Positions
+            Positions = snapshot.Positions |> Dictionary.toHashMap
             Skill = skill
             Target = target
           }
@@ -472,8 +473,8 @@ module AbilityActivation =
         =
         let casterPos =
           snapshot.Positions
-          |> HashMap.tryFind playerId
-          |> Option.defaultValue Vector2.Zero
+          |> Dictionary.tryFindV playerId
+          |> ValueOption.defaultValue Vector2.Zero
 
         core.EventBus.Publish(
           GameEvent.Notification(

@@ -8,6 +8,7 @@ open Microsoft.Xna.Framework.Content
 open Microsoft.Xna.Framework.Graphics
 open FSharp.UMX
 open FSharp.Data.Adaptive
+open Pomo.Core
 open Pomo.Core.Domain.Units
 open Pomo.Core.Domain.Particles
 open Pomo.Core.Graphics
@@ -47,13 +48,13 @@ module ParticleEmitter =
 
   let inline private computeEffectPosition
     (owner: Guid<EntityId> voption)
-    (positions: HashMap<Guid<EntityId>, Vector2>)
+    (positions: IReadOnlyDictionary<Guid<EntityId>, Vector2>)
     (fallbackPos: Vector3)
     =
     match owner with
     | ValueSome ownerId ->
       positions
-      |> HashMap.tryFindV ownerId
+      |> Dictionary.tryFindV ownerId
       |> ValueOption.map(fun p -> Vector3(p.X, 0.0f, p.Y))
       |> ValueOption.defaultValue fallbackPos
     | ValueNone -> fallbackPos

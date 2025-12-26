@@ -31,7 +31,7 @@ type EntityRenderData = {
 type ParticleRenderData = {
   GetTexture: string -> Texture2D voption
   GetModelByAsset: string -> Model voption
-  EntityPositions: HashMap<Guid<EntityId>, Vector2>
+  EntityPositions: IReadOnlyDictionary<Guid<EntityId>, Vector2>
   SquishFactor: float32
   ModelScale: float32
   FallbackTexture: Texture2D

@@ -5,6 +5,7 @@ open Microsoft.Xna.Framework
 open FSharp.UMX
 open FSharp.Data.Adaptive
 
+open Pomo.Core
 open Pomo.Core.Domain.Units
 open Pomo.Core.Domain.World
 open Pomo.Core.Domain.Events
@@ -46,6 +47,7 @@ module PlayerMovement =
 
   open Pomo.Core.Environment
   open Pomo.Core.Environment.Patterns
+  open System.Collections.Generic
 
   type PlayerMovementSystem
     (game: Game, env: PomoEnvironment, playerId: Guid<EntityId>) =
@@ -110,10 +112,10 @@ module PlayerMovement =
           gameplay.Projections.ComputeMovementSnapshot(scenarioId)
         | ValueNone ->
             {
-              Positions = HashMap.empty
-              SpatialGrid = HashMap.empty
-              Rotations = HashMap.empty
-              ModelConfigIds = HashMap.empty
+              Positions = Dictionary()
+              SpatialGrid = Dictionary()
+              Rotations = Dictionary()
+              ModelConfigIds = Dictionary()
             }
 
       // Process collisions
@@ -129,8 +131,8 @@ module PlayerMovement =
           ->
           let currentPos =
             snapshot.Positions
-            |> HashMap.tryFind playerId
-            |> Option.defaultValue Vector2.Zero
+            |> Dictionary.tryFindV playerId
+            |> ValueOption.defaultValue Vector2.Zero
 
           accumulatedMtv <- accumulatedMtv + mtv
         | _ -> ()
@@ -155,8 +157,8 @@ module PlayerMovement =
 
         let position =
           snapshot.Positions
-          |> HashMap.tryFind playerId
-          |> Option.defaultValue Vector2.Zero
+          |> Dictionary.tryFindV playerId
+          |> ValueOption.defaultValue Vector2.Zero
 
         let movementSpeed = movementSpeed |> AVal.force
 

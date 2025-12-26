@@ -1,6 +1,7 @@
 namespace Pomo.Core.Systems
 
 open System
+open System.Collections.Generic
 open Microsoft.Xna.Framework
 open FSharp.UMX
 open FSharp.Data.Adaptive
@@ -26,7 +27,7 @@ module Combat =
     Cooldowns: HashMap<Guid<EntityId>, HashMap<int<SkillId>, TimeSpan>>
     Resources: HashMap<Guid<EntityId>, Entity.Resource>
     DerivedStats: HashMap<Guid<EntityId>, Entity.DerivedStats>
-    Positions: HashMap<Guid<EntityId>, Vector2>
+    Positions: IReadOnlyDictionary<Guid<EntityId>, Vector2>
   }
 
   type WorldContext = {
@@ -46,7 +47,7 @@ module Combat =
 
     let inline getPosition (ctx: EntityContext) (entityId: Guid<EntityId>) =
       ctx.Positions
-      |> HashMap.tryFindV entityId
+      |> Dictionary.tryFindV entityId
       |> ValueOption.defaultValue Vector2.Zero
 
     let resolveCircle

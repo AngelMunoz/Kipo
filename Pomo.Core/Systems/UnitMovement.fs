@@ -4,11 +4,12 @@ open System
 open Microsoft.Xna.Framework
 open FSharp.UMX
 open FSharp.Data.Adaptive
+open Pomo.Core
 open Pomo.Core.Domain.Units
 open Pomo.Core.Domain.World
 open Pomo.Core.Domain.Events
 open Pomo.Core.Systems.Systems
-open Pomo.Core.Domain.Core // For Constants.AI.WaypointReachedThreshold
+open Pomo.Core.Domain.Core
 open Pomo.Core.Algorithms
 open Pomo.Core.Systems
 
@@ -88,9 +89,9 @@ module UnitMovement =
 
         // Process movement for entities in this scenario
         let positions =
-          snapshot.Positions |> HashMap.filter(fun id _ -> id <> playerId)
+          snapshot.Positions |> Dictionary.filter(fun id _ -> id <> playerId)
 
-        for (entityId, currentPos) in positions do
+        for KeyValue(entityId, currentPos) in positions do
           match movementStates.TryFindV entityId with
           | ValueSome state ->
             let speed =
@@ -148,7 +149,7 @@ module UnitMovement =
             let snapshot =
               gameplay.Projections.ComputeMovementSnapshot(scenarioId)
 
-            match snapshot.Positions.TryFindV eId with
+            match snapshot.Positions |> Dictionary.tryFindV eId with
             | ValueSome currentPos ->
 
               match frameCollisions.TryGetValue eId with
@@ -163,9 +164,9 @@ module UnitMovement =
         let snapshot = gameplay.Projections.ComputeMovementSnapshot(scenarioId)
 
         let positions =
-          snapshot.Positions |> HashMap.filter(fun id _ -> id <> playerId)
+          snapshot.Positions |> Dictionary.filter(fun id _ -> id <> playerId)
 
-        for (entityId, currentPos) in positions do
+        for KeyValue(entityId, currentPos) in positions do
           match movementStates.TryFindV entityId with
           | ValueSome state ->
             let speed =

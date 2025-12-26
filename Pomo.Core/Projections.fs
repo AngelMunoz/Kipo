@@ -294,21 +294,22 @@ module Projections =
       set |> ValueOption.bind(fun set -> sets |> HashMap.tryFindV set))
 
 
-
   [<Struct>]
   type MovementSnapshot = {
-    Positions: HashMap<Guid<EntityId>, Vector2>
-    SpatialGrid: HashMap<GridCell, IndexList<Guid<EntityId>>>
-    Rotations: HashMap<Guid<EntityId>, float32>
-    ModelConfigIds: HashMap<Guid<EntityId>, string>
+    Positions: IReadOnlyDictionary<Guid<EntityId>, Vector2>
+    SpatialGrid: IReadOnlyDictionary<GridCell, Guid<EntityId>[]>
+    Rotations: IReadOnlyDictionary<Guid<EntityId>, float32>
+    ModelConfigIds: IReadOnlyDictionary<Guid<EntityId>, string>
   } with
 
     static member Empty = {
-      Positions = HashMap.empty
-      SpatialGrid = HashMap.empty
-      Rotations = HashMap.empty
-      ModelConfigIds = HashMap.empty
+      Positions = Dictionary() :> IReadOnlyDictionary<_, _>
+      SpatialGrid = Dictionary() :> IReadOnlyDictionary<_, _>
+      Rotations = Dictionary() :> IReadOnlyDictionary<_, _>
+      ModelConfigIds = Dictionary() :> IReadOnlyDictionary<_, _>
     }
+
+
 
   [<Struct>]
   type EntityScenarioContext = {
@@ -359,10 +360,12 @@ module Projections =
     (scenarioId: Guid<ScenarioId>)
     =
     let dt = float32 time.TotalSeconds
-    let mutable newPositions = HashMap.empty
-    let mutable newGrid = HashMap.empty
-    let mutable newRotations = HashMap.empty
-    let mutable newModelConfigIds = HashMap.empty
+
+    // Phase 3: Use mutable builders instead of immutable HashMap.add loops
+    let positionsBuilder = Dictionary<Guid<EntityId>, Vector2>()
+    let rotationsBuilder = Dictionary<Guid<EntityId>, float32>()
+    let modelConfigBuilder = Dictionary<Guid<EntityId>, string>()
+    let gridBuilder = Dictionary<GridCell, ResizeArray<Guid<EntityId>>>()
 
     for (id, startPos) in positions do
       match entityScenarios |> HashMap.tryFindV id with
@@ -373,7 +376,7 @@ module Projections =
           | ValueSome v -> startPos + (v * dt)
           | ValueNone -> startPos
 
-        newPositions <- newPositions |> HashMap.add id currentPos
+        positionsBuilder[id] <- currentPos
 
         // Calculate Rotation (Derived from Velocity if moving, else keep existing)
         let rotation =
@@ -382,32 +385,34 @@ module Projections =
             float32(Math.Atan2(float v.X, float v.Y))
           | _ -> rotations |> HashMap.tryFind id |> Option.defaultValue 0.0f
 
-        newRotations <- newRotations |> HashMap.add id rotation
+        rotationsBuilder[id] <- rotation
 
         // Model Config
         match modelConfigIds |> HashMap.tryFindV id with
-        | ValueSome configId ->
-          newModelConfigIds <- newModelConfigIds |> HashMap.add id configId
+        | ValueSome configId -> modelConfigBuilder[id] <- configId
         | ValueNone -> ()
 
-        // Calculate Grid
+        // Calculate Grid Cell
         let cell =
           Spatial.getGridCell Core.Constants.Collision.GridCellSize currentPos
 
-        // Add to Grid
-        let cellContent =
-          match newGrid |> HashMap.tryFindV cell with
-          | ValueSome list -> list
-          | ValueNone -> IndexList.empty
-
-        newGrid <- newGrid |> HashMap.add cell (cellContent |> IndexList.add id)
+        // Add to Grid (O(1) amortized with ResizeArray)
+        match gridBuilder |> Dictionary.tryFindV cell with
+        | ValueSome list -> list.Add id
+        | ValueNone -> gridBuilder[cell] <- ResizeArray([| id |])
       | _ -> ()
 
+    // Return dictionaries directly as IReadOnlyDictionary (no conversion cost)
+    let spatialGrid = Dictionary<GridCell, Guid<EntityId>[]>()
+
+    for kv in gridBuilder do
+      spatialGrid[kv.Key] <- kv.Value.ToArray()
+
     {
-      Positions = newPositions
-      SpatialGrid = newGrid
-      Rotations = newRotations
-      ModelConfigIds = newModelConfigIds
+      Positions = positionsBuilder
+      SpatialGrid = spatialGrid
+      Rotations = rotationsBuilder
+      ModelConfigIds = modelConfigBuilder
     }
 
   let private entityScenarioContexts(world: World) =
@@ -452,6 +457,7 @@ module Projections =
   let create(itemStore: ItemStore, modelStore: ModelStore, world: World) =
     let derivedStats = calculateDerivedStats itemStore world
 
+
     { new ProjectionService with
         member _.LiveEntities = liveEntities world
         member _.CombatStatuses = calculateCombatStatuses world
@@ -493,18 +499,17 @@ module Projections =
           let potentialTargets =
             cells
             |> IndexList.collect(fun cell ->
-              match snapshot.SpatialGrid |> HashMap.tryFindV cell with
-              | ValueSome list -> list
-              | ValueNone -> IndexList.empty)
+              match snapshot.SpatialGrid.TryGetValue cell with
+              | true, list -> IndexList.ofArray list
+              | false, _ -> IndexList.empty)
 
           potentialTargets
           |> IndexList.choose(fun entityId ->
-            // Filter out non-live entities (projectiles, dead entities, etc.)
             if not(liveEntities.Contains entityId) then
               None
             else
-              match snapshot.Positions |> HashMap.tryFindV entityId with
-              | ValueSome pos when Vector2.Distance(pos, center) <= radius ->
+              match snapshot.Positions.TryGetValue entityId with
+              | true, pos when Vector2.Distance(pos, center) <= radius ->
                 Some struct (entityId, pos)
               | _ -> None)
     }

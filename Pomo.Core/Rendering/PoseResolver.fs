@@ -28,12 +28,12 @@ module PoseResolver =
 
   /// Gets entity facing from rotations
   let inline private getEntityFacing
-    (rotations: HashMap<Guid<EntityId>, float32>)
+    (rotations: IReadOnlyDictionary<Guid<EntityId>, float32>)
     (entityId: Guid<EntityId>)
     =
-    match rotations |> HashMap.tryFindV entityId with
-    | ValueSome r -> r
-    | ValueNone -> 0.0f
+    match rotations.TryGetValue entityId with
+    | true, r -> r
+    | false, _ -> 0.0f
 
   /// Gets entity pose or empty
   let inline private getEntityPose
@@ -135,9 +135,9 @@ module PoseResolver =
     (logicPos: Vector2)
     : ResolvedEntity voption =
 
-    match snapshot.ModelConfigIds |> HashMap.tryFindV entityId with
-    | ValueNone -> ValueNone
-    | ValueSome configId ->
+    match snapshot.ModelConfigIds.TryGetValue entityId with
+    | false, _ -> ValueNone
+    | true, configId ->
       match data.ModelStore.tryFind configId with
       | ValueNone -> ValueNone
       | ValueSome config ->
@@ -200,12 +200,13 @@ module PoseResolver =
     (nodeTransformsPool: Dictionary<string, Matrix>)
     : ResolvedEntity[] =
     // Pre-allocate output buffer based on entity count
-    let estimatedCount = HashMap.count snapshot.Positions
+    let estimatedCount = snapshot.Positions.Count
     let results = ResizeArray<ResolvedEntity>(estimatedCount)
-    let nodesBuffer = ResizeArray<ResolvedRigNode>(16) // Typical rig has ~10 nodes
+    let nodesBuffer = ResizeArray<ResolvedRigNode>(16)
 
-    // Direct iteration over positions - no HashMap.toArray
-    for entityId, logicPos in snapshot.Positions do
+    for kv in snapshot.Positions do
+      let entityId = kv.Key
+      let logicPos = kv.Value
 
       resolveEntity
         core
