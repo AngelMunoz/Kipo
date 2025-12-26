@@ -18,7 +18,7 @@ open Pomo.Core.Domain.Particles
 open Pomo.Core.Graphics
 open Pomo.Core.Rendering
 
-module RenderOrchestratorV2 =
+module RenderOrchestrator =
 
   type RenderResources = {
     GraphicsDevice: GraphicsDevice

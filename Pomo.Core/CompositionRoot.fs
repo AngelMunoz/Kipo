@@ -364,7 +364,7 @@ module CompositionRoot =
 
         // Recreate Renderers with new map key
         let renderOrchestrator =
-          RenderOrchestratorV2.create(
+          RenderOrchestrator.create(
             game,
             pomoEnv,
             newMapKey,
