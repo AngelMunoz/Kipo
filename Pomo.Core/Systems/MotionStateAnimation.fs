@@ -65,7 +65,7 @@ type MotionStateAnimationSystem(game: Game, env: PomoEnvironment) =
 
   override this.Update(gameTime) =
     // Force world data directly - no reactive projection
-    let velocities = core.World.Velocities |> Dictionary.toHashMap
+    let velocities = core.World.Velocities
     let activeAnimations = core.World.ActiveAnimations
     let resources = core.World.Resources |> AMap.force
     let modelConfigIds = core.World.ModelConfigId |> AMap.force
@@ -82,8 +82,8 @@ type MotionStateAnimationSystem(game: Game, env: PomoEnvironment) =
         // Get velocity and animations
         let velocity =
           velocities
-          |> HashMap.tryFind entityId
-          |> Option.defaultValue Vector2.Zero
+          |> Dictionary.tryFindV entityId
+          |> ValueOption.defaultValue Vector2.Zero
 
         let currentAnims =
           activeAnimations

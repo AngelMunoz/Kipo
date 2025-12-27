@@ -266,7 +266,7 @@ module Properties =
   let ``getBillboardVectors returns orthogonal vectors``() =
     let ppu = Vector2(32.0f, 16.0f)
     let view = RenderMath.Camera.getViewMatrix Vector2.Zero ppu
-    let struct (right, up) = RenderMath.Billboard.getVectors view
+    let struct (right, up) = RenderMath.Billboard.getVectors &view
     // Right and Up should be orthogonal (dot product = 0)
     let dot = Vector3.Dot(right, up)
     abs(dot) < 0.0001f

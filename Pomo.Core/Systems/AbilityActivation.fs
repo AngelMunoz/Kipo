@@ -190,7 +190,8 @@ module AbilityActivation =
   [<Struct>]
   type PendingCastExecutionParams = {
     ValidationContext: ValidationContext
-    Positions: HashMap<Guid<EntityId>, Vector2>
+    Positions:
+      System.Collections.Generic.IReadOnlyDictionary<Guid<EntityId>, Vector2>
     Skill: ActiveSkill
     Target: SystemCommunications.SkillTarget
   }
@@ -222,7 +223,7 @@ module AbilityActivation =
       =
       let casterId = args.ValidationContext.EntityId
 
-      let casterPos = args.Positions.TryFindV casterId
+      let casterPos = args.Positions |> Dictionary.tryFindV casterId
 
       match casterPos with
       | ValueNone -> () // Caster has no position, should not happen
@@ -252,7 +253,9 @@ module AbilityActivation =
           let centerTargetPos =
             match args.Target with
             | SystemCommunications.TargetEntity targetId ->
-              args.Positions.TryFindV targetId
+              match args.Positions |> Dictionary.tryFindV targetId with
+              | ValueSome pos -> ValueSome pos
+              | ValueNone -> ValueNone
             | SystemCommunications.TargetPosition pos -> ValueSome pos
             | _ -> ValueNone // Should not happen for pending casts
 
@@ -344,7 +347,7 @@ module AbilityActivation =
 
           handlePendingCast changeCtx.AbilityActivationContext {
             ValidationContext = validationContext
-            Positions = snapshot.Positions |> Dictionary.toHashMap
+            Positions = snapshot.Positions
             Skill = skill
             Target = target
           }

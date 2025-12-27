@@ -43,17 +43,23 @@ module Projectile =
     (originPos: Vector2)
     (maxRange: float32)
     =
-    world.Positions
-    |> Dictionary.toArrayV
-    |> Array.filter(fun struct (id, _) ->
-      world.LiveEntities.Contains id && id <> casterId && id <> currentTargetId)
-    |> Array.chooseV(fun struct (id, pos) ->
-      let distance = Vector2.DistanceSquared(originPos, pos)
+    // Pre-size to reasonable capacity for chaining (typically 5-10 potential targets)
+    let candidates = ResizeArray<struct (Guid<EntityId> * float32)>(10)
+    let maxRangeSq = maxRange * maxRange
 
-      if distance <= maxRange * maxRange then
-        ValueSome struct (id, distance)
-      else
-        ValueNone)
+    // Single-pass iteration: filter and map in one step
+    for KeyValue(id, pos) in world.Positions do
+      if
+        world.LiveEntities.Contains id
+        && id <> casterId
+        && id <> currentTargetId
+      then
+        let distanceSq = Vector2.DistanceSquared(originPos, pos)
+
+        if distanceSq <= maxRangeSq then
+          candidates.Add(struct (id, distanceSq))
+
+    candidates.ToArray()
 
   /// Creates an impact event record for when a projectile reaches its target.
   let inline private makeImpact
