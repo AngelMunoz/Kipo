@@ -1,40 +1,42 @@
 module CommandQueueTests
 
-open Xunit
-open FsCheck.Xunit
+open Microsoft.VisualStudio.TestTools.UnitTesting
 open Pomo.Core.Graphics
+open FsCheck
+open FsCheck.FSharp
 
 // ============================================================================
 // Integration Tests for ICommandQueue
 // ============================================================================
 
-module Integration =
+[<TestClass>]
+type IntegrationTests() =
 
-  [<Fact>]
-  let ``create returns working queue``() =
+  [<TestMethod>]
+  member _.``create returns working queue``() =
     use queue = CommandQueue.create<int> 16
-    Assert.Equal(0, queue.Count)
+    Assert.AreEqual(0, queue.Count)
 
-  [<Fact>]
-  let ``add and count work together``() =
+  [<TestMethod>]
+  member _.``add and count work together``() =
     use queue = CommandQueue.create<int> 16
     let item1 = 10
     let item2 = 20
     queue.Add(&item1)
     queue.Add(&item2)
-    Assert.Equal(2, queue.Count)
+    Assert.AreEqual(2, queue.Count)
 
-  [<Fact>]
-  let ``clear resets count``() =
+  [<TestMethod>]
+  member _.``clear resets count``() =
     use queue = CommandQueue.create<int> 16
     let item = 42
     queue.Add(&item)
     queue.Add(&item)
     queue.Clear()
-    Assert.Equal(0, queue.Count)
+    Assert.AreEqual(0, queue.Count)
 
-  [<Fact>]
-  let ``iterate visits all items``() =
+  [<TestMethod>]
+  member _.``iterate visits all items``() =
     use queue = CommandQueue.create<int> 16
     let item1 = 10
     let item2 = 20
@@ -46,10 +48,10 @@ module Integration =
     let mutable sum = 0
     queue.Iterate(fun x -> sum <- sum + x)
 
-    Assert.Equal(60, sum)
+    Assert.AreEqual(60, sum)
 
-  [<Fact>]
-  let ``module iter works with inline lambda``() =
+  [<TestMethod>]
+  member _.``module iter works with inline lambda``() =
     use queue = CommandQueue.create<int> 16
     let item1 = 5
     let item2 = 15
@@ -59,10 +61,10 @@ module Integration =
     let mutable sum = 0
     CommandQueue.iter (fun x -> sum <- sum + x) queue
 
-    Assert.Equal(20, sum)
+    Assert.AreEqual(20, sum)
 
-  [<Fact>]
-  let ``AsReadOnlySpan returns correct slice``() =
+  [<TestMethod>]
+  member _.``AsReadOnlySpan returns correct slice``() =
     use queue = CommandQueue.create<int> 16
     let item1 = 100
     let item2 = 200
@@ -71,12 +73,12 @@ module Integration =
 
     let span = queue.AsReadOnlySpan()
 
-    Assert.Equal(2, span.Length)
-    Assert.Equal(100, span.[0])
-    Assert.Equal(200, span.[1])
+    Assert.AreEqual(2, span.Length)
+    Assert.AreEqual(100, span.[0])
+    Assert.AreEqual(200, span.[1])
 
-  [<Fact>]
-  let ``sort orders items``() =
+  [<TestMethod>]
+  member _.``sort orders items``() =
     use queue = CommandQueue.create<int> 16
     let item1 = 30
     let item2 = 10
@@ -88,64 +90,73 @@ module Integration =
     queue.Sort(System.Collections.Generic.Comparer<int>.Default)
 
     let span = queue.AsReadOnlySpan()
-    Assert.Equal(10, span.[0])
-    Assert.Equal(20, span.[1])
-    Assert.Equal(30, span.[2])
+    Assert.AreEqual(10, span.[0])
+    Assert.AreEqual(20, span.[1])
+    Assert.AreEqual(30, span.[2])
 
-  [<Fact>]
-  let ``buffer grows when capacity exceeded``() =
+  [<TestMethod>]
+  member _.``buffer grows when capacity exceeded``() =
     use queue = CommandQueue.create<int> 2
 
     for i in 1..10 do
       let mutable item = i
       queue.Add(&item)
 
-    Assert.Equal(10, queue.Count)
+    Assert.AreEqual(10, queue.Count)
 
 // ============================================================================
 // Property-Based Tests
 // ============================================================================
 
-module Properties =
+[<TestClass>]
+type PropertyTests() =
 
-  [<Property>]
-  let ``count always equals number of adds``(items: int list) =
-    if items.Length > 0 && items.Length < 1000 then
-      use queue = CommandQueue.create<int> 16
+  let intListArb = Arb.list(Arb.fromGen(Gen.choose(-1000, 1000)))
 
-      for item in items do
-        let mutable i = item
-        queue.Add(&i)
+  [<TestMethod>]
+  member _.``count always equals number of adds``() =
+    Prop.forAll intListArb (fun items ->
+      if items.Length > 0 && items.Length < 1000 then
+        use queue = CommandQueue.create<int> 16
 
-      queue.Count = items.Length
-    else
-      true // skip edge cases
+        for item in items do
+          let mutable i = item
+          queue.Add(&i)
 
-  [<Property>]
-  let ``iterate sum equals list sum``(items: int list) =
-    if items.Length > 0 && items.Length < 1000 then
-      use queue = CommandQueue.create<int> 16
+        queue.Count = items.Length
+      else
+        true)
+    |> Check.QuickThrowOnFailure
 
-      for item in items do
-        let mutable i = item
-        queue.Add(&i)
+  [<TestMethod>]
+  member _.``iterate sum equals list sum``() =
+    Prop.forAll intListArb (fun items ->
+      if items.Length > 0 && items.Length < 1000 then
+        use queue = CommandQueue.create<int> 16
 
-      let mutable sum = 0
-      queue.Iterate(fun x -> sum <- sum + x)
-      sum = List.sum items
-    else
-      true
+        for item in items do
+          let mutable i = item
+          queue.Add(&i)
 
-  [<Property>]
-  let ``clear always results in zero count``(items: int list) =
-    if items.Length > 0 && items.Length < 1000 then
-      use queue = CommandQueue.create<int> 16
+        let mutable sum = 0
+        queue.Iterate(fun x -> sum <- sum + x)
+        sum = List.sum items
+      else
+        true)
+    |> Check.QuickThrowOnFailure
 
-      for item in items do
-        let mutable i = item
-        queue.Add(&i)
+  [<TestMethod>]
+  member _.``clear always results in zero count``() =
+    Prop.forAll intListArb (fun items ->
+      if items.Length > 0 && items.Length < 1000 then
+        use queue = CommandQueue.create<int> 16
 
-      queue.Clear()
-      queue.Count = 0
-    else
-      true
+        for item in items do
+          let mutable i = item
+          queue.Add(&i)
+
+        queue.Clear()
+        queue.Count = 0
+      else
+        true)
+    |> Check.QuickThrowOnFailure
