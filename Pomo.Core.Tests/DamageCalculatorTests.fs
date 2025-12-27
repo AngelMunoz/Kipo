@@ -356,11 +356,11 @@ type PropertyTests() =
           not result.IsEvaded)
 
       abs(actualHitRate - expectedHitChance) < 0.1
-      |> Prop.classify (expectedHitChance < 0.2) "low chance (<20%)"
+      |> Prop.classify (expectedHitChance <= 0.20) "low chance (<=20%)"
       |> Prop.classify
-        (expectedHitChance >= 0.2 && expectedHitChance < 0.8)
+        (expectedHitChance > 0.20 && expectedHitChance < 0.80)
         "medium chance (20-80%)"
-      |> Prop.classify (expectedHitChance >= 0.8) "high chance (>80%)"
+      |> Prop.classify (expectedHitChance >= 0.80) "high chance (>=80%)"
       |> Prop.collect(sprintf "expected %.0f%%" (expectedHitChance * 100.0)))
     |> Check.VerboseThrowOnFailure
 
