@@ -493,12 +493,8 @@ module Projections =
     })
 
   let create
-    (
-      itemStore: ItemStore,
-      modelStore: ModelStore,
-      world: World,
-      physicsCache: PhysicsCache.IService
-    ) =
+    (itemStore: ItemStore, world: World, physicsCache: PhysicsCache.IService)
+    =
     let derivedStats = calculateDerivedStats itemStore world
 
 

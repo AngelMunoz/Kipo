@@ -154,7 +154,8 @@ type PropertyTests() =
       let altB = 10.0f
       let resultA = RenderMath.LogicRender.toRender logicPos altA ppu
       let resultB = RenderMath.LogicRender.toRender logicPos altB ppu
-      abs(resultB.Y - resultA.Y - 10.0f) < 0.0001f)
+      // Use larger tolerance for float32 precision with large zBase values
+      abs(resultB.Y - resultA.Y - 10.0f) < 0.01f)
     |> Check.QuickThrowOnFailure
 
   [<TestMethod>]

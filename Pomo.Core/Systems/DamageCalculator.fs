@@ -43,9 +43,9 @@ module DamageCalculator =
       let effectiveAttacker = max 0.0 attackerValue
       let effectiveDefender = max 0.0 defenderValue
       let statAdvantage = effectiveAttacker - effectiveDefender
-      let divisor = 100.0
+      let divisor = 200.0
       let chance = baseHitChance + statAdvantage / divisor
-      max 0.05 (min 0.95 chance)
+      max 0.20 (min 0.80 chance)
 
   let calculateEffectDamage
     (attackerStats: DerivedStats)
