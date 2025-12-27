@@ -1186,3 +1186,17 @@ module HUDComponents =
     |> W.mapPositions positions
     |> W.bindMapFactions factMap
     |> W.bindViewBounds viewBounds
+
+  /// Create a full-screen loading overlay that covers the entire UI
+  let createLoadingOverlay(config: HUDConfig aval) =
+    let label =
+      Label.create "Loading..."
+      |> W.textColor Color.White
+      |> W.hAlign HorizontalAlignment.Center
+      |> W.vAlign VerticalAlignment.Center
+
+    Panel.create()
+    |> W.hAlign HorizontalAlignment.Stretch
+    |> W.vAlign VerticalAlignment.Stretch
+    |> W.bindBackground(config |> AVal.map _.Theme.TooltipBackground)
+    |> W.childrenP [ label ]

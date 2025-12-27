@@ -27,6 +27,7 @@ module HUDService =
   let create(contentPath: string) : IHUDService =
     let initialConfig = loadConfig contentPath
     let config = cval initialConfig
+    let loadingOverlayVisible = cval false
 
     { new IHUDService with
         member _.Config = config :> HUDConfig aval
@@ -93,4 +94,12 @@ module HUDService =
           | HUDPanelId.CharacterSheet -> cfg.Layout.CharacterSheet.Visible
           | HUDPanelId.EquipmentPanel -> cfg.Layout.EquipmentPanel.Visible
           | HUDPanelId.MiniMap -> cfg.Layout.MiniMap.Visible
+
+        member _.LoadingOverlayVisible = loadingOverlayVisible :> bool aval
+
+        member _.ShowLoadingOverlay() =
+          transact(fun () -> loadingOverlayVisible.Value <- true)
+
+        member _.HideLoadingOverlay() =
+          transact(fun () -> loadingOverlayVisible.Value <- false)
     }

@@ -35,6 +35,13 @@ module W =
   open Pomo.Core.Domain.Entity
   open Myra.Graphics2D.Brushes
 
+  let inline background<'T when 'T: (member set_Background: Color -> unit)>
+    (value: Color)
+    (w: 'T)
+    =
+    w.set_Background(value)
+    w
+
   let inline width<'T when 'T: (member set_Width: Nullable<int> -> unit)>
     (value: int)
     (w: 'T)

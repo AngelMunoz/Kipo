@@ -18,7 +18,7 @@ open Pomo.Core.EventBus
 open Pomo.Core.Stores
 open Pomo.Core.Domain.Core
 open Pomo.Core.Domain.Action
-open Pomo.Core.Systems.UIService // Required for GuiAction
+open Pomo.Core.Systems.UIService
 open Pomo.Core.Environment
 open Pomo.Core.UI
 
@@ -91,7 +91,6 @@ module GameplayUI =
     let resources = core.World.Resources
     let derivedStats = gameplay.Projections.DerivedStats
 
-    // --- Fixed top panel (always visible) ---
     let topPanel =
       HStack.create()
       |> W.hAlign HorizontalAlignment.Right
@@ -105,7 +104,6 @@ module GameplayUI =
 
     topPanel.Widgets.Add(backButton)
 
-    // --- Prepare data sources ---
     let resourceZero: Entity.Resource = {
       HP = 0
       MP = 0
@@ -209,10 +207,8 @@ module GameplayUI =
       |> AVal.map(fun _ ->
         gameplay.CameraService.GetCamera(playerId) |> ValueOption.toOption)
 
-    // Target frame placeholder (deferred - always ValueNone for now)
     let selectedEntityId = AVal.constant ValueNone
 
-    // --- Create HUD components (unconditionally) ---
     let playerVitals =
       HUDComponents.createPlayerVitals
         config
@@ -280,17 +276,15 @@ module GameplayUI =
         core.World.ItemInstances
         stores.ItemStore
 
-    // --- Build reactive children list based on layout visibility ---
+    let loadingOverlay = HUDComponents.createLoadingOverlay config
+
     let layout = config |> AVal.map _.Layout
 
     let hudChildren =
-      layout
-      |> AVal.map(fun l -> [
-        // Combat indicator first (rendered behind everything else)
+      (layout, hudService.LoadingOverlayVisible)
+      ||> AVal.map2(fun l overlayVisible -> [
         combatIndicator :> Widget
-
-        // Top panel
-        topPanel :> Widget
+        topPanel
 
         if l.PlayerVitals.Visible then
           applyLayout l.PlayerVitals playerVitals
@@ -315,6 +309,9 @@ module GameplayUI =
 
         if l.EquipmentPanel.Visible then
           applyLayout l.EquipmentPanel equipmentPanel
+
+        if overlayVisible then
+          loadingOverlay
       ])
 
     panel |> Panel.bindChildren hudChildren |> ignore

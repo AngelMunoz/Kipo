@@ -201,6 +201,24 @@ module JsonFileLoader =
     with ex ->
       Error $"Failed to load file '{filePath}': {ex.Message}"
 
+  /// Generic JSON loader for arbitrary types with custom decoder
+  let readJson<'T>
+    (deserializer: JDeckDeserializer)
+    (decoder: JDeck.Decoder<'T>)
+    (filePath: string)
+    : Result<'T, string> =
+    try
+      let json =
+        Path.Combine(AppContext.BaseDirectory, filePath) |> File.ReadAllBytes
+
+      let doc = JsonDocument.Parse(json)
+
+      match decoder doc.RootElement with
+      | Ok result -> Ok result
+      | Error decodeError -> Error $"Deserialization error: {decodeError}"
+    with ex ->
+      Error $"Failed to load file '{filePath}': {ex.Message}"
+
 
 
 module Stores =

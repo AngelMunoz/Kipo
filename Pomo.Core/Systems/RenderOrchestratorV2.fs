@@ -17,6 +17,7 @@ open Pomo.Core.Domain.Units
 open Pomo.Core.Domain.Particles
 open Pomo.Core.Graphics
 open Pomo.Core.Rendering
+open Pomo.Core.AssetPreloader
 
 module RenderOrchestrator =
 
@@ -405,6 +406,17 @@ module RenderOrchestrator =
           // Use TerrainEmitter to load tile textures and pre-compute render indices
           let tileCache = TerrainEmitter.loadTileTextures game.Content map
           let layerIndices = TerrainEmitter.computeLayerRenderIndices map
+
+          let struct (totalAttempted, totalLoaded, totalFailed) =
+            AssetPreloader.preloadAssets
+              game.Content
+              modelCache
+              textureCache
+              mapKey
+              map
+              stores.ModelStore
+              stores.ParticleStore
+
 
           // Main-thread load queue and pending sets
           let loadQueue = ConcurrentQueue<(unit -> unit)>()

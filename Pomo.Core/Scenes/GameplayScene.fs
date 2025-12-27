@@ -254,6 +254,11 @@ module GameplayScene =
       MapSpawning.spawnEnemiesForScenario spawnCtx candidates publisher
 
     let loadMap (newMapKey: string) (targetSpawn: string voption) =
+      // Show loading overlay immediately
+      hudService.ShowLoadingOverlay()
+
+      let startTime = System.Diagnostics.Stopwatch.StartNew()
+
       mapDependentComponents.Clear()
       clearCurrentMapData()
 
@@ -264,7 +269,6 @@ module GameplayScene =
       let scenario: World.Scenario = { Id = scenarioId; Map = mapDef }
       mutableWorld.Scenarios[scenarioId] <- scenario
 
-      // Recreate Renderers with new map key
       let renderOrchestrator =
         RenderOrchestrator.create(
           game,
@@ -277,6 +281,14 @@ module GameplayScene =
       mapDependentComponents.Add(renderOrchestrator)
 
       spawnEntitiesForMap mapDef playerId scenarioId targetSpawn
+
+      let elapsed = startTime.Elapsed
+      let minDuration = AssetPreloader.Constants.MinLoadingOverlayDuration
+
+      if elapsed < minDuration then
+        System.Threading.Thread.Sleep(minDuration - elapsed)
+
+      hudService.HideLoadingOverlay()
 
     // UI for Gameplay (HUD)
     let mutable hudDesktop: Desktop voption = ValueNone

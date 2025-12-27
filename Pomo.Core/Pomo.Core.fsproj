@@ -18,6 +18,7 @@
     <Compile Include="Domain/Particles.fs" />
     <Compile Include="Domain/Item.fs" />
     <Compile Include="Domain/Map.fs" />
+    <Compile Include="Domain/AssetManifest.fs" />
     <Compile Include="Domain/Spatial.fs" />
     <Compile Include="Domain/Navigation.fs" />
     <Compile Include="Domain/AI.fs" />
@@ -73,6 +74,7 @@
     <Compile Include="Systems/Collision.fs" />
     <Compile Include="Systems/MapLoader.fs" />
     <Compile Include="Systems/CameraSystem.fs" />
+    <Compile Include="AssetPreloader.fs" />
     <Compile Include="Systems/RenderOrchestratorV2.fs" />
     <Compile Include="Systems/State.fs" />
     <Compile Include="Systems/Inventory.fs" />

@@ -1,0 +1,29 @@
+{
+  "MapKey": "Proto",
+  "Version": "1.0",
+  "Assets": {
+    "Models": [
+      "3d_models/kaykit_prototype/Dummy_Base",
+      "3d_models/kaykit_prototype/Dummy_Base_Dummy_Body",
+      "3d_models/kaykit_prototype/Dummy_Base_Dummy_Body_Dummy_Head",
+      "3d_models/kaykit_prototype/Dummy_Base_Dummy_Body_Dummy_ArmLeft",
+      "3d_models/kaykit_prototype/Dummy_Base_Dummy_Body_Dummy_ArmRight",
+      "3d_models/kaykit_prototype/Dummy_Base_Dummy_Body_Dummy_Target",
+      "3d_models/kaykit_prototype/Barrel_B",
+      "3d_models/kaykit_prototype/Coin_A",
+      "3d_models/kaykit_prototype/Primitive_Beam",
+      "3d_models/kaykit_prototype/Primitive_Cube_Small",
+      "3d_models/kaykit_prototype/Can_A"
+    ],
+    "Textures": [
+      "Particles/jellyfish0-masks/15",
+      "Particles/jellyfish0-masks/43",
+      "Particles/jellyfish0-masks/40",
+      "Particles/jellyfish0-masks/18",
+      "Particles/jellyfish0-masks/5",
+      "Particles/jellyfish0-masks/3",
+      "Particles/jellyfish0-masks/8"
+    ],
+    "Icons": []
+  }
+}

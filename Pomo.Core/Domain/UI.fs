@@ -236,10 +236,13 @@ module UI =
 
   type IHUDService =
     abstract Config: HUDConfig aval
+    abstract LoadingOverlayVisible: bool aval
     abstract GetFactionColor: Faction -> Color
     abstract TogglePanelVisible: HUDPanelId -> unit
     abstract SetPanelVisible: HUDPanelId -> bool -> unit
     abstract IsPanelVisible: HUDPanelId -> bool
+    abstract ShowLoadingOverlay: unit -> unit
+    abstract HideLoadingOverlay: unit -> unit
 
 
   module Serialization =
