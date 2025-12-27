@@ -2,7 +2,7 @@ module EmitterTests
 
 open System
 open System.Collections.Generic
-open Xunit
+open Microsoft.VisualStudio.TestTools.UnitTesting
 open Microsoft.Xna.Framework
 open Microsoft.Xna.Framework.Graphics
 open FSharp.UMX
@@ -41,16 +41,17 @@ let createRenderCore() : RenderCore = {
 // EntityEmitter Tests
 // ============================================================================
 
-module EntityEmitterTests =
+[<TestClass>]
+type EntityEmitterTests() =
 
-  [<Fact>]
-  let ``emit returns empty array for empty entities``() =
+  [<TestMethod>]
+  member _.``emit returns empty array for empty entities``() =
     let getModel _ = ValueNone
     let result = EntityEmitter.emit getModel Array.empty
-    Assert.Empty(result)
+    Assert.AreEqual(0, result.Length)
 
-  [<Fact>]
-  let ``emit returns commands for entities with valid models``() =
+  [<TestMethod>]
+  member _.``emit returns commands for entities with valid models``() =
     let model = fakeModel()
 
     let getModel(asset: string) =
@@ -69,10 +70,10 @@ module EntityEmitterTests =
     |]
 
     let result = EntityEmitter.emit getModel entities
-    Assert.Single(result) |> ignore
+    Assert.AreEqual(1, result.Length)
 
-  [<Fact>]
-  let ``emit filters out nodes with missing models``() =
+  [<TestMethod>]
+  member _.``emit filters out nodes with missing models``() =
     let model = fakeModel()
 
     let getModel(asset: string) =
@@ -99,10 +100,10 @@ module EntityEmitterTests =
     |]
 
     let result = EntityEmitter.emit getModel entities
-    Assert.Equal(2, result.Length)
+    Assert.AreEqual(2, result.Length)
 
-  [<Fact>]
-  let ``emit handles multiple entities``() =
+  [<TestMethod>]
+  member _.``emit handles multiple entities``() =
     let model = fakeModel()
     let getModel _ = ValueSome model
 
@@ -137,13 +138,14 @@ module EntityEmitterTests =
     |]
 
     let result = EntityEmitter.emit getModel entities
-    Assert.Equal(3, result.Length)
+    Assert.AreEqual(3, result.Length)
 
 // ============================================================================
 // TerrainEmitter Tests
 // ============================================================================
 
-module TerrainEmitterTests =
+[<TestClass>]
+type TerrainEmitterTests() =
 
   /// Creates a fake MapLayer with optional tiles
   let createLayer
@@ -167,8 +169,8 @@ module TerrainEmitterTests =
       Tiles = tiles
     }
 
-  [<Fact>]
-  let ``emitLayer returns empty for invisible layer``() =
+  [<TestMethod>]
+  member _.``emitLayer returns empty for invisible layer``() =
     let core = createRenderCore()
 
     let data: TerrainRenderData = {
@@ -204,16 +206,14 @@ module TerrainEmitterTests =
     let viewBounds = struct (-1000.0f, 1000.0f, -1000.0f, 1000.0f)
 
     let result = TerrainEmitter.emitLayer core data map layer viewBounds
-    Assert.Empty(result)
-
-    let result = TerrainEmitter.emitLayer core data map layer viewBounds
-    Assert.Empty(result)
+    Assert.AreEqual(0, result.Length)
 
 // ============================================================================
 // PoseResolver Tests
 // ============================================================================
 
-module PoseResolverTests =
+[<TestClass>]
+type PoseResolverTests() =
 
   /// Creates minimal EntityRenderData for testing
   let createEntityRenderData() : EntityRenderData =
@@ -264,18 +264,18 @@ module PoseResolverTests =
         entities |> List.map(fun (id, _, cfg) -> id, cfg) |> Dictionary.ofSeq
     }
 
-  [<Fact>]
-  let ``resolveAll returns empty for empty snapshot``() =
+  [<TestMethod>]
+  member _.``resolveAll returns empty for empty snapshot``() =
     let core = createRenderCore()
     let data = createEntityRenderData()
     let snapshot = MovementSnapshot.Empty
     let pool = Dictionary<string, Matrix>()
 
     let result = PoseResolver.resolveAll core data snapshot pool
-    Assert.Empty(result)
+    Assert.AreEqual(0, result.Length)
 
-  [<Fact>]
-  let ``resolveAll creates ResolvedEntity for valid entities``() =
+  [<TestMethod>]
+  member _.``resolveAll creates ResolvedEntity for valid entities``() =
     let core = createRenderCore()
     let data = createEntityRenderData()
     let entityId: Guid<EntityId> = %Guid.NewGuid()
@@ -286,11 +286,11 @@ module PoseResolverTests =
     let pool = Dictionary<string, Matrix>()
 
     let result = PoseResolver.resolveAll core data snapshot pool
-    Assert.Single(result) |> ignore
-    Assert.Equal(entityId, result.[0].EntityId)
+    Assert.AreEqual(1, result.Length)
+    Assert.AreEqual(entityId, result.[0].EntityId)
 
-  [<Fact>]
-  let ``resolveAll includes all rig nodes``() =
+  [<TestMethod>]
+  member _.``resolveAll includes all rig nodes``() =
     let modelStore =
       { new ModelStore with
           member _.find id = failwith "not found"
@@ -346,11 +346,11 @@ module PoseResolverTests =
     let pool = Dictionary<string, Matrix>()
 
     let result = PoseResolver.resolveAll core data snapshot pool
-    Assert.Single(result) |> ignore
-    Assert.Equal(3, result.[0].Nodes.Length)
+    Assert.AreEqual(1, result.Length)
+    Assert.AreEqual(3, result.[0].Nodes.Length)
 
-  [<Fact>]
-  let ``resolveAll skips entities with missing config``() =
+  [<TestMethod>]
+  member _.``resolveAll skips entities with missing config``() =
     let core = createRenderCore()
     let data = createEntityRenderData()
     let entityId: Guid<EntityId> = %Guid.NewGuid()
@@ -361,4 +361,4 @@ module PoseResolverTests =
     let pool = Dictionary<string, Matrix>()
 
     let result = PoseResolver.resolveAll core data snapshot pool
-    Assert.Empty(result)
+    Assert.AreEqual(0, result.Length)
