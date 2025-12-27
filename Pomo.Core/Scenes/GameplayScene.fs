@@ -66,12 +66,7 @@ module GameplayScene =
     let physicsCacheService = Projections.PhysicsCache.create worldView
 
     let projections =
-      Projections.create(
-        stores.ItemStore,
-        stores.ModelStore,
-        worldView,
-        physicsCacheService
-      )
+      Projections.create(stores.ItemStore, worldView, physicsCacheService)
 
     let cameraService =
       CameraSystem.create(
