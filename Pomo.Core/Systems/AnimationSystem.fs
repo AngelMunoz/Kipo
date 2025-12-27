@@ -1,6 +1,7 @@
 namespace Pomo.Core.Systems
 
 open System
+open System.Buffers
 open Microsoft.Xna.Framework
 open FSharp.Data.Adaptive
 open FSharp.UMX
@@ -82,8 +83,8 @@ module AnimationSystemLogic =
       ValueSome { animState with Time = newTime }
 
   /// Processes all active animations for a single entity, mutating the pose dictionary in-place.
-  /// Updates the animations array in-place if count matches, otherwise returns new array.
-  /// Returns: struct (updated:bool, newArrayNeeded:AnimationState[] voption)
+  /// Uses ArrayPool for temporary working array to avoid GC allocations, then returns the final array.
+  /// Returns: struct (updated:bool, newArray:AnimationState[] voption)
   let processEntityAnimationsInPlace
     (activeAnims: AnimationState[])
     (animationStore: AnimationStore)
@@ -92,42 +93,54 @@ module AnimationSystemLogic =
     : struct (bool * AnimationState[] voption) =
 
     poseDict.Clear()
+
+    // Rent from pool to avoid GC allocation for working array
+    let pool = ArrayPool<AnimationState>.Shared
+    let workingArray = pool.Rent(activeAnims.Length)
     let mutable writeIndex = 0
 
-    for i = 0 to activeAnims.Length - 1 do
-      let animState = activeAnims[i]
+    try
+      // Copy input to working array
+      System.Array.Copy(activeAnims, workingArray, activeAnims.Length)
 
-      match animationStore.tryFind animState.ClipId with
-      | ValueSome clip ->
-        match updateAnimationState animState clip gameTimeDelta with
-        | ValueSome newAnimState ->
-          for track in clip.Tracks do
-            let struct (rotation, position) =
-              evaluateTrack track newAnimState.Time clip.Duration clip.IsLooping
+      for i = 0 to activeAnims.Length - 1 do
+        let animState = workingArray[i]
 
-            let matrix =
-              Matrix.CreateFromQuaternion(rotation)
-              * Matrix.CreateTranslation(position)
+        match animationStore.tryFind animState.ClipId with
+        | ValueSome clip ->
+          match updateAnimationState animState clip gameTimeDelta with
+          | ValueSome newAnimState ->
+            for track in clip.Tracks do
+              let struct (rotation, position) =
+                evaluateTrack
+                  track
+                  newAnimState.Time
+                  clip.Duration
+                  clip.IsLooping
 
-            poseDict[track.NodeName] <- matrix
+              let matrix =
+                Matrix.CreateFromQuaternion(rotation)
+                * Matrix.CreateTranslation(position)
 
-          // Write back to array at current write position
-          activeAnims[writeIndex] <- newAnimState
-          writeIndex <- writeIndex + 1
+              poseDict[track.NodeName] <- matrix
+
+            // Write back to working array at current write position
+            workingArray[writeIndex] <- newAnimState
+            writeIndex <- writeIndex + 1
+          | ValueNone -> ()
         | ValueNone -> ()
-      | ValueNone -> ()
 
-    if writeIndex = 0 then
-      // All animations finished
-      struct (false, ValueNone)
-    elif writeIndex = activeAnims.Length then
-      // Same count - array was updated in-place, no new array needed
-      struct (true, ValueNone)
-    else
-      // Fewer animations - need to return a right-sized array
-      let newArray = Array.zeroCreate writeIndex
-      System.Array.Copy(activeAnims, newArray, writeIndex)
-      struct (true, ValueSome newArray)
+      if writeIndex = 0 then
+        // All animations finished
+        struct (false, ValueNone)
+      else
+        // Create final right-sized array for storage
+        let finalArray = Array.zeroCreate writeIndex
+        System.Array.Copy(workingArray, finalArray, writeIndex)
+        struct (true, ValueSome finalArray)
+    finally
+      // Always return to pool
+      pool.Return(workingArray, clearArray = false)
 
 type AnimationSystem(game: Game, env: PomoEnvironment) =
   inherit GameComponent(game)
@@ -168,9 +181,10 @@ type AnimationSystem(game: Game, env: PomoEnvironment) =
           gameTimeDelta
 
       if hasActiveAnims then
+        // Always update since we now always create a new array copy
         match newArrayOpt with
         | ValueSome newArray -> animUpdates.Add(struct (entityId, newArray))
-        | ValueNone -> () // Array was updated in-place, no storage update needed
+        | ValueNone -> () // Should not happen anymore, but handle gracefully
       else
         removals.Add entityId
 
