@@ -100,6 +100,7 @@ module CompositionRoot =
       let publishGuiAction(action: GuiAction) =
         match action with
         | GuiAction.StartNewGame ->
+          scope.HUDService.ShowLoadingOverlay()
           sceneTransitionSubject.OnNext(Scene.Gameplay("Lobby", ValueNone))
         | GuiAction.ExitGame -> game.Exit()
         | GuiAction.OpenSettings

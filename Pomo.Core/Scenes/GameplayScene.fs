@@ -338,7 +338,8 @@ module GameplayScene =
         | _ -> None)
       |> Observable.subscribe(fun event ->
         if event.EntityId = playerId then
-          // Trigger Scene Transition instead of local loadMap
+          hudService.ShowLoadingOverlay()
+
           sceneTransitionSubject.OnNext(
             Gameplay(event.TargetMap, ValueSome event.TargetSpawn)
           ))
