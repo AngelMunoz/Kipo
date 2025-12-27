@@ -1,6 +1,8 @@
 namespace Pomo.Core.Systems
 
 open System
+open System.Collections.Generic
+
 open FSharp.UMX
 open FSharp.Data.Adaptive
 open Microsoft.Xna.Framework
@@ -21,15 +23,16 @@ open Pomo.Core.Domain.Spatial
 open Systems
 
 /// Shared context and result types for AI system
+
 module AIContext =
 
   /// Snapshot of world state for AI decision making
   [<Struct>]
   type WorldSnapshot = {
-    Positions: HashMap<Guid<EntityId>, Vector2>
-    Velocities: HashMap<Guid<EntityId>, Vector2>
+    Positions: IReadOnlyDictionary<Guid<EntityId>, Vector2>
+    Velocities: IReadOnlyDictionary<Guid<EntityId>, Vector2>
     Factions: HashMap<Guid<EntityId>, Faction HashSet>
-    SpatialGrid: HashMap<GridCell, IndexList<Guid<EntityId>>>
+    SpatialGrid: IReadOnlyDictionary<GridCell, Guid<EntityId>[]>
   }
 
   /// Context for target-related data
@@ -234,7 +237,7 @@ module Perception =
     let cues = ResizeArray<PerceptionCue>()
 
     for entityId in nearbyEntities do
-      match world.Positions |> HashMap.tryFindV entityId with
+      match world.Positions |> Dictionary.tryFindV entityId with
       | ValueSome pos ->
         match world.Factions |> HashMap.tryFindV entityId with
         | ValueSome targetFactions ->
@@ -324,7 +327,7 @@ module Perception =
 
     let nearbyEntities = seq {
       for cell in cells do
-        match world.SpatialGrid |> HashMap.tryFindV cell with
+        match world.SpatialGrid |> Dictionary.tryFindV cell with
         | ValueSome list ->
           for entityId in list do
             if seen.Add entityId then
@@ -1068,7 +1071,7 @@ module AISystemLogic =
         if targetResult.IsValueNone then
           // Prefer real-time position over stale memory position
           let pos =
-            match world.Positions |> HashMap.tryFindV id with
+            match world.Positions |> Dictionary.tryFindV id with
             | ValueSome p -> p
             | ValueNone -> entry.lastKnownPosition
 
@@ -1251,7 +1254,8 @@ type AISystem(game: Game, env: PomoEnvironment) =
     let currentTick = (core.World.Time |> AVal.force).TotalGameTime
 
     // Lazily compute velocities/factions/cooldowns only when first accessed
-    let mutable velocitiesOpt: HashMap<Guid<EntityId>, Vector2> voption =
+    let mutable velocitiesOpt
+      : IReadOnlyDictionary<Guid<EntityId>, Vector2> voption =
       ValueNone
 
     let mutable factionsOpt: HashMap<Guid<EntityId>, Faction HashSet> voption =
@@ -1265,7 +1269,7 @@ type AISystem(game: Game, env: PomoEnvironment) =
       match velocitiesOpt with
       | ValueSome v -> v
       | ValueNone ->
-        let v = core.World.Velocities |> Dictionary.toHashMap
+        let v = core.World.Velocities
         velocitiesOpt <- ValueSome v
         v
 
@@ -1332,7 +1336,7 @@ type AISystem(game: Game, env: PomoEnvironment) =
               w
 
           let posOpt =
-            world.Positions |> HashMap.tryFindV controller.controlledEntityId
+            world.Positions |> Dictionary.tryFindV controller.controlledEntityId
 
           let facOpt =
             getFactions() |> HashMap.tryFindV controller.controlledEntityId
@@ -1344,7 +1348,7 @@ type AISystem(game: Game, env: PomoEnvironment) =
             ->
             let vel =
               getVelocities()
-              |> HashMap.tryFindV controller.controlledEntityId
+              |> Dictionary.tryFindV controller.controlledEntityId
               |> ValueOption.defaultValue Vector2.Zero
 
             let entityCtx: AIContext.EntityContext = {

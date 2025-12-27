@@ -1,5 +1,6 @@
 namespace Pomo.Core.Rendering
 
+open System.Collections.Concurrent
 open System.Collections.Generic
 open Microsoft.Xna.Framework
 open Microsoft.Xna.Framework.Content
@@ -10,6 +11,20 @@ open Pomo.Core.Projections
 open Pomo.Core.Stores
 
 module EntityEmitter =
+
+  let createLazyModelLoader (content: ContentManager) : string -> Model voption =
+      let cache = ConcurrentDictionary<string, Lazy<Model voption>>()
+      fun path ->
+          let loader = cache.GetOrAdd(path, fun p ->
+              lazy (
+                  try
+                      lock content (fun () ->
+                          let model = content.Load<Model>(p)
+                          ValueSome model)
+                  with _ -> ValueNone
+              )
+          )
+          loader.Value
 
   let loadModels
     (content: ContentManager)

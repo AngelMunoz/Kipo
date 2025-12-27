@@ -23,11 +23,12 @@ module ActionHandler =
 
   open Pomo.Core.Rendering
   open Pomo.Core.Domain.Entity
+  open System.Collections.Generic
 
   let private findHoveredEntity
     (world: World)
-    (positions: HashMap<Guid<EntityId>, Vector2>)
-    (rotations: HashMap<Guid<EntityId>, float32>)
+    (positions: IReadOnlyDictionary<Guid<EntityId>, Vector2>)
+    (rotations: IReadOnlyDictionary<Guid<EntityId>, float32>)
     (cameraService: CameraService)
     (playerId: Guid<EntityId>)
     =
@@ -194,7 +195,7 @@ module ActionHandler =
                       projections.ComputeMovementSnapshot(scenarioId)
 
                     snapshot.Positions, snapshot.Rotations
-                  | ValueNone -> HashMap.empty, HashMap.empty
+                  | ValueNone -> Dictionary(), Dictionary()
 
                 let clickedEntity =
                   findHoveredEntity

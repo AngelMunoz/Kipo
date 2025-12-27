@@ -3,7 +3,6 @@ namespace Pomo.Core
 open System.Collections.Generic
 open FSharp.Data.Adaptive
 
-
 module Dictionary =
 
   let inline tryFindV
@@ -15,12 +14,66 @@ module Dictionary =
     | false, _ -> ValueNone
 
   let inline toHashMap(dict: IReadOnlyDictionary<'Key, 'Value>) =
-    let mutable acc = HashMap.empty
+    dict |> Seq.map(fun kv -> struct (kv.Key, kv.Value)) |> HashMap.ofSeqV
 
-    for kv in dict do
-      acc <- HashMap.add kv.Key kv.Value acc
+  let inline toArrayV(dict: IReadOnlyDictionary<_, _>) = [|
+    for KeyValue(key, value) in dict do
+      struct (key, value)
+  |]
 
-    acc
+  let inline filter
+    ([<InlineIfLambda>] predicate: _ -> _ -> bool)
+    (dict: IReadOnlyDictionary<_, _>)
+    : IReadOnlyDictionary<_, _> =
+    let newd = Dictionary()
+
+    for KeyValue(key, value) in dict do
+      if predicate key value then
+        newd.Add(key, value)
+
+    newd
+
+  let inline chooseV
+    ([<InlineIfLambda>] chooser: _ -> _ -> 'T voption)
+    (dict: IReadOnlyDictionary<_, _>)
+    : IReadOnlyDictionary<_, _> =
+    let newd = Dictionary()
+
+    for KeyValue(key, value) in dict do
+      match chooser key value with
+      | ValueSome v -> newd.Add(key, v)
+      | ValueNone -> ()
+
+    newd
+
+  let inline ofSeq(seq: seq<_ * _>) =
+    let d = Dictionary()
+
+    for key, value in seq do
+      d.Add(key, value)
+
+    d
+
+  let inline ofSeqV(seq: seq<struct (_ * _)>) =
+    let d = Dictionary()
+
+    for struct (key, value) in seq do
+      d.Add(key, value)
+
+    d
+
+  let inline mapValues
+    ([<InlineIfLambda>] mapping: _ -> _)
+    (dict: IReadOnlyDictionary<_, _>)
+    : IReadOnlyDictionary<_, _> =
+    let newd = Dictionary()
+
+    for KeyValue(key, value) in dict do
+      newd.Add(key, mapping value)
+
+    newd
+
+  let empty() = Dictionary()
 
 module Array =
 
@@ -52,6 +105,17 @@ module Array =
       | Choice2Of2 v2 -> second.Add(v2)
 
     struct (first.ToArray(), second.ToArray())
+
+  let inline chooseV
+    ([<InlineIfLambda>] chooser: _ -> 'U voption)
+    (array: 'T array)
+    : 'U array =
+    [|
+      for item in array do
+        match chooser item with
+        | ValueSome v -> v
+        | ValueNone -> ()
+    |]
 
 [<AutoOpen>]
 module DictionaryExtensions =

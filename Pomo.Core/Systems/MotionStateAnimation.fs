@@ -25,22 +25,18 @@ module AnimationStateLogic =
       Time = TimeSpan.Zero
       Speed = 1.0f
     })
-    |> IndexList.ofArray
 
-  let private hasAnyOfClips
-    (clipIds: string[])
-    (animations: AnimationState IndexList)
-    =
+  let private hasAnyOfClips (clipIds: string[]) (animations: AnimationState[]) =
     animations
-    |> IndexList.exists(fun _ anim -> clipIds |> Array.contains anim.ClipId)
+    |> Array.exists(fun anim -> clipIds |> Array.contains anim.ClipId)
 
   /// Determines what animation action to take based on movement state.
   /// Returns: Some true = start run animation, Some false = stop animation, None = no change
   let determineAnimationAction
     (currentVelocity: Vector2)
-    (currentActiveAnimations: AnimationState IndexList)
+    (currentActiveAnimations: AnimationState[])
     (runClipIds: string[] voption)
-    : (bool * AnimationState IndexList voption) voption =
+    : (bool * AnimationState[] voption) voption =
 
     match runClipIds with
     | ValueNone -> ValueNone
@@ -69,8 +65,8 @@ type MotionStateAnimationSystem(game: Game, env: PomoEnvironment) =
 
   override this.Update(gameTime) =
     // Force world data directly - no reactive projection
-    let velocities = core.World.Velocities |> Dictionary.toHashMap
-    let activeAnimations = core.World.ActiveAnimations |> AMap.force
+    let velocities = core.World.Velocities
+    let activeAnimations = core.World.ActiveAnimations
     let resources = core.World.Resources |> AMap.force
     let modelConfigIds = core.World.ModelConfigId |> AMap.force
 
@@ -86,13 +82,13 @@ type MotionStateAnimationSystem(game: Game, env: PomoEnvironment) =
         // Get velocity and animations
         let velocity =
           velocities
-          |> HashMap.tryFind entityId
-          |> Option.defaultValue Vector2.Zero
+          |> Dictionary.tryFindV entityId
+          |> ValueOption.defaultValue Vector2.Zero
 
         let currentAnims =
           activeAnimations
-          |> HashMap.tryFind entityId
-          |> Option.defaultValue IndexList.empty
+          |> Dictionary.tryFindV entityId
+          |> ValueOption.defaultValue Array.empty
 
         // Resolve RunClipIds from ModelStore
         let runClipIds =

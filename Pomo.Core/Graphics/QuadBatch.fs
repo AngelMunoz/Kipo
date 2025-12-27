@@ -10,7 +10,8 @@ type QuadBatch(graphicsDevice: GraphicsDevice) =
   let mutable vertices = Array.zeroCreate<VertexPositionTexture> 2048
   let mutable indices = Array.zeroCreate<int16> 3072 // 6 indices per quad
   let mutable quadCount = 0
-  let mutable isStarted = false
+  let mutable storedView = Matrix.Identity
+  let mutable storedProjection = Matrix.Identity
 
   // Ensure indices are populated
   do
@@ -24,12 +25,12 @@ type QuadBatch(graphicsDevice: GraphicsDevice) =
       indices.[iBase + 4] <- int16(vBase + 2)
       indices.[iBase + 5] <- int16(vBase + 3)
 
-  member _.Begin(view: Matrix, projection: Matrix, ?texture: Texture2D) =
-    if isStarted then
-      failwith "Batch already started"
-
-    isStarted <- true
+  member _.Begin
+    (view: inref<Matrix>, projection: inref<Matrix>, ?texture: Texture2D)
+    =
     quadCount <- 0
+    storedView <- view
+    storedProjection <- projection
     effect.View <- view
     effect.Projection <- projection
     effect.World <- Matrix.Identity
@@ -41,10 +42,19 @@ type QuadBatch(graphicsDevice: GraphicsDevice) =
     | Some t -> effect.Texture <- t
     | None -> ()
 
-  member _.End() =
-    if not isStarted then
-      failwith "Batch not started"
+  // Internal helper that reuses stored matrices from effect state
+  member private _.BeginInternal([<Struct>] ?texture: Texture2D) =
+    quadCount <- 0
+    effect.View <- storedView
+    effect.Projection <- storedProjection
+    effect.World <- Matrix.Identity
+    effect.VertexColorEnabled <- false
+    effect.DiffuseColor <- Vector3.One
+    effect.Alpha <- 1.0f
 
+    texture |> ValueOption.iter(fun t -> effect.Texture <- t)
+
+  member _.End() =
     if quadCount > 0 then
       // Enforce Render States
       graphicsDevice.BlendState <- BlendState.AlphaBlend
@@ -65,21 +75,16 @@ type QuadBatch(graphicsDevice: GraphicsDevice) =
           quadCount * 2
         )
 
-    isStarted <- false
-
   member this.Draw
     (texture: Texture2D, position: Vector3, size: Vector2, ?color: Color)
     =
-    if not isStarted then
-      failwith "Batch not started"
-
     // Flush if texture changes or buffer full
     if not(isNull effect.Texture) && effect.Texture <> texture then
       this.End()
-      this.Begin(effect.View, effect.Projection, texture)
+      this.BeginInternal texture
     elif quadCount >= 512 then
       this.End()
-      this.Begin(effect.View, effect.Projection, texture)
+      this.BeginInternal texture
 
     if isNull effect.Texture then
       effect.Texture <- texture

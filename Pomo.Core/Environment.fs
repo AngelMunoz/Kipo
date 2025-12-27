@@ -1,6 +1,7 @@
 namespace Pomo.Core
 
 open System
+open System.Collections.Generic
 open Microsoft.Xna.Framework
 open Microsoft.Xna.Framework.Graphics
 open Microsoft.Xna.Framework.Content
@@ -88,9 +89,10 @@ module Environment =
 
   type IAnimationWriteService =
     abstract UpdateActiveAnimations:
-      Guid<EntityId> * IndexList<Animation.AnimationState> -> unit
+      Guid<EntityId> * Animation.AnimationState[] -> unit
 
-    abstract UpdatePose: Guid<EntityId> * HashMap<string, Matrix> -> unit
+    abstract UpdatePose: Guid<EntityId> * Dictionary<string, Matrix> -> unit
+
     abstract RemoveAnimationState: Guid<EntityId> -> unit
     abstract UpdateModelConfig: Guid<EntityId> * string -> unit
 

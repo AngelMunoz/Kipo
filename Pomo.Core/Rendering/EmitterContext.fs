@@ -21,7 +21,7 @@ type RenderCore = {
 type EntityRenderData = {
   ModelStore: ModelStore
   GetModelByAsset: string -> Model voption
-  EntityPoses: HashMap<Guid<EntityId>, HashMap<string, Matrix>>
+  EntityPoses: IReadOnlyDictionary<Guid<EntityId>, Dictionary<string, Matrix>>
   LiveProjectiles: HashMap<Guid<EntityId>, LiveProjectile>
   SquishFactor: float32
   ModelScale: float32
@@ -31,7 +31,7 @@ type EntityRenderData = {
 type ParticleRenderData = {
   GetTexture: string -> Texture2D voption
   GetModelByAsset: string -> Model voption
-  EntityPositions: HashMap<Guid<EntityId>, Vector2>
+  EntityPositions: IReadOnlyDictionary<Guid<EntityId>, Vector2>
   SquishFactor: float32
   ModelScale: float32
   FallbackTexture: Texture2D

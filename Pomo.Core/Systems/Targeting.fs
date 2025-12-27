@@ -79,7 +79,8 @@ module Targeting =
   module private TargetingHandlers =
 
     let private getSkillActivationPositions
-      (positions: HashMap<Guid<EntityId>, Vector2>)
+      (positions:
+        System.Collections.Generic.IReadOnlyDictionary<Guid<EntityId>, Vector2>)
       (casterId: Guid<EntityId>)
       (targetId: Guid<EntityId>)
       =
@@ -92,7 +93,8 @@ module Targeting =
     let handleTargetEntity
       (eventBus: EventBus)
       (stateWrite: IStateWriteService)
-      (positions: HashMap<Guid<EntityId>, Vector2>)
+      (positions:
+        System.Collections.Generic.IReadOnlyDictionary<Guid<EntityId>, Vector2>)
       (skill: ActiveSkill)
       (casterId: Guid<EntityId>)
       (targetId: Guid<EntityId>)
@@ -136,7 +138,8 @@ module Targeting =
 
     let handleTargetDirection
       (eventBus: EventBus)
-      (positions: HashMap<Guid<EntityId>, Vector2>)
+      (positions:
+        System.Collections.Generic.IReadOnlyDictionary<Guid<EntityId>, Vector2>)
       (skill: ActiveSkill)
       (casterId: Guid<EntityId>)
       (targetPos: Vector2)
@@ -161,7 +164,8 @@ module Targeting =
     let handleTargetPosition
       (eventBus: EventBus)
       (stateWrite: IStateWriteService)
-      (positions: HashMap<Guid<EntityId>, Vector2>)
+      (positions:
+        System.Collections.Generic.IReadOnlyDictionary<Guid<EntityId>, Vector2>)
       (skill: ActiveSkill)
       (casterId: Guid<EntityId>)
       (targetPos: Vector2)

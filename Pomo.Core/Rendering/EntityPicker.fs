@@ -4,25 +4,27 @@ open System
 open Microsoft.Xna.Framework
 open FSharp.UMX
 open FSharp.Data.Adaptive
+open Pomo.Core
 open Pomo.Core.Domain.Units
 open Pomo.Core.Graphics
 
 module EntityPicker =
+  open System.Collections.Generic
 
   let pickEntity
     (ray: Ray)
     (pixelsPerUnit: Vector2)
     (modelScale: float32)
     (squishFactor: float32)
-    (positions: HashMap<Guid<EntityId>, Vector2>)
-    (rotations: HashMap<Guid<EntityId>, float32>)
+    (positions: IReadOnlyDictionary<Guid<EntityId>, Vector2>)
+    (rotations: IReadOnlyDictionary<Guid<EntityId>, float32>)
     (excludeEntityId: Guid<EntityId>)
     : Guid<EntityId> voption =
 
     let mutable nearestEntity = ValueNone
     let mutable nearestDistance = Single.MaxValue
 
-    for entityId, logicPos in positions do
+    for KeyValue(entityId, logicPos) in positions do
       if entityId <> excludeEntityId then
         // 1. Compute translation (cheap)
         let renderPos =
@@ -36,7 +38,7 @@ module EntityPicker =
 
         if ray.Intersects(broadPhaseSphere).HasValue then
           let facing =
-            match rotations |> HashMap.tryFindV entityId with
+            match rotations |> Dictionary.tryFindV entityId with
             | ValueSome r -> r
             | ValueNone -> 0.0f
 

@@ -19,6 +19,7 @@ open Pomo.Core.Systems.Systems
 module Collision =
   open Pomo.Core.Domain
   open Pomo.Core.Domain.World
+  open System.Collections.Generic
 
   // Helper to get entities in nearby cells
   let private neighborOffsets = [|
@@ -34,16 +35,16 @@ module Collision =
   |]
 
   let getNearbyEntities
-    (grid: HashMap<GridCell, IndexList<Guid<EntityId>>>)
+    (grid: IReadOnlyDictionary<GridCell, Guid<EntityId>[]>)
     (cell: GridCell)
     =
     neighborOffsets
     |> Seq.collect(fun struct (dx, dy) ->
       let neighborCell = { X = cell.X + dx; Y = cell.Y + dy }
 
-      match grid |> HashMap.tryFindV neighborCell with
+      match grid |> Dictionary.tryFindV neighborCell with
       | ValueSome entities -> entities
-      | ValueNone -> IndexList.empty)
+      | ValueNone -> Array.empty)
 
 
   open Pomo.Core.Environment
@@ -282,13 +283,13 @@ module Collision =
         }
 
         // Check for entity-entity collisions
-        for (entityId, pos) in positions do
+        for KeyValue(entityId, pos) in positions do
           let cell = getGridCell Core.Constants.Collision.GridCellSize pos
           let nearbyEntities = getNearbyTo cell
 
           for otherId in nearbyEntities do
             if entityId <> otherId then
-              match positions |> HashMap.tryFindV otherId with
+              match positions |> Dictionary.tryFindV otherId with
               | ValueSome otherPos ->
                 let distance = Vector2.Distance(pos, otherPos)
                 // Simple radius check
@@ -319,7 +320,7 @@ module Collision =
           |> Option.bind(fun g ->
             g.Objects |> IndexList.tryFind(fun _ o -> o.Id = key.ObjectId))
 
-        for entityId, targetPos in positions do
+        for KeyValue(entityId, targetPos) in positions do
           // Check if this entity is a projectile and how it should handle terrain
           let projectileOpt = liveProjectiles |> HashMap.tryFindV entityId
 

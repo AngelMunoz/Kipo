@@ -28,12 +28,11 @@ module Movement =
     override this.Update _ =
       let scenarios = core.World.Scenarios |> AMap.force
 
-      for (scenarioId, _) in scenarios do
+      for scenarioId, _ in scenarios do
         let snapshot = gameplay.Projections.ComputeMovementSnapshot(scenarioId)
 
-        for id, newPosition in snapshot.Positions do
+        for KeyValue(id, newPosition) in snapshot.Positions do
           stateWrite.UpdatePosition(id, newPosition)
 
-        for id, newRotation in snapshot.Rotations do
+        for KeyValue(id, newRotation) in snapshot.Rotations do
           stateWrite.UpdateRotation(id, newRotation)
-

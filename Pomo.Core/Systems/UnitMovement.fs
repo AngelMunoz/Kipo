@@ -4,11 +4,12 @@ open System
 open Microsoft.Xna.Framework
 open FSharp.UMX
 open FSharp.Data.Adaptive
+open Pomo.Core
 open Pomo.Core.Domain.Units
 open Pomo.Core.Domain.World
 open Pomo.Core.Domain.Events
 open Pomo.Core.Systems.Systems
-open Pomo.Core.Domain.Core // For Constants.AI.WaypointReachedThreshold
+open Pomo.Core.Domain.Core
 open Pomo.Core.Algorithms
 open Pomo.Core.Systems
 
@@ -73,43 +74,6 @@ module UnitMovement =
       let scenarios = core.World.Scenarios |> AMap.force
       let movementStates = movementStates |> AMap.force
       let derivedStats = derivedStats |> AMap.force
-
-      for (scenarioId, _) in scenarios do
-        let snapshot = gameplay.Projections.ComputeMovementSnapshot(scenarioId)
-
-        // Process collisions for this scenario
-        // Note: collisionEvents is a concurrent queue, so we can't easily peek/filter without dequeuing.
-        // But we can dequeue all and re-enqueue or process?
-        // Actually, collision events are global. We should process them all once?
-        // But we need snapshot to resolve collision.
-        // If we process all collisions once, we need to look up scenario for each event.
-        // Let's do that separately.
-        ()
-
-        // Process movement for entities in this scenario
-        let positions =
-          snapshot.Positions |> HashMap.filter(fun id _ -> id <> playerId)
-
-        for (entityId, currentPos) in positions do
-          match movementStates.TryFindV entityId with
-          | ValueSome state ->
-            let speed =
-              match derivedStats.TryFindV entityId with
-              | ValueSome stats -> float32 stats.MS
-              | ValueNone -> 100.0f
-
-            // Retrieve accumulated MTV for this entity from the global collision processing (see below)
-            // We need to process collisions before movement.
-            // So let's move collision processing to the top and use a map of EntityId -> MTV.
-            ()
-          | ValueNone -> ()
-
-      // Refactored Update Logic:
-      // 1. Process all collision events and build a map of MTVs.
-      //    To do this, we need positions. But positions depend on scenario.
-      //    So we need to know the scenario of the entity in the collision event.
-      //    We can look it up in World.EntityScenario.
-
       let entityScenarios = core.World.EntityScenario |> AMap.force
 
       let frameCollisions =
@@ -125,30 +89,10 @@ module UnitMovement =
           ->
           match entityScenarios.TryFindV eId with
           | ValueSome scenarioId ->
-            // We need the position to resolve collision (apply MTV).
-            // We can get it from the snapshot of that scenario.
-            // But we don't want to compute snapshot for every event.
-            // Maybe we can just accumulate MTVs and apply them later?
-            // MovementLogic.resolveCollision takes currentPos.
-            // It adds MTV to position and publishes PositionChanged?
-            // No, resolveCollision returns the MTV to apply.
-            // Wait, MovementLogic.resolveCollision signature:
-            // entityId -> currentPos -> mtv -> eventBus -> Vector2 (applied mtv)
-            // It publishes PositionChanged!
-            // So we need currentPos.
-
-            // Optimization: Cache snapshots?
-            // Projections.ComputeMovementSnapshot is likely cached per frame if using AVal?
-            // No, it's `unit -> MovementSnapshot`. It forces AVal.
-            // So calling it multiple times is okay if AVal is cached.
-            // `world.Positions` is AVal.
-            // `calculateMovementSnapshot` is pure.
-            // So we should compute it once per scenario.
-
             let snapshot =
               gameplay.Projections.ComputeMovementSnapshot(scenarioId)
 
-            match snapshot.Positions.TryFindV eId with
+            match snapshot.Positions |> Dictionary.tryFindV eId with
             | ValueSome currentPos ->
 
               match frameCollisions.TryGetValue eId with
@@ -162,85 +106,83 @@ module UnitMovement =
       for (scenarioId, _) in scenarios do
         let snapshot = gameplay.Projections.ComputeMovementSnapshot(scenarioId)
 
-        let positions =
-          snapshot.Positions |> HashMap.filter(fun id _ -> id <> playerId)
+        for KeyValue(entityId, currentPos) in snapshot.Positions do
+          if entityId <> playerId then
+            match movementStates.TryFindV entityId with
+            | ValueSome state ->
+              let speed =
+                match derivedStats.TryFindV entityId with
+                | ValueSome stats -> float32 stats.MS
+                | ValueNone -> 100.0f
 
-        for (entityId, currentPos) in positions do
-          match movementStates.TryFindV entityId with
-          | ValueSome state ->
-            let speed =
-              match derivedStats.TryFindV entityId with
-              | ValueSome stats -> float32 stats.MS
-              | ValueNone -> 100.0f
+              let mtv =
+                match frameCollisions.TryGetValue entityId with
+                | true, m -> m
+                | false, _ -> Vector2.Zero
 
-            let mtv =
-              match frameCollisions.TryGetValue entityId with
-              | true, m -> m
-              | false, _ -> Vector2.Zero
+              match state with
+              | MovingAlongPath path ->
+                currentPaths[entityId] <- path
 
-            match state with
-            | MovingAlongPath path ->
-              currentPaths[entityId] <- path
+                match
+                  MovementLogic.handleMovingAlongPath currentPos path speed mtv
+                with
+                | MovementLogic.Arrived ->
+                  MovementLogic.notifyArrived entityId stateWrite core.EventBus
+                  lastVelocities[entityId] <- Vector2.Zero
+                  currentPaths.Remove(entityId) |> ignore
+                | MovementLogic.WaypointReached remaining ->
+                  MovementLogic.notifyWaypointReached
+                    entityId
+                    remaining
+                    stateWrite
+                    core.EventBus
+                | MovementLogic.Moving finalVel ->
+                  let lastVel =
+                    match lastVelocities.TryGetValue entityId with
+                    | true, v -> v
+                    | false, _ -> Vector2.Zero
 
-              match
-                MovementLogic.handleMovingAlongPath currentPos path speed mtv
-              with
-              | MovementLogic.Arrived ->
-                MovementLogic.notifyArrived entityId stateWrite core.EventBus
-                lastVelocities[entityId] <- Vector2.Zero
+                  lastVelocities[entityId] <-
+                    MovementLogic.notifyVelocityChange
+                      entityId
+                      finalVel
+                      lastVel
+                      stateWrite
+
+              | MovingTo target ->
+                match
+                  MovementLogic.handleMovingTo currentPos target speed mtv
+                with
+                | MovementLogic.Arrived ->
+                  MovementLogic.notifyArrived entityId stateWrite core.EventBus
+                  lastVelocities[entityId] <- Vector2.Zero
+                  currentPaths.Remove(entityId) |> ignore
+                | MovementLogic.Moving finalVel ->
+                  let lastVel =
+                    match lastVelocities.TryGetValue entityId with
+                    | true, v -> v
+                    | false, _ -> Vector2.Zero
+
+                  lastVelocities[entityId] <-
+                    MovementLogic.notifyVelocityChange
+                      entityId
+                      finalVel
+                      lastVel
+                      stateWrite
+                | _ -> ()
+
+              | Idle ->
+                if
+                  lastVelocities.ContainsKey entityId
+                  && lastVelocities[entityId] <> Vector2.Zero
+                then
+                  lastVelocities[entityId] <-
+                    MovementLogic.notifyVelocityChange
+                      entityId
+                      Vector2.Zero
+                      lastVelocities[entityId]
+                      stateWrite
+
                 currentPaths.Remove(entityId) |> ignore
-              | MovementLogic.WaypointReached remaining ->
-                MovementLogic.notifyWaypointReached
-                  entityId
-                  remaining
-                  stateWrite
-                  core.EventBus
-              | MovementLogic.Moving finalVel ->
-                let lastVel =
-                  match lastVelocities.TryGetValue entityId with
-                  | true, v -> v
-                  | false, _ -> Vector2.Zero
-
-                lastVelocities[entityId] <-
-                  MovementLogic.notifyVelocityChange
-                    entityId
-                    finalVel
-                    lastVel
-                    stateWrite
-
-            | MovingTo target ->
-              match
-                MovementLogic.handleMovingTo currentPos target speed mtv
-              with
-              | MovementLogic.Arrived ->
-                MovementLogic.notifyArrived entityId stateWrite core.EventBus
-                lastVelocities[entityId] <- Vector2.Zero
-                currentPaths.Remove(entityId) |> ignore
-              | MovementLogic.Moving finalVel ->
-                let lastVel =
-                  match lastVelocities.TryGetValue entityId with
-                  | true, v -> v
-                  | false, _ -> Vector2.Zero
-
-                lastVelocities[entityId] <-
-                  MovementLogic.notifyVelocityChange
-                    entityId
-                    finalVel
-                    lastVel
-                    stateWrite
-              | _ -> ()
-
-            | Idle ->
-              if
-                lastVelocities.ContainsKey entityId
-                && lastVelocities[entityId] <> Vector2.Zero
-              then
-                lastVelocities[entityId] <-
-                  MovementLogic.notifyVelocityChange
-                    entityId
-                    Vector2.Zero
-                    lastVelocities[entityId]
-                    stateWrite
-
-              currentPaths.Remove(entityId) |> ignore
-          | ValueNone -> ()
+            | ValueNone -> ()

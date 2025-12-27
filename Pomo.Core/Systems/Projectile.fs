@@ -5,6 +5,7 @@ open Microsoft.Xna.Framework
 open FSharp.UMX
 open FSharp.Data.Adaptive
 
+open Pomo.Core
 open Pomo.Core.Domain
 open Pomo.Core.Domain.Units
 open Pomo.Core.Domain.Events
@@ -13,6 +14,7 @@ open Pomo.Core.Domain.Particles
 open Pomo.Core.Domain.Skill
 open Pomo.Core.Systems.Systems
 open Pomo.Core.Environment
+open Pomo.Core.Domain.Animation
 
 module Projectile =
 
@@ -20,7 +22,7 @@ module Projectile =
   [<Struct>]
   type WorldContext = {
     Rng: Random
-    Positions: HashMap<Guid<EntityId>, Vector2>
+    Positions: Collections.Generic.IReadOnlyDictionary<Guid<EntityId>, Vector2>
     LiveEntities: HashSet<Guid<EntityId>>
   }
 
@@ -41,17 +43,23 @@ module Projectile =
     (originPos: Vector2)
     (maxRange: float32)
     =
-    world.Positions
-    |> HashMap.filter(fun id _ ->
-      world.LiveEntities.Contains id && id <> casterId && id <> currentTargetId)
-    |> HashMap.chooseV(fun _ pos ->
-      let distance = Vector2.DistanceSquared(originPos, pos)
+    // Pre-size to reasonable capacity for chaining (typically 5-10 potential targets)
+    let candidates = ResizeArray<struct (Guid<EntityId> * float32)>(10)
+    let maxRangeSq = maxRange * maxRange
 
-      if distance <= maxRange * maxRange then
-        ValueSome distance
-      else
-        ValueNone)
-    |> HashMap.toArrayV
+    // Single-pass iteration: filter and map in one step
+    for KeyValue(id, pos) in world.Positions do
+      if
+        world.LiveEntities.Contains id
+        && id <> casterId
+        && id <> currentTargetId
+      then
+        let distanceSq = Vector2.DistanceSquared(originPos, pos)
+
+        if distanceSq <= maxRangeSq then
+          candidates.Add(struct (id, distanceSq))
+
+    candidates.ToArray()
 
   /// Creates an impact event record for when a projectile reaches its target.
   let inline private makeImpact
@@ -237,26 +245,23 @@ module Projectile =
       | _ -> processHorizontalProjectile stateWrite world ctx
 
 
-  open Pomo.Core.Domain.Animation
-  open Pomo.Core.EventBus
-
   /// Context for visual effect spawning operations
   [<Struct>]
   type VisualEffectContext = {
     ParticleStore: Pomo.Core.Stores.ParticleStore
     SkillStore: Pomo.Core.Stores.SkillStore
     VisualEffects: ResizeArray<Particles.VisualEffect>
-    Positions: HashMap<Guid<EntityId>, Vector2>
-    EffectOwners: System.Collections.Generic.HashSet<Guid<EntityId>>
+    Positions: Collections.Generic.IReadOnlyDictionary<Guid<EntityId>, Vector2>
+    EffectOwners: Collections.Generic.HashSet<Guid<EntityId>>
   }
 
   /// Calculates rotation quaternion for impact visuals based on projectile direction
   let inline calculateImpactRotation
-    (positions: HashMap<Guid<EntityId>, Vector2>)
+    (positions: Collections.Generic.IReadOnlyDictionary<Guid<EntityId>, Vector2>)
     (projectileId: Guid<EntityId>)
     (targetPos: Vector2)
     =
-    match positions |> HashMap.tryFindV projectileId with
+    match positions |> Dictionary.tryFindV projectileId with
     | ValueSome projPos when projPos <> targetPos ->
       let dir = Vector2.Normalize(targetPos - projPos)
       let angle = MathF.Atan2(dir.Y, dir.X)
@@ -305,10 +310,11 @@ module Projectile =
 
   let inline ensureProjectileAnimation
     (stateWrite: IStateWriteService)
-    (activeAnims: HashMap<Guid<EntityId>, IndexList<AnimationState>>)
+    (activeAnims:
+      Collections.Generic.IReadOnlyDictionary<Guid<EntityId>, AnimationState[]>)
     (projectileId: Guid<EntityId>)
     =
-    match activeAnims |> HashMap.tryFindV projectileId with
+    match activeAnims |> Dictionary.tryFindV projectileId with
     | ValueNone ->
       let spinAnim: AnimationState = {
         ClipId = "Projectile_Spin"
@@ -316,7 +322,7 @@ module Projectile =
         Speed = 1.0f
       }
 
-      stateWrite.UpdateActiveAnimations(projectileId, IndexList.single spinAnim)
+      stateWrite.UpdateActiveAnimations(projectileId, [| spinAnim |])
     | ValueSome _ -> ()
 
   /// Spawns flight visuals for a projectile if not already present
@@ -328,7 +334,7 @@ module Projectile =
     match projectile.Info.Visuals.VfxId with
     | ValueSome vfxId ->
       if not(ctx.EffectOwners.Contains projectileId) then
-        match ctx.Positions |> HashMap.tryFindV projectileId with
+        match ctx.Positions |> Dictionary.tryFindV projectileId with
         | ValueSome pos ->
           spawnEffect
             ctx.ParticleStore
@@ -388,7 +394,7 @@ module Projectile =
       let liveEntities = gameplay.Projections.LiveEntities |> ASet.force
       let liveProjectiles = core.World.LiveProjectiles |> AMap.force
       let entityScenarios = core.World.EntityScenario |> AMap.force
-      let activeAnims = core.World.ActiveAnimations |> AMap.force
+      let activeAnims = core.World.ActiveAnimations
       let visualEffects = core.World.VisualEffects
 
       // Rebuild effectOwners set each frame for accuracy

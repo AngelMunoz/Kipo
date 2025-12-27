@@ -5,6 +5,7 @@ open System.Collections.Generic
 open Microsoft.Xna.Framework
 open FSharp.UMX
 open FSharp.Data.Adaptive
+open Pomo.Core
 open Pomo.Core.Domain.Units
 open Pomo.Core.Domain.Projectile
 open Pomo.Core.Domain.Animation
@@ -28,21 +29,29 @@ module PoseResolver =
 
   /// Gets entity facing from rotations
   let inline private getEntityFacing
-    (rotations: HashMap<Guid<EntityId>, float32>)
+    (rotations: IReadOnlyDictionary<Guid<EntityId>, float32>)
     (entityId: Guid<EntityId>)
     =
-    match rotations |> HashMap.tryFindV entityId with
-    | ValueSome r -> r
-    | ValueNone -> 0.0f
+    match rotations.TryGetValue entityId with
+    | true, r -> r
+    | false, _ -> 0.0f
+
+  /// Cached empty pose to avoid per-frame allocations
+  let private emptyPose: System.Collections.Generic.Dictionary<string, Matrix> =
+    System.Collections.Generic.Dictionary()
 
   /// Gets entity pose or empty
   let inline private getEntityPose
-    (poses: HashMap<Guid<EntityId>, HashMap<string, Matrix>>)
+    (poses:
+      System.Collections.Generic.IReadOnlyDictionary<
+        Guid<EntityId>,
+        System.Collections.Generic.Dictionary<string, Matrix>
+       >)
     (entityId: Guid<EntityId>)
     =
-    match poses |> HashMap.tryFindV entityId with
+    match poses |> Dictionary.tryFindV entityId with
     | ValueSome pose -> pose
-    | ValueNone -> HashMap.empty
+    | ValueNone -> emptyPose
 
   /// Computes projectile altitude
   let inline private computeAltitude
@@ -70,10 +79,10 @@ module PoseResolver =
 
   /// Gets node animation matrix
   let inline private getNodeAnimation
-    (entityPose: HashMap<string, Matrix>)
+    (entityPose: IReadOnlyDictionary<string, Matrix>)
     (nodeName: string)
     =
-    match entityPose |> HashMap.tryFindV nodeName with
+    match entityPose |> Dictionary.tryFindV nodeName with
     | ValueSome m -> m
     | ValueNone -> Matrix.Identity
 
@@ -107,7 +116,7 @@ module PoseResolver =
   /// Applies transforms along rig hierarchy (tail-recursive)
   [<TailCall>]
   let rec private applyTransforms
-    (entityPose: HashMap<string, Matrix>)
+    (entityPose: IReadOnlyDictionary<string, Matrix>)
     (nodeTransforms: Dictionary<string, Matrix>)
     (struct (nodes, currentParentWorld):
       struct (struct (string * RigNode) list * Matrix))
@@ -135,9 +144,9 @@ module PoseResolver =
     (logicPos: Vector2)
     : ResolvedEntity voption =
 
-    match snapshot.ModelConfigIds |> HashMap.tryFindV entityId with
-    | ValueNone -> ValueNone
-    | ValueSome configId ->
+    match snapshot.ModelConfigIds.TryGetValue entityId with
+    | false, _ -> ValueNone
+    | true, configId ->
       match data.ModelStore.tryFind configId with
       | ValueNone -> ValueNone
       | ValueSome config ->
@@ -200,12 +209,13 @@ module PoseResolver =
     (nodeTransformsPool: Dictionary<string, Matrix>)
     : ResolvedEntity[] =
     // Pre-allocate output buffer based on entity count
-    let estimatedCount = HashMap.count snapshot.Positions
+    let estimatedCount = snapshot.Positions.Count
     let results = ResizeArray<ResolvedEntity>(estimatedCount)
-    let nodesBuffer = ResizeArray<ResolvedRigNode>(16) // Typical rig has ~10 nodes
+    let nodesBuffer = ResizeArray<ResolvedRigNode>(16)
 
-    // Direct iteration over positions - no HashMap.toArray
-    for entityId, logicPos in snapshot.Positions do
+    for kv in snapshot.Positions do
+      let entityId = kv.Key
+      let logicPos = kv.Value
 
       resolveEntity
         core

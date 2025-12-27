@@ -7,6 +7,7 @@ open Microsoft.Xna.Framework
 open Microsoft.Xna.Framework.Graphics
 open FSharp.UMX
 open FSharp.Data.Adaptive
+open Pomo.Core
 open Pomo.Core.Domain.Units
 open Pomo.Core.Domain.Map
 open Pomo.Core.Domain.Animation
@@ -244,7 +245,7 @@ module PoseResolverTests =
     {
       ModelStore = modelStore
       GetModelByAsset = fun _ -> ValueSome(fakeModel())
-      EntityPoses = HashMap.empty
+      EntityPoses = Dictionary.empty()
       LiveProjectiles = HashMap.empty
       SquishFactor = 2.0f
       ModelScale = 1.0f
@@ -256,11 +257,11 @@ module PoseResolverTests =
     : MovementSnapshot =
     {
       Positions =
-        entities |> List.map(fun (id, pos, _) -> id, pos) |> HashMap.ofList
-      SpatialGrid = HashMap.empty
-      Rotations = HashMap.empty
+        entities |> List.map(fun (id, pos, _) -> id, pos) |> Dictionary.ofSeq
+      SpatialGrid = Dictionary.empty()
+      Rotations = Dictionary.empty()
       ModelConfigIds =
-        entities |> List.map(fun (id, _, cfg) -> id, cfg) |> HashMap.ofList
+        entities |> List.map(fun (id, _, cfg) -> id, cfg) |> Dictionary.ofSeq
     }
 
   [<Fact>]
@@ -334,7 +335,7 @@ module PoseResolverTests =
     let data = {
       ModelStore = modelStore
       GetModelByAsset = fun _ -> ValueSome(fakeModel())
-      EntityPoses = HashMap.empty
+      EntityPoses = Dictionary.empty()
       LiveProjectiles = HashMap.empty
       SquishFactor = 2.0f
       ModelScale = 1.0f

@@ -5,6 +5,7 @@ open Microsoft.Xna.Framework
 open Microsoft.Xna.Framework.Graphics
 open FSharp.UMX
 open FSharp.Data.Adaptive
+open Pomo.Core
 open Pomo.Core.Domain.Core
 open Pomo.Core.Domain.Units
 open Pomo.Core.Domain.Camera
@@ -69,8 +70,8 @@ module CameraSystem =
               | ValueSome scenarioId ->
                 let pos =
                   projections.ComputeMovementSnapshot(scenarioId).Positions
-                  |> HashMap.tryFind playerId
-                  |> Option.defaultValue Vector2.Zero
+                  |> Dictionary.tryFindV playerId
+                  |> ValueOption.defaultValue Vector2.Zero
 
                 let ppu =
                   match scenarios |> HashMap.tryFindV scenarioId with
