@@ -1,0 +1,12 @@
+# Blender MTL File: 'SpooktoberExportFile.blend'
+# Material Count: 1
+
+newmtl DarkWood
+Ns 323.999994
+Ka 1.000000 1.000000 1.000000
+Kd 0.153778 0.116567 0.105912
+Ks 0.500000 0.500000 0.500000
+Ke 0.0 0.0 0.0
+Ni 1.450000
+d 1.000000
+illum 2
