@@ -539,6 +539,11 @@ module Particles =
               ("MeshRotation", MeshRotationModeCodec.decoder)
               json
 
+          let! meshRotationMode =
+            VOptional.Property.get
+              ("MeshRotationMode", MeshRotationModeCodec.decoder)
+              json
+
           let! scalePivot =
             VOptional.Property.get ("ScalePivot", Helper.vec3FromDict) json
 
@@ -584,9 +589,9 @@ module Particles =
               | ValueSome m -> m
               | ValueNone -> Uniform
             MeshRotation =
-              match meshRotation with
-              | ValueSome m -> m
-              | ValueNone -> Tumbling
+              meshRotation
+              |> ValueOption.orElse meshRotationMode
+              |> ValueOption.defaultValue Tumbling
             ScalePivot =
               match scalePivot with
               | ValueSome v -> v

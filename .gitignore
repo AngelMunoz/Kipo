@@ -485,7 +485,7 @@ $RECYCLE.BIN/
 
 /samples
 *.tiled-session
-!Pomo.Core/Content/3d_models/kaykit_prototype/*.obj
+!Pomo.Core/Content/3d_models/**/*.obj
 
 .gemini/
 gha-creds-*.json

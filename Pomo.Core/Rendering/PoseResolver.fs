@@ -150,7 +150,8 @@ module PoseResolver =
       match data.ModelStore.tryFind configId with
       | ValueNone -> ValueNone
       | ValueSome config ->
-        let facing = getEntityFacing snapshot.Rotations entityId
+        let facingBase = getEntityFacing snapshot.Rotations entityId
+        let facing = facingBase + config.FacingOffset
         let entityPose = getEntityPose data.EntityPoses entityId
         let isProjectile = data.LiveProjectiles |> HashMap.containsKey entityId
 

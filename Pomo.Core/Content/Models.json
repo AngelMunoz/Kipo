@@ -33,11 +33,14 @@
   },
   "Projectile": {
     "Rig": {
-      "Root": { "Model": "3d_models/kaykit_prototype/Can_A" }
+      "Root": {
+        "Model": "3d_models/kay_kit_characters/arrow_green"
+      }
     },
     "AnimationBindings": {
       "Spin": ["Projectile_Spin"]
-    }
+    },
+    "FacingOffsetDeg": 180
   },
   "Barrel_B": {
     "Rig": {
@@ -49,12 +52,63 @@
   },
   "LightSphere": {
     "Rig": {
-      "Root": { "Model": "3d_models/kaykit_prototype/Coin_A" }
+      "Root": { "Model": "3d_models/kaykit_resources/Gold_Nugget_Large" }
     }
   },
   "LightColumn": {
     "Rig": {
-      "Root": { "Model": "3d_models/kaykit_prototype/Primitive_Beam" }
+      "Root": { "Model": "3d_models/kaykit_prototype/Primitive_Pillar" }
+    }
+  },
+  "ArrowGreen": {
+    "Rig": {
+      "Root": {
+        "Model": "3d_models/kay_kit_characters/arrow_green"
+      }
+    },
+    "FacingOffsetDeg": 180
+  },
+  "ArrowPurple": {
+    "Rig": {
+      "Root": {
+        "Model": "3d_models/kay_kit_characters/arrow_purple"
+      }
+    },
+    "FacingOffsetDeg": 180
+  },
+  "ThunderBolt": {
+    "Rig": {
+      "Root": { "Model": "3d_models/kaykit_spooktober/Items/treeA_graveyard" }
+    }
+  },
+  "PiercingBeam": {
+    "Rig": {
+      "Root": {
+        "Model": "3d_models/kay_kit_characters/arrow_green_half"
+      }
+    },
+    "FacingOffsetDeg": 180
+  },
+  "BladeShard": {
+    "Rig": {
+      "Root": {
+        "Model": "3d_models/kay_kit_characters/sword_broken_half"
+      }
+    }
+  },
+  "GoldNugget": {
+    "Rig": {
+      "Root": { "Model": "3d_models/kaykit_resources/Gold_Nugget_Small" }
+    }
+  },
+  "Skull": {
+    "Rig": {
+      "Root": { "Model": "3d_models/kay_kit_characters/skull" }
+    }
+  },
+  "IceShard": {
+    "Rig": {
+      "Root": { "Model": "3d_models/kay_kit_characters/arrow_purple" }
     }
   }
 }

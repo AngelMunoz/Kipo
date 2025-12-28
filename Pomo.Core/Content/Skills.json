@@ -12,6 +12,7 @@
     "Range": [16.0, 2],
     "Area": "Point",
     "Delivery": { "Type": "Instant" },
+    "ImpactVisuals": { "Vfx": "MeleeHit" },
     "Formula": "AP * 1.0",
     "Effects": [],
     "Origin": "Caster"
@@ -218,10 +219,10 @@
   "8": {
     "Kind": "Active",
     "Id": 8,
-    "Name": "Catchy Song",
-    "Description": "Lobs a musical note that bounces between enemies.",
+    "Name": "Barbed Arrow",
+    "Description": "Fires a poisoned arrow that bounces between enemies.",
     "Intent": "Offensive",
-    "DamageSource": "Magical",
+    "DamageSource": "Physical",
     "Cost": { "Type": "MP", "Amount": 5 },
     "Cooldown": 4.0,
     "Targeting": "TargetEntity",
@@ -235,11 +236,33 @@
         "Type": "Chained",
         "JumpsLeft": 4,
         "MaxRange": 80.0
+      },
+      "Visuals": {
+        "Model": "ArrowGreen",
+        "Vfx": "BarbedArrowProjectile",
+        "Rotation": 180
       }
     },
-    "Formula": "MA * 0.8",
+    "ImpactVisuals": { "Vfx": "BarbedArrowImpact" },
+    "Formula": "DA * 1.2",
     "Origin": "Caster",
-    "Effects": []
+    "Effects": [
+      {
+        "Name": "Poisoned",
+        "Kind": "DamageOverTime",
+        "Stacking": { "Type": "AddStack", "StackCount": 4 },
+        "Duration": { "Type": "Loop", "Interval": 1.0, "Duration": 10.0 },
+        "DamageSource": "Magical",
+        "Visuals": { "Vfx": "Poisoned" },
+        "Modifiers": [
+          {
+            "Type": "AbilityDamageMod",
+            "AbilityDamageValue": "DA",
+            "Element": "Earth"
+          }
+        ]
+      }
+    ]
   },
   "9": {
     "Kind": "Active",
@@ -311,7 +334,11 @@
       "Type": "Projectile",
       "Speed": 200.0,
       "CollisionMode": "IgnoreTerrain",
-      "Visuals": { "Model": "IceShard", "Vfx": "IceShatterProjectile" }
+      "Visuals": {
+        "Model": "IceShard",
+        "Vfx": "IceShatterProjectile",
+        "Scale": 0.1
+      }
     },
     "ImpactVisuals": { "Vfx": "IceShatter" },
     "ElementFormula": {
@@ -341,8 +368,10 @@
     "Delivery": {
       "Type": "Projectile",
       "Speed": 300.0,
-      "CollisionMode": "IgnoreTerrain"
+      "CollisionMode": "IgnoreTerrain",
+      "Visuals": { "Model": "PiercingBeam", "Vfx": "PiercingBoltProjectile" }
     },
+    "ImpactVisuals": { "Vfx": "PiercingBoltImpact" },
     "Formula": "AP * 1.5",
     "Origin": "Caster",
     "Effects": []
@@ -367,8 +396,12 @@
       "Type": "Projectile",
       "Speed": 250.0,
       "CollisionMode": "BlockedByTerrain",
-      "Visuals": { "Model": "Dagger", "Vfx": "FanOfKnivesWind" }
+      "Visuals": {
+        "Model": "BladeShard",
+        "Vfx": "FanOfKnivesWind"
+      }
     },
+    "ImpactVisuals": { "Vfx": "FanOfKnivesImpact" },
     "Formula": "AP * 1.2",
     "Origin": "Caster",
     "Effects": []
@@ -461,8 +494,14 @@
     "Delivery": {
       "Type": "Projectile",
       "Speed": 350.0,
-      "CollisionMode": "BlockedByTerrain"
+      "CollisionMode": "BlockedByTerrain",
+      "Visuals": {
+        "Model": "ArrowPurple",
+        "Vfx": "CripplingShotProjectile",
+        "Rotation": 180
+      }
     },
+    "ImpactVisuals": { "Vfx": "CripplingShotImpact" },
     "Formula": "AP * 1.0",
     "Origin": "Caster",
     "Effects": [
@@ -472,6 +511,7 @@
         "Stacking": { "Type": "RefreshDuration" },
         "Duration": { "Type": "Timed", "Seconds": 4.0 },
         "DamageSource": "Physical",
+        "Visuals": { "Vfx": "Crippled" },
         "Modifiers": [
           {
             "Type": "StaticMod",
@@ -506,6 +546,7 @@
         "Stacking": { "Type": "RefreshDuration" },
         "Duration": { "Type": "Timed", "Seconds": 6.0 },
         "DamageSource": "Magical",
+        "Visuals": { "Vfx": "Cursed" },
         "Modifiers": [
           {
             "Type": "StaticMod",
@@ -542,8 +583,10 @@
     "Delivery": {
       "Type": "Projectile",
       "Speed": 400.0,
-      "CollisionMode": "IgnoreTerrain"
+      "CollisionMode": "IgnoreTerrain",
+      "Visuals": { "Model": "ThunderBolt", "Vfx": "ThunderSpearProjectile" }
     },
+    "ImpactVisuals": { "Vfx": "ThunderSpearImpact" },
     "ElementFormula": {
       "Element": "Lightning",
       "Formula": "(AP * 1.2) + (LightningA * 1500)"
@@ -597,6 +640,7 @@
         "Stacking": { "Type": "RefreshDuration" },
         "Duration": { "Type": "Timed", "Seconds": 20.0 },
         "DamageSource": "Physical",
+        "Visuals": { "Vfx": "Empowered" },
         "Modifiers": [
           {
             "Type": "StaticMod",
@@ -630,6 +674,7 @@
         "Stacking": { "Type": "RefreshDuration" },
         "Duration": { "Type": "Instant" },
         "DamageSource": "Magical",
+        "Visuals": { "Vfx": "HealingSparkles" },
         "Modifiers": [
           {
             "Type": "AbilityDamageMod",
@@ -661,6 +706,7 @@
         "Stacking": { "Type": "RefreshDuration" },
         "Duration": { "Type": "Timed", "Seconds": 8.0 },
         "DamageSource": "Magical",
+        "Visuals": { "Vfx": "Enfeebled" },
         "Modifiers": [
           {
             "Type": "StaticMod",
@@ -702,6 +748,7 @@
         "Stacking": { "Type": "RefreshDuration" },
         "Duration": { "Type": "Loop", "Interval": 2.0, "Duration": 16.0 },
         "DamageSource": "Magical",
+        "Visuals": { "Vfx": "Regenerating" },
         "Modifiers": [
           {
             "Type": "AbilityDamageMod",

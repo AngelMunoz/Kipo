@@ -84,7 +84,7 @@
     },
     {
       "Texture": "Particles/jellyfish0-masks/15",
-      "BlendMode": "AlphaBlend",
+      "BlendMode": "Additive",
       "SimulationSpace": "Local",
       "Rate": 200,
       "Shape": "Point",
@@ -94,8 +94,8 @@
         "Speed": [3, 8],
         "SizeStart": 0.8,
         "SizeEnd": 1.2,
-        "ColorStart": "#4B0082FF",
-        "ColorEnd": "#00000000",
+        "ColorStart": "#693800ce",
+        "ColorEnd": "#120b0375",
         "Gravity": 0,
         "Drag": 2.5
       }
@@ -144,6 +144,27 @@
         "SizeEnd": 0.0,
         "ColorStart": "#300030FF",
         "ColorEnd": "#00000000",
+        "Gravity": -3,
+        "Drag": 0.5
+      }
+    },
+    {
+      "Texture": "Particles/jellyfish0-masks/43",
+      "BlendMode": "Additive",
+      "SimulationSpace": "Local",
+      "Rate": 60,
+      "Shape": "Cone",
+      "Angle": 20,
+      "Radius": 0.3,
+      "EmissionMode": "Outward",
+      "LocalOffset": { "X": 0.0, "Y": 0.3, "Z": 0.0 },
+      "Particle": {
+        "Lifetime": [0.4, 0.8],
+        "Speed": [8, 15],
+        "SizeStart": 1.2,
+        "SizeEnd": 0.0,
+        "ColorStart": "#693800ce",
+        "ColorEnd": "#120b0375",
         "Gravity": -3,
         "Drag": 0.5
       }
@@ -262,19 +283,40 @@
       "Texture": "Particles/jellyfish0-masks/43",
       "BlendMode": "AlphaBlend",
       "SimulationSpace": "Local",
-      "Rate": 30,
-      "Shape": "Sphere",
-      "Radius": 1.0,
-      "LocalOffset": { "X": 0.0, "Y": 1.0, "Z": 0.0 },
+      "Rate": 50,
+      "Shape": "Cone",
+      "Angle": 15,
+      "LocalOffset": { "X": 0.0, "Y": -5, "Z": 0 },
       "Particle": {
         "Lifetime": [1.0, 2.0],
         "Speed": [5, 10],
-        "SizeStart": 1.0,
+        "SizeStart": 1,
         "SizeEnd": 0.0,
-        "ColorStart": "#300030FF",
-        "ColorEnd": "#00000000",
-        "Gravity": -5,
-        "Drag": 0.0
+        "ColorStart": "#000485FF",
+        "ColorEnd": "#00000b00",
+        "Gravity": 50,
+        "Drag": 0.0,
+        "RandomVelocity": { "X": 20, "Y": 0, "Z": 20 }
+      }
+    },
+    {
+      "Texture": "Particles/jellyfish0-masks/25",
+      "BlendMode": "AlphaBlend",
+      "SimulationSpace": "Local",
+      "Rate": 60,
+      "Shape": "sphere",
+      "Radius": 1.0,
+      "LocalOffset": { "X": 0.0, "Y": 0, "Z": 0 },
+      "Particle": {
+        "Lifetime": [1.0, 2.0],
+        "Speed": [5, 20],
+        "SizeStart": 0.5,
+        "SizeEnd": 0.0,
+        "ColorStart": "#00000bFF",
+        "ColorEnd": "#00000b00",
+        "Gravity": 15,
+        "Drag": 0.0,
+        "RandomVelocity": { "X": 20, "Y": 0, "Z": 20 }
       }
     }
   ],
@@ -301,23 +343,47 @@
     },
     {
       "RenderMode": "Mesh",
-      "Model": "3d_models/kaykit_prototype/Primitive_Cube_Small",
+      "Model": "3d_models/kaykit_resources/Stone_Chunks_Small",
+      "MeshRotationMode": "RandomStatic",
       "SimulationSpace": "World",
       "Rate": 0,
-      "Burst": 8,
+      "Burst": 15,
       "Shape": "Sphere",
       "Radius": 0.5,
-      "LocalOffset": { "X": 0.0, "Y": 0.2, "Z": 0.0 },
+      "LocalOffset": { "X": 0.0, "Y": 0, "Z": 0.0 },
       "FloorHeight": 0.0,
       "Particle": {
-        "Lifetime": [1.5, 2.5],
+        "Lifetime": [0.5, 1],
         "Speed": [100, 200],
-        "SizeStart": 0.15,
-        "SizeEnd": 0.1,
+        "SizeStart": 1.0,
+        "SizeEnd": 1,
         "ColorStart": "#8B7355FF",
         "ColorEnd": "#654321FF",
         "Gravity": 400,
-        "Drag": 1.0
+        "Drag": 4.0
+      }
+    },
+    {
+      "RenderMode": "Mesh",
+      "Model": "3d_models/kaykit_resources/Stone_Chunks_Small",
+      "MeshRotationMode": "RandomStatic",
+      "SimulationSpace": "World",
+      "Rate": 0,
+      "Burst": 20,
+      "Shape": "Sphere",
+      "Radius": 0.5,
+      "LocalOffset": { "X": 0.0, "Y": 0, "Z": 0.0 },
+      "FloorHeight": 0.0,
+      "Particle": {
+        "Lifetime": [0.5, 0.7],
+        "Speed": [100, 200],
+        "SizeStart": 0.5,
+        "SizeEnd": 0.3,
+        "ColorStart": "#8B7355FF",
+        "ColorEnd": "#654321FF",
+        "Gravity": 400,
+        "Drag": 4.0,
+        "RandomVelocity": { "X": 50, "Y": 100, "Z": 50 }
       }
     }
   ],
@@ -345,6 +411,27 @@
       },
       "FloorHeight": 0.0,
       "EmissionRotation": { "X": 0, "Y": 0.0, "Z": 0.0 }
+    },
+    {
+      "RenderMode": "Mesh",
+      "Model": "3d_models/kaykit_resources/Silver_Nugget_Small",
+      "SimulationSpace": "World",
+      "Rate": 0,
+      "Burst": 5,
+      "Shape": "Cone",
+      "Angle": 45,
+      "Radius": 0.3,
+      "FloorHeight": 0.0,
+      "Particle": {
+        "Lifetime": [1.0, 2.0],
+        "Speed": [100, 200],
+        "SizeStart": 1,
+        "SizeEnd": 0.3,
+        "ColorStart": "#00FFFFFF",
+        "ColorEnd": "#00FFFF88",
+        "Gravity": 400,
+        "Drag": 0.8
+      }
     }
   ],
   "IceShatterProjectile": [
@@ -434,7 +521,7 @@
   "OrbitalGlow": [
     {
       "RenderMode": "Mesh",
-      "Model": "3d_models/kaykit_prototype/Coin_A",
+      "Model": "3d_models/kaykit_resources/Gold_Nugget_Large",
       "BlendMode": "Additive",
       "SimulationSpace": "World",
       "Rate": 0,
@@ -498,7 +585,7 @@
   "LightDome": [
     {
       "RenderMode": "Mesh",
-      "Model": "3d_models/kaykit_prototype/Coin_A",
+      "Model": "3d_models/kaykit_prototype/Barrel_B",
       "MeshRotation": "Fixed",
       "BlendMode": "Additive",
       "SimulationSpace": "World",
@@ -510,7 +597,7 @@
         "Lifetime": [0.8, 0.8],
         "Speed": [0, 0],
         "SizeStart": 1.0,
-        "SizeEnd": 6.0,
+        "SizeEnd": 10.0,
         "ColorStart": "#FFFFE0FF",
         "ColorEnd": "#FFFFE000",
         "Gravity": 0,
@@ -579,6 +666,831 @@
         "ColorEnd": "#FFFFE000",
         "Gravity": 0,
         "Drag": 0.5
+      }
+    }
+  ],
+  "BarbedArrowProjectile": [
+    {
+      "RenderMode": "Mesh",
+      "Model": "3d_models/kay_kit_characters/arrow_green",
+      "MeshRotation": "Fixed",
+      "SimulationSpace": "Local",
+      "Rate": 0,
+      "Burst": 1,
+      "Shape": "Point",
+      "EmissionRotation": { "X": 0.0, "Y": 90.0, "Z": 0.0 },
+      "Particle": {
+        "Lifetime": [10.0, 10.0],
+        "Speed": [0, 0],
+        "SizeStart": 0.5,
+        "SizeEnd": 0.5,
+        "ColorStart": "#FFFFFFFF",
+        "ColorEnd": "#FFFFFFFF",
+        "Gravity": 0,
+        "Drag": 0
+      }
+    },
+    {
+      "Texture": "Particles/jellyfish0-masks/3",
+      "BlendMode": "Additive",
+      "SimulationSpace": "World",
+      "Rate": 60,
+      "Shape": "Point",
+      "Particle": {
+        "Lifetime": [0.3, 0.5],
+        "Speed": [5, 12],
+        "SizeStart": 0.5,
+        "SizeEnd": 0.0,
+        "ColorStart": "#88FF88FF",
+        "ColorEnd": "#00880000",
+        "Gravity": 0,
+        "Drag": 0.5
+      }
+    }
+  ],
+  "BarbedArrowImpact": [
+    {
+      "RenderMode": "Mesh",
+      "Model": "3d_models/kay_kit_characters/arrow_green_broken_half",
+      "SimulationSpace": "World",
+      "Rate": 0,
+      "Burst": 2,
+      "Shape": "Sphere",
+      "Radius": 0.2,
+      "FloorHeight": 0.0,
+      "Particle": {
+        "Lifetime": [1.5, 2.5],
+        "Speed": [40, 100],
+        "SizeStart": 0.3,
+        "SizeEnd": 0.2,
+        "ColorStart": "#FFFFFFFF",
+        "ColorEnd": "#FFFFFF88",
+        "Gravity": 400,
+        "Drag": 1.5
+      }
+    },
+    {
+      "Texture": "Particles/jellyfish0-masks/15",
+      "BlendMode": "Additive",
+      "SimulationSpace": "World",
+      "Rate": 0,
+      "Burst": 40,
+      "Shape": "Sphere",
+      "Radius": 0.4,
+      "Particle": {
+        "Lifetime": [0.4, 0.8],
+        "Speed": [20, 60],
+        "SizeStart": 0.8,
+        "SizeEnd": 0.0,
+        "ColorStart": "#88FF88FF",
+        "ColorEnd": "#00880000",
+        "Gravity": 50,
+        "Drag": 1.0
+      }
+    }
+  ],
+  "PiercingBoltProjectile": [
+    {
+      "RenderMode": "Mesh",
+      "Model": "3d_models/kaykit_prototype/Primitive_Beam",
+      "MeshRotation": "Fixed",
+      "SimulationSpace": "Local",
+      "Rate": 0,
+      "Burst": 1,
+      "Shape": "Point",
+      "EmissionRotation": { "X": 0.0, "Y": 90.0, "Z": 0.0 },
+      "Particle": {
+        "Lifetime": [10.0, 10.0],
+        "Speed": [0, 0],
+        "SizeStart": 0.3,
+        "SizeEnd": 0.3,
+        "ColorStart": "#FFFFFFFF",
+        "ColorEnd": "#FFFFFFFF",
+        "Gravity": 0,
+        "Drag": 0
+      }
+    },
+    {
+      "Texture": "Particles/jellyfish0-masks/5",
+      "BlendMode": "Additive",
+      "SimulationSpace": "World",
+      "Rate": 100,
+      "Shape": "Point",
+      "Particle": {
+        "Lifetime": [0.2, 0.4],
+        "Speed": [10, 30],
+        "SizeStart": 0.8,
+        "SizeEnd": 0.0,
+        "ColorStart": "#FFFFFFAA",
+        "ColorEnd": "#FFFFFF00",
+        "Gravity": 0,
+        "Drag": 1.5
+      }
+    }
+  ],
+  "PiercingBoltImpact": [
+    {
+      "Texture": "Particles/jellyfish0-masks/15",
+      "BlendMode": "Additive",
+      "SimulationSpace": "World",
+      "Rate": 0,
+      "Burst": 100,
+      "Shape": "Sphere",
+      "Radius": 0.3,
+      "Particle": {
+        "Lifetime": [0.3, 0.6],
+        "Speed": [50, 150],
+        "SizeStart": 0.8,
+        "SizeEnd": 0.0,
+        "ColorStart": "#FFFFFFFF",
+        "ColorEnd": "#FFFFFF00",
+        "Gravity": 200,
+        "Drag": 2.0
+      }
+    }
+  ],
+  "CripplingShotProjectile": [
+    {
+      "RenderMode": "Mesh",
+      "Model": "3d_models/kay_kit_characters/arrow_purple",
+      "MeshRotation": "Fixed",
+      "SimulationSpace": "Local",
+      "Rate": 0,
+      "Burst": 1,
+      "Shape": "Point",
+      "EmissionRotation": { "X": 0.0, "Y": 90.0, "Z": 0.0 },
+      "Particle": {
+        "Lifetime": [10.0, 10.0],
+        "Speed": [0, 0],
+        "SizeStart": 0.5,
+        "SizeEnd": 0.5,
+        "ColorStart": "#FFFFFFFF",
+        "ColorEnd": "#FFFFFFFF",
+        "Gravity": 0,
+        "Drag": 0
+      }
+    },
+    {
+      "Texture": "Particles/jellyfish0-masks/43",
+      "BlendMode": "AlphaBlend",
+      "SimulationSpace": "World",
+      "Rate": 60,
+      "Shape": "Point",
+      "Particle": {
+        "Lifetime": [0.3, 0.5],
+        "Speed": [5, 15],
+        "SizeStart": 0.6,
+        "SizeEnd": 0.0,
+        "ColorStart": "#4A0080FF",
+        "ColorEnd": "#00000000",
+        "Gravity": 50,
+        "Drag": 1.0
+      }
+    }
+  ],
+  "CripplingShotImpact": [
+    {
+      "RenderMode": "Mesh",
+      "Model": "3d_models/kay_kit_characters/arrow_purple_broken_half",
+      "SimulationSpace": "World",
+      "Rate": 0,
+      "Burst": 3,
+      "Shape": "Sphere",
+      "Radius": 0.3,
+      "FloorHeight": 0.0,
+      "Particle": {
+        "Lifetime": [1.0, 2.0],
+        "Speed": [50, 120],
+        "SizeStart": 0.3,
+        "SizeEnd": 0.2,
+        "ColorStart": "#FFFFFFFF",
+        "ColorEnd": "#FFFFFF88",
+        "Gravity": 400,
+        "Drag": 1.5
+      }
+    }
+  ],
+  "ThunderSpearProjectile": [
+    {
+      "RenderMode": "Mesh",
+      "Model": "3d_models/kaykit_spooktober/Items/treeA_graveyard",
+      "MeshRotation": "Fixed",
+      "BlendMode": "Additive",
+      "SimulationSpace": "Local",
+      "Rate": 0,
+      "Burst": 1,
+      "Shape": "Point",
+      "EmissionRotation": { "X": 0.0, "Y": 90.0, "Z": 0.0 },
+      "Particle": {
+        "Lifetime": [10.0, 10.0],
+        "Speed": [0, 0],
+        "SizeStart": 0.3,
+        "SizeEnd": 0.3,
+        "ColorStart": "#00FFFFFF",
+        "ColorEnd": "#00FFFFFF",
+        "Gravity": 0,
+        "Drag": 0
+      }
+    },
+    {
+      "Texture": "Particles/jellyfish0-masks/15",
+      "BlendMode": "Additive",
+      "SimulationSpace": "World",
+      "Rate": 150,
+      "Shape": "Sphere",
+      "Radius": 0.2,
+      "Particle": {
+        "Lifetime": [0.1, 0.2],
+        "Speed": [30, 80],
+        "SizeStart": 0.8,
+        "SizeEnd": 0.0,
+        "ColorStart": "#00FFFFFF",
+        "ColorEnd": "#0088FF00",
+        "Gravity": 0,
+        "Drag": 0.3
+      }
+    }
+  ],
+  "ThunderSpearImpact": [
+    {
+      "RenderMode": "Mesh",
+      "Model": "3d_models/kaykit_spooktober/Items/treeB_graveyard",
+      "MeshRotation": "Fixed",
+      "BlendMode": "Additive",
+      "SimulationSpace": "World",
+      "Rate": 0,
+      "Burst": 1,
+      "Shape": "Point",
+      "EmissionRotation": { "X": 90.0, "Y": 0.0, "Z": 0.0 },
+      "Particle": {
+        "Lifetime": [0.4, 0.4],
+        "Speed": [0, 0],
+        "SizeStart": 0.6,
+        "SizeEnd": 0.0,
+        "ColorStart": "#00FFFFFF",
+        "ColorEnd": "#00FFFF00",
+        "Gravity": 0,
+        "Drag": 0
+      }
+    },
+    {
+      "Texture": "Particles/jellyfish0-masks/15",
+      "BlendMode": "Additive",
+      "SimulationSpace": "World",
+      "Rate": 0,
+      "Burst": 250,
+      "Shape": "Sphere",
+      "Radius": 0.6,
+      "Particle": {
+        "Lifetime": [0.2, 0.5],
+        "Speed": [100, 300],
+        "SizeStart": 1.2,
+        "SizeEnd": 0.0,
+        "ColorStart": "#00FFFFFF",
+        "ColorEnd": "#0088FF00",
+        "Gravity": 0,
+        "Drag": 1.0,
+        "RandomVelocity": { "X": 30, "Y": 30, "Z": 30 }
+      }
+    }
+  ],
+  "LightBoltProjectile": [
+    {
+      "RenderMode": "Mesh",
+      "Model": "3d_models/kaykit_resources/Gold_Nugget_Large",
+      "BlendMode": "Additive",
+      "SimulationSpace": "Local",
+      "Rate": 0,
+      "Burst": 1,
+      "Shape": "Point",
+      "Particle": {
+        "Lifetime": [10.0, 10.0],
+        "Speed": [0, 0],
+        "SizeStart": 1.0,
+        "SizeEnd": 1.0,
+        "ColorStart": "#FFFFD0FF",
+        "ColorEnd": "#FFFFD0FF",
+        "Gravity": 0,
+        "Drag": 0
+      }
+    },
+    {
+      "Texture": "Particles/jellyfish0-masks/3",
+      "BlendMode": "Additive",
+      "SimulationSpace": "World",
+      "Rate": 80,
+      "Shape": "Point",
+      "Particle": {
+        "Lifetime": [0.3, 0.6],
+        "Speed": [10, 30],
+        "SizeStart": 1.0,
+        "SizeEnd": 0.0,
+        "ColorStart": "#FFFFD0FF",
+        "ColorEnd": "#FFFFD000",
+        "Gravity": 0,
+        "Drag": 0.5
+      }
+    }
+  ],
+  "LightBoltImpact": [
+    {
+      "Texture": "Particles/jellyfish0-masks/15",
+      "BlendMode": "Additive",
+      "SimulationSpace": "World",
+      "Rate": 0,
+      "Burst": 150,
+      "Shape": "Sphere",
+      "Radius": 0.5,
+      "Particle": {
+        "Lifetime": [0.4, 0.8],
+        "Speed": [50, 150],
+        "SizeStart": 1.2,
+        "SizeEnd": 0.0,
+        "ColorStart": "#FFFFD0FF",
+        "ColorEnd": "#FFD70000",
+        "Gravity": -20,
+        "Drag": 1.0
+      }
+    },
+    {
+      "RenderMode": "Mesh",
+      "Model": "3d_models/kaykit_resources/Silver_Nugget_Small",
+      "MeshRotation": "Fixed",
+      "BlendMode": "Additive",
+      "SimulationSpace": "World",
+      "Rate": 0,
+      "Burst": 1,
+      "Shape": "Point",
+      "ScaleAxis": { "X": 0, "Y": 1.0, "Z": 0 },
+      "Particle": {
+        "Lifetime": [0.6, 0.6],
+        "Speed": [0, 0],
+        "SizeStart": 0.5,
+        "SizeEnd": 3.0,
+        "ColorStart": "#FFFFD0FF",
+        "ColorEnd": "#FFFFD000",
+        "Gravity": 0,
+        "Drag": 0
+      }
+    }
+  ],
+  "ShadowStrikeProjectile": [
+    {
+      "RenderMode": "Mesh",
+      "Model": "3d_models/kay_kit_characters/skull",
+      "SimulationSpace": "Local",
+      "Rate": 0,
+      "Burst": 1,
+      "Shape": "Point",
+      "Particle": {
+        "Lifetime": [10.0, 10.0],
+        "Speed": [0, 0],
+        "SizeStart": 0.3,
+        "SizeEnd": 0.3,
+        "ColorStart": "#4B0082FF",
+        "ColorEnd": "#4B0082FF",
+        "Gravity": 0,
+        "Drag": 0
+      }
+    },
+    {
+      "Texture": "Particles/jellyfish0-masks/43",
+      "BlendMode": "AlphaBlend",
+      "SimulationSpace": "World",
+      "Rate": 100,
+      "Shape": "Sphere",
+      "Radius": 0.3,
+      "Particle": {
+        "Lifetime": [0.3, 0.6],
+        "Speed": [5, 20],
+        "SizeStart": 1.0,
+        "SizeEnd": 0.0,
+        "ColorStart": "#4B0082FF",
+        "ColorEnd": "#00000000",
+        "Gravity": 0,
+        "Drag": 0.5
+      }
+    }
+  ],
+  "ShadowStrikeImpact": [
+    {
+      "Texture": "Particles/jellyfish0-masks/43",
+      "BlendMode": "AlphaBlend",
+      "SimulationSpace": "World",
+      "Rate": 0,
+      "Burst": 200,
+      "Shape": "Sphere",
+      "Radius": 0.8,
+      "Particle": {
+        "Lifetime": [0.5, 1.2],
+        "Speed": [20, 80],
+        "SizeStart": 1.5,
+        "SizeEnd": 0.0,
+        "ColorStart": "#4B0082FF",
+        "ColorEnd": "#00000000",
+        "Gravity": 50,
+        "Drag": 1.0
+      }
+    }
+  ],
+  "WhirlwindSlash": [
+    {
+      "Texture": "Particles/jellyfish0-masks/5",
+      "BlendMode": "Additive",
+      "SimulationSpace": "World",
+      "Rate": 0,
+      "Burst": 300,
+      "Shape": "Sphere",
+      "Radius": 2.0,
+      "Particle": {
+        "Lifetime": [0.4, 0.8],
+        "Speed": [50, 150],
+        "SizeStart": 1.5,
+        "SizeEnd": 0.5,
+        "ColorStart": "#FFFFFFCC",
+        "ColorEnd": "#FFFFFF00",
+        "Gravity": 0,
+        "Drag": 0.5
+      }
+    },
+    {
+      "RenderMode": "Mesh",
+      "Model": "3d_models/kaykit_prototype/Primitive_Cube_Small",
+      "SimulationSpace": "World",
+      "Rate": 0,
+      "Burst": 6,
+      "Shape": "Sphere",
+      "Radius": 1.5,
+      "FloorHeight": 0.0,
+      "Particle": {
+        "Lifetime": [1.0, 1.5],
+        "Speed": [80, 150],
+        "SizeStart": 0.1,
+        "SizeEnd": 0.05,
+        "ColorStart": "#888888FF",
+        "ColorEnd": "#88888800",
+        "Gravity": 400,
+        "Drag": 1.0
+      }
+    }
+  ],
+  "WindSlash": [
+    {
+      "Texture": "Particles/jellyfish0-masks/5",
+      "BlendMode": "Additive",
+      "SimulationSpace": "World",
+      "Rate": 0,
+      "Burst": 200,
+      "Shape": "Cone",
+      "Angle": 35,
+      "Radius": 0.3,
+      "EmissionMode": "Outward",
+      "LocalOffset": { "X": 0.0, "Y": 1.0, "Z": 0.0 },
+      "Particle": {
+        "Lifetime": [0.3, 0.6],
+        "Speed": [200, 350],
+        "SizeStart": 2.0,
+        "SizeEnd": 0.5,
+        "ColorStart": "#CCFFCCFF",
+        "ColorEnd": "#CCFFCC00",
+        "Gravity": 0,
+        "Drag": 0.3
+      }
+    },
+    {
+      "Texture": "Particles/jellyfish0-masks/15",
+      "BlendMode": "Additive",
+      "SimulationSpace": "World",
+      "Rate": 0,
+      "Burst": 100,
+      "Shape": "Cone",
+      "Angle": 35,
+      "Radius": 0.2,
+      "EmissionMode": "Outward",
+      "LocalOffset": { "X": 0.0, "Y": 1.0, "Z": 0.0 },
+      "Particle": {
+        "Lifetime": [0.2, 0.4],
+        "Speed": [250, 400],
+        "SizeStart": 0.8,
+        "SizeEnd": 0.0,
+        "ColorStart": "#FFFFFFFF",
+        "ColorEnd": "#FFFFFF00",
+        "Gravity": 0,
+        "Drag": 0.2
+      }
+    }
+  ],
+  "Crippled": [
+    {
+      "Texture": "Particles/jellyfish0-masks/43",
+      "BlendMode": "Additive",
+      "SimulationSpace": "Local",
+      "Rate": 15,
+      "Shape": "Cone",
+      "Angle": 90,
+      "LocalOffset": { "X": 0.0, "Y": 15.0, "Z": 0.0 },
+      "Particle": {
+        "Lifetime": [1.0, 2.0],
+        "Speed": [5, 10],
+        "SizeStart": 0.8,
+        "SizeEnd": 0.0,
+        "ColorStart": "#4488FFCC",
+        "ColorEnd": "#224488",
+        "Gravity": 12,
+        "Drag": 0.0,
+        "RandomVelocity": { "X": 15, "Y": 0, "Z": 15 }
+      }
+    },
+    {
+      "Texture": "Particles/jellyfish0-masks/15",
+      "BlendMode": "Additive",
+      "SimulationSpace": "Local",
+      "Rate": 10,
+      "Shape": "Sphere",
+      "Radius": 1.0,
+      "LocalOffset": { "X": 0.0, "Y": 12.0, "Z": 0.0 },
+      "Particle": {
+        "Lifetime": [1.0, 1.5],
+        "Speed": [8, 15],
+        "SizeStart": 0.5,
+        "SizeEnd": 0.0,
+        "ColorStart": "#6699FFFF",
+        "ColorEnd": "#33669900",
+        "Gravity": 10,
+        "Drag": 0.0,
+        "RandomVelocity": { "X": 10, "Y": 0, "Z": 10 }
+      }
+    }
+  ],
+  "Cursed": [
+    {
+      "Texture": "Particles/jellyfish0-masks/43",
+      "BlendMode": "Additive",
+      "SimulationSpace": "Local",
+      "Rate": 15,
+      "Shape": "Cone",
+      "Angle": 90,
+      "LocalOffset": { "X": 0.0, "Y": 15.0, "Z": 0.0 },
+      "Particle": {
+        "Lifetime": [1.0, 2.0],
+        "Speed": [5, 10],
+        "SizeStart": 0.8,
+        "SizeEnd": 0.0,
+        "ColorStart": "#8800AACC",
+        "ColorEnd": "#440066",
+        "Gravity": 12,
+        "Drag": 0.0,
+        "RandomVelocity": { "X": 15, "Y": 0, "Z": 15 }
+      }
+    },
+    {
+      "Texture": "Particles/jellyfish0-masks/25",
+      "BlendMode": "Additive",
+      "SimulationSpace": "Local",
+      "Rate": 10,
+      "Shape": "Sphere",
+      "Radius": 1.0,
+      "LocalOffset": { "X": 0.0, "Y": 12.0, "Z": 0.0 },
+      "Particle": {
+        "Lifetime": [1.0, 1.5],
+        "Speed": [8, 15],
+        "SizeStart": 0.5,
+        "SizeEnd": 0.0,
+        "ColorStart": "#AA44DDFF",
+        "ColorEnd": "#66228800",
+        "Gravity": 10,
+        "Drag": 0.0,
+        "RandomVelocity": { "X": 10, "Y": 0, "Z": 10 }
+      }
+    }
+  ],
+  "Empowered": [
+    {
+      "Texture": "Particles/jellyfish0-masks/15",
+      "BlendMode": "Additive",
+      "SimulationSpace": "Local",
+      "Rate": 20,
+      "Shape": "Sphere",
+      "Radius": 1.0,
+      "LocalOffset": { "X": 0.0, "Y": 0.0, "Z": 0.0 },
+      "Particle": {
+        "Lifetime": [1.0, 1.5],
+        "Speed": [8, 15],
+        "SizeStart": 0.7,
+        "SizeEnd": 0.0,
+        "ColorStart": "#FF6600FF",
+        "ColorEnd": "#FF220000",
+        "Gravity": -12,
+        "Drag": 0.0,
+        "RandomVelocity": { "X": 10, "Y": 0, "Z": 10 }
+      }
+    },
+    {
+      "Texture": "Particles/jellyfish0-masks/25",
+      "BlendMode": "Additive",
+      "SimulationSpace": "Local",
+      "Rate": 15,
+      "Shape": "Sphere",
+      "Radius": 0.8,
+      "LocalOffset": { "X": 0.0, "Y": 0.0, "Z": 0.0 },
+      "Particle": {
+        "Lifetime": [0.8, 1.2],
+        "Speed": [10, 18],
+        "SizeStart": 0.5,
+        "SizeEnd": 0.0,
+        "ColorStart": "#FFAA00FF",
+        "ColorEnd": "#FF440000",
+        "Gravity": -15,
+        "Drag": 0.0,
+        "RandomVelocity": { "X": 8, "Y": 0, "Z": 8 }
+      }
+    }
+  ],
+  "Enfeebled": [
+    {
+      "Texture": "Particles/jellyfish0-masks/43",
+      "BlendMode": "Additive",
+      "SimulationSpace": "Local",
+      "Rate": 12,
+      "Shape": "Cone",
+      "Angle": 90,
+      "LocalOffset": { "X": 0.0, "Y": 15.0, "Z": 0.0 },
+      "Particle": {
+        "Lifetime": [1.0, 2.0],
+        "Speed": [5, 10],
+        "SizeStart": 0.7,
+        "SizeEnd": 0.0,
+        "ColorStart": "#888888CC",
+        "ColorEnd": "#44444400",
+        "Gravity": 12,
+        "Drag": 0.0,
+        "RandomVelocity": { "X": 15, "Y": 0, "Z": 15 }
+      }
+    },
+    {
+      "Texture": "Particles/jellyfish0-masks/15",
+      "BlendMode": "Additive",
+      "SimulationSpace": "Local",
+      "Rate": 8,
+      "Shape": "Sphere",
+      "Radius": 1.0,
+      "LocalOffset": { "X": 0.0, "Y": 12.0, "Z": 0.0 },
+      "Particle": {
+        "Lifetime": [1.0, 1.5],
+        "Speed": [8, 15],
+        "SizeStart": 0.5,
+        "SizeEnd": 0.0,
+        "ColorStart": "#AAAAAAFF",
+        "ColorEnd": "#55555500",
+        "Gravity": 10,
+        "Drag": 0.0,
+        "RandomVelocity": { "X": 10, "Y": 0, "Z": 10 }
+      }
+    }
+  ],
+  "Regenerating": [
+    {
+      "Texture": "Particles/jellyfish0-masks/15",
+      "BlendMode": "Additive",
+      "SimulationSpace": "Local",
+      "Rate": 18,
+      "Shape": "Sphere",
+      "Radius": 1.0,
+      "LocalOffset": { "X": 0.0, "Y": 0.0, "Z": 0.0 },
+      "Particle": {
+        "Lifetime": [1.0, 1.5],
+        "Speed": [8, 15],
+        "SizeStart": 0.6,
+        "SizeEnd": 0.0,
+        "ColorStart": "#44FF44FF",
+        "ColorEnd": "#22AA2200",
+        "Gravity": -12,
+        "Drag": 0.0,
+        "RandomVelocity": { "X": 10, "Y": 0, "Z": 10 }
+      }
+    },
+    {
+      "Texture": "Particles/jellyfish0-masks/25",
+      "BlendMode": "Additive",
+      "SimulationSpace": "Local",
+      "Rate": 12,
+      "Shape": "Sphere",
+      "Radius": 0.8,
+      "LocalOffset": { "X": 0.0, "Y": 0.0, "Z": 0.0 },
+      "Particle": {
+        "Lifetime": [0.8, 1.2],
+        "Speed": [10, 18],
+        "SizeStart": 0.4,
+        "SizeEnd": 0.0,
+        "ColorStart": "#88FF88FF",
+        "ColorEnd": "#44CC4400",
+        "Gravity": -15,
+        "Drag": 0.0,
+        "RandomVelocity": { "X": 8, "Y": 0, "Z": 8 }
+      }
+    }
+  ],
+  "Poisoned": [
+    {
+      "Texture": "Particles/jellyfish0-masks/43",
+      "BlendMode": "Additive",
+      "SimulationSpace": "Local",
+      "Rate": 15,
+      "Shape": "Cone",
+      "Angle": 90,
+      "LocalOffset": { "X": 0.0, "Y": 15.0, "Z": 0.0 },
+      "Particle": {
+        "Lifetime": [1.0, 2.0],
+        "Speed": [5, 10],
+        "SizeStart": 0.7,
+        "SizeEnd": 0.0,
+        "ColorStart": "#44FF44CC",
+        "ColorEnd": "#228822",
+        "Gravity": 12,
+        "Drag": 0.0,
+        "RandomVelocity": { "X": 15, "Y": 0, "Z": 15 }
+      }
+    },
+    {
+      "Texture": "Particles/jellyfish0-masks/15",
+      "BlendMode": "Additive",
+      "SimulationSpace": "Local",
+      "Rate": 10,
+      "Shape": "Sphere",
+      "Radius": 1.0,
+      "LocalOffset": { "X": 0.0, "Y": 12.0, "Z": 0.0 },
+      "Particle": {
+        "Lifetime": [1.0, 1.5],
+        "Speed": [8, 15],
+        "SizeStart": 0.5,
+        "SizeEnd": 0.0,
+        "ColorStart": "#66FF66FF",
+        "ColorEnd": "#33AA3300",
+        "Gravity": 10,
+        "Drag": 0.0,
+        "RandomVelocity": { "X": 10, "Y": 0, "Z": 10 }
+      }
+    }
+  ],
+  "MeleeHit": [
+    {
+      "Texture": "Particles/jellyfish0-masks/15",
+      "BlendMode": "Additive",
+      "SimulationSpace": "World",
+      "Rate": 0,
+      "Burst": 30,
+      "Shape": "Sphere",
+      "Radius": 0.3,
+      "Particle": {
+        "Lifetime": [0.2, 0.4],
+        "Speed": [40, 100],
+        "SizeStart": 1.0,
+        "SizeEnd": 0.0,
+        "ColorStart": "#FFFFFFFF",
+        "ColorEnd": "#FF880000",
+        "Gravity": 100,
+        "Drag": 1.5
+      }
+    }
+  ],
+  "FanOfKnivesImpact": [
+    {
+      "RenderMode": "Mesh",
+      "Model": "3d_models/kay_kit_characters/sword_broken_half",
+      "MeshRotation": "Fixed",
+      "SimulationSpace": "World",
+      "Rate": 0,
+      "Burst": 1,
+      "Shape": "Point",
+      "FloorHeight": 0.0,
+      "Particle": {
+        "Lifetime": [2.0, 3.0],
+        "Speed": [0, 0],
+        "SizeStart": 0.4,
+        "SizeEnd": 0.0,
+        "ColorStart": "#FFFFFFFF",
+        "ColorEnd": "#FFFFFF00",
+        "Gravity": 0,
+        "Drag": 0
+      }
+    },
+    {
+      "Texture": "Particles/jellyfish0-masks/15",
+      "BlendMode": "Additive",
+      "SimulationSpace": "World",
+      "Rate": 0,
+      "Burst": 15,
+      "Shape": "Sphere",
+      "Radius": 0.2,
+      "Particle": {
+        "Lifetime": [0.2, 0.4],
+        "Speed": [20, 50],
+        "SizeStart": 0.6,
+        "SizeEnd": 0.0,
+        "ColorStart": "#CCCCCCFF",
+        "ColorEnd": "#88888800",
+        "Gravity": 80,
+        "Drag": 1.0
       }
     }
   ]

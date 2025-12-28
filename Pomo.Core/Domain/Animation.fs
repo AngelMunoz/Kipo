@@ -52,6 +52,7 @@ module Animation =
   type ModelConfig = {
     Rig: HashMap<string, RigNode>
     AnimationBindings: HashMap<string, string[]>
+    FacingOffset: float32
   }
 
   module Serialization =
@@ -131,12 +132,19 @@ module Animation =
               ("AnimationBindings", AnimationBindings.clipArrayDecoder)
               json
 
+          and! facingOffsetDeg =
+            VOptional.Property.get ("FacingOffsetDeg", Required.float) json
+
           return {
             Rig = rig
             AnimationBindings =
               bindings
               |> ValueOption.map HashMap.ofMap
               |> ValueOption.defaultValue HashMap.empty
+            FacingOffset =
+              match facingOffsetDeg with
+              | ValueSome d -> float32(Math.PI * d / 180.0)
+              | ValueNone -> 0.0f
           }
         }
 

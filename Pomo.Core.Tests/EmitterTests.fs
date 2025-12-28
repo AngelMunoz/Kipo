@@ -235,6 +235,7 @@ type PoseResolverTests() =
                     }
                   ]
                 AnimationBindings = HashMap.empty
+                FacingOffset = 0.0f
               }
             else
               ValueNone
@@ -323,6 +324,7 @@ type PoseResolverTests() =
                     }
                   ]
                 AnimationBindings = HashMap.empty
+                FacingOffset = 0.0f
               }
             else
               ValueNone
