@@ -1,0 +1,22 @@
+# Blender MTL File: 'SpooktoberExportFile.blend'
+# Material Count: 2
+
+newmtl GreenDark
+Ns 323.999994
+Ka 1.000000 1.000000 1.000000
+Kd 0.021420 0.257312 0.266761
+Ks 0.500000 0.500000 0.500000
+Ke 0.0 0.0 0.0
+Ni 1.450000
+d 1.000000
+illum 2
+
+newmtl Orange
+Ns 575.999996
+Ka 1.000000 1.000000 1.000000
+Kd 1.000000 0.166063 0.017658
+Ks 0.500000 0.500000 0.500000
+Ke 0.0 0.0 0.0
+Ni 1.450000
+d 1.000000
+illum 2

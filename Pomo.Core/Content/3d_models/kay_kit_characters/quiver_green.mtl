@@ -1,0 +1,22 @@
+# Blender MTL File: 'SkeletonCharacterPack_export.blend'
+# Material Count: 2
+
+newmtl GreenDark
+Ns 323.999994
+Ka 1.000000 1.000000 1.000000
+Kd 0.021420 0.257312 0.266761
+Ks 0.500000 0.500000 0.500000
+Ke 0.0 0.0 0.0
+Ni 1.450000
+d 1.000000
+illum 2
+
+newmtl WoodDark
+Ns 323.999994
+Ka 1.000000 1.000000 1.000000
+Kd 0.153778 0.116567 0.105912
+Ks 0.500000 0.500000 0.500000
+Ke 0.0 0.0 0.0
+Ni 1.450000
+d 1.000000
+illum 2
