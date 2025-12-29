@@ -75,6 +75,7 @@ Built-in WYSIWYG 3D block map editor using a **True 3D** world architecture. The
 
 ### 8. Persistence
 - **JSON Format**: JDeck encoders/decoders
+- **Schema Version**: `Version: int` field for future migrations
 - **Self-Contained Palette**: Block types in map file
 - **Sparse Storage**: Only placed blocks stored
 
@@ -102,6 +103,7 @@ type CollisionType =
   | Mesh of string   // Collision mesh path for slopes
   | NoCollision      // Decorations, passthrough
 
+[<Struct>]
 type PlacedBlock = {
   Cell: GridCell3D
   BlockTypeId: int<BlockTypeId>
@@ -117,10 +119,11 @@ type BlockType = {
 }
 
 type BlockMapDefinition = {
+  Version: int  // Schema version for migrations
   Key: string
   Width: int; Height: int; Depth: int
-  Palette: Map<int<BlockTypeId>, BlockType>
-  Blocks: Map<GridCell3D, PlacedBlock>
+  Palette: Dictionary<int<BlockTypeId>, BlockType>
+  Blocks: Dictionary<GridCell3D, PlacedBlock>
   SpawnCell: GridCell3D voption
 }
 ```

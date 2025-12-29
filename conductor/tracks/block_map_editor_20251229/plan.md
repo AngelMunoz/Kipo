@@ -1,10 +1,13 @@
 # Implementation Plan - 3D Block Map Editor (True 3D Architecture)
 
 > [!IMPORTANT]
-> **True 3D Foundation:** The world uses `WorldPosition` (X/Y/Z) with Y as vertical height. The isometric camera is just one view mode. This enables future first-person, cutscenes, etc.
+> **True 3D Foundation:** The world uses `WorldPosition` (X/Y/Z) with Y as vertical height. The isometric camera is just one view mode.
 
 > [!WARNING]
-> **Performance & GC:** All implementations follow existing patterns: `[<Struct>]` DUs, `voption`, `Dictionary<K,V>`, `ArrayPool`, no allocations in hot paths.
+> **Performance & GC:** All implementations follow existing patterns: `[<Struct>]` DUs, `voption`, `Dictionary<K,V>`, no allocations in hot paths.
+
+> [!NOTE]
+> **Compile Between Phases:** Each phase must compile and run before moving to the next. Y=0 behavior preserved throughout migration.
 
 ---
 
@@ -25,10 +28,28 @@
     - Helper functions for cell ↔ world position conversion
 - [ ] Task: Update `MovementSnapshot` in `Projections.fs`
     - `Positions: IReadOnlyDictionary<EntityId, WorldPosition>`
-- [ ] Task: Update all systems using positions
+- [ ] Task: Update all systems using positions (see Migration Checklist below)
     - Pattern: `position.X, position.Z` for XZ plane operations
-    - Most distance checks continue working on XZ plane
-- [ ] Task: Verification - All tests pass, game runs with Y=0
+    - Use `WorldPosition.toVector2` where 2D is still appropriate
+- [ ] Task: Verification - Game compiles, runs with Y=0, no behavior change
+
+### Migration Checklist (Vector2 → WorldPosition)
+
+The following files contain `Vector2.Distance` or `Vector2` position logic:
+
+| File | Change Required |
+|------|----------------|
+| `Systems/AISystem.fs` | Use XZ distance for perception |
+| `Systems/Collision.fs` | XZ plane collision, Y for height blocks |
+| `Systems/Combat.fs` | XZ distance for AoE |
+| `Systems/MovementLogic.fs` | XZ waypoint distance |
+| `Systems/Navigation.fs` | XZ pathfinding |
+| `Systems/Projectile.fs` | XZ targeting, Y for altitude |
+| `Systems/Targeting.fs` | XZ range validation |
+| `Systems/AbilityActivation.fs` | XZ skill range |
+| `Domain/Spatial.fs` | Add `distanceXZ` helper |
+| `Algorithms/Pathfinding.fs` | XZ-only for now |
+| `Projections.fs` | MovementSnapshot update |
 
 ---
 
@@ -129,8 +150,11 @@
 
 ---
 
-## Phase 7: Editor UI & Polish
+## Phase 7: Editor Integration & UI
 
+- [ ] Task: Register `EditorScene` in `Scenes.fs` / `CompositionRoot.fs`
+- [ ] Task: Add "Map Editor" menu entry in MainMenu
+- [ ] Task: Wire editor input bindings in `InputMapping.fs`
 - [ ] Task: Block palette UI (minimal list)
 - [ ] Task: Layer indicator and controls
 - [ ] Task: Brush mode buttons
@@ -142,11 +166,27 @@
 ## Phase 8: 3D Navigation (Future)
 
 > [!NOTE]
-> This phase can be deferred. Basic block collision provides sufficient gameplay initially.
+> Defer until needed. Block collision + XZ pathfinding works initially.
 
 - [ ] Task: Create `BlockNavGrid` for 3D pathfinding
 - [ ] Task: Handle ramp/stair transitions
 - [ ] Task: Update AI pathfinding for height
+
+---
+
+## Testing Philosophy
+
+> [!CAUTION]
+> **No tests for the sake of testing.** Tests must represent real use cases. If bugs are found, replicate in tests, fix, and keep the test.
+
+**Required Tests:**
+- Serialization roundtrip (JDeck encode → decode → equal)
+- Any bugs discovered during implementation → replicated and fixed
+
+**NOT Required:**
+- Redundant coverage tests
+- Tests that just "prove it compiles"
+- Mocking tests that don't exercise real code paths
 
 ---
 
