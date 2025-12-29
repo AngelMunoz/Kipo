@@ -51,14 +51,17 @@
 ## Phase 2: Block Map Domain & Persistence
 
 - [ ] Task: Create `Domain/BlockMap.fs`
-    - `BlockType`, `PlacedBlock`, `BlockPalette`, `BlockMapDefinition`
+    - `CollisionType` enum: `Box | Mesh of string | NoCollision`
+    - `PlacedBlock` with `Rotation: Quaternion voption`
+    - `BlockType` with `CollisionType`
+    - `BlockMapDefinition` with embedded palette
     - All types with `[<Struct>]` where appropriate
 - [ ] Task: Create `Loaders/BlockMapLoader.fs`
-    - JDeck decoders for all BlockMap types
+    - JDeck decoders including Quaternion
     - JDeck encoders for JSON serialization
     - Load/Save functions
 - [ ] Task: Unit tests for serialization roundtrip
-- [ ] Task: Create sample block palette JSON
+- [ ] Task: Create sample block palette JSON with slope blocks
 
 ---
 
@@ -67,12 +70,13 @@
 - [ ] Task: Create `Rendering/BlockEmitter.fs`
     - `emitBlocks: BlockMapDefinition → MeshCommand[]`
     - Load models from palette paths
+    - Apply `Quaternion` rotation to mesh transforms
     - Position at `GridCell3D` world coordinates
     - Frustum culling
 - [ ] Task: Integrate into `RenderOrchestratorV2`
     - Render blocks in mesh pass
     - Proper depth sorting with entities
-- [ ] Task: Verification - Static blocks render at correct 3D positions
+- [ ] Task: Verification - Rotated blocks render correctly
 
 ---
 
@@ -80,31 +84,36 @@
 
 - [ ] Task: Create `Editor/EditorState.fs`
     - FDA `cval<T>` for all state
-    - `CurrentLayer`, `GridCursor`, `BrushMode`
+    - `CurrentLayer`, `GridCursor`, `BrushMode`, `CurrentRotation`
 - [ ] Task: Create `Editor/EditorScene.fs`
     - Scene setup and transitions
     - Register editor systems
 - [ ] Task: Create `Editor/EditorInputSystem.fs`
     - Ray-to-grid intersection for 3D placement
-    - Block placement/removal
+    - Block placement/removal with rotation
     - Layer navigation (Page Up/Down)
+    - Rotation controls (gizmo or angle sliders)
 - [ ] Task: Grid overlay rendering at current Y-level
-- [ ] Task: Cursor preview (ghost block)
+- [ ] Task: Cursor preview (ghost block with current rotation)
 - [ ] Task: Undo/redo stack
 
 ---
 
-## Phase 5: 3D Collision (Block-Based)
+## Phase 5: 3D Collision
 
-- [ ] Task: Create `Systems/BlockGridCollision.fs`
-    - Build occupancy from solid blocks
-    - `isBlocked(GridCell3D): bool`
-- [ ] Task: Extend collision system for 3D
-    - Check block occupancy at entity's Y-level
-    - Add to existing collision pipeline
-- [ ] Task: Entity-block collision response
-    - Prevent walking through solid blocks
-- [ ] Task: Verification - Entities blocked by solid blocks
+- [ ] Task: Extend `Domain/Spatial.fs` with `GridCell3D`
+    - 3D spatial grid (extends existing 2D pattern)
+    - `getCellsInRadius3D`, `getGridCell3D`
+- [ ] Task: Create `Systems/BlockCollision.fs`
+    - **Box collision**: Fast AABB for `CollisionType.Box`
+    - **Mesh collision**: Ray-surface for `CollisionType.Mesh`
+        - Load collision mesh, apply block rotation
+        - Raycast down to find surface height
+    - Skip blocks with `CollisionType.NoCollision`
+- [ ] Task: Integrate into movement system
+    - Entity Y follows surface height on mesh blocks (slopes)
+    - Entity blocked by Box blocks at same height
+- [ ] Task: Verification - Walk up/down rotated slope blocks
 
 ---
 
@@ -152,7 +161,7 @@
 | `Editor/EditorScene.fs` | Editor scene |
 | `Editor/EditorInputSystem.fs` | Block placement |
 | `Rendering/BlockEmitter.fs` | Block mesh emission |
-| `Systems/BlockGridCollision.fs` | 3D block collision |
+| `Systems/BlockCollision.fs` | Box + mesh collision |
 
 ### Modified Files
 | File | Change |

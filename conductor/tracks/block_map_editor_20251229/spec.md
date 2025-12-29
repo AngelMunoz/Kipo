@@ -58,9 +58,10 @@ Built-in WYSIWYG 3D block map editor using a **True 3D** world architecture. The
 - **Block Properties**: Name, Model path, IsSolid, CanStack
 
 ### 5. 3D Collision System
-- **Grid-Based**: Block occupancy grid for fast collision
-- **Height-Aware**: Entities blocked by solid blocks at same height
-- **IsSolid Flag**: Per-block-type, auto-generates collision
+- **Dual-strategy**: Fast AABB for regular blocks, mesh collision for slopes
+- **CollisionType per BlockType**: `Box | Mesh | NoCollision`
+- **3D Spatial Grid**: Extends current 2D grid to 3D (`GridCell3D`)
+- **Mesh Collision**: For rotated slope blocks, ray-surface intersection
 
 ### 6. 3D Pathfinding
 - **3D Navigation Grid**: Walkable cells with height transitions
@@ -95,10 +96,16 @@ type GridCell3D = { X: int; Y: int; Z: int }  // Y = height
 
 ### BlockMap
 ```fsharp
+[<Struct>]
+type CollisionType =
+  | Box              // Fast AABB check
+  | Mesh of string   // Collision mesh path for slopes
+  | NoCollision      // Decorations, passthrough
+
 type PlacedBlock = {
   Cell: GridCell3D
   BlockTypeId: int<BlockTypeId>
-  Rotation: int
+  Rotation: Quaternion voption  // None = no rotation, Some = arbitrary 3D
 }
 
 type BlockType = {
@@ -106,8 +113,7 @@ type BlockType = {
   Name: string
   Model: string
   Category: string
-  IsSolid: bool
-  IsRamp: bool  // Height transition
+  CollisionType: CollisionType
 }
 
 type BlockMapDefinition = {
@@ -190,8 +196,10 @@ type EditorState = {
 - [ ] Map saves/loads with JDeck
 
 ### Collision
-- [ ] Solid blocks prevent entity movement
+- [ ] Box collision for standard blocks
+- [ ] Mesh collision for rotated slope blocks
 - [ ] Height differences respected
+- [ ] 3D spatial grid for collision queries
 
 ### Camera
 - [ ] Isometric camera works with 3D world
