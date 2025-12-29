@@ -94,5 +94,85 @@
     "Skills": [7],
     "DecisionTree": "Turret",
     "Model": "HumanoidBase"
+  },
+  "SkeletonArcher": {
+    "Name": "Skeleton Archer",
+    "ArchetypeId": 2,
+    "Family": "Sense",
+    "Skills": [17, 19],
+    "DecisionTree": "TacticalRanged",
+    "Model": "SkeletonArcher"
+  },
+  "SkeletonArcherDamaged": {
+    "Name": "Skeleton Archer (Damaged)",
+    "ArchetypeId": 2,
+    "Family": "Sense",
+    "Skills": [17, 19],
+    "DecisionTree": "TacticalRanged",
+    "Model": "SkeletonArcherBroken"
+  },
+  "SkeletonMage": {
+    "Name": "Skeleton Mage",
+    "ArchetypeId": 1,
+    "Family": "Magic",
+    "Skills": [11, 20],
+    "DecisionTree": "RangedCaster",
+    "Model": "SkeletonMage"
+  },
+  "SkeletonMageDamaged": {
+    "Name": "Skeleton Mage (Damaged)",
+    "ArchetypeId": 1,
+    "Family": "Magic",
+    "Skills": [11, 20],
+    "DecisionTree": "RangedCaster",
+    "Model": "SkeletonMageBroken"
+  },
+  "SkeletonWarrior": {
+    "Name": "Skeleton Warrior",
+    "ArchetypeId": 1,
+    "Family": "Power",
+    "Skills": [1, 16, 21],
+    "DecisionTree": "MeleeAttacker",
+    "Model": "SkeletonWarrior"
+  },
+  "SkeletonWarriorDamaged": {
+    "Name": "Skeleton Warrior (Damaged)",
+    "ArchetypeId": 1,
+    "Family": "Power",
+    "Skills": [1, 16, 21],
+    "DecisionTree": "MeleeAttacker",
+    "Model": "SkeletonWarriorBroken"
+  },
+  "SkeletonMinion": {
+    "Name": "Skeleton Minion",
+    "ArchetypeId": 1,
+    "Family": "Power",
+    "Skills": [1],
+    "DecisionTree": "MeleeAttacker",
+    "Model": "SkeletonMinion"
+  },
+  "SkeletonMinionDamaged": {
+    "Name": "Skeleton Minion (Damaged)",
+    "ArchetypeId": 1,
+    "Family": "Power",
+    "Skills": [1],
+    "DecisionTree": "MeleeAttacker",
+    "Model": "SkeletonMinionBroken"
+  },
+  "Jack": {
+    "Name": "Jack",
+    "ArchetypeId": 1,
+    "Family": "Charm",
+    "Skills": [5, 14, 22, 23],
+    "DecisionTree": "SupportBuffer",
+    "Model": "Jack"
+  },
+  "Witch": {
+    "Name": "Witch",
+    "ArchetypeId": 1,
+    "Family": "Magic",
+    "Skills": [2, 3, 9, 10],
+    "DecisionTree": "RangedCaster",
+    "Model": "Witch"
   }
 }

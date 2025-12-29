@@ -279,7 +279,7 @@
 /processorParam:TextureFormat=Compressed
 /build:3d_models/kay_kit_characters/Jack/character_jack.obj
 
-#begin 3d_models/kay_kit_characters/Jack/character_jackArmLeft..obj
+#begin 3d_models/kay_kit_characters/Jack/character_jackArmLeft.obj
 /importer:FbxImporter
 /processor:ModelProcessor
 /processorParam:ColorKeyColor=0,0,0,0
@@ -296,7 +296,7 @@
 /processorParam:Scale=1
 /processorParam:SwapWindingOrder=False
 /processorParam:TextureFormat=Compressed
-/build:3d_models/kay_kit_characters/Jack/character_jackArmLeft..obj
+/build:3d_models/kay_kit_characters/Jack/character_jackArmLeft.obj
 
 #begin 3d_models/kay_kit_characters/Jack/character_jackArmRight.obj
 /importer:FbxImporter
@@ -3395,25 +3395,6 @@
 /processorParam:TextureFormat=Compressed
 /build:3d_models/kaykit_prototype/Wall.obj
 
-#begin 3d_models/kaykit_resources/Copper_Nugget_Small.obj
-/importer:FbxImporter
-/processor:ModelProcessor
-/processorParam:ColorKeyColor=0,0,0,0
-/processorParam:ColorKeyEnabled=True
-/processorParam:DefaultEffect=BasicEffect
-/processorParam:GenerateMipmaps=True
-/processorParam:GenerateTangentFrames=False
-/processorParam:PremultiplyTextureAlpha=True
-/processorParam:PremultiplyVertexColors=True
-/processorParam:ResizeTexturesToPowerOfTwo=False
-/processorParam:RotationX=0
-/processorParam:RotationY=0
-/processorParam:RotationZ=0
-/processorParam:Scale=1
-/processorParam:SwapWindingOrder=False
-/processorParam:TextureFormat=Compressed
-/build:3d_models/kaykit_resources/Copper_Nugget_Small.obj
-
 #begin 3d_models/kaykit_resources/Copper_Nugget_Large.obj
 /importer:FbxImporter
 /processor:ModelProcessor
@@ -3451,6 +3432,25 @@
 /processorParam:SwapWindingOrder=False
 /processorParam:TextureFormat=Compressed
 /build:3d_models/kaykit_resources/Copper_Nugget_Medium.obj
+
+#begin 3d_models/kaykit_resources/Copper_Nugget_Small.obj
+/importer:FbxImporter
+/processor:ModelProcessor
+/processorParam:ColorKeyColor=0,0,0,0
+/processorParam:ColorKeyEnabled=True
+/processorParam:DefaultEffect=BasicEffect
+/processorParam:GenerateMipmaps=True
+/processorParam:GenerateTangentFrames=False
+/processorParam:PremultiplyTextureAlpha=True
+/processorParam:PremultiplyVertexColors=True
+/processorParam:ResizeTexturesToPowerOfTwo=False
+/processorParam:RotationX=0
+/processorParam:RotationY=0
+/processorParam:RotationZ=0
+/processorParam:Scale=1
+/processorParam:SwapWindingOrder=False
+/processorParam:TextureFormat=Compressed
+/build:3d_models/kaykit_resources/Copper_Nugget_Small.obj
 
 #begin 3d_models/kaykit_resources/Copper_Nuggets.obj
 /importer:FbxImporter

@@ -287,12 +287,17 @@ module EntitySpawnerLogic =
         memories = HashMap.empty
       }
 
+      let modelConfig =
+        aiEntity
+        |> Option.map(fun e -> e.Model)
+        |> Option.defaultValue "HumanoidBase"
+
       let bundle: EntitySpawnBundle = {
         Snapshot = snapshot
         Resources = ValueSome resource
         Factions = ValueSome factions
         BaseStats = ValueSome baseStats
-        ModelConfig = ValueSome "HumanoidBase"
+        ModelConfig = ValueSome modelConfig
         InputMap = ValueNone
         ActionSets = ValueNone
         ActiveActionSet = ValueNone

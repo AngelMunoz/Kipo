@@ -1,37 +1,37 @@
 {
   "magic_casters": {
-    "Entities": ["FireMage", "IceMage", "ElementalCaster"],
-    "Weights": [0.33, 0.33, 0.34],
+    "Entities": ["SkeletonMage", "SkeletonMageDamaged"],
+    "Weights": [0.7, 0.3],
     "Overrides": {},
     "Faction": "TeamRed"
   },
   "fire_mages": {
-    "Entities": ["FireMage"],
+    "Entities": ["Witch"],
     "Weights": [1.0],
     "Overrides": {},
-    "Faction": "TeamRed"
+    "Faction": "TeamPurple"
   },
   "melee_fighters": {
-    "Entities": ["Warrior", "Berserker"],
-    "Weights": [0.5, 0.5],
+    "Entities": ["SkeletonWarrior", "SkeletonWarriorDamaged"],
+    "Weights": [0.7, 0.3],
     "Overrides": {},
     "Faction": "TeamBlue"
   },
   "support_units": {
-    "Entities": ["Bard", "Enchanter"],
-    "Weights": [0.5, 0.5],
+    "Entities": ["Jack"],
+    "Weights": [1.0],
     "Overrides": {},
     "Faction": "TeamGreen"
   },
   "ranged_attackers": {
-    "Entities": ["Sniper", "Assassin"],
-    "Weights": [0.5, 0.5],
+    "Entities": ["SkeletonArcher", "SkeletonArcherDamaged"],
+    "Weights": [0.7, 0.3],
     "Overrides": {},
     "Faction": "TeamYellow"
   },
   "defense_towers": {
-    "Entities": ["FireMage", "IceMage", "ElementalCaster"],
-    "Weights": [0.5, 0.25, 0.25],
+    "Entities": ["SkeletonMinion", "SkeletonMinionDamaged"],
+    "Weights": [0.6, 0.4],
     "Overrides": {},
     "Faction": "TeamPurple"
   }

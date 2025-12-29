@@ -886,8 +886,8 @@
         "Speed": [0, 0],
         "SizeStart": 0.3,
         "SizeEnd": 0.3,
-        "ColorStart": "#00FFFFFF",
-        "ColorEnd": "#00FFFFFF",
+        "ColorStart": "#00BFFFFF",
+        "ColorEnd": "#00BFFFFF",
         "Gravity": 0,
         "Drag": 0
       }
@@ -927,8 +927,8 @@
         "Speed": [0, 0],
         "SizeStart": 0.6,
         "SizeEnd": 0.0,
-        "ColorStart": "#00FFFFFF",
-        "ColorEnd": "#00FFFF00",
+        "ColorStart": "#00BFFFFF",
+        "ColorEnd": "#0088FFFF",
         "Gravity": 0,
         "Drag": 0
       }
