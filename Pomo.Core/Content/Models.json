@@ -195,6 +195,82 @@
       "Run": ["Run_Bounce"]
     }
   },
+  "SkeletonMage": {
+    "Rig": {
+      "Root": { "Model": "3d_models/kay_kit_characters/Skeletons/skeleton_mage_body" },
+      "Head": {
+        "Model": "3d_models/kay_kit_characters/Skeletons/skeleton_mage_skull",
+        "Parent": "Root"
+      },
+      "Eyes": {
+        "Model": "3d_models/kay_kit_characters/Skeletons/skeleton_mage_skull_eyes",
+        "Parent": "Head"
+      },
+      "Jaw": {
+        "Model": "3d_models/kay_kit_characters/Skeletons/skeleton_mage_skull_jaw",
+        "Parent": "Head"
+      },
+      "Scarf": {
+        "Model": "3d_models/kay_kit_characters/Skeletons/skeleton_mage_skull_scarf",
+        "Parent": "Head"
+      },
+      "Cape": {
+        "Model": "3d_models/kay_kit_characters/Skeletons/skeleton_mage_cape",
+        "Parent": "Root"
+      },
+      "Arm_L": {
+        "Model": "3d_models/kay_kit_characters/Skeletons/skeleton_mage_left_arm",
+        "Parent": "Root",
+        "Pivot": { "X": 0.0, "Y": 1.5, "Z": 0.0 }
+      },
+      "Arm_R": {
+        "Model": "3d_models/kay_kit_characters/Skeletons/skeleton_mage_right_arm",
+        "Parent": "Root",
+        "Pivot": { "X": 0.0, "Y": 1.5, "Z": 0.0 }
+      }
+    },
+    "AnimationBindings": {
+      "Run": ["Arm_Swing", "Run_Bounce"]
+    }
+  },
+  "SkeletonArcher": {
+    "Rig": {
+      "Root": { "Model": "3d_models/kay_kit_characters/Skeletons/skeleton_archer_body" },
+      "Head": {
+        "Model": "3d_models/kay_kit_characters/Skeletons/skeleton_archer_skull",
+        "Parent": "Root"
+      },
+      "Eyes": {
+        "Model": "3d_models/kay_kit_characters/Skeletons/skeleton_archer_skull_eyes",
+        "Parent": "Head"
+      },
+      "Jaw": {
+        "Model": "3d_models/kay_kit_characters/Skeletons/skeleton_archer_skull_jaw",
+        "Parent": "Head"
+      },
+      "Hood": {
+        "Model": "3d_models/kay_kit_characters/Skeletons/skeleton_archer_skull_hood",
+        "Parent": "Head"
+      },
+      "Mask": {
+        "Model": "3d_models/kay_kit_characters/Skeletons/skeleton_archer_skull_mask",
+        "Parent": "Head"
+      },
+      "Arm_L": {
+        "Model": "3d_models/kay_kit_characters/Skeletons/skeleton_archer_left_arm",
+        "Parent": "Root",
+        "Pivot": { "X": 0.0, "Y": 1.5, "Z": 0.0 }
+      },
+      "Arm_R": {
+        "Model": "3d_models/kay_kit_characters/Skeletons/skeleton_archer_right_arm",
+        "Parent": "Root",
+        "Pivot": { "X": 0.0, "Y": 1.5, "Z": 0.0 }
+      }
+    },
+    "AnimationBindings": {
+      "Run": ["Arm_Swing", "Run_Bounce"]
+    }
+  },
   "Rogue": {
     "Rig": {
       "Root": { "Model": "3d_models/lay_kit_adventurers/Characters/rogue" }

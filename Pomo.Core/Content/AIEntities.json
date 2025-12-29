@@ -101,7 +101,7 @@
     "Family": "Sense",
     "Skills": [17, 19],
     "DecisionTree": "TacticalRanged",
-    "Model": "Ranger"
+    "Model": "SkeletonArcher"
   },
   "Mage": {
     "Name": "Mage",
@@ -109,7 +109,7 @@
     "Family": "Magic",
     "Skills": [11, 20],
     "DecisionTree": "RangedCaster",
-    "Model": "Mage"
+    "Model": "SkeletonMage"
   },
   "Knight": {
     "Name": "Knight",
