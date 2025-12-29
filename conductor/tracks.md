@@ -11,3 +11,8 @@ This file tracks all major tracks for the project. Each track has its own detail
 
 ## [ ] Track: Implementation of a data-driven Loot System with physical world representation and interaction.
 *Link: [./conductor/tracks/looting_system_20251227/](./conductor/tracks/looting_system_20251227/)*
+
+---
+
+## [ ] Track: Built-in WYSIWYG 3D block map editor with True 3D world architecture
+*Link: [./conductor/tracks/block_map_editor_20251229/](./conductor/tracks/block_map_editor_20251229/)*
