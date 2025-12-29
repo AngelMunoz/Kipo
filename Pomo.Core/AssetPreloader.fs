@@ -45,15 +45,14 @@ module AssetPreloader =
 
   /// Load a manifest from disk, or return UseHeuristics
   let tryLoadManifest(mapKey: string) : ManifestLookup =
-    let manifestPath = $"AssetManifests/{mapKey}"
+    let manifestPath = $"Content/AssetManifests/{mapKey}.json"
 
     try
       let deserializer = Serialization.create()
 
       match
-        JsonFileLoader.readJson
+        JsonFileLoader.readJson<AssetManifest.LoadingManifest>
           deserializer
-          Serialization.LoadingManifest.decoder
           manifestPath
       with
       | Ok manifest -> Explicit manifest
@@ -79,7 +78,6 @@ module AssetPreloader =
 
       discoverHeuristicAssets mapDef modelStore particleStore
 
-  /// Preload models into cache
   let preloadModels
     (content: ContentManager)
     (modelCache: ConcurrentDictionary<string, Lazy<Model>>)
@@ -87,9 +85,12 @@ module AssetPreloader =
     =
     let mutable loaded = 0
     let mutable failed = 0
+    let mutable skipped = 0
 
     for path in modelPaths do
-      if not(modelCache.ContainsKey(path)) then
+      if modelCache.ContainsKey(path) then
+        skipped <- skipped + 1
+      else
         try
           let model = content.Load<Model>(path)
           modelCache[path] <- Lazy<Model>(fun () -> model)
@@ -100,9 +101,8 @@ module AssetPreloader =
 
           failed <- failed + 1
 
-    struct (loaded, failed)
+    struct (loaded, failed, skipped)
 
-  /// Preload textures into cache
   let preloadTextures
     (content: ContentManager)
     (textureCache: ConcurrentDictionary<string, Lazy<Texture2D>>)
@@ -110,9 +110,12 @@ module AssetPreloader =
     =
     let mutable loaded = 0
     let mutable failed = 0
+    let mutable skipped = 0
 
     for path in texturePaths do
-      if not(textureCache.ContainsKey(path)) then
+      if textureCache.ContainsKey(path) then
+        skipped <- skipped + 1
+      else
         try
           let texture = content.Load<Texture2D>(path)
           textureCache[path] <- Lazy<Texture2D>(fun () -> texture)
@@ -123,7 +126,7 @@ module AssetPreloader =
 
           failed <- failed + 1
 
-    struct (loaded, failed)
+    struct (loaded, failed, skipped)
 
   /// Main preload function
   /// Returns (total assets attempted, total loaded, total failed)
@@ -139,17 +142,18 @@ module AssetPreloader =
 
     let assets = getAssetsToPreload mapKey mapDef modelStore particleStore
 
-    let struct (modelsLoaded, modelsFailed) =
+    let struct (modelsLoaded, modelsFailed, modelsSkipped) =
       preloadModels content modelCache assets.Models
 
-    let struct (texturesLoaded, texturesFailed) =
+    let struct (texturesLoaded, texturesFailed, texturesSkipped) =
       preloadTextures content textureCache assets.Textures
 
     let totalAttempted = assets.Models.Length + assets.Textures.Length
     let totalLoaded = modelsLoaded + texturesLoaded
     let totalFailed = modelsFailed + texturesFailed
+    let totalSkipped = modelsSkipped + texturesSkipped
 
     printfn
-      $"[AssetPreloader] Preloaded {totalLoaded}/{totalAttempted} assets ({modelsFailed + texturesFailed} failed)"
+      $"[AssetPreloader] {mapKey}: loaded {totalLoaded}, cached {totalSkipped}, failed {totalFailed} (total: {totalAttempted})"
 
     struct (totalAttempted, totalLoaded, totalFailed)

@@ -22,9 +22,10 @@ module TerrainEmitter =
     (content: ContentManager)
     (map: MapDefinition)
     : int -> Texture2D voption =
-    
+
     // 1. Pre-compute GID -> AssetPath mapping (fast, lightweight)
     let assetMap = Dictionary<int, string>()
+
     for tileset in map.Tilesets do
       for localId, tileDef in tileset.Tiles do
         let globalId = tileset.FirstGid + localId
@@ -35,21 +36,27 @@ module TerrainEmitter =
 
     // 3. Loading function
     fun gid ->
-        let loader = textureCache.GetOrAdd(gid, fun id ->
-            lazy (
-                match assetMap.TryGetValue(id) with
-                | true, assetPath ->
-                    try
-                        // Lock content to ensure thread safety of Content.Load
-                        lock content (fun () ->
-                            let tex = content.Load<Texture2D>(assetPath)
-                            ValueSome tex)
-                    with _ ->
-                        ValueNone
-                | false, _ -> ValueNone
-            )
+      let loader =
+        textureCache.GetOrAdd(
+          gid,
+          fun id ->
+            lazy
+              (match assetMap.TryGetValue(id) with
+               | true, assetPath ->
+                 try
+                   // Lock content to ensure thread safety of Content.Load
+                   lock content (fun () ->
+                     let tex = content.Load<Texture2D>(assetPath)
+                     ValueSome tex)
+                 with ex ->
+                   printfn
+                     $"[TerrainEmitter] Failed to load texture: {assetPath} - {ex.Message}"
+
+                   ValueNone
+               | false, _ -> ValueNone)
         )
-        loader.Value
+
+      loader.Value
 
   /// Pre-loads tile textures from map tilesets into a cache
   let loadTileTextures
@@ -66,8 +73,9 @@ module TerrainEmitter =
         try
           let texture = content.Load<Texture2D> assetPath
           cache[globalId] <- texture
-        with _ ->
-          ()
+        with ex ->
+          printfn
+            $"[TerrainEmitter] Failed to load texture: {assetPath} (GID {globalId}) - {ex.Message}"
 
     cache
 

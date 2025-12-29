@@ -95,69 +95,53 @@
     "DecisionTree": "Turret",
     "Model": "HumanoidBase"
   },
-  "SkeletonArcher": {
-    "Name": "Skeleton Archer",
+  "Ranger": {
+    "Name": "Ranger",
     "ArchetypeId": 2,
     "Family": "Sense",
     "Skills": [17, 19],
     "DecisionTree": "TacticalRanged",
-    "Model": "SkeletonArcher"
+    "Model": "Ranger"
   },
-  "SkeletonArcherDamaged": {
-    "Name": "Skeleton Archer (Damaged)",
-    "ArchetypeId": 2,
+  "Mage": {
+    "Name": "Mage",
+    "ArchetypeId": 1,
+    "Family": "Magic",
+    "Skills": [11, 20],
+    "DecisionTree": "RangedCaster",
+    "Model": "Mage"
+  },
+  "Knight": {
+    "Name": "Knight",
+    "ArchetypeId": 1,
+    "Family": "Power",
+    "Skills": [1, 16, 21],
+    "DecisionTree": "MeleeAttacker",
+    "Model": "Knight"
+  },
+  "Barbarian": {
+    "Name": "Barbarian",
+    "ArchetypeId": 1,
+    "Family": "Power",
+    "Skills": [1, 6, 16],
+    "DecisionTree": "MeleeAttacker",
+    "Model": "Barbarian"
+  },
+  "Rogue": {
+    "Name": "Rogue",
+    "ArchetypeId": 1,
     "Family": "Sense",
-    "Skills": [17, 19],
+    "Skills": [12, 13],
     "DecisionTree": "TacticalRanged",
-    "Model": "SkeletonArcherBroken"
+    "Model": "Rogue"
   },
-  "SkeletonMage": {
-    "Name": "Skeleton Mage",
+  "RogueHooded": {
+    "Name": "Hooded Rogue",
     "ArchetypeId": 1,
-    "Family": "Magic",
-    "Skills": [11, 20],
-    "DecisionTree": "RangedCaster",
-    "Model": "SkeletonMage"
-  },
-  "SkeletonMageDamaged": {
-    "Name": "Skeleton Mage (Damaged)",
-    "ArchetypeId": 1,
-    "Family": "Magic",
-    "Skills": [11, 20],
-    "DecisionTree": "RangedCaster",
-    "Model": "SkeletonMageBroken"
-  },
-  "SkeletonWarrior": {
-    "Name": "Skeleton Warrior",
-    "ArchetypeId": 1,
-    "Family": "Power",
-    "Skills": [1, 16, 21],
-    "DecisionTree": "MeleeAttacker",
-    "Model": "SkeletonWarrior"
-  },
-  "SkeletonWarriorDamaged": {
-    "Name": "Skeleton Warrior (Damaged)",
-    "ArchetypeId": 1,
-    "Family": "Power",
-    "Skills": [1, 16, 21],
-    "DecisionTree": "MeleeAttacker",
-    "Model": "SkeletonWarriorBroken"
-  },
-  "SkeletonMinion": {
-    "Name": "Skeleton Minion",
-    "ArchetypeId": 1,
-    "Family": "Power",
-    "Skills": [1],
-    "DecisionTree": "MeleeAttacker",
-    "Model": "SkeletonMinion"
-  },
-  "SkeletonMinionDamaged": {
-    "Name": "Skeleton Minion (Damaged)",
-    "ArchetypeId": 1,
-    "Family": "Power",
-    "Skills": [1],
-    "DecisionTree": "MeleeAttacker",
-    "Model": "SkeletonMinionBroken"
+    "Family": "Sense",
+    "Skills": [12, 13, 17],
+    "DecisionTree": "TacticalRanged",
+    "Model": "RogueHooded"
   },
   "Jack": {
     "Name": "Jack",

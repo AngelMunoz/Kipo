@@ -12,19 +12,27 @@ open Pomo.Core.Stores
 
 module EntityEmitter =
 
-  let createLazyModelLoader (content: ContentManager) : string -> Model voption =
-      let cache = ConcurrentDictionary<string, Lazy<Model voption>>()
-      fun path ->
-          let loader = cache.GetOrAdd(path, fun p ->
-              lazy (
-                  try
-                      lock content (fun () ->
-                          let model = content.Load<Model>(p)
-                          ValueSome model)
-                  with _ -> ValueNone
-              )
-          )
-          loader.Value
+  let createLazyModelLoader(content: ContentManager) : string -> Model voption =
+    let cache = ConcurrentDictionary<string, Lazy<Model voption>>()
+
+    fun path ->
+      let loader =
+        cache.GetOrAdd(
+          path,
+          fun p ->
+            lazy
+              (try
+                lock content (fun () ->
+                  let model = content.Load<Model>(p)
+                  ValueSome model)
+               with ex ->
+                 printfn
+                   $"[EntityEmitter] Failed to load model: {p} - {ex.Message}"
+
+                 ValueNone)
+        )
+
+      loader.Value
 
   let loadModels
     (content: ContentManager)
@@ -38,8 +46,9 @@ module EntityEmitter =
           try
             let model = content.Load<Model>(node.ModelAsset)
             cache[node.ModelAsset] <- model
-          with _ ->
-            ()
+          with ex ->
+            printfn
+              $"[EntityEmitter] Failed to load model: {node.ModelAsset} - {ex.Message}"
 
     cache
 

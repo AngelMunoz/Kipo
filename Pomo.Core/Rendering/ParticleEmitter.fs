@@ -21,33 +21,47 @@ module ParticleEmitter =
   let createLazyAssetLoaders
     (content: ContentManager)
     : struct ((string -> Texture2D voption) * (string -> Model voption)) =
-    
+
     let textureCache = ConcurrentDictionary<string, Lazy<Texture2D voption>>()
     let modelCache = ConcurrentDictionary<string, Lazy<Model voption>>()
 
     let getTexture path =
-        let loader = textureCache.GetOrAdd(path, fun p ->
-            lazy (
-                try
-                    lock content (fun () ->
-                        let tex = content.Load<Texture2D>(p)
-                        ValueSome tex)
-                with _ -> ValueNone
-            )
+      let loader =
+        textureCache.GetOrAdd(
+          path,
+          fun p ->
+            lazy
+              (try
+                lock content (fun () ->
+                  let tex = content.Load<Texture2D>(p)
+                  ValueSome tex)
+               with ex ->
+                 printfn
+                   $"[ParticleEmitter] Failed to load texture: {p} - {ex.Message}"
+
+                 ValueNone)
         )
-        loader.Value
+
+      loader.Value
 
     let getModel path =
-        let loader = modelCache.GetOrAdd(path, fun p ->
-            lazy (
-                try
-                    lock content (fun () ->
-                        let model = content.Load<Model>(p)
-                        ValueSome model)
-                with _ -> ValueNone
-            )
+      let loader =
+        modelCache.GetOrAdd(
+          path,
+          fun p ->
+            lazy
+              (try
+                lock content (fun () ->
+                  let model = content.Load<Model>(p)
+                  ValueSome model)
+               with ex ->
+                 printfn
+                   $"[ParticleEmitter] Failed to load model: {p} - {ex.Message}"
+
+                 ValueNone)
         )
-        loader.Value
+
+      loader.Value
 
     struct (getTexture, getModel)
 
@@ -69,15 +83,17 @@ module ParticleEmitter =
             try
               let texture = content.Load<Texture2D>(texturePath)
               textureCache[texturePath] <- texture
-            with _ ->
-              ()
+            with ex ->
+              printfn
+                $"[ParticleEmitter] Failed to load texture: {texturePath} - {ex.Message}"
         | Mesh modelPath ->
           if not(modelCache.ContainsKey modelPath) then
             try
               let model = content.Load<Model>(modelPath)
               modelCache[modelPath] <- model
-            with _ ->
-              ()
+            with ex ->
+              printfn
+                $"[ParticleEmitter] Failed to load model: {modelPath} - {ex.Message}"
 
     struct (textureCache, modelCache)
 

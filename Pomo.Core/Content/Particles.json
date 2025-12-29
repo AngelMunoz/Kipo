@@ -1115,7 +1115,7 @@
     },
     {
       "RenderMode": "Mesh",
-      "Model": "3d_models/kaykit_prototype/Primitive_Cube_Small",
+      "Model": "3d_models/kaykit_resources/Stone_Chunks_Small",
       "SimulationSpace": "World",
       "Rate": 0,
       "Burst": 6,

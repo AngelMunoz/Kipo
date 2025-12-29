@@ -111,302 +111,6 @@
       "Root": { "Model": "3d_models/kay_kit_characters/arrow_purple" }
     }
   },
-  "SkeletonArcher": {
-    "Rig": {
-      "Root": {
-        "Model": "3d_models/kay_kit_characters/Skeleton/character_skeleton_archer_body"
-      },
-      "Head": {
-        "Model": "3d_models/kay_kit_characters/Skeleton/character_skeleton_archer_head",
-        "Parent": "Root"
-      },
-      "Hood": {
-        "Model": "3d_models/kay_kit_characters/Skeleton/character_skeleton_archer_hood",
-        "Parent": "Head"
-      },
-      "Eyes": {
-        "Model": "3d_models/kay_kit_characters/Skeleton/character_skeleton_archer_eyes",
-        "Parent": "Head"
-      },
-      "Jaw": {
-        "Model": "3d_models/kay_kit_characters/Skeleton/character_skeleton_archer_jaw",
-        "Parent": "Head"
-      },
-      "Mask": {
-        "Model": "3d_models/kay_kit_characters/Skeleton/character_skeleton_archer_mask",
-        "Parent": "Head"
-      },
-      "Arm_L": {
-        "Model": "3d_models/kay_kit_characters/Skeleton/character_skeleton_archer_armLeft",
-        "Parent": "Root",
-        "Pivot": { "X": 0.0, "Y": 1.5, "Z": 0.0 }
-      },
-      "Arm_R": {
-        "Model": "3d_models/kay_kit_characters/Skeleton/character_skeleton_archer_armRight",
-        "Parent": "Root",
-        "Pivot": { "X": 0.0, "Y": 1.5, "Z": 0.0 }
-      }
-    },
-    "AnimationBindings": {
-      "Run": ["Arm_Swing", "Run_Bounce"]
-    }
-  },
-  "SkeletonArcherBroken": {
-    "Rig": {
-      "Root": {
-        "Model": "3d_models/kay_kit_characters/Skeleton/character_skeleton_archer_body"
-      },
-      "Head": {
-        "Model": "3d_models/kay_kit_characters/Skeleton/character_skeleton_archer_head_broken",
-        "Parent": "Root"
-      },
-      "Hood": {
-        "Model": "3d_models/kay_kit_characters/Skeleton/character_skeleton_archer_hood_broken",
-        "Parent": "Head"
-      },
-      "Eyes": {
-        "Model": "3d_models/kay_kit_characters/Skeleton/character_skeleton_archer_eyes_broken",
-        "Parent": "Head"
-      },
-      "Jaw": {
-        "Model": "3d_models/kay_kit_characters/Skeleton/character_skeleton_archer_jaw_broken",
-        "Parent": "Head"
-      },
-      "Mask": {
-        "Model": "3d_models/kay_kit_characters/Skeleton/character_skeleton_archer_mask_broken",
-        "Parent": "Head"
-      },
-      "Arm_L": {
-        "Model": "3d_models/kay_kit_characters/Skeleton/character_skeleton_archer_armLeft_broken",
-        "Parent": "Root",
-        "Pivot": { "X": 0.0, "Y": 1.5, "Z": 0.0 }
-      },
-      "Arm_R": {
-        "Model": "3d_models/kay_kit_characters/Skeleton/character_skeleton_archer_armRight_broken",
-        "Parent": "Root",
-        "Pivot": { "X": 0.0, "Y": 1.5, "Z": 0.0 }
-      }
-    },
-    "AnimationBindings": {
-      "Run": ["Arm_Swing", "Run_Bounce"]
-    }
-  },
-  "SkeletonMage": {
-    "Rig": {
-      "Root": {
-        "Model": "3d_models/kay_kit_characters/Skeleton/character_skeleton_mage_body"
-      },
-      "Head": {
-        "Model": "3d_models/kay_kit_characters/Skeleton/character_skeleton_mage_head",
-        "Parent": "Root"
-      },
-      "Cowl": {
-        "Model": "3d_models/kay_kit_characters/Skeleton/character_skeleton_mage_cowl",
-        "Parent": "Head"
-      },
-      "Cloak": {
-        "Model": "3d_models/kay_kit_characters/Skeleton/character_skeleton_mage_cloak",
-        "Parent": "Root"
-      },
-      "Eyes": {
-        "Model": "3d_models/kay_kit_characters/Skeleton/character_skeleton_mage_eyes",
-        "Parent": "Head"
-      },
-      "Jaw": {
-        "Model": "3d_models/kay_kit_characters/Skeleton/character_skeleton_mage_jaw",
-        "Parent": "Head"
-      },
-      "Arm_L": {
-        "Model": "3d_models/kay_kit_characters/Skeleton/character_skeleton_mage_armLeft",
-        "Parent": "Root",
-        "Pivot": { "X": 0.0, "Y": 1.5, "Z": 0.0 }
-      },
-      "Arm_R": {
-        "Model": "3d_models/kay_kit_characters/Skeleton/character_skeleton_mage_armRight",
-        "Parent": "Root",
-        "Pivot": { "X": 0.0, "Y": 1.5, "Z": 0.0 }
-      }
-    },
-    "AnimationBindings": {
-      "Run": ["Arm_Swing", "Run_Bounce"]
-    }
-  },
-  "SkeletonMageBroken": {
-    "Rig": {
-      "Root": {
-        "Model": "3d_models/kay_kit_characters/Skeleton/character_skeleton_mage_body_broken"
-      },
-      "Head": {
-        "Model": "3d_models/kay_kit_characters/Skeleton/character_skeleton_mage_head_broken",
-        "Parent": "Root"
-      },
-      "Cowl": {
-        "Model": "3d_models/kay_kit_characters/Skeleton/character_skeleton_mage_cowl_broken",
-        "Parent": "Head"
-      },
-      "Cloak": {
-        "Model": "3d_models/kay_kit_characters/Skeleton/character_skeleton_mage_cloak_broken",
-        "Parent": "Root"
-      },
-      "Eyes": {
-        "Model": "3d_models/kay_kit_characters/Skeleton/character_skeleton_mage_eyes_broken",
-        "Parent": "Head"
-      },
-      "Jaw": {
-        "Model": "3d_models/kay_kit_characters/Skeleton/character_skeleton_mage_jaw_broken",
-        "Parent": "Head"
-      },
-      "Arm_L": {
-        "Model": "3d_models/kay_kit_characters/Skeleton/character_skeleton_mage_armLeft_broken",
-        "Parent": "Root",
-        "Pivot": { "X": 0.0, "Y": 1.5, "Z": 0.0 }
-      },
-      "Arm_R": {
-        "Model": "3d_models/kay_kit_characters/Skeleton/character_skeleton_mage_armRight_broken",
-        "Parent": "Root",
-        "Pivot": { "X": 0.0, "Y": 1.5, "Z": 0.0 }
-      }
-    },
-    "AnimationBindings": {
-      "Run": ["Arm_Swing", "Run_Bounce"]
-    }
-  },
-  "SkeletonWarrior": {
-    "Rig": {
-      "Root": {
-        "Model": "3d_models/kay_kit_characters/Skeleton/character_skeleton_warrior_body"
-      },
-      "Head": {
-        "Model": "3d_models/kay_kit_characters/Skeleton/character_skeleton_warrior_head",
-        "Parent": "Root"
-      },
-      "Helmet": {
-        "Model": "3d_models/kay_kit_characters/Skeleton/character_skeleton_warrior_helmet",
-        "Parent": "Head"
-      },
-      "Eyes": {
-        "Model": "3d_models/kay_kit_characters/Skeleton/character_skeleton_warrior_eyes",
-        "Parent": "Head"
-      },
-      "Jaw": {
-        "Model": "3d_models/kay_kit_characters/Skeleton/character_skeleton_warrior_jaw",
-        "Parent": "Head"
-      },
-      "Arm_L": {
-        "Model": "3d_models/kay_kit_characters/Skeleton/character_skeleton_warrior_armLeft",
-        "Parent": "Root",
-        "Pivot": { "X": 0.0, "Y": 1.5, "Z": 0.0 }
-      },
-      "Arm_R": {
-        "Model": "3d_models/kay_kit_characters/Skeleton/character_skeleton_warrior_armRight",
-        "Parent": "Root",
-        "Pivot": { "X": 0.0, "Y": 1.5, "Z": 0.0 }
-      }
-    },
-    "AnimationBindings": {
-      "Run": ["Arm_Swing", "Run_Bounce"]
-    }
-  },
-  "SkeletonWarriorBroken": {
-    "Rig": {
-      "Root": {
-        "Model": "3d_models/kay_kit_characters/Skeleton/character_skeleton_warrior_body_broken"
-      },
-      "Head": {
-        "Model": "3d_models/kay_kit_characters/Skeleton/character_skeleton_warrior_head_broken",
-        "Parent": "Root"
-      },
-      "Helmet": {
-        "Model": "3d_models/kay_kit_characters/Skeleton/character_skeleton_warrior_helmet_broken",
-        "Parent": "Head"
-      },
-      "Eyes": {
-        "Model": "3d_models/kay_kit_characters/Skeleton/character_skeleton_warrior_eyes_broken",
-        "Parent": "Head"
-      },
-      "Jaw": {
-        "Model": "3d_models/kay_kit_characters/Skeleton/character_skeleton_warrior_jaw_broken",
-        "Parent": "Head"
-      },
-      "Arm_L": {
-        "Model": "3d_models/kay_kit_characters/Skeleton/character_skeleton_warrior_armLeft_broken",
-        "Parent": "Root",
-        "Pivot": { "X": 0.0, "Y": 1.5, "Z": 0.0 }
-      },
-      "Arm_R": {
-        "Model": "3d_models/kay_kit_characters/Skeleton/character_skeleton_warrior_armRight_broken",
-        "Parent": "Root",
-        "Pivot": { "X": 0.0, "Y": 1.5, "Z": 0.0 }
-      }
-    },
-    "AnimationBindings": {
-      "Run": ["Arm_Swing", "Run_Bounce"]
-    }
-  },
-  "SkeletonMinion": {
-    "Rig": {
-      "Root": {
-        "Model": "3d_models/kay_kit_characters/Skeleton/character_skeleton_minion_body"
-      },
-      "Head": {
-        "Model": "3d_models/kay_kit_characters/Skeleton/character_skeleton_minion_head",
-        "Parent": "Root"
-      },
-      "Eyes": {
-        "Model": "3d_models/kay_kit_characters/Skeleton/character_skeleton_minion_eyes",
-        "Parent": "Head"
-      },
-      "Jaw": {
-        "Model": "3d_models/kay_kit_characters/Skeleton/character_skeleton_minion_jaw",
-        "Parent": "Head"
-      },
-      "Arm_L": {
-        "Model": "3d_models/kay_kit_characters/Skeleton/character_skeleton_minion_armLeft",
-        "Parent": "Root",
-        "Pivot": { "X": 0.0, "Y": 1.5, "Z": 0.0 }
-      },
-      "Arm_R": {
-        "Model": "3d_models/kay_kit_characters/Skeleton/character_skeleton_minion_armRight",
-        "Parent": "Root",
-        "Pivot": { "X": 0.0, "Y": 1.5, "Z": 0.0 }
-      }
-    },
-    "AnimationBindings": {
-      "Run": ["Arm_Swing", "Run_Bounce"]
-    }
-  },
-  "SkeletonMinionBroken": {
-    "Rig": {
-      "Root": {
-        "Model": "3d_models/kay_kit_characters/Skeleton/character_skeleton_minion_body_broken"
-      },
-      "Head": {
-        "Model": "3d_models/kay_kit_characters/Skeleton/character_skeleton_minion_head_broken",
-        "Parent": "Root"
-      },
-      "Eyes": {
-        "Model": "3d_models/kay_kit_characters/Skeleton/character_skeleton_minion_eyes_broken",
-        "Parent": "Head"
-      },
-      "Jaw": {
-        "Model": "3d_models/kay_kit_characters/Skeleton/character_skeleton_minion_jaw_broken",
-        "Parent": "Head"
-      },
-      "Arm_L": {
-        "Model": "3d_models/kay_kit_characters/Skeleton/character_skeleton_minion_armLeft_broken",
-        "Parent": "Root",
-        "Pivot": { "X": 0.0, "Y": 1.5, "Z": 0.0 }
-      },
-      "Arm_R": {
-        "Model": "3d_models/kay_kit_characters/Skeleton/character_skeleton_minion_armRight_broken",
-        "Parent": "Root",
-        "Pivot": { "X": 0.0, "Y": 1.5, "Z": 0.0 }
-      }
-    },
-    "AnimationBindings": {
-      "Run": ["Arm_Swing", "Run_Bounce"]
-    }
-  },
   "Jack": {
     "Rig": {
       "Root": { "Model": "3d_models/kay_kit_characters/Jack/character_jack" },
@@ -457,6 +161,56 @@
     },
     "AnimationBindings": {
       "Run": ["Arm_Swing", "Run_Bounce"]
+    }
+  },
+  "Barbarian": {
+    "Rig": {
+      "Root": { "Model": "3d_models/lay_kit_adventurers/Characters/barbarian" }
+    },
+    "AnimationBindings": {
+      "Run": ["Run_Bounce"]
+    }
+  },
+  "Knight": {
+    "Rig": {
+      "Root": { "Model": "3d_models/lay_kit_adventurers/Characters/knight" }
+    },
+    "AnimationBindings": {
+      "Run": ["Run_Bounce"]
+    }
+  },
+  "Mage": {
+    "Rig": {
+      "Root": { "Model": "3d_models/lay_kit_adventurers/Characters/mage" }
+    },
+    "AnimationBindings": {
+      "Run": ["Run_Bounce"]
+    }
+  },
+  "Ranger": {
+    "Rig": {
+      "Root": { "Model": "3d_models/lay_kit_adventurers/Characters/ranger" }
+    },
+    "AnimationBindings": {
+      "Run": ["Run_Bounce"]
+    }
+  },
+  "Rogue": {
+    "Rig": {
+      "Root": { "Model": "3d_models/lay_kit_adventurers/Characters/rogue" }
+    },
+    "AnimationBindings": {
+      "Run": ["Run_Bounce"]
+    }
+  },
+  "RogueHooded": {
+    "Rig": {
+      "Root": {
+        "Model": "3d_models/lay_kit_adventurers/Characters/rogue_hooded"
+      }
+    },
+    "AnimationBindings": {
+      "Run": ["Run_Bounce"]
     }
   }
 }

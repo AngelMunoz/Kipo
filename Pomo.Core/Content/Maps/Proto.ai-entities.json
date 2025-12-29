@@ -1,7 +1,7 @@
 {
   "magic_casters": {
-    "Entities": ["SkeletonMage", "SkeletonMageDamaged"],
-    "Weights": [0.7, 0.3],
+    "Entities": ["Mage"],
+    "Weights": [1.0],
     "Overrides": {},
     "Faction": "TeamRed"
   },
@@ -12,8 +12,8 @@
     "Faction": "TeamPurple"
   },
   "melee_fighters": {
-    "Entities": ["SkeletonWarrior", "SkeletonWarriorDamaged"],
-    "Weights": [0.7, 0.3],
+    "Entities": ["Knight"],
+    "Weights": [1.0],
     "Overrides": {},
     "Faction": "TeamBlue"
   },
@@ -24,14 +24,14 @@
     "Faction": "TeamGreen"
   },
   "ranged_attackers": {
-    "Entities": ["SkeletonArcher", "SkeletonArcherDamaged"],
-    "Weights": [0.7, 0.3],
+    "Entities": ["Ranger"],
+    "Weights": [1.0],
     "Overrides": {},
     "Faction": "TeamYellow"
   },
   "defense_towers": {
-    "Entities": ["SkeletonMinion", "SkeletonMinionDamaged"],
-    "Weights": [0.6, 0.4],
+    "Entities": ["Barbarian"],
+    "Weights": [1.0],
     "Overrides": {},
     "Faction": "TeamPurple"
   }
