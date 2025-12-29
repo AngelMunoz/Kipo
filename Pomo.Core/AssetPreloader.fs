@@ -8,6 +8,7 @@ open Microsoft.Xna.Framework.Graphics
 open Pomo.Core.Domain
 open Pomo.Core.Domain.AssetManifest
 open Pomo.Core.Serialization
+open Pomo.Core.Graphics
 
 module AssetPreloader =
 
@@ -80,7 +81,7 @@ module AssetPreloader =
 
   let preloadModels
     (content: ContentManager)
-    (modelCache: ConcurrentDictionary<string, Lazy<Model>>)
+    (modelCache: ConcurrentDictionary<string, Lazy<LoadedModel>>)
     (modelPaths: string[])
     =
     let mutable loaded = 0
@@ -93,7 +94,13 @@ module AssetPreloader =
       else
         try
           let model = content.Load<Model>(path)
-          modelCache[path] <- Lazy<Model>(fun () -> model)
+          let loadedModel = LoadedModel.fromModel model
+          modelCache[path] <- Lazy<LoadedModel>(fun () -> loadedModel)
+
+          if not loadedModel.HasNormals then
+            printfn
+              $"[AssetPreloader] Model '{path}' missing normals, lighting will be disabled"
+
           loaded <- loaded + 1
         with ex ->
           printfn
@@ -132,7 +139,7 @@ module AssetPreloader =
   /// Returns (total assets attempted, total loaded, total failed)
   let preloadAssets
     (content: ContentManager)
-    (modelCache: ConcurrentDictionary<string, Lazy<Model>>)
+    (modelCache: ConcurrentDictionary<string, Lazy<LoadedModel>>)
     (textureCache: ConcurrentDictionary<string, Lazy<Texture2D>>)
     (mapKey: string)
     (mapDef: Map.MapDefinition)

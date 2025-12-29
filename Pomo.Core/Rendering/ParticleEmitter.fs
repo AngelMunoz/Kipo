@@ -70,10 +70,10 @@ module ParticleEmitter =
     (content: ContentManager)
     (particleStore: ParticleStore)
     : struct (IReadOnlyDictionary<string, Texture2D> *
-      IReadOnlyDictionary<string, Model>)
+      IReadOnlyDictionary<string, LoadedModel>)
     =
     let textureCache = Dictionary<string, Texture2D>()
-    let modelCache = Dictionary<string, Model>()
+    let modelCache = Dictionary<string, LoadedModel>()
 
     for _, emitters in particleStore.all() do
       for emitter in emitters do
@@ -90,7 +90,12 @@ module ParticleEmitter =
           if not(modelCache.ContainsKey modelPath) then
             try
               let model = content.Load<Model>(modelPath)
-              modelCache[modelPath] <- model
+              let loaded = LoadedModel.fromModel model
+              modelCache[modelPath] <- loaded
+
+              if not loaded.HasNormals then
+                printfn
+                  $"[ParticleEmitter] Model '{modelPath}' missing normals, lighting will be disabled"
             with ex ->
               printfn
                 $"[ParticleEmitter] Failed to load model: {modelPath} - {ex.Message}"
@@ -149,7 +154,7 @@ module ParticleEmitter =
     }
 
   let inline private transformMeshParticle
-    (model: Model)
+    (loadedModel: LoadedModel)
     (config: EmitterConfig)
     (effectPos: Vector3)
     (effectRotation: Quaternion)
@@ -177,7 +182,7 @@ module ParticleEmitter =
         squishFactor
 
     {
-      Model = model
+      LoadedModel = loadedModel
       WorldMatrix = worldMatrix
     }
 
@@ -260,12 +265,12 @@ module ParticleEmitter =
       let mutable idx = 0
 
       for meshEmitter in effect.MeshEmitters do
-        data.GetModelByAsset meshEmitter.ModelPath
-        |> ValueOption.iter(fun model ->
+        data.GetLoadedModelByAsset meshEmitter.ModelPath
+        |> ValueOption.iter(fun loadedModel ->
           for particle in meshEmitter.Particles do
             buffer[idx] <-
               transformMeshParticle
-                model
+                loadedModel
                 meshEmitter.Config
                 effectPos
                 effectRotation

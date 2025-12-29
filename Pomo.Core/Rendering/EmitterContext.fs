@@ -10,6 +10,7 @@ open Pomo.Core.Domain.Units
 open Pomo.Core.Domain.Projectile
 open Pomo.Core.Domain.Animation
 open Pomo.Core.Stores
+open Pomo.Core.Graphics
 
 /// Shared rendering core - used by all emitters
 type RenderCore = {
@@ -20,7 +21,7 @@ type RenderCore = {
 /// Entity-specific rendering data
 type EntityRenderData = {
   ModelStore: ModelStore
-  GetModelByAsset: string -> Model voption
+  GetLoadedModelByAsset: string -> LoadedModel voption
   EntityPoses: IReadOnlyDictionary<Guid<EntityId>, Dictionary<string, Matrix>>
   LiveProjectiles: HashMap<Guid<EntityId>, LiveProjectile>
   SquishFactor: float32
@@ -30,7 +31,7 @@ type EntityRenderData = {
 /// Particle-specific rendering data (billboard + mesh)
 type ParticleRenderData = {
   GetTexture: string -> Texture2D voption
-  GetModelByAsset: string -> Model voption
+  GetLoadedModelByAsset: string -> LoadedModel voption
   EntityPositions: IReadOnlyDictionary<Guid<EntityId>, Vector2>
   SquishFactor: float32
   ModelScale: float32

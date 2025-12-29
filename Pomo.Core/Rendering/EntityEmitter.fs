@@ -12,8 +12,10 @@ open Pomo.Core.Stores
 
 module EntityEmitter =
 
-  let createLazyModelLoader(content: ContentManager) : string -> Model voption =
-    let cache = ConcurrentDictionary<string, Lazy<Model voption>>()
+  let createLazyModelLoader
+    (content: ContentManager)
+    : string -> LoadedModel voption =
+    let cache = ConcurrentDictionary<string, Lazy<LoadedModel voption>>()
 
     fun path ->
       let loader =
@@ -24,7 +26,13 @@ module EntityEmitter =
               (try
                 lock content (fun () ->
                   let model = content.Load<Model>(p)
-                  ValueSome model)
+                  let loaded = LoadedModel.fromModel model
+
+                  if not loaded.HasNormals then
+                    printfn
+                      $"[EntityEmitter] Model '{p}' missing normals, lighting will be disabled"
+
+                  ValueSome loaded)
                with ex ->
                  printfn
                    $"[EntityEmitter] Failed to load model: {p} - {ex.Message}"
@@ -37,15 +45,20 @@ module EntityEmitter =
   let loadModels
     (content: ContentManager)
     (modelStore: ModelStore)
-    : IReadOnlyDictionary<string, Model> =
-    let cache = Dictionary<string, Model>()
+    : IReadOnlyDictionary<string, LoadedModel> =
+    let cache = Dictionary<string, LoadedModel>()
 
     for config in modelStore.all() do
       for _, node in config.Rig do
         if not(cache.ContainsKey node.ModelAsset) then
           try
             let model = content.Load<Model>(node.ModelAsset)
-            cache[node.ModelAsset] <- model
+            let loaded = LoadedModel.fromModel model
+            cache[node.ModelAsset] <- loaded
+
+            if not loaded.HasNormals then
+              printfn
+                $"[EntityEmitter] Model '{node.ModelAsset}' missing normals, lighting will be disabled"
           with ex ->
             printfn
               $"[EntityEmitter] Failed to load model: {node.ModelAsset} - {ex.Message}"
@@ -53,16 +66,16 @@ module EntityEmitter =
     cache
 
   let emit
-    (getModelByAsset: string -> Model voption)
+    (getLoadedModelByAsset: string -> LoadedModel voption)
     (entities: ResolvedEntity[])
     : MeshCommand[] =
     entities
     |> Array.Parallel.collect(fun entity ->
       entity.Nodes
       |> Array.choose(fun node ->
-        getModelByAsset node.ModelAsset
-        |> ValueOption.map(fun model -> {
-          Model = model
+        getLoadedModelByAsset node.ModelAsset
+        |> ValueOption.map(fun loadedModel -> {
+          LoadedModel = loadedModel
           WorldMatrix = node.WorldMatrix
         })
         |> function
@@ -78,4 +91,4 @@ module EntityEmitter =
     let resolvedEntities =
       PoseResolver.resolveAll core data snapshot nodeTransformsPool
 
-    emit data.GetModelByAsset resolvedEntities
+    emit data.GetLoadedModelByAsset resolvedEntities

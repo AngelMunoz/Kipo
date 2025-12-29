@@ -28,10 +28,10 @@ module RenderOrchestrator =
     QuadBatch: QuadBatch
     SpriteBatch: SpriteBatch
     NodeTransformsPool: Dictionary<string, Matrix>
-    ModelCache: ConcurrentDictionary<string, Lazy<Model>>
+    ModelCache: ConcurrentDictionary<string, Lazy<LoadedModel>>
     TextureCache: ConcurrentDictionary<string, Lazy<Texture2D>>
     TileTextureCache: Dictionary<int, Texture2D>
-    GetModel: string -> Model voption
+    GetLoadedModel: string -> LoadedModel voption
     GetTexture: string -> Texture2D voption
     GetTileTexture: int -> Texture2D voption
     LayerRenderIndices: IReadOnlyDictionary<int, int[]>
@@ -63,7 +63,8 @@ module RenderOrchestrator =
       device.RasterizerState <- RasterizerState.CullNone
 
       for cmd in commands do
-        let model = cmd.Model
+        let loadedModel = cmd.LoadedModel
+        let model = loadedModel.Model
         let world = cmd.WorldMatrix
 
         for mesh in model.Meshes do
@@ -73,7 +74,12 @@ module RenderOrchestrator =
               be.World <- world
               be.View <- view
               be.Projection <- projection
-              LightEmitter.applyDefaultLighting &be
+
+              if loadedModel.HasNormals then
+                LightEmitter.applyDefaultLighting &be
+              else
+                be.LightingEnabled <- false
+                be.TextureEnabled <- true
             | _ -> ()
 
           mesh.Draw()
@@ -216,7 +222,7 @@ module RenderOrchestrator =
 
     let entityData = {
       ModelStore = stores.ModelStore
-      GetModelByAsset = res.GetModel
+      GetLoadedModelByAsset = res.GetLoadedModel
       EntityPoses = poses
       LiveProjectiles = projectiles
       SquishFactor = squish
@@ -225,7 +231,7 @@ module RenderOrchestrator =
 
     let particleData = {
       GetTexture = res.GetTexture
-      GetModelByAsset = res.GetModel
+      GetLoadedModelByAsset = res.GetLoadedModel
       EntityPositions = snapshot.Positions
       SquishFactor = squish
       ModelScale = Core.Constants.Entity.ModelScale
@@ -390,13 +396,13 @@ module RenderOrchestrator =
             ParticleEmitter.loadAssets game.Content stores.ParticleStore
 
           // Merge entity and particle model caches
-          let modelCache = ConcurrentDictionary<string, Lazy<Model>>()
+          let modelCache = ConcurrentDictionary<string, Lazy<LoadedModel>>()
 
           for kvp in entityModelCache do
-            modelCache[kvp.Key] <- Lazy<Model>(fun () -> kvp.Value)
+            modelCache[kvp.Key] <- Lazy<LoadedModel>(fun () -> kvp.Value)
 
           for kvp in particleModelCache do
-            modelCache[kvp.Key] <- Lazy<Model>(fun () -> kvp.Value)
+            modelCache[kvp.Key] <- Lazy<LoadedModel>(fun () -> kvp.Value)
 
           let textureCache = ConcurrentDictionary<string, Lazy<Texture2D>>()
 
@@ -438,7 +444,7 @@ module RenderOrchestrator =
 
                 pending.TryRemove(key) |> ignore)
 
-          let getModel asset =
+          let getLoadedModel asset =
             match modelCache.TryGetValue asset with
             | true, lazyModel -> ValueSome(lazyModel.Value)
             | false, _ ->
@@ -447,7 +453,15 @@ module RenderOrchestrator =
                   modelCache.GetOrAdd(
                     asset,
                     fun key ->
-                      Lazy<Model>(fun () -> game.Content.Load<Model>(key))
+                      Lazy<LoadedModel>(fun () ->
+                        let model = game.Content.Load<Model>(key)
+                        let loaded = LoadedModel.fromModel model
+
+                        if not loaded.HasNormals then
+                          printfn
+                            $"[RenderOrchestrator] Model '{key}' missing normals, lighting will be disabled"
+
+                        loaded)
                   )
 
                 lazyModel.Force() |> ignore)
@@ -482,7 +496,7 @@ module RenderOrchestrator =
               ModelCache = modelCache
               TextureCache = textureCache
               TileTextureCache = tileCache
-              GetModel = getModel
+              GetLoadedModel = getLoadedModel
               GetTexture = getTexture
               GetTileTexture = fun gid -> tileCache |> Dictionary.tryFindV gid
               LayerRenderIndices = layerIndices
