@@ -11,6 +11,7 @@ open Pomo.Core.Graphics
 open Pomo.Core.Rendering
 
 module EditorRender =
+  open Pomo.Core.Domain
 
   type RenderContext = {
     Device: GraphicsDevice
@@ -30,43 +31,6 @@ module EditorRender =
       (float32 viewport.Height)
       cam.Zoom
 
-  let emitBlockCommands
-    (getModel: string -> LoadedModel voption)
-    (blockMap: BlockMapDefinition)
-    (cam: EditorCameraState)
-    (viewBounds: struct (float32 * float32 * float32 * float32))
-    (pixelsPerUnit: Vector2)
-    (logicOffset: Vector3)
-    (renderOffset: Vector3)
-    =
-    // Adjust culling bounds to map space (0..W) from centered render space (-W/2..W/2)
-    // Culling uses Logic Units.
-    let struct (minX, minZ, maxX, maxZ) = viewBounds
-
-    let adjustedBounds =
-      struct (minX - logicOffset.X,
-              minZ - logicOffset.Z,
-              maxX - logicOffset.X,
-              maxZ - logicOffset.Z)
-
-    let commands =
-      BlockEmitter.emit
-        getModel
-        blockMap
-        adjustedBounds
-        cam.Position.Y
-        (float32 blockMap.Height * CellSize)
-        pixelsPerUnit
-
-    // Apply Render Offset to shift blocks to centered world position
-    let translation = Matrix.CreateTranslation(renderOffset)
-
-    commands
-    |> Array.map(fun cmd -> {
-      cmd with
-          WorldMatrix = cmd.WorldMatrix * translation
-    })
-
   let emitGridVerts
     (layer: int)
     (width: int)
@@ -74,41 +38,43 @@ module EditorRender =
     (pixelsPerUnit: Vector2)
     (centerOffset: Vector3)
     =
-    let squish = RenderMath.WorldMatrix.getSquishFactor pixelsPerUnit
-
-    // Render Space dimensions
-    let renderWidth = (float32 width * CellSize) / pixelsPerUnit.X
-    let renderDepth = (float32 depth * CellSize) / pixelsPerUnit.Y
+    // Render Space dimensions - Uniform Scale
+    // Use PPU.X (64) for all dimensions
+    let scaleFactor = CellSize / pixelsPerUnit.X
+    let renderWidth = float32 width * scaleFactor
+    let renderDepth = float32 depth * scaleFactor
+    let layerHeight = float32 layer * scaleFactor // Wait. layer * 32 / 64 = layer * 0.5.
+    // If CellSize=32. Layer 10 -> 320. 320/64 = 5.
+    // layerHeight = 5.
 
     [|
       for z in 0..depth do
-        // Map Depth (Z) corresponds to Render Z
-        let zPos = (float32 z * CellSize) / pixelsPerUnit.Y
+        let zPos = float32 z * scaleFactor
 
         yield
           VertexPositionColor(
-            Vector3(0f, float32 layer * squish, zPos) + centerOffset,
+            Vector3(0f, layerHeight, zPos) + centerOffset,
             Color.Gray
           )
 
         yield
           VertexPositionColor(
-            Vector3(renderWidth, float32 layer * squish, zPos) + centerOffset,
+            Vector3(renderWidth, layerHeight, zPos) + centerOffset,
             Color.Gray
           )
 
       for x in 0..width do
-        let xPos = (float32 x * CellSize) / pixelsPerUnit.X
+        let xPos = float32 x * scaleFactor
 
         yield
           VertexPositionColor(
-            Vector3(xPos, float32 layer * squish, 0f) + centerOffset,
+            Vector3(xPos, layerHeight, 0f) + centerOffset,
             Color.Gray
           )
 
         yield
           VertexPositionColor(
-            Vector3(xPos, float32 layer * squish, renderDepth) + centerOffset,
+            Vector3(xPos, layerHeight, renderDepth) + centerOffset,
             Color.Gray
           )
     |]
@@ -118,57 +84,62 @@ module EditorRender =
     (pixelsPerUnit: Vector2)
     (centerOffset: Vector3)
     =
-    let worldPos = GridCell3D.toWorldPosition cell CellSize
-    // Apply logic offset to world position before converting to render pos
-    let adjustedPos: WorldPosition = {
-      X = worldPos.X + centerOffset.X
-      Y = worldPos.Y + centerOffset.Y
-      Z = worldPos.Z + centerOffset.Z
-    }
+    let scaleFactor = CellSize / pixelsPerUnit.X
 
-    let renderPos = RenderMath.LogicRender.toRender adjustedPos pixelsPerUnit
+    let x = float32 cell.X * scaleFactor
+    let y = float32 cell.Y * scaleFactor
+    let z = float32 cell.Z * scaleFactor
 
-    let size = CellSize * 0.9f
+    let basePos = Vector3(x, y, z) + centerOffset
+    let size = scaleFactor
+
+    let mkV v =
+      VertexPositionColor(basePos + v, Color.Yellow)
+
+    // Wireframe Box
+    let p0 = Vector3(0f, 0f, 0f)
+    let p1 = Vector3(size, 0f, 0f)
+    let p2 = Vector3(size, 0f, size)
+    let p3 = Vector3(0f, 0f, size)
+    let p4 = Vector3(0f, size, 0f)
+    let p5 = Vector3(size, size, 0f)
+    let p6 = Vector3(size, size, size)
+    let p7 = Vector3(0f, size, size)
 
     [|
-      VertexPositionColor(
-        renderPos + Vector3(-size / 2f, 0f, -size / 2f),
-        Color.Yellow
-      )
-      VertexPositionColor(
-        renderPos + Vector3(size / 2f, 0f, -size / 2f),
-        Color.Yellow
-      )
-      VertexPositionColor(
-        renderPos + Vector3(size / 2f, 0f, -size / 2f),
-        Color.Yellow
-      )
-      VertexPositionColor(
-        renderPos + Vector3(size / 2f, 0f, size / 2f),
-        Color.Yellow
-      )
-      VertexPositionColor(
-        renderPos + Vector3(size / 2f, 0f, size / 2f),
-        Color.Yellow
-      )
-      VertexPositionColor(
-        renderPos + Vector3(-size / 2f, 0f, size / 2f),
-        Color.Yellow
-      )
-      VertexPositionColor(
-        renderPos + Vector3(-size / 2f, 0f, size / 2f),
-        Color.Yellow
-      )
-      VertexPositionColor(
-        renderPos + Vector3(-size / 2f, 0f, -size / 2f),
-        Color.Yellow
-      )
+      // Bottom
+      mkV p0
+      mkV p1
+      mkV p1
+      mkV p2
+      mkV p2
+      mkV p3
+      mkV p3
+      mkV p0
+      // Top
+      mkV p4
+      mkV p5
+      mkV p5
+      mkV p6
+      mkV p6
+      mkV p7
+      mkV p7
+      mkV p4
+      // Verticals
+      mkV p0
+      mkV p4
+      mkV p1
+      mkV p5
+      mkV p2
+      mkV p6
+      mkV p3
+      mkV p7
     |]
 
   let renderMeshes (ctx: RenderContext) (commands: MeshCommand[]) =
     ctx.Device.DepthStencilState <- DepthStencilState.Default
     ctx.Device.BlendState <- BlendState.Opaque
-    ctx.Device.RasterizerState <- RasterizerState.CullNone
+    ctx.Device.RasterizerState <- RasterizerState.CullNone // Show both sides for checking
 
     for cmd in commands do
       for mesh in cmd.LoadedModel.Model.Meshes do
@@ -229,6 +200,7 @@ module EditorRender =
     let layer = state.CurrentLayer |> AVal.force
     let cursor = state.GridCursor |> AVal.force
     let viewBounds = getViewBounds cam viewport
+    let struct (minX, minZ, maxX, maxZ) = viewBounds
 
     // Center offset to move map origin (0,0) to world center
     // Logic Offset (Huge) for culling
@@ -240,23 +212,66 @@ module EditorRender =
       )
 
     // Render Offset (Small) for visual positioning
+    // Enforce UNIFORM SCALING for True 3D (Cube blocks)
+    // Use PPU.X (64) as the standard divisor.
+    let scaleFactor = CellSize / pixelsPerUnit.X
+
     let renderCenterOffset =
       Vector3(
         logicCenterOffset.X / pixelsPerUnit.X,
         logicCenterOffset.Y, // Y is 0
-        logicCenterOffset.Z / pixelsPerUnit.Y
+        logicCenterOffset.Z / pixelsPerUnit.X // Uniform scale Z
       )
 
-    emitBlockCommands
-      getModel
-      blockMap
-      cam
-      viewBounds
-      pixelsPerUnit
-      logicCenterOffset
-      renderCenterOffset
-    |> renderMeshes ctx
+    // Emit blocks with True 3D Logic (No Squish, No Iso Correction)
+    let commands =
+      let cellBounds =
+        RenderMath.Camera.getViewCellBounds3D
+          viewBounds
+          cam.Position.Y
+          CellSize
+          1000.0f
 
+      [|
+        for kvp in blockMap.Blocks do
+          let block = kvp.Value
+          let cell = block.Cell
+
+          if
+            RenderMath.Camera.isInCellBounds cell.X cell.Y cell.Z cellBounds
+          then
+            match BlockMap.getBlockType blockMap block with
+            | ValueSome typeInfo ->
+              match getModel typeInfo.Model with
+              | ValueSome loadedModel ->
+                // Calculate True 3D Render Position
+                let x = float32 cell.X * scaleFactor
+                let y = float32 cell.Y * scaleFactor
+                let z = float32 cell.Z * scaleFactor
+
+                let pos = Vector3(x, y, z) + renderCenterOffset
+
+                // World Matrix: Scale * Rotation * Translation
+                let scale = Matrix.CreateScale(scaleFactor)
+
+                let rot =
+                  match block.Rotation with
+                  | ValueSome q -> Matrix.CreateFromQuaternion q
+                  | ValueNone -> Matrix.Identity
+
+                let trans = Matrix.CreateTranslation(pos)
+
+                yield {
+                  LoadedModel = loadedModel
+                  WorldMatrix = scale * rot * trans
+                }
+              | ValueNone -> ()
+            | ValueNone -> ()
+      |]
+
+    commands |> renderMeshes ctx
+
+    // Grid with Uniform Z Scale
     emitGridVerts
       layer
       blockMap.Width
