@@ -156,16 +156,14 @@ module PoseResolver =
         let entityPose = getEntityPose data.EntityPoses entityId
         let isProjectile = data.LiveProjectiles |> HashMap.containsKey entityId
 
+        // For descending projectiles, get the altitude for tilt calculation
+        // Note: logicPos.Y already contains the altitude from the projectile system
         let altitude =
           computeAltitude data.LiveProjectiles entityId core.PixelsPerUnit.Y
 
-        let posWithAltitude = {
-          logicPos with
-              Y = logicPos.Y + altitude
-        }
-
+        // Use logicPos directly - Y already contains altitude
         let renderPos =
-          RenderMath.LogicRender.toRender posWithAltitude core.PixelsPerUnit
+          RenderMath.LogicRender.toRender logicPos core.PixelsPerUnit
 
         let entityBaseMatrix =
           if isProjectile then

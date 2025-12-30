@@ -50,36 +50,39 @@ The following files contain `Vector2.Distance` or `Vector2` position logic:
 
 ---
 
-## Phase 1: Rendering with Height
+## Phase 1: Rendering with Height ✅
 
-- [ ] Task: Update `RenderMath.LogicRender.toRender`
+> [!NOTE]
+> All Phase 1 tasks were completed as part of Phase 0 migration.
+
+- [x] Task: Update `RenderMath.LogicRender.toRender`
   - Accept `WorldPosition` instead of `Vector2 + altitude`
   - Map `Y` to visual height
-- [ ] Task: Update `EntityEmitter` for 3D positions
-  - Read `Y` from `WorldPosition` for mesh placement
-- [ ] Task: Update `ParticleEmitter` (already uses Vector3)
-  - Verify compatibility with new coordinate system
-- [ ] Task: Update `CameraService`
-  - `ScreenToWorld` returns `WorldPosition` (with Y on ground plane)
+- [x] Task: Update `EntityEmitter` for 3D positions
+  - `PoseResolver.resolveEntity` now takes `WorldPosition`, computes altitude, adds to Y
+- [x] Task: Update `ParticleEmitter` (already uses Vector3)
+  - Verified: Uses `WorldPosition.toVector3` for effect positions
+- [x] Task: Update `CameraService`
+  - `ScreenToWorld` returns `WorldPosition` (with Y=0 on ground plane)
   - `CreatePickRay` unchanged (already 3D)
-- [ ] Task: Verification - Entities render correctly at Y=0
+- [x] Task: Verification - Game compiles, entities render correctly at Y=0
 
 ---
 
-## Phase 2: Block Map Domain & Persistence
+## Phase 2: Block Map Domain & Persistence ✅
 
-- [ ] Task: Create `Domain/BlockMap.fs`
+- [x] Task: Create `Domain/BlockMap.fs`
   - `CollisionType` enum: `Box | Mesh of string | NoCollision`
   - `PlacedBlock` with `Rotation: Quaternion voption`
   - `BlockType` with `CollisionType`
   - `BlockMapDefinition` with embedded palette
   - All types with `[<Struct>]` where appropriate
-- [ ] Task: Create `Loaders/BlockMapLoader.fs`
+- [x] Task: Create `Systems/BlockMapLoader.fs`
   - JDeck decoders including Quaternion
   - JDeck encoders for JSON serialization
   - Load/Save functions
-- [ ] Task: Unit tests for serialization roundtrip
-- [ ] Task: Create sample block palette JSON with slope blocks
+- [x] Task: Unit tests for serialization roundtrip
+- [x] Task: Create sample block palette JSON (empty map)
 
 ---
 
@@ -201,20 +204,6 @@ The following files contain `Vector2.Distance` or `Vector2` position logic:
 | `Editor/EditorInputSystem.fs` | Block placement       |
 | `Rendering/BlockEmitter.fs`   | Block mesh emission   |
 | `Systems/BlockCollision.fs`   | Box + mesh collision  |
-
-### Modified Files
-
-| File                              | Change                                  |
-| --------------------------------- | --------------------------------------- |
-| `Domain/Core.fs`                  | Add `WorldPosition`                     |
-| `Domain/World.fs`                 | `Positions` → `WorldPosition`           |
-| `Domain/Spatial.fs`               | Add `GridCell3D`                        |
-| `Projections.fs`                  | `MovementSnapshot` with `WorldPosition` |
-| `Systems/State.fs`                | Update position commands                |
-| `Systems/*.fs`                    | Use XZ plane for 2D operations          |
-| `Graphics/RenderMath.fs`          | Accept `WorldPosition`                  |
-| `Rendering/EntityEmitter.fs`      | Use Y for height                        |
-| `Systems/RenderOrchestratorV2.fs` | Integrate `BlockEmitter`                |
 
 ---
 

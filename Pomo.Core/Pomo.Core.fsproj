@@ -20,6 +20,7 @@
     <Compile Include="Domain/Map.fs" />
     <Compile Include="Domain/AssetManifest.fs" />
     <Compile Include="Domain/Spatial.fs" />
+    <Compile Include="Domain/BlockMap.fs" />
     <Compile Include="Domain/Navigation.fs" />
     <Compile Include="Domain/AI.fs" />
     <Compile Include="Domain/Animation.fs" />
@@ -73,6 +74,7 @@
     <Compile Include="Systems/UnitMovement.fs" />
     <Compile Include="Systems/Collision.fs" />
     <Compile Include="Systems/MapLoader.fs" />
+    <Compile Include="Systems/BlockMapLoader.fs" />
     <Compile Include="Systems/CameraSystem.fs" />
     <Compile Include="AssetPreloader.fs" />
     <Compile Include="Systems/RenderOrchestratorV2.fs" />
@@ -142,6 +144,9 @@
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
     <Content Include="Content/HUDConfig.json">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+    <Content Include="Content/CustomMaps/**/*.json">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
   </ItemGroup>

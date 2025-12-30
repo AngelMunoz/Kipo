@@ -1204,11 +1204,16 @@ module private Culling =
       let halfW = (right - left) / 2.0f * Constants.AI.ActiveZoneMargin
       let halfH = (bottom - top) / 2.0f * Constants.AI.ActiveZoneMargin
 
+      // cam.Position is WorldPosition where X/Z is the ground plane
+      // pos is Vector2 where X is X and Y is the 2D Y (maps to WorldPosition.Z)
+      let camX = cam.Position.X
+      let camY = cam.Position.Z // Z is the 2D Y coordinate
+
       if
-        pos.X >= cam.Position.X - halfW
-        && pos.X <= cam.Position.X + halfW
-        && pos.Y >= cam.Position.Y - halfH
-        && pos.Y <= cam.Position.Y + halfH
+        pos.X >= camX - halfW
+        && pos.X <= camX + halfW
+        && pos.Y >= camY - halfH
+        && pos.Y <= camY + halfH
       then
         result <- true
 
