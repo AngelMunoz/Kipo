@@ -21,6 +21,8 @@ type EditorCameraState() =
     this.Yaw <- defaultIsometricYaw
     this.Pitch <- defaultIsometricPitch
     this.Mode <- Isometric
+    this.Position <- Vector3.Zero
+    this.Zoom <- 2.0f
 
 module EditorCamera =
 

@@ -1,5 +1,7 @@
 namespace Pomo.Core.Editor
 
+open System.Collections.Generic
+open System.Buffers
 open Microsoft.Xna.Framework
 open Microsoft.Xna.Framework.Content
 open Microsoft.Xna.Framework.Graphics
@@ -13,6 +15,7 @@ open Pomo.Core.Rendering
 module EditorRender =
   open Pomo.Core.Domain
 
+  [<Struct>]
   type RenderContext = {
     Device: GraphicsDevice
     View: Matrix
@@ -31,55 +34,46 @@ module EditorRender =
       (float32 viewport.Height)
       cam.Zoom
 
-  let emitGridVerts
+  let private emitGridVerts
     (layer: int)
     (width: int)
     (depth: int)
     (pixelsPerUnit: Vector2)
     (centerOffset: Vector3)
     =
-    // Render Space dimensions - Uniform Scale
-    // Use PPU.X (64) for all dimensions
     let scaleFactor = CellSize / pixelsPerUnit.X
     let renderWidth = float32 width * scaleFactor
     let renderDepth = float32 depth * scaleFactor
-    let layerHeight = float32 layer * scaleFactor // Wait. layer * 32 / 64 = layer * 0.5.
-    // If CellSize=32. Layer 10 -> 320. 320/64 = 5.
-    // layerHeight = 5.
+    let layerHeight = float32 layer * scaleFactor
 
     [|
       for z in 0..depth do
         let zPos = float32 z * scaleFactor
 
-        yield
-          VertexPositionColor(
-            Vector3(0f, layerHeight, zPos) + centerOffset,
-            Color.Gray
-          )
+        VertexPositionColor(
+          Vector3(0f, layerHeight, zPos) + centerOffset,
+          Color.Gray
+        )
 
-        yield
-          VertexPositionColor(
-            Vector3(renderWidth, layerHeight, zPos) + centerOffset,
-            Color.Gray
-          )
-
+        VertexPositionColor(
+          Vector3(renderWidth, layerHeight, zPos) + centerOffset,
+          Color.Gray
+        )
       for x in 0..width do
         let xPos = float32 x * scaleFactor
 
-        yield
-          VertexPositionColor(
-            Vector3(xPos, layerHeight, 0f) + centerOffset,
-            Color.Gray
-          )
+        VertexPositionColor(
+          Vector3(xPos, layerHeight, 0f) + centerOffset,
+          Color.Gray
+        )
 
-        yield
-          VertexPositionColor(
-            Vector3(xPos, layerHeight, renderDepth) + centerOffset,
-            Color.Gray
-          )
+        VertexPositionColor(
+          Vector3(xPos, layerHeight, renderDepth) + centerOffset,
+          Color.Gray
+        )
     |]
 
-  let emitCursorVerts
+  let private emitCursorVerts
     (cell: GridCell3D)
     (pixelsPerUnit: Vector2)
     (centerOffset: Vector3)
@@ -136,12 +130,18 @@ module EditorRender =
       mkV p7
     |]
 
-  let renderMeshes (ctx: RenderContext) (commands: MeshCommand[]) =
+  let private renderMeshes
+    (ctx: inref<RenderContext>)
+    (count: int)
+    (commands: MeshCommand[])
+    =
     ctx.Device.DepthStencilState <- DepthStencilState.Default
     ctx.Device.BlendState <- BlendState.Opaque
-    ctx.Device.RasterizerState <- RasterizerState.CullNone // Show both sides for checking
+    ctx.Device.RasterizerState <- RasterizerState.CullNone
 
-    for cmd in commands do
+    for i in 0 .. count - 1 do
+      let cmd = commands.[i]
+
       for mesh in cmd.LoadedModel.Model.Meshes do
         for eff in mesh.Effects do
           match eff with
@@ -149,6 +149,7 @@ module EditorRender =
             be.World <- cmd.WorldMatrix
             be.View <- ctx.View
             be.Projection <- ctx.Projection
+            be.Alpha <- 1.0f
 
             if cmd.LoadedModel.HasNormals then
               LightEmitter.applyDefaultLighting &be
@@ -159,8 +160,36 @@ module EditorRender =
 
         mesh.Draw()
 
-  let renderLines
-    (ctx: RenderContext)
+  let private renderGhost (ctx: inref<RenderContext>) (cmd: MeshCommand) =
+    ctx.Device.DepthStencilState <- DepthStencilState.DepthRead
+    ctx.Device.BlendState <- BlendState.AlphaBlend
+    ctx.Device.RasterizerState <- RasterizerState.CullNone
+
+    for mesh in cmd.LoadedModel.Model.Meshes do
+      for eff in mesh.Effects do
+        match eff with
+        | :? BasicEffect as be ->
+          be.World <- cmd.WorldMatrix
+          be.View <- ctx.View
+          be.Projection <- ctx.Projection
+          be.Alpha <- 0.6f
+
+          if cmd.LoadedModel.HasNormals then
+            LightEmitter.applyDefaultLighting &be
+          else
+            be.LightingEnabled <- false
+            be.TextureEnabled <- true
+        | _ -> ()
+
+      mesh.Draw()
+
+      for eff in mesh.Effects do
+        match eff with
+        | :? BasicEffect as be -> be.Alpha <- 1.0f
+        | _ -> ()
+
+  let private renderLines
+    (ctx: inref<RenderContext>)
     (effect: BasicEffect)
     (verts: VertexPositionColor[])
     =
@@ -179,94 +208,64 @@ module EditorRender =
           verts.Length / 2
         )
 
-  let draw
-    (getModel: string -> LoadedModel voption)
-    (effect: BasicEffect)
-    (state: EditorState)
-    (cam: EditorCameraState)
-    (pixelsPerUnit: Vector2)
-    (device: GraphicsDevice)
+  let inline private calcRenderOffsets
+    (width: int)
+    (depth: int)
+    (ppu: Vector2)
     =
-    let viewport = device.Viewport
-
-    let ctx = {
-      Device = device
-      View = EditorCamera.getViewMatrix cam
-      Projection = EditorCamera.getProjectionMatrix cam viewport pixelsPerUnit
-      PixelsPerUnit = pixelsPerUnit
-    }
-
-    let blockMap = state.BlockMap |> AVal.force
-    let layer = state.CurrentLayer |> AVal.force
-    let cursor = state.GridCursor |> AVal.force
-    let viewBounds = getViewBounds cam viewport
-    let struct (minX, minZ, maxX, maxZ) = viewBounds
-
-    // Center offset to move map origin (0,0) to world center
-    // Logic Offset (Huge) for culling
-    let logicCenterOffset =
+    let logicCenter =
       Vector3(
-        -float32 blockMap.Width * CellSize * 0.5f,
+        -float32 width * CellSize * 0.5f,
         0f,
-        -float32 blockMap.Depth * CellSize * 0.5f
+        -float32 depth * CellSize * 0.5f
       )
 
-    // Render Offset (Small) for visual positioning
-    // Enforce UNIFORM SCALING for True 3D (Cube blocks)
-    // Use PPU.X (64) as the standard divisor.
-    let scaleFactor = CellSize / pixelsPerUnit.X
+    let scale = CellSize / ppu.X
 
-    let renderCenterOffset =
-      Vector3(
-        logicCenterOffset.X / pixelsPerUnit.X,
-        logicCenterOffset.Y, // Y is 0
-        logicCenterOffset.Z / pixelsPerUnit.X // Uniform scale Z
-      )
+    let renderCenter =
+      Vector3(logicCenter.X / ppu.X, logicCenter.Y, logicCenter.Z / ppu.X)
 
-    // Emit blocks with True 3D Logic (No Squish, No Iso Correction)
-    let commands =
-      // Adjust view bounds to Map Logic Space for correct culling
-      // View is centered at 0. Map (0,0) is at logicCenterOffset (negative).
-      // MapCoords = ViewCoords - LogicOffset.
-      let struct (minX, minZ, maxX, maxZ) = viewBounds
+    struct (logicCenter, renderCenter, scale)
 
-      let adjustedBounds =
-        struct (minX - logicCenterOffset.X,
-                minZ - logicCenterOffset.Z,
-                maxX - logicCenterOffset.X,
-                maxZ - logicCenterOffset.Z)
+  let private populateCommands
+    (blockMap: BlockMapDefinition)
+    (getModel: string -> LoadedModel voption)
+    (cellBounds: struct (int * int * int * int * int * int))
+    (scaleFactor: float32)
+    (renderCenterOffset: Vector3)
+    (pool: ArrayPool<MeshCommand>)
+    (commands: byref<MeshCommand[]>)
+    (count: byref<int>)
+    =
+    let struct (minX, maxX, minY, maxY, minZ, maxZ) = cellBounds
 
-      let cellBounds =
-        RenderMath.Camera.getViewCellBounds3D
-          adjustedBounds
-          cam.Position.Y
-          CellSize
-          2000.0f // Increased vertical range just in case
+    for x in minX..maxX do
+      for z in minZ..maxZ do
+        for y in minY..maxY do
+          let cell = { X = x; Y = y; Z = z }
 
-      [|
-        for kvp in blockMap.Blocks do
-          let block = kvp.Value
-          let cell = block.Cell
-
-          if
-            RenderMath.Camera.isInCellBounds cell.X cell.Y cell.Z cellBounds
-          then
+          match blockMap.Blocks.TryGetValue cell with
+          | true, block ->
             match BlockMap.getBlockType blockMap block with
             | ValueSome typeInfo ->
               match getModel typeInfo.Model with
               | ValueSome loadedModel ->
-                // Calculate True 3D Render Position
-                // Offset by half cell size to center in grid cell (0..1 range)
+                // Resize pool array if needed
+                if count >= commands.Length then
+                  let newSize = commands.Length * 2
+                  let newArr = pool.Rent(newSize)
+                  System.Array.Copy(commands, newArr, count)
+                  pool.Return(commands)
+                  commands <- newArr
+
+                // Calculate Render Props
                 let halfCell = scaleFactor * 0.5f
                 let x = float32 cell.X * scaleFactor + halfCell
                 let y = float32 cell.Y * scaleFactor + halfCell
                 let z = float32 cell.Z * scaleFactor + halfCell
                 let pos = Vector3(x, y, z) + renderCenterOffset
 
-                // World Matrix: Scale * Rotation * Translation
-                // Scale relative to cell size.
-                // scaleFactor = 32 / 64 = 0.5.
-                // We use 0.5f because KayKit models are likely 2 units wide by default.
+                // Scale relative to cell size (KayKit 2x2 assumption -> 0.5 scale)
                 let modelScale = 0.5f
                 let scale = Matrix.CreateScale(scaleFactor * modelScale)
 
@@ -277,29 +276,124 @@ module EditorRender =
 
                 let trans = Matrix.CreateTranslation(pos)
 
-                yield {
+                commands.[count] <- {
                   LoadedModel = loadedModel
                   WorldMatrix = scale * rot * trans
                 }
+
+                count <- count + 1
               | ValueNone -> ()
             | ValueNone -> ()
-      |]
+          | false, _ -> ()
 
-    commands |> renderMeshes ctx
+  let private emitGhostBlock
+    (state: EditorState)
+    (getModel: string -> LoadedModel voption)
+    (scaleFactor: float32)
+    (renderCenterOffset: Vector3)
+    : MeshCommand voption =
+    match state.GridCursor.Value, state.SelectedBlockType.Value with
+    | ValueSome cell, ValueSome typeId ->
+      let map = state.BlockMap.Value
 
-    // Grid with Uniform Z Scale
-    emitGridVerts
-      layer
-      blockMap.Width
-      blockMap.Depth
-      pixelsPerUnit
-      renderCenterOffset
-    |> renderLines ctx effect
+      match map.Palette.TryGetValue typeId with
+      | true, blockType ->
+        match getModel blockType.Model with
+        | ValueSome loadedModel ->
+          let halfCell = scaleFactor * 0.5f
+          let x = float32 cell.X * scaleFactor + halfCell
+          let y = float32 cell.Y * scaleFactor + halfCell
+          let z = float32 cell.Z * scaleFactor + halfCell
+          let pos = Vector3(x, y, z) + renderCenterOffset
 
-    cursor
-    |> ValueOption.iter(fun c ->
-      emitCursorVerts c pixelsPerUnit renderCenterOffset
-      |> renderLines ctx effect)
+          let modelScale = 0.5f
+          let scale = Matrix.CreateScale(scaleFactor * modelScale)
+          let rot = Matrix.CreateFromQuaternion(state.CurrentRotation.Value)
+          let trans = Matrix.CreateTranslation(pos)
+
+          ValueSome {
+            LoadedModel = loadedModel
+            WorldMatrix = scale * rot * trans
+          }
+        | _ -> ValueNone
+      | _ -> ValueNone
+    | _ -> ValueNone
+
+  let draw
+    (ctx: inref<RenderContext>)
+    (getModel: string -> LoadedModel voption)
+    (effect: BasicEffect)
+    (state: EditorState)
+    (cam: EditorCameraState)
+    (pixelsPerUnit: Vector2)
+    (viewport: Viewport)
+    =
+    let blockMap = state.BlockMap |> AVal.force
+    let layer = state.CurrentLayer |> AVal.force
+    let cursor = state.GridCursor |> AVal.force
+    let viewBounds = getViewBounds cam viewport
+
+    let struct (logicCenterOffset, renderCenterOffset, scaleFactor) =
+      calcRenderOffsets blockMap.Width blockMap.Depth pixelsPerUnit
+
+    // Calculate Culling Bounds
+    let struct (minX, minZ, maxX, maxZ) = viewBounds
+
+    let adjustedBounds =
+      struct (minX - logicCenterOffset.X,
+              minZ - logicCenterOffset.Z,
+              maxX - logicCenterOffset.X,
+              maxZ - logicCenterOffset.Z)
+
+    let cellBounds =
+      RenderMath.Camera.getViewCellBounds3D
+        adjustedBounds
+        cam.Position.Y
+        CellSize
+        2000.0f
+
+    // Rent and Populate
+    let pool = ArrayPool<MeshCommand>.Shared
+    let mutable commands = pool.Rent(256)
+    let mutable count = 0
+
+    try
+      populateCommands
+        blockMap
+        getModel
+        cellBounds
+        scaleFactor
+        renderCenterOffset
+        pool
+        &commands
+        &count
+
+      renderMeshes &ctx count commands
+
+      // Ghost Block
+      match emitGhostBlock state getModel scaleFactor renderCenterOffset with
+      | ValueSome ghost -> renderGhost &ctx ghost
+      | ValueNone -> ()
+
+    finally
+      pool.Return(commands)
+
+    // Grid and Cursor
+    let verts =
+      emitGridVerts
+        layer
+        blockMap.Width
+        blockMap.Depth
+        pixelsPerUnit
+        renderCenterOffset
+
+    renderLines &ctx effect verts
+
+    match cursor with
+    | ValueSome c ->
+      let cursorVerts = emitCursorVerts c pixelsPerUnit renderCenterOffset
+      renderLines &ctx effect cursorVerts
+    | ValueNone -> ()
 
   let createSystem
     (game: Game)
@@ -314,6 +408,14 @@ module EditorRender =
 
     let mutable lineEffect: BasicEffect voption = ValueNone
 
+    // Mutable context to avoid per-frame allocation
+    let mutable renderContext = {
+      Device = game.GraphicsDevice
+      View = Matrix.Identity
+      Projection = Matrix.Identity
+      PixelsPerUnit = pixelsPerUnit
+    }
+
     { new DrawableGameComponent(game, DrawOrder = 100) with
         override _.LoadContent() =
           getBlockModel <- ValueSome(BlockEmitter.createLazyModelLoader content)
@@ -325,6 +427,16 @@ module EditorRender =
         override _.Draw _ =
           match getBlockModel, lineEffect with
           | ValueSome getModel, ValueSome effect ->
-            draw getModel effect state cam pixelsPerUnit game.GraphicsDevice
+            let viewport = game.GraphicsDevice.Viewport
+
+            // Update Context In-Place
+            renderContext <- {
+              renderContext with
+                  View = EditorCamera.getViewMatrix cam
+                  Projection =
+                    EditorCamera.getProjectionMatrix cam viewport pixelsPerUnit
+            }
+
+            draw &renderContext getModel effect state cam pixelsPerUnit viewport
           | _ -> ()
     }

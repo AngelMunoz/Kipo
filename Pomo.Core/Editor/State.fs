@@ -17,6 +17,7 @@ type EditorState = {
   BrushMode: cval<BrushMode>
   CurrentRotation: cval<Quaternion>
   CameraMode: cval<CameraMode>
+  ShowHelp: cval<bool>
   UndoStack: clist<EditorAction>
   RedoStack: clist<EditorAction>
 }
@@ -31,6 +32,7 @@ module EditorState =
     BrushMode = cval Place
     CurrentRotation = cval Quaternion.Identity
     CameraMode = cval Isometric
+    ShowHelp = cval false
     UndoStack = clist []
     RedoStack = clist []
   }
@@ -44,23 +46,13 @@ module EditorState =
     let finalAction =
       transact(fun () ->
         match action with
-        | PlaceBlock(cell, blockTypeId, _) ->
+        | PlaceBlock(block, _) ->
           let map = state.BlockMap.Value
-          let prev = map.Blocks |> Dictionary.tryFindV cell
+          let prev = map.Blocks |> Dictionary.tryFindV block.Cell
 
-          let block: PlacedBlock = {
-            Cell = cell
-            BlockTypeId = blockTypeId
-            Rotation =
-              if state.CurrentRotation.Value = Quaternion.Identity then
-                ValueNone
-              else
-                ValueSome state.CurrentRotation.Value
-          }
-
-          map.Blocks[cell] <- block
+          map.Blocks[block.Cell] <- block
           state.BlockMap.Value <- { map with Version = map.Version + 1 }
-          PlaceBlock(cell, blockTypeId, prev)
+          PlaceBlock(block, prev)
 
         | RemoveBlock(cell, _) ->
           let map = state.BlockMap.Value
@@ -95,12 +87,12 @@ module EditorState =
 
         // Apply inverse
         match action with
-        | PlaceBlock(cell, _, prev) ->
+        | PlaceBlock(block, prev) ->
           let map = state.BlockMap.Value
 
           match prev with
-          | ValueSome pb -> map.Blocks[cell] <- pb
-          | ValueNone -> map.Blocks.Remove cell |> ignore
+          | ValueSome pb -> map.Blocks[block.Cell] <- pb
+          | ValueNone -> map.Blocks.Remove block.Cell |> ignore
 
           state.BlockMap.Value <- { map with Version = map.Version + 1 }
 
@@ -125,43 +117,24 @@ module EditorState =
       match state.RedoStack |> AList.tryLast |> AVal.force with
       | Some action ->
         state.RedoStack.RemoveAt(state.RedoStack.Count - 1) |> ignore
+        state.UndoStack.Add action |> ignore
 
-        // Re-apply. We use a simple apply logic here instead of calling applyAction
-        // to avoid double-stacking undos.
         match action with
-        | PlaceBlock(cell, blockTypeId, _) ->
+        | PlaceBlock(block, _) ->
           let map = state.BlockMap.Value
-
-          let block: PlacedBlock = {
-            Cell = cell
-            BlockTypeId = blockTypeId
-            Rotation =
-              if state.CurrentRotation.Value = Quaternion.Identity then
-                ValueNone
-              else
-                ValueSome state.CurrentRotation.Value
-          }
-
-          map.Blocks[cell] <- block
+          map.Blocks[block.Cell] <- block
           state.BlockMap.Value <- { map with Version = map.Version + 1 }
-          state.UndoStack.Add action |> ignore
 
         | RemoveBlock(cell, _) ->
           let map = state.BlockMap.Value
           map.Blocks.Remove cell |> ignore
           state.BlockMap.Value <- { map with Version = map.Version + 1 }
-          state.UndoStack.Add action |> ignore
 
-        | SetRotation(rot, _) ->
-          state.CurrentRotation.Value <- rot
-          state.UndoStack.Add action |> ignore
+        | SetRotation(rot, _) -> state.CurrentRotation.Value <- rot
 
         | ChangeLayer delta ->
           state.CurrentLayer.Value <- state.CurrentLayer.Value + delta |> max 0
-          state.UndoStack.Add action |> ignore
 
-        | SetBrushMode(mode, _) ->
-          state.BrushMode.Value <- mode
-          state.UndoStack.Add action |> ignore
+        | SetBrushMode(mode, _) -> state.BrushMode.Value <- mode
 
       | None -> ())

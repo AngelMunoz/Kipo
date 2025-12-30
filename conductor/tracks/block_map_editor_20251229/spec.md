@@ -57,23 +57,32 @@ Built-in WYSIWYG 3D block map editor using a **True 3D** world architecture. The
 - **Categories**: Terrain, Decoration, Structure
 - **Block Properties**: Name, Model path, IsSolid, CanStack
 
-### 5. 3D Collision System
+### 5. Map Objects & Settings
+- **Map Settings**: Global properties (BattleMode, MaxEnemies)
+- **Map Objects**: Logical entities distinct from blocks (Spawns, Zones, Teleports)
+- **Object Types**:
+  - **Spawn**: Player/Enemy spawn points with group/faction data
+  - **Zone**: 3D volumes for effects (Speed, Heal, Damage)
+  - **Teleport**: localized teleports or map transitions
+- **Object Properties**: Strongly typed per object kind (no generic dictionaries)
+
+### 6. 3D Collision System
 - **Dual-strategy**: Fast AABB for regular blocks, mesh collision for slopes
 - **CollisionType per BlockType**: `Box | Mesh | NoCollision`
 - **3D Spatial Grid**: Extends current 2D grid to 3D (`GridCell3D`)
 - **Mesh Collision**: For rotated slope blocks, ray-surface intersection
 
-### 6. 3D Pathfinding
+### 7. 3D Pathfinding
 - **3D Navigation Grid**: Walkable cells with height transitions
 - **Ramps/Stairs**: Transition blocks between Y-levels
 - **A* with Height**: Path considers vertical movement
 
-### 7. Preview Mode
+### 8. Preview Mode
 - **Play Button**: Test map with player entity
 - **Spawn Point**: Designated block for player spawn
 - **Stop Button**: Return to editor, map intact
 
-### 8. Persistence
+### 9. Persistence
 - **JSON Format**: JDeck encoders/decoders
 - **Schema Version**: `Version: int` field for future migrations
 - **Self-Contained Palette**: Block types in map file
@@ -93,6 +102,66 @@ type WorldPosition = { X: float32; Y: float32; Z: float32 }
 ```fsharp
 [<Struct>]
 type GridCell3D = { X: int; Y: int; Z: int }  // Y = height
+```
+
+### Map Objects & Settings
+```fsharp
+type BattleMode = PVE | PVP
+
+[<RequireQualifiedAccess>]
+type ZoneEffect =
+    | Speed of multiplier: float32
+    | Heal of amount: float32
+    | Damage of amount: float32
+    | ResourceChange of resource: string * amount: float32
+
+[<RequireQualifiedAccess>]
+type MapObjectShape =
+    | Point
+    | Box of size: Vector3
+    | Sphere of radius: float32
+
+[<Struct>]
+type SpawnProperties = {
+    IsPlayerSpawn: bool
+    EntityGroup: string voption
+    MaxSpawns: int
+    Faction: int voption
+}
+
+[<Struct>]
+type ZoneProperties = {
+    Effect: ZoneEffect
+}
+
+[<Struct>]
+type TeleportProperties = {
+    TargetMap: string voption
+    TargetObjectName: string
+}
+
+[<RequireQualifiedAccess>]
+type MapObjectData =
+    | Spawn of SpawnProperties
+    | Zone of ZoneProperties
+    | Teleport of TeleportProperties
+    | Trigger
+
+[<Struct>]
+type MapObject = {
+    Id: int
+    Name: string
+    Position: WorldPosition
+    Rotation: Quaternion voption
+    Shape: MapObjectShape
+    Data: MapObjectData
+}
+
+[<Struct>]
+type MapSettings = {
+    BattleMode: BattleMode
+    MaxEnemyEntities: int
+}
 ```
 
 ### BlockMap
@@ -122,8 +191,10 @@ type BlockMapDefinition = {
   Version: int  // Schema version for migrations
   Key: string
   Width: int; Height: int; Depth: int
+  Settings: MapSettings
   Palette: Dictionary<int<BlockTypeId>, BlockType>
   Blocks: Dictionary<GridCell3D, PlacedBlock>
+  Objects: Dictionary<int, MapObject>
   SpawnCell: GridCell3D voption
 }
 ```
@@ -136,6 +207,9 @@ type EditorState = {
   BrushMode: cval<BrushMode>
   ShowGrid: cval<bool>
   GridCursor: cval<GridCell3D voption>
+  // New for Objects
+  SelectedObjectId: cval<int voption>
+  ToolMode: cval<ToolMode> // Block | Object
 }
 ```
 
@@ -181,6 +255,7 @@ type EditorState = {
 - Multi-select and copy/paste
 - Runtime map loading from user files
 - Full 3D navmesh (start with grid-based)
+- **Game Logic Integration**: This track only covers the editor and format. Parsing these objects for gameplay happens in a separate track.
 
 ---
 
@@ -197,6 +272,8 @@ type EditorState = {
 - [ ] Layer up/down changes active Y-level
 - [ ] Blocks render at correct 3D positions
 - [ ] Map saves/loads with JDeck
+- [ ] **Map Settings** editable via UI
+- [ ] **Map Objects** (Spawn, Zone) placement and property editing
 
 ### Collision
 - [ ] Box collision for standard blocks

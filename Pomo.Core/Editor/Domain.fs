@@ -23,10 +23,7 @@ open Pomo.Core.Domain.BlockMap
 /// Editor actions for undo/redo
 [<Struct>]
 type EditorAction =
-  | PlaceBlock of
-    cell: GridCell3D *
-    blockTypeId: int<BlockTypeId> *
-    replacedBlock: PlacedBlock voption
+  | PlaceBlock of placedBlock: PlacedBlock * replacedBlock: PlacedBlock voption
   | RemoveBlock of cell: GridCell3D * removedBlock: PlacedBlock voption
   | SetRotation of rotation: Quaternion * prevRotation: Quaternion
   | ChangeLayer of delta: int

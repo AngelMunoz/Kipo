@@ -84,6 +84,21 @@ The following files contain `Vector2.Distance` or `Vector2` position logic:
 - [x] Task: Unit tests for serialization roundtrip
 - [x] Task: Create sample block palette JSON (empty map)
 
+### Phase 2b: Map Objects Domain & Persistence
+
+> [!NOTE]
+> Extending the domain to support strongly typed map objects and settings.
+
+- [ ] Task: Update `Domain/BlockMap.fs`
+  - Add `MapSettings` struct with `BattleMode`, `MaxEnemyEntities`
+  - Add `MapObject` struct with `WorldPosition` and `MapObjectData`
+  - Add `MapObjectData` DU (Spawn, Zone, Teleport, Trigger)
+  - Add `BlockMapDefinition.Settings` and `.Objects` fields
+- [ ] Task: Update `Systems/BlockMapLoader.fs`
+  - Add JDeck encoders/decoders for new types
+  - Ensure backward compatibility or version bump if needed
+- [ ] Task: Update serialization tests
+
 ---
 
 ## Phase 3: Block Rendering ✅
@@ -160,6 +175,12 @@ The following files contain `Vector2.Distance` or `Vector2` position logic:
 - [ ] Task: Brush mode buttons
 - [ ] Task: Save/Load buttons with file dialogs
 - [ ] Task: Preview mode (spawn player, test map)
+- [ ] Task: **Map Settings UI** (Side panel for global map properties)
+- [ ] Task: **Object Tool**
+  - Separate tool mode for placing Objects vs Blocks
+  - Visualizers (Wireframe box for zones, Icons for spawns)
+- [ ] Task: **Object Inspector**
+  - Edit properties of selected object (Spawn group, Zone effect, etc.)
 
 ---
 

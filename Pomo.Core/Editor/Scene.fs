@@ -74,7 +74,7 @@ module EditorScene =
     let renderSystem =
       EditorRender.createSystem game state camera pixelsPerUnit game.Content
 
-    let uiSystem = EditorUI.createSystem game state uiService
+    let uiSystem = EditorUI.createSystem game state uiService camera
 
     let components: IGameComponent list = [
       inputSystem

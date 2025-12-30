@@ -12,7 +12,7 @@ open Myra.Graphics2D.Brushes
 
 module EditorUI =
 
-  let build(state: EditorState) =
+  let build (state: EditorState) (camPos: aval<Vector3>) =
     let panel = Panel.create()
 
     let container =
@@ -22,6 +22,7 @@ module EditorUI =
       |> W.padding 20
 
     let title = Label.create "MAP EDITOR" |> W.textColor Color.Yellow
+    let helpLabel = Label.create "Presss F1 for help" |> W.size 120 12
 
     let undoBtn =
       Btn.create "Undo (Ctrl+Z)"
@@ -64,6 +65,22 @@ module EditorUI =
       Label.create "Camera: Isometric"
       |> W.bindText(state.CameraMode |> AVal.map(fun m -> $"Camera: %A{m}"))
 
+    let cursorInfo =
+      Label.create "Cursor: None"
+      |> W.bindText(
+        state.GridCursor
+        |> AVal.map(fun c ->
+          match c with
+          | ValueSome cell -> $"Cursor: {cell.X}, {cell.Y}, {cell.Z}"
+          | ValueNone -> "Cursor: None")
+      )
+
+    let cameraPosInfo =
+      Label.create "Pos: 0, 0, 0"
+      |> W.bindText(
+        camPos |> AVal.map(fun p -> $"Pos: {p.X:F1}, {p.Y:F1}, {p.Z:F1}")
+      )
+
     let palette =
       HStack.spaced 4
       |> W.hAlign HorizontalAlignment.Right
@@ -100,9 +117,66 @@ module EditorUI =
 
     palette |> HStack.bindChildren paletteChildren |> ignore
 
+    // Help Overlay
+    let controls = [
+      "Tab", "Toggle Camera Mode"
+      "WASD", "Move Camera"
+      "Scroll", "Zoom / Elevate"
+      "R-Click", "Cam Rotate / Erase (Iso)"
+      "M-Click", "Reset Camera"
+      "L-Click", "Place Block"
+      "1 / 2", "Brush Mode"
+      "R", "Reset Rotation"
+      "Q / E", "Rotate (Shift/Alt axis)"
+      "PgUp/Dn", "Change Layer"
+      "Ctrl+Z/Y", "Undo / Redo"
+    ]
+
+    let helpRows =
+      controls
+      |> List.map(fun (key, action) ->
+        HStack.spaced 10
+        |> W.childrenH [
+          Label.create key
+          |> W.textColor Color.Yellow
+          |> W.width 100
+          |> W.hAlign HorizontalAlignment.Right
+
+          Label.create action
+          |> W.textColor Color.White
+          |> W.hAlign HorizontalAlignment.Left
+        ]
+        :> Widget)
+
+    let helpList =
+      VStack.spaced 5
+      |> W.childrenV(
+        (Label.create "--- EDITOR CONTROLS (F1) ---"
+         |> W.hAlign HorizontalAlignment.Center
+         |> W.textColor Color.Cyan
+        :> Widget)
+        :: helpRows
+      )
+
+    let helpContainer =
+      Panel.create()
+      |> W.hAlign HorizontalAlignment.Center
+      |> W.vAlign VerticalAlignment.Center
+      |> W.padding 20
+
+    helpContainer.Background <- SolidBrush(Color(0, 0, 0, 220))
+    helpContainer.Widgets.Add(helpList)
+
+    // Bind visibility
+    let helpSub =
+      state.ShowHelp.AddCallback(fun show -> helpContainer.Visible <- show)
+
+    WidgetSubs.get(helpContainer).Add(helpSub)
+
     container
     |> W.childrenV [
       title
+      helpLabel
       undoBtn
       redoBtn
       blockInfo
@@ -110,27 +184,36 @@ module EditorUI =
       brushInfo
       layerInfo
       cameraInfo
+      cursorInfo
+      cameraPosInfo
     ]
     |> ignore
 
     panel.Widgets.Add(container)
     panel.Widgets.Add(palette)
+    panel.Widgets.Add(helpContainer)
     panel
 
   let createSystem
     (game: Game)
     (state: EditorState)
     (uiService: Pomo.Core.Environment.IUIService)
+    (cam: EditorCameraState)
     : DrawableGameComponent =
 
     let mutable desktop: Desktop voption = ValueNone
+    let camPos = cval cam.Position
 
     { new DrawableGameComponent(game, DrawOrder = 1000) with
         override _.LoadContent() =
-          let root = build state
+          let root = build state camPos
           desktop <- ValueSome(new Desktop(Root = root))
 
         override _.Update _ =
+          transact(fun () ->
+            if camPos.Value <> cam.Position then
+              camPos.Value <- cam.Position)
+
           desktop
           |> ValueOption.iter(fun d ->
             uiService.SetMouseOverUI d.IsMouseOverGUI)

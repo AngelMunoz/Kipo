@@ -22,6 +22,7 @@ module EditorInput =
 
   /// Handle camera movement based on mode
   let handleCameraInput
+    (state: EditorState) // Added state
     (cam: EditorCameraState)
     (keyboard: KeyboardState)
     (mouse: MouseState)
@@ -84,7 +85,9 @@ module EditorInput =
       mouse.MiddleButton = ButtonState.Pressed
       && prevMouse.MiddleButton = ButtonState.Released
     then
-      cam.ResetToIsometric()
+      transact(fun () ->
+        cam.ResetToIsometric()
+        state.CameraMode.Value <- Isometric)
 
   /// Handle editor actions (block placement, layer changes, etc.)
   let handleEditorInput
@@ -97,8 +100,15 @@ module EditorInput =
     (prevMouse: MouseState)
     (viewport: Viewport)
     (pixelsPerUnit: Vector2)
+    (deltaTime: float32)
+    (rotationTimer: byref<float32>)
+    (undoRedoTimer: byref<float32>)
     =
     let isMouseOverUI = uiService.IsMouseOverUI |> AVal.force
+
+    // Toggle Help
+    if isKeyJustPressed prevKeyboard keyboard Keys.F1 then
+      transact(fun () -> state.ShowHelp.Value <- not state.ShowHelp.Value)
 
     // Toggle camera mode with Tab (Works even if over UI)
     if isKeyJustPressed prevKeyboard keyboard Keys.Tab then
@@ -107,16 +117,28 @@ module EditorInput =
         cam.Mode <- newMode
         state.CameraMode.Value <- newMode)
 
-    // Undo/Redo
-    let ctrl =
-      keyboard.IsKeyDown(Keys.LeftControl)
-      || keyboard.IsKeyDown(Keys.RightControl)
+    // Undo/Redo (Continuous)
+    undoRedoTimer <- undoRedoTimer - deltaTime
+    let undoDelay = 0.1f
 
-    if ctrl && isKeyJustPressed prevKeyboard keyboard Keys.Z then
-      EditorState.undo state
+    if undoRedoTimer <= 0.0f then
+      let ctrl =
+        keyboard.IsKeyDown(Keys.LeftControl)
+        || keyboard.IsKeyDown(Keys.RightControl)
 
-    if ctrl && isKeyJustPressed prevKeyboard keyboard Keys.Y then
-      EditorState.redo state
+      if ctrl then
+        if keyboard.IsKeyDown Keys.Z then
+          undoRedoTimer <- undoDelay
+          EditorState.undo state
+        elif keyboard.IsKeyDown Keys.Y then
+          undoRedoTimer <- undoDelay
+          EditorState.redo state
+
+    // Reset Rotation
+    if isKeyJustPressed prevKeyboard keyboard Keys.R then
+      EditorState.applyAction
+        state
+        (SetRotation(Quaternion.Identity, state.CurrentRotation.Value))
 
     // Layer navigation with Page Up/Down
     if isKeyJustPressed prevKeyboard keyboard Keys.PageUp then
@@ -134,22 +156,38 @@ module EditorInput =
       let current = state.BrushMode |> AVal.force
       EditorState.applyAction state (SetBrushMode(Erase, current))
 
-    // Rotate block with Q/E
-    if isKeyJustPressed prevKeyboard keyboard Keys.Q then
-      let current = state.CurrentRotation |> AVal.force
+    // Rotate block with Q/E (Continuous)
+    rotationTimer <- rotationTimer - deltaTime
 
-      let newRot =
-        current * Quaternion.CreateFromYawPitchRoll(MathHelper.PiOver2, 0f, 0f)
+    let isShift =
+      keyboard.IsKeyDown Keys.LeftShift || keyboard.IsKeyDown Keys.RightShift
 
-      EditorState.applyAction state (SetRotation(newRot, current))
+    let isAlt =
+      keyboard.IsKeyDown Keys.LeftAlt || keyboard.IsKeyDown Keys.RightAlt
 
-    if isKeyJustPressed prevKeyboard keyboard Keys.E then
-      let current = state.CurrentRotation |> AVal.force
+    let getRotationAxis() =
+      if isShift then Vector3.UnitX // Pitch
+      elif isAlt then Vector3.UnitZ // Roll
+      else Vector3.UnitY // Yaw
 
-      let newRot =
-        current * Quaternion.CreateFromYawPitchRoll(-MathHelper.PiOver2, 0f, 0f)
+    if rotationTimer <= 0.0f then
+      let rotationDelay = 0.05f
+      let step = MathHelper.ToRadians(10.0f)
 
-      EditorState.applyAction state (SetRotation(newRot, current))
+      if keyboard.IsKeyDown Keys.Q then
+        rotationTimer <- rotationDelay
+        let current = state.CurrentRotation |> AVal.force
+        let axis = getRotationAxis()
+        let delta = Quaternion.CreateFromAxisAngle(axis, step)
+        let newRot = current * delta
+        EditorState.applyAction state (SetRotation(newRot, current))
+      elif keyboard.IsKeyDown Keys.E then
+        rotationTimer <- rotationDelay
+        let current = state.CurrentRotation |> AVal.force
+        let axis = getRotationAxis()
+        let delta = Quaternion.CreateFromAxisAngle(axis, -step)
+        let newRot = current * delta
+        EditorState.applyAction state (SetRotation(newRot, current))
 
     // Update cursor position
     let map = state.BlockMap |> AVal.force
@@ -209,9 +247,19 @@ module EditorInput =
       | ValueSome blockTypeId ->
         match state.BrushMode |> AVal.force with
         | Place ->
-          EditorState.applyAction
-            state
-            (PlaceBlock(cell, blockTypeId, ValueNone))
+          let rotation =
+            if state.CurrentRotation.Value = Quaternion.Identity then
+              ValueNone
+            else
+              ValueSome state.CurrentRotation.Value
+
+          let block: PlacedBlock = {
+            Cell = cell
+            BlockTypeId = blockTypeId
+            Rotation = rotation
+          }
+
+          EditorState.applyAction state (PlaceBlock(block, ValueNone))
         | Erase -> EditorState.applyAction state (RemoveBlock(cell, ValueNone))
         | Select -> ()
       | ValueNone ->
@@ -236,6 +284,8 @@ module EditorInput =
     : GameComponent =
     let mutable prevKeyboard = Keyboard.GetState()
     let mutable prevMouse = Mouse.GetState()
+    let mutable rotationTimer = 0.0f
+    let mutable undoRedoTimer = 0.0f
 
     { new GameComponent(game) with
         override _.Update gameTime =
@@ -244,7 +294,7 @@ module EditorInput =
           let deltaTime = float32 gameTime.ElapsedGameTime.TotalSeconds
           let viewport = game.GraphicsDevice.Viewport
 
-          handleCameraInput cam keyboard mouse prevMouse deltaTime
+          handleCameraInput state cam keyboard mouse prevMouse deltaTime
 
           handleEditorInput
             state
@@ -256,6 +306,9 @@ module EditorInput =
             prevMouse
             viewport
             pixelsPerUnit
+            deltaTime
+            &rotationTimer
+            &undoRedoTimer
 
           prevKeyboard <- keyboard
           prevMouse <- mouse
