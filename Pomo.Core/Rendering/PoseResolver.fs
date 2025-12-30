@@ -7,6 +7,7 @@ open FSharp.UMX
 open FSharp.Data.Adaptive
 open Pomo.Core
 open Pomo.Core.Domain.Units
+open Pomo.Core.Domain.Core
 open Pomo.Core.Domain.Projectile
 open Pomo.Core.Domain.Animation
 open Pomo.Core.Graphics
@@ -141,7 +142,7 @@ module PoseResolver =
     (nodeTransformsPool: Dictionary<string, Matrix>)
     (nodesBuffer: ResizeArray<ResolvedRigNode>)
     (entityId: Guid<EntityId>)
-    (logicPos: Vector2)
+    (logicPos: WorldPosition)
     : ResolvedEntity voption =
 
     match snapshot.ModelConfigIds.TryGetValue entityId with
@@ -158,8 +159,13 @@ module PoseResolver =
         let altitude =
           computeAltitude data.LiveProjectiles entityId core.PixelsPerUnit.Y
 
+        let posWithAltitude = {
+          logicPos with
+              Y = logicPos.Y + altitude
+        }
+
         let renderPos =
-          RenderMath.LogicRender.toRender logicPos altitude core.PixelsPerUnit
+          RenderMath.LogicRender.toRender posWithAltitude core.PixelsPerUnit
 
         let entityBaseMatrix =
           if isProjectile then

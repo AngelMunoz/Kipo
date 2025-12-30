@@ -9,6 +9,7 @@ open FSharp.UMX
 
 open Pomo.Core
 open Pomo.Core.Domain
+open Pomo.Core.Domain.Core
 open Pomo.Core.Domain.World
 open Pomo.Core.Domain.Particles
 open Pomo.Core.Domain.Skill
@@ -757,7 +758,7 @@ module ParticleSystem =
     // For syncing gameplay effects to visuals (direct from world.ActiveEffects)
     ActiveEffects: HashMap<Guid<EntityId>, Skill.ActiveEffect IndexList>
     // For transform updates (not stable - raw world data)
-    Positions: IReadOnlyDictionary<Guid<EntityId>, Vector2>
+    Positions: IReadOnlyDictionary<Guid<EntityId>, WorldPosition>
     Velocities: IReadOnlyDictionary<Guid<EntityId>, Vector2>
     Rotations: IReadOnlyDictionary<Guid<EntityId>, float32>
   }
@@ -837,8 +838,8 @@ module ParticleSystem =
     | ValueSome ownerId ->
       // Use raw Positions/Velocities/Rotations (works for all entity types)
       match ctx.Positions.TryFindV ownerId with
-      | ValueSome pos ->
-        effect.Position.Value <- Vector3(pos.X, 0.0f, pos.Y)
+      | ValueSome worldPos ->
+        effect.Position.Value <- Vector3(worldPos.X, worldPos.Y, worldPos.Z)
 
         let vel =
           ctx.Velocities.TryFindV ownerId

@@ -11,6 +11,7 @@ open FSharp.UMX
 open FSharp.Data.Adaptive
 open Pomo.Core
 open Pomo.Core.Domain.Units
+open Pomo.Core.Domain.Core
 open Pomo.Core.Domain.Particles
 open Pomo.Core.Graphics
 open Pomo.Core.Stores
@@ -104,14 +105,14 @@ module ParticleEmitter =
 
   let inline private computeEffectPosition
     (owner: Guid<EntityId> voption)
-    (positions: IReadOnlyDictionary<Guid<EntityId>, Vector2>)
+    (positions: IReadOnlyDictionary<Guid<EntityId>, WorldPosition>)
     (fallbackPos: Vector3)
     =
     match owner with
     | ValueSome ownerId ->
       positions
       |> Dictionary.tryFindV ownerId
-      |> ValueOption.map(fun p -> Vector3(p.X, 0.0f, p.Y))
+      |> ValueOption.map(fun p -> WorldPosition.toVector3 p)
       |> ValueOption.defaultValue fallbackPos
     | ValueNone -> fallbackPos
 

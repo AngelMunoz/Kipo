@@ -27,7 +27,7 @@ module ActionHandler =
 
   let private findHoveredEntity
     (world: World)
-    (positions: IReadOnlyDictionary<Guid<EntityId>, Vector2>)
+    (positions: IReadOnlyDictionary<Guid<EntityId>, WorldPosition>)
     (rotations: IReadOnlyDictionary<Guid<EntityId>, float32>)
     (cameraService: CameraService)
     (playerId: Guid<EntityId>)
@@ -180,7 +180,7 @@ module ActionHandler =
 
                   match cameraService.ScreenToWorld(rawMousePos, entityId) with
                   | ValueSome worldPos -> worldPos
-                  | ValueNone -> rawMousePos // Fallback if no camera found (shouldn't happen for local player)
+                  | ValueNone -> WorldPosition.fromVector2 rawMousePos // Fallback if no camera found (shouldn't happen for local player)
 
                 let targetingMode =
                   targetingService.TargetingMode |> AVal.force
@@ -226,7 +226,7 @@ module ActionHandler =
                       GameEvent.Intent(
                         IntentEvent.MovementTarget {
                           EntityId = entityId
-                          Target = mousePosition
+                          Target = WorldPosition.toVector2 mousePosition
                         }
                       )
                     )
@@ -254,7 +254,8 @@ module ActionHandler =
                     ()
 
                 | ValueSome TargetPosition ->
-                  let selection = SelectedPosition mousePosition
+                  let selection =
+                    SelectedPosition(WorldPosition.toVector2 mousePosition)
 
                   eventBus.Publish(
                     GameEvent.Intent(
@@ -265,7 +266,8 @@ module ActionHandler =
                     )
                   )
                 | ValueSome TargetDirection ->
-                  let selection = SelectedPosition mousePosition
+                  let selection =
+                    SelectedPosition(WorldPosition.toVector2 mousePosition)
 
                   eventBus.Publish(
                     GameEvent.Intent(

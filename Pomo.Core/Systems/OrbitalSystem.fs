@@ -9,6 +9,7 @@ open FSharp.Data.Adaptive
 open Pomo.Core
 open Pomo.Core.Domain
 open Pomo.Core.Domain.Units
+open Pomo.Core.Domain.Core
 open Pomo.Core.Domain.World
 open Pomo.Core.Domain.Orbital
 open Pomo.Core.Domain.Events
@@ -175,7 +176,9 @@ module OrbitalSystem =
             // Get center position based on OrbitalCenter type
             let centerPosOpt =
               match orbital.Center with
-              | EntityCenter entityId -> snapshot.Positions.TryFindV entityId
+              | EntityCenter entityId ->
+                snapshot.Positions.TryFindV entityId
+                |> ValueOption.map WorldPosition.toVector2
               | PositionCenter pos -> ValueSome pos
 
             // Get entity facing rotation (only for entity-centered orbitals)

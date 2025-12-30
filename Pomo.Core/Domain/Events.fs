@@ -82,7 +82,7 @@ module SystemCommunications =
   [<Struct>]
   type ShowNotification = {
     Message: string
-    Position: Vector2
+    Position: WorldPosition
     Type: NotificationType
   }
 

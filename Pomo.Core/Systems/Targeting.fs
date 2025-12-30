@@ -80,21 +80,30 @@ module Targeting =
 
     let private getSkillActivationPositions
       (positions:
-        System.Collections.Generic.IReadOnlyDictionary<Guid<EntityId>, Vector2>)
+        System.Collections.Generic.IReadOnlyDictionary<
+          Guid<EntityId>,
+          WorldPosition
+         >)
       (casterId: Guid<EntityId>)
       (targetId: Guid<EntityId>)
       =
 
       match positions.TryFindV casterId, positions.TryFindV targetId with
       | ValueSome casterPos, ValueSome targetPos ->
-        ValueSome(casterPos, targetPos)
+        ValueSome(
+          WorldPosition.toVector2 casterPos,
+          WorldPosition.toVector2 targetPos
+        )
       | _ -> ValueNone
 
     let handleTargetEntity
       (eventBus: EventBus)
       (stateWrite: IStateWriteService)
       (positions:
-        System.Collections.Generic.IReadOnlyDictionary<Guid<EntityId>, Vector2>)
+        System.Collections.Generic.IReadOnlyDictionary<
+          Guid<EntityId>,
+          WorldPosition
+         >)
       (skill: ActiveSkill)
       (casterId: Guid<EntityId>)
       (targetId: Guid<EntityId>)
@@ -139,7 +148,10 @@ module Targeting =
     let handleTargetDirection
       (eventBus: EventBus)
       (positions:
-        System.Collections.Generic.IReadOnlyDictionary<Guid<EntityId>, Vector2>)
+        System.Collections.Generic.IReadOnlyDictionary<
+          Guid<EntityId>,
+          WorldPosition
+         >)
       (skill: ActiveSkill)
       (casterId: Guid<EntityId>)
       (targetPos: Vector2)
@@ -147,7 +159,8 @@ module Targeting =
 
       match positions.TryFindV casterId with
       | ValueNone -> () // Caster position not found, do nothing.
-      | ValueSome casterPos ->
+      | ValueSome casterPosWorld ->
+        let casterPos = WorldPosition.toVector2 casterPosWorld
         // For TargetDirection, we don't check range for movement,
         // as the skill originates from the caster.
         // We just fire the intent immediately.
@@ -165,7 +178,10 @@ module Targeting =
       (eventBus: EventBus)
       (stateWrite: IStateWriteService)
       (positions:
-        System.Collections.Generic.IReadOnlyDictionary<Guid<EntityId>, Vector2>)
+        System.Collections.Generic.IReadOnlyDictionary<
+          Guid<EntityId>,
+          WorldPosition
+         >)
       (skill: ActiveSkill)
       (casterId: Guid<EntityId>)
       (targetPos: Vector2)
@@ -173,7 +189,8 @@ module Targeting =
 
       match positions.TryFindV casterId with
       | ValueNone -> () // Caster position not found, do nothing.
-      | ValueSome casterPos ->
+      | ValueSome casterPosWorld ->
+        let casterPos = WorldPosition.toVector2 casterPosWorld
         let distance = Vector2.Distance(casterPos, targetPos)
         let maxRange = skill.Range |> ValueOption.defaultValue 0f
 

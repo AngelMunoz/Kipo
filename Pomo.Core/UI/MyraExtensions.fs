@@ -9,6 +9,7 @@ open Myra.Graphics2D.UI
 open FSharp.UMX
 open FSharp.Data.Adaptive
 open Pomo.Core.Domain.World
+open Pomo.Core.Domain.Core
 
 
 module WidgetSubs =
@@ -197,8 +198,8 @@ module W =
   let inline mapPositions<'T
     when 'T :> Widget
     and 'T: (member set_Positions:
-      IReadOnlyDictionary<Guid<EntityId>, Vector2> -> unit)>
-    (positions: IReadOnlyDictionary<Guid<EntityId>, Vector2>)
+      IReadOnlyDictionary<Guid<EntityId>, WorldPosition> -> unit)>
+    (positions: IReadOnlyDictionary<Guid<EntityId>, WorldPosition>)
     (w: 'T)
     =
     w.set_Positions(positions)

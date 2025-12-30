@@ -6,6 +6,7 @@ open FSharp.UMX
 open FSharp.Data.Adaptive
 open Pomo.Core
 open Pomo.Core.Domain.Units
+open Pomo.Core.Domain.Core
 open Pomo.Core.Graphics
 
 module EntityPicker =
@@ -16,7 +17,7 @@ module EntityPicker =
     (pixelsPerUnit: Vector2)
     (modelScale: float32)
     (squishFactor: float32)
-    (positions: IReadOnlyDictionary<Guid<EntityId>, Vector2>)
+    (positions: IReadOnlyDictionary<Guid<EntityId>, WorldPosition>)
     (rotations: IReadOnlyDictionary<Guid<EntityId>, float32>)
     (excludeEntityId: Guid<EntityId>)
     : Guid<EntityId> voption =
@@ -27,8 +28,7 @@ module EntityPicker =
     for KeyValue(entityId, logicPos) in positions do
       if entityId <> excludeEntityId then
         // 1. Compute translation (cheap)
-        let renderPos =
-          RenderMath.LogicRender.toRender logicPos 0.0f pixelsPerUnit
+        let renderPos = RenderMath.LogicRender.toRender logicPos pixelsPerUnit
 
         // 2. Broad Phase Culling
         // Sphere Center: slightly above feet

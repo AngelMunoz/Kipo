@@ -15,6 +15,7 @@ open Pomo.Core.Domain.Skill
 open Pomo.Core.Systems.Systems
 open Pomo.Core.Environment
 open Pomo.Core.Domain.Animation
+open Pomo.Core.Domain.Core
 
 module Projectile =
 
@@ -22,7 +23,7 @@ module Projectile =
   [<Struct>]
   type WorldContext = {
     Rng: Random
-    Positions: Collections.Generic.IReadOnlyDictionary<Guid<EntityId>, Vector2>
+    Positions: Collections.Generic.IReadOnlyDictionary<Guid<EntityId>, WorldPosition>
     LiveEntities: HashSet<Guid<EntityId>>
   }
 
@@ -31,8 +32,8 @@ module Projectile =
   type ProjectileContext = {
     Id: Guid<EntityId>
     Projectile: LiveProjectile
-    Position: Vector2
-    TargetPosition: Vector2
+    Position: WorldPosition
+    TargetPosition: WorldPosition
     TargetEntity: Guid<EntityId> voption
   }
 
@@ -40,12 +41,13 @@ module Projectile =
     (world: WorldContext)
     (casterId: Guid<EntityId>)
     (currentTargetId: Guid<EntityId>)
-    (originPos: Vector2)
+    (originPos: WorldPosition)
     (maxRange: float32)
     =
     // Pre-size to reasonable capacity for chaining (typically 5-10 potential targets)
     let candidates = ResizeArray<struct (Guid<EntityId> * float32)>(10)
     let maxRangeSq = maxRange * maxRange
+    let originPos2d = WorldPosition.toVector2 originPos
 
     // Single-pass iteration: filter and map in one step
     for KeyValue(id, pos) in world.Positions do
@@ -54,7 +56,7 @@ module Projectile =
         && id <> casterId
         && id <> currentTargetId
       then
-        let distanceSq = Vector2.DistanceSquared(originPos, pos)
+        let distanceSq = Vector2.DistanceSquared(originPos2d, WorldPosition.toVector2 pos)
 
         if distanceSq <= maxRangeSq then
           candidates.Add(struct (id, distanceSq))
@@ -69,7 +71,7 @@ module Projectile =
     {
       ProjectileId = ctx.Id
       CasterId = ctx.Projectile.Caster
-      ImpactPosition = ctx.TargetPosition
+      ImpactPosition = WorldPosition.toVector2 ctx.TargetPosition
       TargetEntity = ctx.TargetEntity
       SkillId = ctx.Projectile.SkillId
       RemainingJumps = remainingJumps
@@ -100,10 +102,13 @@ module Projectile =
 
       stateWrite.RemoveEntity(ctx.Id)
 
+      // Update Y position to match altitude
+      let newPos = { ctx.Position with Y = newAltitude }
+
       stateWrite.CreateProjectile(
         ctx.Id,
         updatedProjectile,
-        ValueSome ctx.Position
+        ValueSome newPos
       )
 
     commEvents |> IndexList.ofSeq
@@ -185,7 +190,9 @@ module Projectile =
     (stateWrite: IStateWriteService)
     (ctx: ProjectileContext)
     =
-    let direction = Vector2.Normalize(ctx.TargetPosition - ctx.Position)
+    let pos2d = WorldPosition.toVector2 ctx.Position
+    let target2d = WorldPosition.toVector2 ctx.TargetPosition
+    let direction = Vector2.Normalize(target2d - pos2d)
     let velocity = direction * ctx.Projectile.Info.Speed
     stateWrite.UpdateVelocity(ctx.Id, velocity)
     IndexList.empty
@@ -196,7 +203,9 @@ module Projectile =
     (world: WorldContext)
     (ctx: ProjectileContext)
     =
-    let distance = Vector2.Distance(ctx.Position, ctx.TargetPosition)
+    let pos2d = WorldPosition.toVector2 ctx.Position
+    let target2d = WorldPosition.toVector2 ctx.TargetPosition
+    let distance = Vector2.Distance(pos2d, target2d)
     let threshold = 4.0f
 
     if distance < threshold then
@@ -216,7 +225,7 @@ module Projectile =
     let targetPos =
       match projectile.Target with
       | EntityTarget entityId -> world.Positions.TryFindV entityId
-      | PositionTarget pos -> ValueSome pos
+      | PositionTarget pos -> ValueSome (WorldPosition.fromVector2 pos)
 
     let targetEntity =
       match projectile.Target with
@@ -251,28 +260,31 @@ module Projectile =
     ParticleStore: Pomo.Core.Stores.ParticleStore
     SkillStore: Pomo.Core.Stores.SkillStore
     VisualEffects: ResizeArray<Particles.VisualEffect>
-    Positions: Collections.Generic.IReadOnlyDictionary<Guid<EntityId>, Vector2>
+    Positions: Collections.Generic.IReadOnlyDictionary<Guid<EntityId>, WorldPosition>
     EffectOwners: Collections.Generic.HashSet<Guid<EntityId>>
   }
 
   /// Calculates rotation quaternion for impact visuals based on projectile direction
   let inline calculateImpactRotation
-    (positions: Collections.Generic.IReadOnlyDictionary<Guid<EntityId>, Vector2>)
+    (positions: Collections.Generic.IReadOnlyDictionary<Guid<EntityId>, WorldPosition>)
     (projectileId: Guid<EntityId>)
     (targetPos: Vector2)
     =
     match positions |> Dictionary.tryFindV projectileId with
-    | ValueSome projPos when projPos <> targetPos ->
-      let dir = Vector2.Normalize(targetPos - projPos)
-      let angle = MathF.Atan2(dir.Y, dir.X)
+    | ValueSome projPos ->
+        let projPos2d = WorldPosition.toVector2 projPos
+        if projPos2d <> targetPos then
+          let dir = Vector2.Normalize(targetPos - projPos2d)
+          let angle = MathF.Atan2(dir.Y, dir.X)
 
-      let yaw =
-        Quaternion.CreateFromAxisAngle(Vector3.Up, -angle + MathHelper.PiOver2)
+          let yaw =
+            Quaternion.CreateFromAxisAngle(Vector3.Up, -angle + MathHelper.PiOver2)
 
-      let pitch =
-        Quaternion.CreateFromAxisAngle(Vector3.UnitX, MathHelper.PiOver2)
+          let pitch =
+            Quaternion.CreateFromAxisAngle(Vector3.UnitX, MathHelper.PiOver2)
 
-      yaw * pitch
+          yaw * pitch
+        else Quaternion.Identity
     | _ -> Quaternion.Identity
 
   let inline spawnEffect
@@ -340,7 +352,7 @@ module Projectile =
             ctx.ParticleStore
             ctx.VisualEffects
             vfxId
-            pos
+            (WorldPosition.toVector2 pos)
             Quaternion.Identity
             (ValueSome projectileId)
             ValueNone

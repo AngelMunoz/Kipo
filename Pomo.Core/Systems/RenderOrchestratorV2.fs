@@ -18,6 +18,7 @@ open Pomo.Core.Domain.Particles
 open Pomo.Core.Graphics
 open Pomo.Core.Rendering
 open Pomo.Core.AssetPreloader
+open Pomo.Core.Domain.Core
 
 module RenderOrchestrator =
 

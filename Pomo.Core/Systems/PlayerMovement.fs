@@ -7,6 +7,7 @@ open FSharp.Data.Adaptive
 
 open Pomo.Core
 open Pomo.Core.Domain.Units
+open Pomo.Core.Domain.Core
 open Pomo.Core.Domain.World
 open Pomo.Core.Domain.Events
 open Pomo.Core.Domain.Action
@@ -132,6 +133,7 @@ module PlayerMovement =
           let currentPos =
             snapshot.Positions
             |> Dictionary.tryFindV playerId
+            |> ValueOption.map WorldPosition.toVector2
             |> ValueOption.defaultValue Vector2.Zero
 
           accumulatedMtv <- accumulatedMtv + mtv
@@ -158,6 +160,7 @@ module PlayerMovement =
         let position =
           snapshot.Positions
           |> Dictionary.tryFindV playerId
+          |> ValueOption.map WorldPosition.toVector2
           |> ValueOption.defaultValue Vector2.Zero
 
         let movementSpeed = movementSpeed |> AVal.force

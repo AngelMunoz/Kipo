@@ -8,6 +8,7 @@ open FSharp.Data.Adaptive
 open Pomo.Core.Domain
 open Pomo.Core.Domain.Action
 open Pomo.Core.Domain.Units
+open Pomo.Core.Domain.Core
 open Pomo.Core.Domain.Events
 open Pomo.Core.Domain.Entity
 open Pomo.Core.Domain.Skill
@@ -17,6 +18,7 @@ open Pomo.Core.Stores
 open Pomo.Core
 open Systems
 open Pomo.Core.Environment
+
 
 module EntitySpawnerLogic =
   [<Struct>]
@@ -181,7 +183,7 @@ module EntitySpawnerLogic =
     let snapshot: EntitySnapshot = {
       Id = entityId
       ScenarioId = pending.ScenarioId
-      Position = pos
+      Position = WorldPosition.fromVector2 pos
       Velocity = Vector2.Zero
     }
 

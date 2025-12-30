@@ -48,7 +48,7 @@ module Navigation =
 
       snapshot.Positions
       |> Dictionary.tryFindV entityId
-      |> ValueOption.map(fun pos -> struct (ctx, pos))
+      |> ValueOption.map(fun pos -> struct (ctx, WorldPosition.toVector2 pos))
 
     let inline publishPath entityId path =
       if not(List.isEmpty path) then

@@ -13,6 +13,19 @@ module Spatial =
   type GridCell = { X: int; Y: int }
 
   [<Struct>]
+  type GridCell3D = { X: int; Y: int; Z: int } // Y is height
+
+  module GridCell3D =
+    let fromVector3 (v: Vector3) (cellSize: float32) = {
+      X = int(v.X / cellSize)
+      Y = int(v.Y / cellSize)
+      Z = int(v.Z / cellSize)
+    }
+
+    let toWorldPosition (c: GridCell3D) (cellSize: float32) =
+      Vector3(float32 c.X * cellSize, float32 c.Y * cellSize, float32 c.Z * cellSize)
+
+  [<Struct>]
   type Cone = {
     Origin: Vector2
     Direction: Vector2

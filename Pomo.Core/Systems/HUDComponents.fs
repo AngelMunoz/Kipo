@@ -1156,7 +1156,7 @@ module HUDComponents =
     (config: HUDConfig aval)
     (scenario: Scenario option aval)
     (playerId: Guid<EntityId>)
-    (positions: IReadOnlyDictionary<Guid<EntityId>, Vector2>)
+    (positions: IReadOnlyDictionary<Guid<EntityId>, WorldPosition>)
     (factions: amap<Guid<EntityId>, FSharp.Data.Adaptive.HashSet<Faction>>)
     (camera: Pomo.Core.Domain.Camera.Camera option aval)
     =

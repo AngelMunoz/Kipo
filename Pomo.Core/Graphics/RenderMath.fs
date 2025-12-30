@@ -3,6 +3,7 @@ namespace Pomo.Core.Graphics
 open System
 open Microsoft.Xna.Framework
 open Microsoft.Xna.Framework.Graphics
+open Pomo.Core.Domain.Core
 
 /// Coordinate Space Transformations for Isometric Rendering
 ///
@@ -80,19 +81,18 @@ module RenderMath =
   module LogicRender =
     open CoordSpace
 
-    /// Converts a Logic position (pixels) and altitude to Unified Render Space (3D Units).
+    /// Converts a WorldPosition to Unified Render Space (3D Units).
     /// X = LogicX / PPU.X
-    /// Z = (LogicY / PPU.Y) - altitude (elevated objects sort behind ground objects)
+    /// Z = (LogicZ / PPU.Y) - altitude (elevated objects sort behind ground objects)
     /// Y = Altitude + Z_base (visual height includes altitude and depth bias)
     let inline toRender
-      (logicPos: Vector2)
-      (altitude: float32)
+      (pos: WorldPosition)
       (pixelsPerUnit: Vector2)
       : Vector3 =
-      let x = toRenderX pixelsPerUnit logicPos.X
-      let zBase = toRenderZBase pixelsPerUnit logicPos.Y
-      let y = toVisualHeight zBase altitude
-      let z = toCameraDepth zBase altitude
+      let x = toRenderX pixelsPerUnit pos.X
+      let zBase = toRenderZBase pixelsPerUnit pos.Z
+      let y = toVisualHeight zBase pos.Y
+      let z = toCameraDepth zBase pos.Y
       Vector3(x, y, z)
 
     /// Converts a Tile position (pixels) with explicit depth to Unified Render Space (3D Units).
@@ -119,20 +119,23 @@ module RenderMath =
       (particlePos: Vector3)
       (pixelsPerUnit: Vector2)
       : Vector3 =
-      let logicPos = Vector2(particlePos.X, particlePos.Z)
-      let altitude = correctParticleAltitude pixelsPerUnit particlePos.Y
-      LogicRender.toRender logicPos altitude pixelsPerUnit
+      let pos = {
+          X = particlePos.X
+          Y = correctParticleAltitude pixelsPerUnit particlePos.Y
+          Z = particlePos.Z
+      }
+      LogicRender.toRender pos pixelsPerUnit
 
   /// Screen ↔ Logic space conversions (picking, UI)
   module ScreenLogic =
-    /// Converts Screen coordinates to Logic coordinates.
+    /// Converts Screen coordinates to Logic coordinates (WorldPosition on ground plane Y=0).
     /// Used for Picking / Mouse interaction.
     let inline toLogic
       (screenPos: Vector2)
       (viewport: Viewport)
       (zoom: float32)
-      (cameraPosition: Vector2)
-      : Vector2 =
+      (cameraPosition: WorldPosition)
+      : WorldPosition =
       let screenCenter =
         Vector2(
           float32 viewport.X + float32 viewport.Width / 2.0f,
@@ -141,15 +144,20 @@ module RenderMath =
 
       let deltaPixels = screenPos - screenCenter
       let logicDelta = deltaPixels / zoom
-      cameraPosition + logicDelta
+      
+      {
+          X = cameraPosition.X + logicDelta.X
+          Y = 0.0f // Project to ground plane
+          Z = cameraPosition.Z + logicDelta.Y
+      }
 
     /// Converts Logic coordinates to Screen coordinates.
     /// Inverse of toLogic.
     let inline toScreen
-      (logicPos: Vector2)
+      (logicPos: WorldPosition)
       (viewport: Viewport)
       (zoom: float32)
-      (cameraPosition: Vector2)
+      (cameraPosition: WorldPosition)
       : Vector2 =
       let screenCenter =
         Vector2(
@@ -157,8 +165,9 @@ module RenderMath =
           float32 viewport.Y + float32 viewport.Height / 2.0f
         )
 
-      let logicDelta = logicPos - cameraPosition
-      let deltaPixels = logicDelta * zoom
+      let logicDeltaX = logicPos.X - cameraPosition.X
+      let logicDeltaY = logicPos.Z - cameraPosition.Z // Use Z as 2D Y
+      let deltaPixels = Vector2(logicDeltaX, logicDeltaY) * zoom
       screenCenter + deltaPixels
 
   /// Camera and projection matrix builders
@@ -167,12 +176,12 @@ module RenderMath =
 
     /// Calculates the View Matrix for the camera.
     /// Logic Position is the center of the camera in pixels.
-    let getViewMatrix (logicPos: Vector2) (pixelsPerUnit: Vector2) : Matrix =
+    let getViewMatrix (pos: WorldPosition) (pixelsPerUnit: Vector2) : Matrix =
       let target =
         Vector3(
-          toRenderX pixelsPerUnit logicPos.X,
+          toRenderX pixelsPerUnit pos.X,
           0.0f,
-          toRenderZBase pixelsPerUnit logicPos.Y
+          toRenderZBase pixelsPerUnit pos.Z
         )
 
       let cameraPos = target + Vector3.Up * 100.0f
@@ -191,11 +200,11 @@ module RenderMath =
     /// Calculates the 2D transform matrix for SpriteBatch rendering.
     /// Used for background terrain and UI.
     let get2DViewMatrix
-      (cameraPos: Vector2)
+      (cameraPos: WorldPosition)
       (zoom: float32)
       (viewport: Viewport)
       : Matrix =
-      Matrix.CreateTranslation(-cameraPos.X, -cameraPos.Y, 0.0f)
+      Matrix.CreateTranslation(-cameraPos.X, -cameraPos.Z, 0.0f)
       * Matrix.CreateScale(zoom, zoom, 1.0f)
       * Matrix.CreateTranslation(
         float32 viewport.Width / 2.0f,
@@ -206,7 +215,7 @@ module RenderMath =
     /// Computes camera view bounds in logic space for culling.
     /// Returns struct(left, right, top, bottom).
     let inline getViewBounds
-      (cameraPos: Vector2)
+      (cameraPos: WorldPosition)
       (viewportWidth: float32)
       (viewportHeight: float32)
       (zoom: float32)
@@ -216,8 +225,8 @@ module RenderMath =
 
       struct (cameraPos.X - halfW,
               cameraPos.X + halfW,
-              cameraPos.Y - halfH,
-              cameraPos.Y + halfH)
+              cameraPos.Z - halfH,
+              cameraPos.Z + halfH)
 
   /// World matrix builders for 3D meshes
   module WorldMatrix =

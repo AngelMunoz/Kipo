@@ -123,6 +123,17 @@ module Core =
       let TransientCommandDuration = TimeSpan.FromSeconds 2.0
 
 
+  [<Struct>]
+  type WorldPosition = { X: float32; Y: float32; Z: float32 }
+
+  module WorldPosition =
+    let zero = { X = 0.0f; Y = 0.0f; Z = 0.0f }
+    let fromVector2 (v: Vector2) = { X = v.X; Y = 0f; Z = v.Y }
+    let toVector2 (p: WorldPosition) = Vector2(p.X, p.Z)
+
+
+    let fromVector3(v: Vector3) = { X = v.X; Y = v.Y; Z = v.Z }
+    let toVector3(p: WorldPosition) = Vector3(p.X, p.Y, p.Z)
 
   [<Struct>]
   type Element =

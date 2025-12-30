@@ -120,12 +120,14 @@ module UnitMovement =
                 | true, m -> m
                 | false, _ -> Vector2.Zero
 
+              let currentPos2d = WorldPosition.toVector2 currentPos
+
               match state with
               | MovingAlongPath path ->
                 currentPaths[entityId] <- path
 
                 match
-                  MovementLogic.handleMovingAlongPath currentPos path speed mtv
+                  MovementLogic.handleMovingAlongPath currentPos2d path speed mtv
                 with
                 | MovementLogic.Arrived ->
                   MovementLogic.notifyArrived entityId stateWrite core.EventBus
@@ -152,7 +154,7 @@ module UnitMovement =
 
               | MovingTo target ->
                 match
-                  MovementLogic.handleMovingTo currentPos target speed mtv
+                  MovementLogic.handleMovingTo currentPos2d target speed mtv
                 with
                 | MovementLogic.Arrived ->
                   MovementLogic.notifyArrived entityId stateWrite core.EventBus

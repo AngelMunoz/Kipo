@@ -15,6 +15,7 @@ open Pomo.Core.Domain.Particles
 open Pomo.Core.Stores
 open Pomo.Core.Domain.Events
 open Pomo.Core.Systems.Systems
+open Pomo.Core.Domain.Core
 
 module Collision =
   open Pomo.Core.Domain
@@ -117,7 +118,7 @@ module Collision =
     let (Gameplay gameplay) = env.GameplayServices
     let stateWrite = env.CoreServices.StateWrite
 
-    let spawnTerrainImpactEffect (vfxId: string) (pos: Vector2) =
+    let spawnTerrainImpactEffect (vfxId: string) (pos: WorldPosition) =
       stores.ParticleStore.tryFind vfxId
       |> ValueOption.iter(fun configs ->
         let struct (billboardEmitters, meshEmitters) =
@@ -127,7 +128,7 @@ module Collision =
           Id = System.Guid.NewGuid().ToString()
           Emitters = billboardEmitters
           MeshEmitters = meshEmitters
-          Position = ref(Vector3(pos.X, 0.0f, pos.Y))
+          Position = ref(Vector3(pos.X, pos.Y, pos.Z))
           Rotation = ref Quaternion.Identity
           Scale = ref Vector3.One
           IsAlive = ref true
@@ -284,14 +285,16 @@ module Collision =
 
         // Check for entity-entity collisions
         for KeyValue(entityId, pos) in positions do
-          let cell = getGridCell Core.Constants.Collision.GridCellSize pos
+          let cell = getGridCell Core.Constants.Collision.GridCellSize (WorldPosition.toVector2 pos)
           let nearbyEntities = getNearbyTo cell
 
           for otherId in nearbyEntities do
             if entityId <> otherId then
               match positions |> Dictionary.tryFindV otherId with
               | ValueSome otherPos ->
-                let distance = Vector2.Distance(pos, otherPos)
+                let pos2d = WorldPosition.toVector2 pos
+                let otherPos2d = WorldPosition.toVector2 otherPos
+                let distance = Vector2.Distance(pos2d, otherPos2d)
                 // Simple radius check
                 if distance < Core.Constants.Entity.CollisionDistance then
                   core.EventBus.Publish(
@@ -333,11 +336,14 @@ module Collision =
           if shouldCheckWalls then
             let startPos =
               match velocities.TryFindV entityId with
-              | ValueSome v -> targetPos - (v * dt)
+              | ValueSome v ->
+                  { X = targetPos.X - v.X * dt
+                    Y = targetPos.Y
+                    Z = targetPos.Z - v.Y * dt }
               | ValueNone -> targetPos
 
             // 2. Determine Steps
-            let displacement = targetPos - startPos
+            let displacement = WorldPosition.toVector2 targetPos - WorldPosition.toVector2 startPos
             let dist = displacement.Length()
             // Step size reduced for tighter precision with smaller radius
             let stepSize = 3.0f
@@ -364,7 +370,10 @@ module Collision =
             for step = 1 to numSteps do
               // Advance position
               if numSteps > 1 || dist > 0.0f then
-                currentPos <- currentPos + stepMove
+                currentPos <-
+                    { X = currentPos.X + stepMove.X
+                      Y = currentPos.Y
+                      Z = currentPos.Z + stepMove.Y }
               else
                 // Static case: just use targetPos (which equals startPos)
                 currentPos <- targetPos
@@ -379,13 +388,14 @@ module Collision =
                 let mutable iterationMTV = Vector2.Zero
                 let mutable iterationHasCollision = false
 
-                let entityPoly = getEntityPolygon currentPos
+                let currentPos2d = WorldPosition.toVector2 currentPos
+                let entityPoly = getEntityPolygon currentPos2d
                 let entityAxes = getAxes entityPoly
 
                 // SPATIAL LOOKUP
                 // 1. Get current cell
                 let cell =
-                  getGridCell Core.Constants.Collision.GridCellSize currentPos
+                  getGridCell Core.Constants.Collision.GridCellSize currentPos2d
 
                 // 2. Collect potential collision objects from neighbor cells (GC-friendly)
                 nearbyObjectsSet.Clear()
@@ -415,7 +425,7 @@ module Collision =
                       mapCtx.PolylineObjects
                       entityPoly
                       entityAxes
-                      currentPos
+                      currentPos2d
                       entityRadius
                       cacheKey
 
@@ -440,7 +450,10 @@ module Collision =
                   | ValueNone -> ()
 
                 if iterationHasCollision then
-                  currentPos <- currentPos + iterationMTV
+                  currentPos <-
+                    { X = currentPos.X + iterationMTV.X
+                      Y = currentPos.Y
+                      Z = currentPos.Z + iterationMTV.Y }
                   totalMTV <- totalMTV + iterationMTV
                   globalHasCollision <- true
                 else
@@ -455,7 +468,7 @@ module Collision =
                 let impact: SystemCommunications.ProjectileImpacted = {
                   ProjectileId = entityId
                   CasterId = proj.Caster
-                  ImpactPosition = currentPos
+                  ImpactPosition = WorldPosition.toVector2 currentPos
                   TargetEntity = ValueNone
                   SkillId = proj.SkillId
                   RemainingJumps = ValueNone

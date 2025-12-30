@@ -296,7 +296,7 @@ module Projections =
 
   [<Struct>]
   type MovementSnapshot = {
-    Positions: IReadOnlyDictionary<Guid<EntityId>, Vector2>
+    Positions: IReadOnlyDictionary<Guid<EntityId>, WorldPosition>
     SpatialGrid: IReadOnlyDictionary<GridCell, Guid<EntityId>[]>
     Rotations: IReadOnlyDictionary<Guid<EntityId>, float32>
     ModelConfigIds: IReadOnlyDictionary<Guid<EntityId>, string>
@@ -358,7 +358,7 @@ module Projections =
     let private calculateSnapshot
       (time: TimeSpan)
       (velocities: IReadOnlyDictionary<Guid<EntityId>, Vector2>)
-      (positions: IReadOnlyDictionary<Guid<EntityId>, Vector2>)
+      (positions: IReadOnlyDictionary<Guid<EntityId>, WorldPosition>)
       (rotations: IReadOnlyDictionary<Guid<EntityId>, float32>)
       (modelConfigIds: HashMap<Guid<EntityId>, string>)
       (entityScenarios: HashMap<Guid<EntityId>, Guid<ScenarioId>>)
@@ -366,7 +366,7 @@ module Projections =
       =
       let dt = float32 time.TotalSeconds
 
-      let positionsBuilder = Dictionary<Guid<EntityId>, Vector2>()
+      let positionsBuilder = Dictionary<Guid<EntityId>, WorldPosition>()
       let rotationsBuilder = Dictionary<Guid<EntityId>, float32>()
       let modelConfigBuilder = Dictionary<Guid<EntityId>, string>()
       let gridBuilder = Dictionary<GridCell, ResizeArray<Guid<EntityId>>>()
@@ -377,7 +377,11 @@ module Projections =
           // Calculate Position
           let currentPos =
             match velocities |> Dictionary.tryFindV id with
-            | ValueSome v -> startPos + (v * dt)
+            | ValueSome v ->
+                // Apply 2D velocity to X/Z plane, preserve Y
+                { WorldPosition.X = startPos.X + v.X * dt
+                  Y = startPos.Y
+                  Z = startPos.Z + v.Y * dt }
             | ValueNone -> startPos
 
           positionsBuilder[id] <- currentPos
@@ -401,7 +405,9 @@ module Projections =
 
           // Calculate Grid Cell
           let cell =
-            Spatial.getGridCell Core.Constants.Collision.GridCellSize currentPos
+            Spatial.getGridCell
+                Core.Constants.Collision.GridCellSize
+                (WorldPosition.toVector2 currentPos)
 
           // Add to Grid (O(1) amortized with ResizeArray)
           match gridBuilder |> Dictionary.tryFindV cell with
@@ -535,7 +541,11 @@ module Projections =
               None
             else
               match snapshot.Positions.TryGetValue entityId with
-              | true, pos when Vector2.Distance(pos, center) <= radius ->
-                Some struct (entityId, pos)
+              | true, pos ->
+                  let pos2d = WorldPosition.toVector2 pos
+                  if Vector2.Distance(pos2d, center) <= radius then
+                    Some struct (entityId, pos2d)
+                  else
+                    None
               | _ -> None)
     }

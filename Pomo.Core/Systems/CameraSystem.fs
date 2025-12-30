@@ -71,7 +71,7 @@ module CameraSystem =
                 let pos =
                   projections.ComputeMovementSnapshot(scenarioId).Positions
                   |> Dictionary.tryFindV playerId
-                  |> ValueOption.defaultValue Vector2.Zero
+                  |> ValueOption.defaultValue WorldPosition.zero
 
                 let ppu =
                   match scenarios |> HashMap.tryFindV scenarioId with
@@ -83,7 +83,7 @@ module CameraSystem =
                   | ValueNone -> Vector2(64.0f, 32.0f) // Fallback
 
                 pos, ppu
-              | ValueNone -> Vector2.Zero, Vector2(64.0f, 32.0f)
+              | ValueNone -> WorldPosition.zero, Vector2(64.0f, 32.0f)
 
             let view = RenderMath.Camera.getViewMatrix position pixelsPerUnit
 

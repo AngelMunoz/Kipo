@@ -3,6 +3,7 @@ namespace Pomo.Core.Rendering
 open Microsoft.Xna.Framework
 open Microsoft.Xna.Framework.Content
 open Microsoft.Xna.Framework.Graphics
+open Pomo.Core.Domain.Core
 open Pomo.Core.Domain.World
 
 module TextEmitter =
@@ -24,7 +25,7 @@ module TextEmitter =
     notifications
     |> Seq.choose(fun notif ->
       let x = notif.Position.X
-      let y = notif.Position.Y
+      let y = notif.Position.Z // Z is the 2D Y for WorldPosition
 
       // Cull if outside camera view
       if x < viewLeft || x > viewRight || y < viewTop || y > viewBottom then
@@ -43,7 +44,7 @@ module TextEmitter =
 
         Some {
           Text = notif.Text
-          ScreenPosition = notif.Position
+          ScreenPosition = WorldPosition.toVector2 notif.Position
           Alpha = alpha
           Color = color
           Scale = scale

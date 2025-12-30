@@ -13,7 +13,7 @@ module Entity =
   type EntitySnapshot = {
     Id: Guid<EntityId>
     ScenarioId: Guid<ScenarioId>
-    Position: Vector2
+    Position: WorldPosition
     Velocity: Vector2
   }
 

@@ -12,10 +12,12 @@ open Pomo.Core.Domain.Animation
 open Pomo.Core.Stores
 open Pomo.Core.Graphics
 
+open Pomo.Core.Domain.Core
+
 /// Shared rendering core - used by all emitters
 type RenderCore = {
   PixelsPerUnit: Vector2
-  ToRenderPos: Vector2 -> float32 -> Vector3
+  ToRenderPos: WorldPosition -> Vector3
 }
 
 /// Entity-specific rendering data
@@ -32,7 +34,7 @@ type EntityRenderData = {
 type ParticleRenderData = {
   GetTexture: string -> Texture2D voption
   GetLoadedModelByAsset: string -> LoadedModel voption
-  EntityPositions: IReadOnlyDictionary<Guid<EntityId>, Vector2>
+  EntityPositions: IReadOnlyDictionary<Guid<EntityId>, WorldPosition>
   SquishFactor: float32
   ModelScale: float32
   FallbackTexture: Texture2D
@@ -60,8 +62,8 @@ module RenderCore =
 
   /// Creates the shared RenderCore from map pixel settings
   let create(pixelsPerUnit: Vector2) : RenderCore =
-    let toRenderPos (logicPos: Vector2) (altitude: float32) =
-      RenderMath.LogicRender.toRender logicPos altitude pixelsPerUnit
+    let toRenderPos (pos: WorldPosition) =
+      RenderMath.LogicRender.toRender pos pixelsPerUnit
 
     {
       PixelsPerUnit = pixelsPerUnit

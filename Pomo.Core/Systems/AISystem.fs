@@ -29,7 +29,7 @@ module AIContext =
   /// Snapshot of world state for AI decision making
   [<Struct>]
   type WorldSnapshot = {
-    Positions: IReadOnlyDictionary<Guid<EntityId>, Vector2>
+    Positions: IReadOnlyDictionary<Guid<EntityId>, WorldPosition>
     Velocities: IReadOnlyDictionary<Guid<EntityId>, Vector2>
     Factions: HashMap<Guid<EntityId>, Faction HashSet>
     SpatialGrid: IReadOnlyDictionary<GridCell, Guid<EntityId>[]>
@@ -238,7 +238,9 @@ module Perception =
 
     for entityId in nearbyEntities do
       match world.Positions |> Dictionary.tryFindV entityId with
-      | ValueSome pos ->
+      | ValueSome worldPos ->
+        let pos = WorldPosition.toVector2 worldPos
+
         match world.Factions |> HashMap.tryFindV entityId with
         | ValueSome targetFactions ->
           let isHostile = isHostileFaction ctx.Entity.Factions targetFactions
@@ -1072,7 +1074,7 @@ module AISystemLogic =
           // Prefer real-time position over stale memory position
           let pos =
             match world.Positions |> Dictionary.tryFindV id with
-            | ValueSome p -> p
+            | ValueSome p -> WorldPosition.toVector2 p
             | ValueNone -> entry.lastKnownPosition
 
           targetResult <- ValueSome struct (id, pos)
@@ -1336,7 +1338,9 @@ type AISystem(game: Game, env: PomoEnvironment) =
               w
 
           let posOpt =
-            world.Positions |> Dictionary.tryFindV controller.controlledEntityId
+            world.Positions
+            |> Dictionary.tryFindV controller.controlledEntityId
+            |> ValueOption.map WorldPosition.toVector2
 
           let facOpt =
             getFactions() |> HashMap.tryFindV controller.controlledEntityId
