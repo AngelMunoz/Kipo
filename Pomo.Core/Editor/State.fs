@@ -18,8 +18,8 @@ type EditorState = {
   CurrentRotation: cval<Quaternion>
   CameraMode: cval<CameraMode>
   ShowHelp: cval<bool>
-  UndoStack: clist<EditorAction>
-  RedoStack: clist<EditorAction>
+  UndoStack: Stack<EditorAction>
+  RedoStack: Stack<EditorAction>
 }
 
 module EditorState =
@@ -33,14 +33,13 @@ module EditorState =
     CurrentRotation = cval Quaternion.Identity
     CameraMode = cval Isometric
     ShowHelp = cval false
-    UndoStack = clist []
-    RedoStack = clist []
+    UndoStack = Stack()
+    RedoStack = Stack()
   }
 
   let private pushUndo (state: EditorState) (action: EditorAction) =
-    transact(fun () ->
-      state.UndoStack.Add action |> ignore
-      state.RedoStack.Clear())
+    state.UndoStack.Push(action)
+    state.RedoStack.Clear()
 
   let applyAction (state: EditorState) (action: EditorAction) : unit =
     let finalAction =
@@ -79,13 +78,11 @@ module EditorState =
     pushUndo state finalAction
 
   let undo(state: EditorState) : unit =
-    transact(fun () ->
-      match state.UndoStack |> AList.tryLast |> AVal.force with
-      | Some action ->
-        state.UndoStack.RemoveAt(state.UndoStack.Count - 1) |> ignore
-        state.RedoStack.Add action |> ignore
+    match state.UndoStack.TryPop() with
+    | true, action ->
+      state.RedoStack.Push(action)
 
-        // Apply inverse
+      transact(fun () ->
         match action with
         | PlaceBlock(block, prev) ->
           let map = state.BlockMap.Value
@@ -101,24 +98,22 @@ module EditorState =
 
           match prev with
           | ValueSome pb -> map.Blocks[cell] <- pb
-          | ValueNone -> () // Wasn't anything there anyway
+          | ValueNone -> ()
 
           state.BlockMap.Value <- { map with Version = map.Version + 1 }
 
         | SetRotation(_, prev) -> state.CurrentRotation.Value <- prev
         | ChangeLayer delta ->
           state.CurrentLayer.Value <- state.CurrentLayer.Value - delta |> max 0
-        | SetBrushMode(_, prev) -> state.BrushMode.Value <- prev
-
-      | None -> ())
+        | SetBrushMode(_, prev) -> state.BrushMode.Value <- prev)
+    | false, _ -> ()
 
   let redo(state: EditorState) : unit =
-    transact(fun () ->
-      match state.RedoStack |> AList.tryLast |> AVal.force with
-      | Some action ->
-        state.RedoStack.RemoveAt(state.RedoStack.Count - 1) |> ignore
-        state.UndoStack.Add action |> ignore
+    match state.RedoStack.TryPop() with
+    | true, action ->
+      state.UndoStack.Push(action)
 
+      transact(fun () ->
         match action with
         | PlaceBlock(block, _) ->
           let map = state.BlockMap.Value
@@ -135,6 +130,5 @@ module EditorState =
         | ChangeLayer delta ->
           state.CurrentLayer.Value <- state.CurrentLayer.Value + delta |> max 0
 
-        | SetBrushMode(mode, _) -> state.BrushMode.Value <- mode
-
-      | None -> ())
+        | SetBrushMode(mode, _) -> state.BrushMode.Value <- mode)
+    | false, _ -> ()

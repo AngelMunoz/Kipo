@@ -15,12 +15,14 @@ open Pomo.Core.Rendering
 module EditorRender =
   open Pomo.Core.Domain
 
-  [<Struct>]
-  type RenderContext = {
+  type DrawContext = {
     Device: GraphicsDevice
-    View: Matrix
-    Projection: Matrix
+    mutable View: Matrix
+    mutable Projection: Matrix
     PixelsPerUnit: Vector2
+    mutable Viewport: Viewport
+    mutable GridBuffer: VertexPositionColor[]
+    CursorBuffer: VertexPositionColor[]
   }
 
   let getViewBounds (cam: EditorCameraState) (viewport: Viewport) =
@@ -34,46 +36,68 @@ module EditorRender =
       (float32 viewport.Height)
       cam.Zoom
 
-  let private emitGridVerts
+  let private populateGridVerts
+    (buffer: VertexPositionColor[])
     (layer: int)
     (width: int)
     (depth: int)
     (pixelsPerUnit: Vector2)
     (centerOffset: Vector3)
-    =
+    : int =
     let scaleFactor = CellSize / pixelsPerUnit.X
     let renderWidth = float32 width * scaleFactor
     let renderDepth = float32 depth * scaleFactor
     let layerHeight = float32 layer * scaleFactor
+    let mutable idx = 0
 
-    [|
-      for z in 0..depth do
-        let zPos = float32 z * scaleFactor
+    for z in 0..depth do
+      let zPos = float32 z * scaleFactor
 
+      buffer.[idx] <-
         VertexPositionColor(
           Vector3(0f, layerHeight, zPos) + centerOffset,
           Color.Gray
         )
 
+      idx <- idx + 1
+
+      buffer.[idx] <-
         VertexPositionColor(
           Vector3(renderWidth, layerHeight, zPos) + centerOffset,
           Color.Gray
         )
-      for x in 0..width do
-        let xPos = float32 x * scaleFactor
 
+      idx <- idx + 1
+
+    for x in 0..width do
+      let xPos = float32 x * scaleFactor
+
+      buffer.[idx] <-
         VertexPositionColor(
           Vector3(xPos, layerHeight, 0f) + centerOffset,
           Color.Gray
         )
 
+      idx <- idx + 1
+
+      buffer.[idx] <-
         VertexPositionColor(
           Vector3(xPos, layerHeight, renderDepth) + centerOffset,
           Color.Gray
         )
-    |]
 
-  let private emitCursorVerts
+      idx <- idx + 1
+
+    idx
+
+  let inline private getGridVertCount (width: int) (depth: int) =
+    (depth + 1) * 2 + (width + 1) * 2
+
+  [<Literal>]
+  let CursorVertCount = 24
+
+  let private populateCursorVerts
+    (buffer: VertexPositionColor[])
     (cell: GridCell3D)
     (pixelsPerUnit: Vector2)
     (centerOffset: Vector3)
@@ -87,51 +111,43 @@ module EditorRender =
     let basePos = Vector3(x, y, z) + centerOffset
     let size = scaleFactor
 
-    let mkV v =
-      VertexPositionColor(basePos + v, Color.Yellow)
+    let p0 = basePos + Vector3(0f, 0f, 0f)
+    let p1 = basePos + Vector3(size, 0f, 0f)
+    let p2 = basePos + Vector3(size, 0f, size)
+    let p3 = basePos + Vector3(0f, 0f, size)
+    let p4 = basePos + Vector3(0f, size, 0f)
+    let p5 = basePos + Vector3(size, size, 0f)
+    let p6 = basePos + Vector3(size, size, size)
+    let p7 = basePos + Vector3(0f, size, size)
 
-    // Wireframe Box
-    let p0 = Vector3(0f, 0f, 0f)
-    let p1 = Vector3(size, 0f, 0f)
-    let p2 = Vector3(size, 0f, size)
-    let p3 = Vector3(0f, 0f, size)
-    let p4 = Vector3(0f, size, 0f)
-    let p5 = Vector3(size, size, 0f)
-    let p6 = Vector3(size, size, size)
-    let p7 = Vector3(0f, size, size)
-
-    [|
-      // Bottom
-      mkV p0
-      mkV p1
-      mkV p1
-      mkV p2
-      mkV p2
-      mkV p3
-      mkV p3
-      mkV p0
-      // Top
-      mkV p4
-      mkV p5
-      mkV p5
-      mkV p6
-      mkV p6
-      mkV p7
-      mkV p7
-      mkV p4
-      // Verticals
-      mkV p0
-      mkV p4
-      mkV p1
-      mkV p5
-      mkV p2
-      mkV p6
-      mkV p3
-      mkV p7
-    |]
+    let color = Color.Yellow
+    buffer.[0] <- VertexPositionColor(p0, color)
+    buffer.[1] <- VertexPositionColor(p1, color)
+    buffer.[2] <- VertexPositionColor(p1, color)
+    buffer.[3] <- VertexPositionColor(p2, color)
+    buffer.[4] <- VertexPositionColor(p2, color)
+    buffer.[5] <- VertexPositionColor(p3, color)
+    buffer.[6] <- VertexPositionColor(p3, color)
+    buffer.[7] <- VertexPositionColor(p0, color)
+    buffer.[8] <- VertexPositionColor(p4, color)
+    buffer.[9] <- VertexPositionColor(p5, color)
+    buffer.[10] <- VertexPositionColor(p5, color)
+    buffer.[11] <- VertexPositionColor(p6, color)
+    buffer.[12] <- VertexPositionColor(p6, color)
+    buffer.[13] <- VertexPositionColor(p7, color)
+    buffer.[14] <- VertexPositionColor(p7, color)
+    buffer.[15] <- VertexPositionColor(p4, color)
+    buffer.[16] <- VertexPositionColor(p0, color)
+    buffer.[17] <- VertexPositionColor(p4, color)
+    buffer.[18] <- VertexPositionColor(p1, color)
+    buffer.[19] <- VertexPositionColor(p5, color)
+    buffer.[20] <- VertexPositionColor(p2, color)
+    buffer.[21] <- VertexPositionColor(p6, color)
+    buffer.[22] <- VertexPositionColor(p3, color)
+    buffer.[23] <- VertexPositionColor(p7, color)
 
   let private renderMeshes
-    (ctx: inref<RenderContext>)
+    (ctx: DrawContext)
     (count: int)
     (commands: MeshCommand[])
     =
@@ -160,7 +176,7 @@ module EditorRender =
 
         mesh.Draw()
 
-  let private renderGhost (ctx: inref<RenderContext>) (cmd: MeshCommand) =
+  let private renderGhost (ctx: DrawContext) (cmd: MeshCommand) =
     ctx.Device.DepthStencilState <- DepthStencilState.DepthRead
     ctx.Device.BlendState <- BlendState.AlphaBlend
     ctx.Device.RasterizerState <- RasterizerState.CullNone
@@ -189,11 +205,12 @@ module EditorRender =
         | _ -> ()
 
   let private renderLines
-    (ctx: inref<RenderContext>)
+    (ctx: DrawContext)
     (effect: BasicEffect)
     (verts: VertexPositionColor[])
+    (vertCount: int)
     =
-    if verts.Length > 0 then
+    if vertCount > 0 then
       effect.World <- Matrix.Identity
       effect.View <- ctx.View
       effect.Projection <- ctx.Projection
@@ -205,7 +222,7 @@ module EditorRender =
           PrimitiveType.LineList,
           verts,
           0,
-          verts.Length / 2
+          vertCount / 2
         )
 
   let inline private calcRenderOffsets
@@ -320,21 +337,19 @@ module EditorRender =
     | _ -> ValueNone
 
   let draw
-    (ctx: inref<RenderContext>)
+    (ctx: DrawContext)
     (getModel: string -> LoadedModel voption)
     (effect: BasicEffect)
     (state: EditorState)
     (cam: EditorCameraState)
-    (pixelsPerUnit: Vector2)
-    (viewport: Viewport)
     =
     let blockMap = state.BlockMap |> AVal.force
     let layer = state.CurrentLayer |> AVal.force
     let cursor = state.GridCursor |> AVal.force
-    let viewBounds = getViewBounds cam viewport
+    let viewBounds = getViewBounds cam ctx.Viewport
 
     let struct (logicCenterOffset, renderCenterOffset, scaleFactor) =
-      calcRenderOffsets blockMap.Width blockMap.Depth pixelsPerUnit
+      calcRenderOffsets blockMap.Width blockMap.Depth ctx.PixelsPerUnit
 
     // Calculate Culling Bounds
     let struct (minX, minZ, maxX, maxZ) = viewBounds
@@ -368,31 +383,38 @@ module EditorRender =
         &commands
         &count
 
-      renderMeshes &ctx count commands
+      renderMeshes ctx count commands
 
       // Ghost Block
       match emitGhostBlock state getModel scaleFactor renderCenterOffset with
-      | ValueSome ghost -> renderGhost &ctx ghost
+      | ValueSome ghost -> renderGhost ctx ghost
       | ValueNone -> ()
 
     finally
       pool.Return(commands)
 
-    // Grid and Cursor
-    let verts =
-      emitGridVerts
+    // Grid (only repopulate if layer or dimensions changed - caller manages caching)
+    let gridVertCount =
+      populateGridVerts
+        ctx.GridBuffer
         layer
         blockMap.Width
         blockMap.Depth
-        pixelsPerUnit
+        ctx.PixelsPerUnit
         renderCenterOffset
 
-    renderLines &ctx effect verts
+    renderLines ctx effect ctx.GridBuffer gridVertCount
 
+    // Cursor
     match cursor with
     | ValueSome c ->
-      let cursorVerts = emitCursorVerts c pixelsPerUnit renderCenterOffset
-      renderLines &ctx effect cursorVerts
+      populateCursorVerts
+        ctx.CursorBuffer
+        c
+        ctx.PixelsPerUnit
+        renderCenterOffset
+
+      renderLines ctx effect ctx.CursorBuffer CursorVertCount
     | ValueNone -> ()
 
   let createSystem
@@ -408,35 +430,54 @@ module EditorRender =
 
     let mutable lineEffect: BasicEffect voption = ValueNone
 
-    // Mutable context to avoid per-frame allocation
-    let mutable renderContext = {
+    // Cached vertex buffers (avoid per-frame allocations)
+    let gridBufferPool = ArrayPool<VertexPositionColor>.Shared
+
+    // DrawContext with all rendering dependencies
+    let drawContext = {
       Device = game.GraphicsDevice
       View = Matrix.Identity
       Projection = Matrix.Identity
       PixelsPerUnit = pixelsPerUnit
+      Viewport = game.GraphicsDevice.Viewport
+      GridBuffer = gridBufferPool.Rent(1024) // Generous initial size
+      CursorBuffer = Array.zeroCreate<VertexPositionColor> CursorVertCount
     }
 
     { new DrawableGameComponent(game, DrawOrder = 100) with
-        override _.LoadContent() =
+        override this.LoadContent() =
           getBlockModel <- ValueSome(BlockEmitter.createLazyModelLoader content)
           let effect = new BasicEffect(game.GraphicsDevice)
           effect.VertexColorEnabled <- true
           effect.LightingEnabled <- false
           lineEffect <- ValueSome effect
 
-        override _.Draw _ =
+        override this.Draw _ =
           match getBlockModel, lineEffect with
           | ValueSome getModel, ValueSome effect ->
             let viewport = game.GraphicsDevice.Viewport
 
-            // Update Context In-Place
-            renderContext <- {
-              renderContext with
-                  View = EditorCamera.getViewMatrix cam
-                  Projection =
-                    EditorCamera.getProjectionMatrix cam viewport pixelsPerUnit
-            }
+            // Ensure grid buffer is large enough
+            let map = state.BlockMap |> AVal.force
+            let needed = getGridVertCount map.Width map.Depth
 
-            draw &renderContext getModel effect state cam pixelsPerUnit viewport
+            if needed > drawContext.GridBuffer.Length then
+              gridBufferPool.Return(drawContext.GridBuffer)
+              drawContext.GridBuffer <- gridBufferPool.Rent(needed * 2)
+
+            // Update Context In-Place
+            drawContext.Viewport <- viewport
+            drawContext.View <- EditorCamera.getViewMatrix cam
+
+            drawContext.Projection <-
+              EditorCamera.getProjectionMatrix cam viewport pixelsPerUnit
+
+            draw drawContext getModel effect state cam
           | _ -> ()
+
+        override this.Dispose(disposing) =
+          if disposing then
+            gridBufferPool.Return(drawContext.GridBuffer)
+
+          base.Dispose(disposing)
     }

@@ -6,9 +6,25 @@ open Microsoft.Xna.Framework.Input
 open FSharp.Data.Adaptive
 open Pomo.Core.Domain
 open Pomo.Core.Domain.Core
+open Pomo.Core.Domain.Spatial
 open Pomo.Core.Domain.BlockMap
 
 module EditorInput =
+  open Pomo.Core.Domain.Spatial
+
+  /// Input context bundling keyboard/mouse state and mutable timers
+  type EditorInputContext = {
+    mutable Keyboard: KeyboardState
+    mutable PrevKeyboard: KeyboardState
+    mutable Mouse: MouseState
+    mutable PrevMouse: MouseState
+    mutable Viewport: Viewport
+    PixelsPerUnit: Vector2
+    mutable DeltaTime: float32
+    mutable RotationTimer: float32
+    mutable UndoRedoTimer: float32
+    mutable LastPaintedCell: GridCell3D
+  }
 
   let private isKeyJustPressed
     (prev: KeyboardState)
@@ -94,16 +110,17 @@ module EditorInput =
     (state: EditorState)
     (cam: EditorCameraState)
     (uiService: Pomo.Core.Environment.IUIService)
-    (keyboard: KeyboardState)
-    (prevKeyboard: KeyboardState)
-    (mouse: MouseState)
-    (prevMouse: MouseState)
-    (viewport: Viewport)
-    (pixelsPerUnit: Vector2)
-    (deltaTime: float32)
-    (rotationTimer: byref<float32>)
-    (undoRedoTimer: byref<float32>)
+    (ctx: EditorInputContext)
     =
+    // Destructure context for easier access
+    let keyboard = ctx.Keyboard
+    let prevKeyboard = ctx.PrevKeyboard
+    let mouse = ctx.Mouse
+    let prevMouse = ctx.PrevMouse
+    let viewport = ctx.Viewport
+    let pixelsPerUnit = ctx.PixelsPerUnit
+    let deltaTime = ctx.DeltaTime
+
     let isMouseOverUI = uiService.IsMouseOverUI |> AVal.force
 
     // Toggle Help
@@ -118,20 +135,20 @@ module EditorInput =
         state.CameraMode.Value <- newMode)
 
     // Undo/Redo (Continuous)
-    undoRedoTimer <- undoRedoTimer - deltaTime
+    ctx.UndoRedoTimer <- ctx.UndoRedoTimer - deltaTime
     let undoDelay = 0.1f
 
-    if undoRedoTimer <= 0.0f then
+    if ctx.UndoRedoTimer <= 0.0f then
       let ctrl =
         keyboard.IsKeyDown(Keys.LeftControl)
         || keyboard.IsKeyDown(Keys.RightControl)
 
       if ctrl then
         if keyboard.IsKeyDown Keys.Z then
-          undoRedoTimer <- undoDelay
+          ctx.UndoRedoTimer <- undoDelay
           EditorState.undo state
         elif keyboard.IsKeyDown Keys.Y then
-          undoRedoTimer <- undoDelay
+          ctx.UndoRedoTimer <- undoDelay
           EditorState.redo state
 
     // Reset Rotation
@@ -157,7 +174,7 @@ module EditorInput =
       EditorState.applyAction state (SetBrushMode(Erase, current))
 
     // Rotate block with Q/E (Continuous)
-    rotationTimer <- rotationTimer - deltaTime
+    ctx.RotationTimer <- ctx.RotationTimer - deltaTime
 
     let isShift =
       keyboard.IsKeyDown Keys.LeftShift || keyboard.IsKeyDown Keys.RightShift
@@ -170,19 +187,19 @@ module EditorInput =
       elif isAlt then Vector3.UnitZ // Roll
       else Vector3.UnitY // Yaw
 
-    if rotationTimer <= 0.0f then
+    if ctx.RotationTimer <= 0.0f then
       let rotationDelay = 0.05f
       let step = MathHelper.ToRadians(10.0f)
 
       if keyboard.IsKeyDown Keys.Q then
-        rotationTimer <- rotationDelay
+        ctx.RotationTimer <- rotationDelay
         let current = state.CurrentRotation |> AVal.force
         let axis = getRotationAxis()
         let delta = Quaternion.CreateFromAxisAngle(axis, step)
         let newRot = current * delta
         EditorState.applyAction state (SetRotation(newRot, current))
       elif keyboard.IsKeyDown Keys.E then
-        rotationTimer <- rotationDelay
+        ctx.RotationTimer <- rotationDelay
         let current = state.CurrentRotation |> AVal.force
         let axis = getRotationAxis()
         let delta = Quaternion.CreateFromAxisAngle(axis, -step)
@@ -214,7 +231,7 @@ module EditorInput =
     // RenderPos = LogicalPos + Offset
     // LogicalPos = RenderPos - Offset
     // Manually subtract since WorldPosition is struct without operator - with Vector3
-    let logicalPos = {
+    let logicalPos: WorldPosition = {
       X = worldPos.X - centerOffset.X
       Y = worldPos.Y - centerOffset.Y
       Z = worldPos.Z - centerOffset.Z
@@ -237,12 +254,17 @@ module EditorInput =
       else
         state.GridCursor.Value <- ValueNone)
 
-    // Left-click: Place or Erase based on brush mode
-    if
+    // Left-click: Place or Erase based on brush mode (single click or drag)
+    let shouldPaint =
       not isMouseOverUI
       && mouse.LeftButton = ButtonState.Pressed
-      && prevMouse.LeftButton = ButtonState.Released
-    then
+      && isValid
+      && (prevMouse.LeftButton = ButtonState.Released
+          || cell <> ctx.LastPaintedCell)
+
+    if shouldPaint then
+      ctx.LastPaintedCell <- cell
+
       match state.SelectedBlockType |> AVal.force with
       | ValueSome blockTypeId ->
         match state.BrushMode |> AVal.force with
@@ -266,6 +288,10 @@ module EditorInput =
         if state.BrushMode |> AVal.force = Erase then
           EditorState.applyAction state (RemoveBlock(cell, ValueNone))
 
+    // Reset last painted cell when button released
+    if mouse.LeftButton = ButtonState.Released then
+      ctx.LastPaintedCell <- { X = -1; Y = -1; Z = -1 }
+
     // Right-click: Always erase (quick erase)
     if
       not isMouseOverUI
@@ -282,34 +308,40 @@ module EditorInput =
     (uiService: Pomo.Core.Environment.IUIService)
     (pixelsPerUnit: Vector2)
     : GameComponent =
-    let mutable prevKeyboard = Keyboard.GetState()
-    let mutable prevMouse = Mouse.GetState()
-    let mutable rotationTimer = 0.0f
-    let mutable undoRedoTimer = 0.0f
+
+    // Input context with mutable state
+    let inputContext = {
+      Keyboard = Keyboard.GetState()
+      PrevKeyboard = Keyboard.GetState()
+      Mouse = Mouse.GetState()
+      PrevMouse = Mouse.GetState()
+      Viewport = game.GraphicsDevice.Viewport
+      PixelsPerUnit = pixelsPerUnit
+      DeltaTime = 0.0f
+      RotationTimer = 0.0f
+      UndoRedoTimer = 0.0f
+      LastPaintedCell = { X = -1; Y = -1; Z = -1 }
+    }
 
     { new GameComponent(game) with
         override _.Update gameTime =
-          let keyboard = Keyboard.GetState()
-          let mouse = Mouse.GetState()
-          let deltaTime = float32 gameTime.ElapsedGameTime.TotalSeconds
-          let viewport = game.GraphicsDevice.Viewport
+          // Update input context in-place
+          inputContext.PrevKeyboard <- inputContext.Keyboard
+          inputContext.PrevMouse <- inputContext.Mouse
+          inputContext.Keyboard <- Keyboard.GetState()
+          inputContext.Mouse <- Mouse.GetState()
+          inputContext.Viewport <- game.GraphicsDevice.Viewport
 
-          handleCameraInput state cam keyboard mouse prevMouse deltaTime
+          inputContext.DeltaTime <-
+            float32 gameTime.ElapsedGameTime.TotalSeconds
 
-          handleEditorInput
+          handleCameraInput
             state
             cam
-            uiService
-            keyboard
-            prevKeyboard
-            mouse
-            prevMouse
-            viewport
-            pixelsPerUnit
-            deltaTime
-            &rotationTimer
-            &undoRedoTimer
+            inputContext.Keyboard
+            inputContext.Mouse
+            inputContext.PrevMouse
+            inputContext.DeltaTime
 
-          prevKeyboard <- keyboard
-          prevMouse <- mouse
+          handleEditorInput state cam uiService inputContext
     }
