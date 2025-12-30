@@ -15,6 +15,7 @@ module EditorScene =
   let create
     (game: Game)
     (stores: StoreServices)
+    (uiService: IUIService)
     (sceneTransitionSubject: IObserver<Scene>)
     (mapKey: string voption)
     : struct (IGameComponent list * IDisposable) =
@@ -61,16 +62,25 @@ module EditorScene =
       transact(fun () ->
         state.SelectedBlockType.Value <- ValueSome 1<BlockTypeId>)
 
-    let pixelsPerUnit = Vector2(64f, 32f)
+    // Use Square PPU for True 3D (1:1 Aspect Ratio)
+    let pixelsPerUnit = Vector2(64f, 64f)
 
     let camera = EditorCameraState()
+    camera.Zoom <- 2.0f // Initial zoom adjusted for 1:1 scale (blocks look taller now)
 
-    let inputSystem = EditorInput.createSystem game state camera pixelsPerUnit
+    let inputSystem =
+      EditorInput.createSystem game state camera uiService pixelsPerUnit
 
     let renderSystem =
       EditorRender.createSystem game state camera pixelsPerUnit game.Content
 
-    let components: IGameComponent list = [ inputSystem; renderSystem ]
+    let uiSystem = EditorUI.createSystem game state uiService
+
+    let components: IGameComponent list = [
+      inputSystem
+      renderSystem
+      uiSystem
+    ]
 
     let disposable =
       { new IDisposable with

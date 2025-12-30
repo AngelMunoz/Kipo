@@ -159,5 +159,6 @@ module CompositionRoot =
         Pomo.Core.Editor.EditorScene.create
           game
           scope.Stores
+          scope.UIService
           sceneTransitionSubject
           mapKey

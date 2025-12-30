@@ -225,12 +225,23 @@ module EditorRender =
 
     // Emit blocks with True 3D Logic (No Squish, No Iso Correction)
     let commands =
+      // Adjust view bounds to Map Logic Space for correct culling
+      // View is centered at 0. Map (0,0) is at logicCenterOffset (negative).
+      // MapCoords = ViewCoords - LogicOffset.
+      let struct (minX, minZ, maxX, maxZ) = viewBounds
+
+      let adjustedBounds =
+        struct (minX - logicCenterOffset.X,
+                minZ - logicCenterOffset.Z,
+                maxX - logicCenterOffset.X,
+                maxZ - logicCenterOffset.Z)
+
       let cellBounds =
         RenderMath.Camera.getViewCellBounds3D
-          viewBounds
+          adjustedBounds
           cam.Position.Y
           CellSize
-          1000.0f
+          2000.0f // Increased vertical range just in case
 
       [|
         for kvp in blockMap.Blocks do
@@ -245,14 +256,19 @@ module EditorRender =
               match getModel typeInfo.Model with
               | ValueSome loadedModel ->
                 // Calculate True 3D Render Position
-                let x = float32 cell.X * scaleFactor
-                let y = float32 cell.Y * scaleFactor
-                let z = float32 cell.Z * scaleFactor
-
+                // Offset by half cell size to center in grid cell (0..1 range)
+                let halfCell = scaleFactor * 0.5f
+                let x = float32 cell.X * scaleFactor + halfCell
+                let y = float32 cell.Y * scaleFactor + halfCell
+                let z = float32 cell.Z * scaleFactor + halfCell
                 let pos = Vector3(x, y, z) + renderCenterOffset
 
                 // World Matrix: Scale * Rotation * Translation
-                let scale = Matrix.CreateScale(scaleFactor)
+                // Scale relative to cell size.
+                // scaleFactor = 32 / 64 = 0.5.
+                // We use 0.5f because KayKit models are likely 2 units wide by default.
+                let modelScale = 0.5f
+                let scale = Matrix.CreateScale(scaleFactor * modelScale)
 
                 let rot =
                   match block.Rotation with

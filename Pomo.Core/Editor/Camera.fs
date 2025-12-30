@@ -9,7 +9,7 @@ open Pomo.Core.Domain.Core
 /// Uses mutable properties for high-frequency updates.
 type EditorCameraState() =
   static let defaultIsometricYaw = MathHelper.PiOver4
-  static let defaultIsometricPitch = -MathHelper.ToRadians(35.264f) // True Isometric Pitch
+  static let defaultIsometricPitch = -MathHelper.ToRadians(30.0f) // Standard Isometric Slope
 
   member val Position = Vector3.Zero with get, set
   member val Yaw = defaultIsometricYaw with get, set

@@ -29,6 +29,13 @@ module BlockMapLoader =
   let save (filePath: string) (map: BlockMapDefinition) : Result<unit, string> =
     try
       let json = (Serialization.encodeBlockMapDefinition map).ToJsonString()
+      let dir = Path.GetDirectoryName(filePath)
+
+      if
+        not(System.String.IsNullOrWhiteSpace dir) && not(Directory.Exists dir)
+      then
+        Directory.CreateDirectory(dir) |> ignore
+
       File.WriteAllText(filePath, json)
       Ok()
     with ex ->

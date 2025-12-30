@@ -90,6 +90,7 @@ module EditorInput =
   let handleEditorInput
     (state: EditorState)
     (cam: EditorCameraState)
+    (uiService: Pomo.Core.Environment.IUIService)
     (keyboard: KeyboardState)
     (prevKeyboard: KeyboardState)
     (mouse: MouseState)
@@ -97,12 +98,25 @@ module EditorInput =
     (viewport: Viewport)
     (pixelsPerUnit: Vector2)
     =
-    // Toggle camera mode with Tab
+    let isMouseOverUI = uiService.IsMouseOverUI |> AVal.force
+
+    // Toggle camera mode with Tab (Works even if over UI)
     if isKeyJustPressed prevKeyboard keyboard Keys.Tab then
       transact(fun () ->
         let newMode = if cam.Mode = Isometric then FreeFly else Isometric
         cam.Mode <- newMode
         state.CameraMode.Value <- newMode)
+
+    // Undo/Redo
+    let ctrl =
+      keyboard.IsKeyDown(Keys.LeftControl)
+      || keyboard.IsKeyDown(Keys.RightControl)
+
+    if ctrl && isKeyJustPressed prevKeyboard keyboard Keys.Z then
+      EditorState.undo state
+
+    if ctrl && isKeyJustPressed prevKeyboard keyboard Keys.Y then
+      EditorState.redo state
 
     // Layer navigation with Page Up/Down
     if isKeyJustPressed prevKeyboard keyboard Keys.PageUp then
@@ -113,10 +127,12 @@ module EditorInput =
 
     // Brush mode
     if isKeyJustPressed prevKeyboard keyboard Keys.D1 then
-      EditorState.applyAction state (SetBrushMode Place)
+      let current = state.BrushMode |> AVal.force
+      EditorState.applyAction state (SetBrushMode(Place, current))
 
     if isKeyJustPressed prevKeyboard keyboard Keys.D2 then
-      EditorState.applyAction state (SetBrushMode Erase)
+      let current = state.BrushMode |> AVal.force
+      EditorState.applyAction state (SetBrushMode(Erase, current))
 
     // Rotate block with Q/E
     if isKeyJustPressed prevKeyboard keyboard Keys.Q then
@@ -125,7 +141,7 @@ module EditorInput =
       let newRot =
         current * Quaternion.CreateFromYawPitchRoll(MathHelper.PiOver2, 0f, 0f)
 
-      EditorState.applyAction state (SetRotation newRot)
+      EditorState.applyAction state (SetRotation(newRot, current))
 
     if isKeyJustPressed prevKeyboard keyboard Keys.E then
       let current = state.CurrentRotation |> AVal.force
@@ -133,7 +149,7 @@ module EditorInput =
       let newRot =
         current * Quaternion.CreateFromYawPitchRoll(-MathHelper.PiOver2, 0f, 0f)
 
-      EditorState.applyAction state (SetRotation newRot)
+      EditorState.applyAction state (SetRotation(newRot, current))
 
     // Update cursor position
     let map = state.BlockMap |> AVal.force
@@ -185,31 +201,37 @@ module EditorInput =
 
     // Left-click: Place or Erase based on brush mode
     if
-      mouse.LeftButton = ButtonState.Pressed
+      not isMouseOverUI
+      && mouse.LeftButton = ButtonState.Pressed
       && prevMouse.LeftButton = ButtonState.Released
     then
       match state.SelectedBlockType |> AVal.force with
       | ValueSome blockTypeId ->
         match state.BrushMode |> AVal.force with
-        | Place -> EditorState.applyAction state (PlaceBlock(cell, blockTypeId))
-        | Erase -> EditorState.applyAction state (RemoveBlock cell)
+        | Place ->
+          EditorState.applyAction
+            state
+            (PlaceBlock(cell, blockTypeId, ValueNone))
+        | Erase -> EditorState.applyAction state (RemoveBlock(cell, ValueNone))
         | Select -> ()
       | ValueNone ->
         if state.BrushMode |> AVal.force = Erase then
-          EditorState.applyAction state (RemoveBlock cell)
+          EditorState.applyAction state (RemoveBlock(cell, ValueNone))
 
     // Right-click: Always erase (quick erase)
     if
-      mouse.RightButton = ButtonState.Pressed
+      not isMouseOverUI
+      && mouse.RightButton = ButtonState.Pressed
       && prevMouse.RightButton = ButtonState.Released
     then
       if cam.Mode = Isometric then // Only in isometric, free-fly uses right-click for rotation
-        EditorState.applyAction state (RemoveBlock cell)
+        EditorState.applyAction state (RemoveBlock(cell, ValueNone))
 
   let createSystem
     (game: Game)
     (state: EditorState)
     (cam: EditorCameraState)
+    (uiService: Pomo.Core.Environment.IUIService)
     (pixelsPerUnit: Vector2)
     : GameComponent =
     let mutable prevKeyboard = Keyboard.GetState()
@@ -227,6 +249,7 @@ module EditorInput =
           handleEditorInput
             state
             cam
+            uiService
             keyboard
             prevKeyboard
             mouse

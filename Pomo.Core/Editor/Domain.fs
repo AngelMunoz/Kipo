@@ -18,11 +18,16 @@ type CameraMode =
   | Isometric
   | FreeFly
 
+open Pomo.Core.Domain.BlockMap
+
 /// Editor actions for undo/redo
 [<Struct>]
 type EditorAction =
-  | PlaceBlock of cell: GridCell3D * blockTypeId: int<BlockTypeId>
-  | RemoveBlock of cell: GridCell3D
-  | SetRotation of rotation: Quaternion
+  | PlaceBlock of
+    cell: GridCell3D *
+    blockTypeId: int<BlockTypeId> *
+    replacedBlock: PlacedBlock voption
+  | RemoveBlock of cell: GridCell3D * removedBlock: PlacedBlock voption
+  | SetRotation of rotation: Quaternion * prevRotation: Quaternion
   | ChangeLayer of delta: int
-  | SetBrushMode of mode: BrushMode
+  | SetBrushMode of mode: BrushMode * prevMode: BrushMode

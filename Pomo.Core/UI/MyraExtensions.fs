@@ -596,9 +596,37 @@ module HStack =
     WidgetSubs.get(w).Add(sub)
     w
 
+  let inline bindChildren<'W when 'W :> HorizontalStackPanel>
+    (childrenAVal: aval<Widget list>)
+    (w: 'W)
+    =
+    let sub =
+      childrenAVal.AddWeakCallback(fun children ->
+        w.Widgets.Clear()
+
+        for child in children do
+          w.Widgets.Add(child))
+
+    WidgetSubs.get(w).Add(sub)
+    w
+
 module VStack =
   let inline create() = VerticalStackPanel()
   let inline spaced(spacing: int) = VerticalStackPanel(Spacing = spacing)
+
+  let inline bindChildren<'W when 'W :> VerticalStackPanel>
+    (childrenAVal: aval<Widget list>)
+    (w: 'W)
+    =
+    let sub =
+      childrenAVal.AddWeakCallback(fun children ->
+        w.Widgets.Clear()
+
+        for child in children do
+          w.Widgets.Add(child))
+
+    WidgetSubs.get(w).Add(sub)
+    w
 
 
 module Grid =

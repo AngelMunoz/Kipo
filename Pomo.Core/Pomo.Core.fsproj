@@ -101,6 +101,7 @@
     <Compile Include="Editor/Camera.fs" />
     <Compile Include="Editor/Input.fs" />
     <Compile Include="Editor/Render.fs" />
+    <Compile Include="Editor/UI.fs" />
     <Compile Include="Editor/Scene.fs" />
     <Compile Include="Scenes.fs" />
     <Compile Include="Scenes/GameplayScene.fs" />

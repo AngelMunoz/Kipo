@@ -86,37 +86,37 @@ The following files contain `Vector2.Distance` or `Vector2` position logic:
 
 ---
 
-## Phase 3: Block Rendering
+## Phase 3: Block Rendering ✅
 
-- [ ] Task: Create `Rendering/BlockEmitter.fs`
+- [x] Task: Create `Rendering/BlockEmitter.fs`
   - `emitBlocks: BlockMapDefinition → MeshCommand[]`
   - Load models from palette paths
   - Apply `Quaternion` rotation to mesh transforms
   - Position at `GridCell3D` world coordinates
   - Frustum culling
-- [ ] Task: Integrate into `RenderOrchestratorV2`
+- [x] Task: Integrate into `RenderOrchestratorV2`
   - Render blocks in mesh pass
   - Proper depth sorting with entities
-- [ ] Task: Verification - Rotated blocks render correctly
+- [x] Task: Verification - Rotated blocks render correctly
 
 ---
 
-## Phase 4: Editor Core
+## Phase 4: Editor Core ✅
 
-- [ ] Task: Create `Editor/EditorState.fs`
+- [x] Task: Create `Editor/EditorState.fs`
   - FDA `cval<T>` for all state
   - `CurrentLayer`, `GridCursor`, `BrushMode`, `CurrentRotation`
-- [ ] Task: Create `Editor/EditorScene.fs`
+- [x] Task: Create `Editor/EditorScene.fs`
   - Scene setup and transitions
   - Register editor systems
-- [ ] Task: Create `Editor/EditorInputSystem.fs`
+- [x] Task: Create `Editor/EditorInputSystem.fs`
   - Ray-to-grid intersection for 3D placement
   - Block placement/removal with rotation
   - Layer navigation (Page Up/Down)
   - Rotation controls (gizmo or angle sliders)
-- [ ] Task: Grid overlay rendering at current Y-level
-- [ ] Task: Cursor preview (ghost block with current rotation)
-- [ ] Task: Undo/redo stack
+- [x] Task: Grid overlay rendering at current Y-level
+- [x] Task: Cursor preview (ghost block with current rotation)
+- [x] Task: Undo/redo stack
 
 ---
 
