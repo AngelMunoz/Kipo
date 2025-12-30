@@ -102,11 +102,13 @@ module CompositionRoot =
         | GuiAction.StartNewGame ->
           scope.HUDService.ShowLoadingOverlay()
           sceneTransitionSubject.OnNext(Scene.Gameplay("Lobby", ValueNone))
+        | GuiAction.OpenMapEditor ->
+          sceneTransitionSubject.OnNext(Scene.MapEditor ValueNone)
         | GuiAction.ExitGame -> game.Exit()
         | GuiAction.OpenSettings
         | GuiAction.BackToMainMenu
         | GuiAction.ToggleCharacterSheet
-        | GuiAction.ToggleEquipment -> () // Not applicable in MainMenu
+        | GuiAction.ToggleEquipment -> ()
 
       let uiComponent =
         { new DrawableGameComponent(game) with
@@ -153,3 +155,9 @@ module CompositionRoot =
           playerId
           mapKey
           targetSpawn
+      | Scene.MapEditor mapKey ->
+        Pomo.Core.Editor.EditorScene.create
+          game
+          scope.Stores
+          sceneTransitionSubject
+          mapKey

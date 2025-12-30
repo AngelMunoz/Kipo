@@ -4,3 +4,4 @@ namespace Pomo.Core.Domain.Scenes
 type Scene =
   | MainMenu
   | Gameplay of mapKey: string * targetSpawn: string voption
+  | MapEditor of editorMapKey: string voption

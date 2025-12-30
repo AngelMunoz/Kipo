@@ -120,10 +120,11 @@ module RenderMath =
       (pixelsPerUnit: Vector2)
       : Vector3 =
       let pos = {
-          X = particlePos.X
-          Y = correctParticleAltitude pixelsPerUnit particlePos.Y
-          Z = particlePos.Z
+        X = particlePos.X
+        Y = correctParticleAltitude pixelsPerUnit particlePos.Y
+        Z = particlePos.Z
       }
+
       LogicRender.toRender pos pixelsPerUnit
 
   /// Screen ↔ Logic space conversions (picking, UI)
@@ -144,11 +145,11 @@ module RenderMath =
 
       let deltaPixels = screenPos - screenCenter
       let logicDelta = deltaPixels / zoom
-      
+
       {
-          X = cameraPosition.X + logicDelta.X
-          Y = 0.0f // Project to ground plane
-          Z = cameraPosition.Z + logicDelta.Y
+        X = cameraPosition.X + logicDelta.X
+        Y = 0.0f // Project to ground plane
+        Z = cameraPosition.Z + logicDelta.Y
       }
 
     /// Converts Logic coordinates to Screen coordinates.
@@ -228,6 +229,47 @@ module RenderMath =
               cameraPos.Z - halfH,
               cameraPos.Z + halfH)
 
+    /// Computes 3D cell bounds for block map culling.
+    /// Converts view bounds to grid cell indices with margin for large models.
+    /// Y bounds are based on camera elevation with visible height range.
+    /// Returns struct(minX, maxX, minY, maxY, minZ, maxZ).
+    let inline getViewCellBounds3D
+      (viewBounds: struct (float32 * float32 * float32 * float32))
+      (cameraY: float32)
+      (cellSize: float32)
+      (visibleHeightRange: float32)
+      : struct (int * int * int * int * int * int) =
+      let struct (viewLeft, viewRight, viewTop, viewBottom) = viewBounds
+      let margin = cellSize * 2.0f // Margin for large models
+
+      let minCellX = int((viewLeft - margin) / cellSize)
+      let maxCellX = int((viewRight + margin) / cellSize) + 1
+      let minCellZ = int((viewTop - margin) / cellSize)
+      let maxCellZ = int((viewBottom + margin) / cellSize) + 1
+
+      // Y culling based on camera elevation
+      // In isometric, we see from above - cull blocks too far above/below camera focus
+      let minCellY = int((cameraY - visibleHeightRange) / cellSize) |> max 0
+      let maxCellY = int((cameraY + visibleHeightRange) / cellSize) + 1
+
+      struct (minCellX, maxCellX, minCellY, maxCellY, minCellZ, maxCellZ)
+
+    /// Checks if a cell is within the 3D cell bounds.
+    let inline isInCellBounds
+      (cellX: int)
+      (cellY: int)
+      (cellZ: int)
+      (bounds: struct (int * int * int * int * int * int))
+      : bool =
+      let struct (minX, maxX, minY, maxY, minZ, maxZ) = bounds
+
+      cellX >= minX
+      && cellX <= maxX
+      && cellY >= minY
+      && cellY <= maxY
+      && cellZ >= minZ
+      && cellZ <= maxZ
+
   /// World matrix builders for 3D meshes
   module WorldMatrix =
     open IsoPipeline
@@ -288,6 +330,23 @@ module RenderMath =
       |> applyIsoCorrection
       |> applySquish squishFactor
       |> translateTo pivot
+      |> translateTo renderPos
+
+    /// Calculates World Matrix for a block in a block map.
+    /// Applies optional rotation, isometric correction, squish, then translation.
+    let createBlock
+      (renderPos: Vector3)
+      (rotation: Quaternion voption)
+      (squishFactor: float32)
+      : Matrix =
+      let rotationMatrix =
+        match rotation with
+        | ValueSome q -> Matrix.CreateFromQuaternion(q)
+        | ValueNone -> Matrix.Identity
+
+      rotationMatrix
+      |> applyIsoCorrection
+      |> applySquish squishFactor
       |> translateTo renderPos
 
   /// Skeletal animation transforms

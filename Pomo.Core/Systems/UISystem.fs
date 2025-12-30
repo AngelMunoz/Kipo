@@ -31,6 +31,11 @@ module MainMenuUI =
       |> W.width 180
       |> Btn.onClick(fun () -> publishGuiAction GuiAction.StartNewGame)
 
+    let mapEditorBtn =
+      Btn.create "Map Editor"
+      |> W.width 180
+      |> Btn.onClick(fun () -> publishGuiAction GuiAction.OpenMapEditor)
+
     let settingsBtn =
       Btn.create "Settings"
       |> W.width 180
@@ -44,7 +49,13 @@ module MainMenuUI =
     VStack.spaced 16
     |> W.hAlign HorizontalAlignment.Center
     |> W.vAlign VerticalAlignment.Center
-    |> W.childrenV [ titleLabel; newGameBtn; settingsBtn; exitBtn ]
+    |> W.childrenV [
+      titleLabel
+      newGameBtn
+      mapEditorBtn
+      settingsBtn
+      exitBtn
+    ]
 
 module private UIHelpers =
   let mapAnchor

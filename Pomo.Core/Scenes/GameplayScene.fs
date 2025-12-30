@@ -297,7 +297,8 @@ module GameplayScene =
         hudService.TogglePanelVisible HUDPanelId.EquipmentPanel
       | GuiAction.StartNewGame
       | GuiAction.OpenSettings
-      | GuiAction.ExitGame -> () // Not applicable in Gameplay
+      | GuiAction.OpenMapEditor
+      | GuiAction.ExitGame -> ()
 
     // 6. Setup Listeners (Subs)
     let subs = new CompositeDisposable()

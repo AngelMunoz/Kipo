@@ -6,6 +6,7 @@ open FSharp.Data.Adaptive
 type GuiAction =
   | StartNewGame
   | OpenSettings
+  | OpenMapEditor
   | ExitGame
   | BackToMainMenu
   | ToggleCharacterSheet

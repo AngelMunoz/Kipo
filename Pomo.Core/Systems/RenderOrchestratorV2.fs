@@ -35,6 +35,8 @@ module RenderOrchestrator =
     GetLoadedModel: string -> LoadedModel voption
     GetTexture: string -> Texture2D voption
     GetTileTexture: int -> Texture2D voption
+    GetBlockModel: string -> LoadedModel voption
+    BlockMap: BlockMap.BlockMapDefinition voption
     LayerRenderIndices: IReadOnlyDictionary<int, int[]>
     FallbackTexture: Texture2D
     HudFont: SpriteFont
@@ -310,6 +312,23 @@ module RenderOrchestrator =
         let struct (terrainBG, terrainFG) =
           TerrainEmitter.emitAll renderCore terrainData map viewBounds
 
+        // Collect block mesh commands via BlockEmitter
+        let meshCommandsBlocks =
+          match res.BlockMap with
+          | ValueSome blockMap ->
+            let ppu = renderCore.PixelsPerUnit
+            // Use map height * cell size as visible range (see all layers)
+            let visibleHeightRange = float32 blockMap.Height * BlockMap.CellSize
+
+            BlockEmitter.emit
+              res.GetBlockModel
+              blockMap
+              viewBounds
+              camera.Position.Y
+              visibleHeightRange
+              ppu
+          | ValueNone -> Array.empty
+
         // Render passes in correct order
         // 1. Background terrain (no depth to avoid tile fighting)
         res.GraphicsDevice.DepthStencilState <- DepthStencilState.None
@@ -324,7 +343,16 @@ module RenderOrchestrator =
         // This ensures entities always render on top of background
         res.GraphicsDevice.Clear(ClearOptions.DepthBuffer, Color.Black, 1.0f, 0)
 
-        // 2. Entities and mesh particles (with depth testing)
+        // 2. Blocks first (they form the ground/structures)
+        res.GraphicsDevice.DepthStencilState <- DepthStencilState.Default
+
+        RenderPasses.renderMeshes
+          res.GraphicsDevice
+          &view
+          &projection
+          meshCommandsBlocks
+
+        // 3. Entities and mesh particles (with depth testing)
         res.GraphicsDevice.DepthStencilState <- DepthStencilState.Default
         // Render entity meshes and particle meshes separately to avoid Array.append allocation
         RenderPasses.renderMeshes
@@ -486,6 +514,17 @@ module RenderOrchestrator =
 
               ValueNone
 
+          // Create block model loader using BlockEmitter's lazy loader
+          let getBlockModel = BlockEmitter.createLazyModelLoader game.Content
+
+          // Try to load block map for this map (if it exists)
+          let blockMapPath = $"Content/CustomMaps/{mapKey}.json"
+
+          let blockMap =
+            match BlockMapLoader.load blockMapPath with
+            | Ok bm -> ValueSome bm
+            | Error _ -> ValueNone // No block map for this level, that's fine
+
           res <-
             ValueSome {
               GraphicsDevice = game.GraphicsDevice
@@ -500,6 +539,8 @@ module RenderOrchestrator =
               GetLoadedModel = getLoadedModel
               GetTexture = getTexture
               GetTileTexture = fun gid -> tileCache |> Dictionary.tryFindV gid
+              GetBlockModel = getBlockModel
+              BlockMap = blockMap
               LayerRenderIndices = layerIndices
               FallbackTexture = fallback
               HudFont = TextEmitter.loadFont game.Content

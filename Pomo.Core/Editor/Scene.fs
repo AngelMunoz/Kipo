@@ -1,0 +1,80 @@
+namespace Pomo.Core.Editor
+
+open System
+open Microsoft.Xna.Framework
+open System.Reactive.Disposables
+open FSharp.Data.Adaptive
+open Pomo.Core.Domain
+open Pomo.Core.Domain.Units
+open Pomo.Core.Domain.Scenes
+open Pomo.Core.Systems
+open Pomo.Core.Environment
+
+module EditorScene =
+
+  let create
+    (game: Game)
+    (stores: StoreServices)
+    (sceneTransitionSubject: IObserver<Scene>)
+    (mapKey: string voption)
+    : struct (IGameComponent list * IDisposable) =
+
+    let subs = new CompositeDisposable()
+
+    let blockMap =
+      match mapKey with
+      | ValueSome key ->
+        let path = $"Content/CustomMaps/{key}.json"
+
+        match BlockMapLoader.load path with
+        | Ok map -> map
+        | Error _ -> BlockMap.createEmpty key 16 8 16
+      | ValueNone -> BlockMap.createEmpty "NewMap" 16 8 16
+
+    let state = EditorState.create blockMap
+
+    if blockMap.Palette.Count = 0 then
+      let addBlock id name model cat =
+        blockMap.Palette.Add(
+          id,
+          {
+            Id = id
+            Name = name
+            Model = model
+            Category = cat
+            CollisionType = BlockMap.Box
+          }
+        )
+
+      addBlock 1<BlockTypeId> "Stone" "Tiles/kaykit_blocks/stone" "Basic"
+      addBlock 2<BlockTypeId> "Dirt" "Tiles/kaykit_blocks/dirt" "Basic"
+      addBlock 3<BlockTypeId> "Grass" "Tiles/kaykit_blocks/grass" "Basic"
+      addBlock 4<BlockTypeId> "Water" "Tiles/kaykit_blocks/water" "Basic"
+      addBlock 5<BlockTypeId> "Wood" "Tiles/kaykit_blocks/wood" "Basic"
+
+      addBlock
+        6<BlockTypeId>
+        "Dark Stone"
+        "Tiles/kaykit_blocks/stone_dark"
+        "Basic"
+
+      transact(fun () ->
+        state.SelectedBlockType.Value <- ValueSome 1<BlockTypeId>)
+
+    let pixelsPerUnit = Vector2(64f, 32f)
+
+    let camera = EditorCameraState()
+
+    let inputSystem = EditorInput.createSystem game state camera pixelsPerUnit
+
+    let renderSystem =
+      EditorRender.createSystem game state camera pixelsPerUnit game.Content
+
+    let components: IGameComponent list = [ inputSystem; renderSystem ]
+
+    let disposable =
+      { new IDisposable with
+          member _.Dispose() = subs.Dispose()
+      }
+
+    struct (components, disposable)
