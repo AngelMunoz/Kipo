@@ -72,6 +72,8 @@ module Core =
 
   module Constants =
     let DefaultPixelsPerUnit = Vector2(64.0f, 32.0f)
+    /// Pixels per unit for BlockMap 3D rendering (1:1 aspect ratio)
+    let BlockMap3DPixelsPerUnit = Vector2(64.0f, 64.0f)
 
     module Entity =
       let Size = Vector2(16.0f, 16.0f)

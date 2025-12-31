@@ -70,8 +70,8 @@ module BlockMapScene =
     let projections =
       Projections.create(stores.ItemStore, worldView, physicsCacheService)
 
-    let cameraService =
-      CameraSystem.create(game, projections, worldView, [| playerId |])
+    // Use BlockMap 3D camera instead of TileMap camera
+    let cameraService = BlockMapCameraSystem.create game projections playerId
 
     let targetingService =
       Targeting.create(
@@ -196,7 +196,7 @@ module BlockMapScene =
       RenderOrchestrator.create(
         game,
         pomoEnv,
-        blockMap.Key,
+        Rendering.BlockMap3D blockMap,
         playerId,
         Render.Layer.TerrainBase
       )

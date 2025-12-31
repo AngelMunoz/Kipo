@@ -10,6 +10,9 @@ open Pomo.Core.Graphics
 module BlockEmitter =
   open Pomo.Core.Domain.Core
 
+  [<Literal>]
+  let private ModelScale = 0.5f // KayKit models are 2x2 units, scale to 1x1
+
   let createLazyModelLoader
     (content: ContentManager)
     : string -> LoadedModel voption =
@@ -40,8 +43,21 @@ module BlockEmitter =
 
       loader.Value
 
+  /// Computes render offset to center the map at origin.
+  /// Matches EditorRender.calcRenderOffsets.
+  let inline private calcCenterOffset
+    (width: int)
+    (depth: int)
+    (scaleFactor: float32)
+    : Vector3 =
+    Vector3(
+      -float32 width * scaleFactor * 0.5f,
+      0f,
+      -float32 depth * scaleFactor * 0.5f
+    )
+
   /// Emits MeshCommands for all visible blocks in the BlockMapDefinition.
-  /// Uses 3D frustum culling based on view bounds and camera elevation.
+  /// Coordinate math matches EditorRender.populateCommands exactly.
   let emit
     (getLoadedModel: string -> LoadedModel voption)
     (blockMap: BlockMapDefinition)
@@ -50,14 +66,31 @@ module BlockEmitter =
     (visibleHeightRange: float32)
     (pixelsPerUnit: Vector2)
     : MeshCommand[] =
+
+    // Render scale: CellSize / PPU (same as editor)
+    let scaleFactor = CellSize / pixelsPerUnit.X
+
+    let centerOffset =
+      calcCenterOffset blockMap.Width blockMap.Depth scaleFactor
+
+    let halfCell = scaleFactor * 0.5f
+
+    // Calculate cell bounds for culling
+    // View bounds need to be adjusted for center offset
+    let struct (viewLeft, viewRight, viewTop, viewBottom) = viewBounds
+
+    let adjustedBounds =
+      struct (viewLeft - centerOffset.X * pixelsPerUnit.X,
+              viewRight - centerOffset.X * pixelsPerUnit.X,
+              viewTop - centerOffset.Z * pixelsPerUnit.X,
+              viewBottom - centerOffset.Z * pixelsPerUnit.X)
+
     let cellBounds =
       RenderMath.Camera.getViewCellBounds3D
-        viewBounds
+        adjustedBounds
         cameraY
         CellSize
         visibleHeightRange
-
-    let squishFactor = RenderMath.WorldMatrix.getSquishFactor pixelsPerUnit
 
     [|
       for kvp in blockMap.Blocks do
@@ -69,20 +102,25 @@ module BlockEmitter =
           | ValueSome blockType ->
             match getLoadedModel blockType.Model with
             | ValueSome loadedModel ->
-              let worldPos = cellToWorldPosition cell
+              // Direct cell -> render position (matches editor)
+              let x = float32 cell.X * scaleFactor + halfCell
+              let y = float32 cell.Y * scaleFactor + halfCell
+              let z = float32 cell.Z * scaleFactor + halfCell
+              let pos = Vector3(x, y, z) + centerOffset
 
-              let renderPos =
-                RenderMath.LogicRender.toRender worldPos pixelsPerUnit
+              // World matrix: scale * rotation * translation (matches editor)
+              let scale = Matrix.CreateScale(scaleFactor * ModelScale)
 
-              let worldMatrix =
-                RenderMath.WorldMatrix.createBlock
-                  renderPos
-                  block.Rotation
-                  squishFactor
+              let rot =
+                match block.Rotation with
+                | ValueSome q -> Matrix.CreateFromQuaternion q
+                | ValueNone -> Matrix.Identity
+
+              let trans = Matrix.CreateTranslation pos
 
               {
                 LoadedModel = loadedModel
-                WorldMatrix = worldMatrix
+                WorldMatrix = scale * rot * trans
               }
             | ValueNone -> ()
           | ValueNone -> ()

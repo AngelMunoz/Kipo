@@ -36,7 +36,7 @@ module RenderOrchestrator =
     GetTexture: string -> Texture2D voption
     GetTileTexture: int -> Texture2D voption
     GetBlockModel: string -> LoadedModel voption
-    BlockMap: BlockMap.BlockMapDefinition voption
+    MapSource: MapSource
     LayerRenderIndices: IReadOnlyDictionary<int, int[]>
     FallbackTexture: Texture2D
     HudFont: SpriteFont
@@ -207,7 +207,7 @@ module RenderOrchestrator =
   let inline private prepareContexts
     (res: RenderResources)
     (stores: StoreServices)
-    (map: Pomo.Core.Domain.Map.MapDefinition)
+    (mapSource: MapSource)
     (snapshot: Pomo.Core.Projections.MovementSnapshot)
     (poses:
       System.Collections.Generic.IReadOnlyDictionary<
@@ -219,7 +219,7 @@ module RenderOrchestrator =
     (layerRenderIndices:
       System.Collections.Generic.IReadOnlyDictionary<int, int[]>)
     =
-    let ppu = Vector2(float32 map.TileWidth, float32 map.TileHeight)
+    let ppu = MapSource.getPixelsPerUnit mapSource
     let renderCore = RenderCore.create ppu
     let squish = RenderMath.WorldMatrix.getSquishFactor ppu
 
@@ -251,7 +251,6 @@ module RenderOrchestrator =
   let private renderFrame
     (res: RenderResources)
     (env: PomoEnvironment)
-    (mapKey: string)
     (playerId: Guid<EntityId>)
     =
     let (Core core) = env.CoreServices
@@ -259,7 +258,6 @@ module RenderOrchestrator =
     let (Gameplay gameplay) = env.GameplayServices
     let world = core.World
     let projections = gameplay.Projections
-    let map = stores.MapStore.find mapKey
     let visualEffects = world.VisualEffects.ToArray()
 
     let scenarioIdOpt =
@@ -273,7 +271,7 @@ module RenderOrchestrator =
         prepareContexts
           res
           stores
-          map
+          res.MapSource
           snapshot
           world.Poses
           (world.LiveProjectiles |> AMap.force)
@@ -308,16 +306,18 @@ module RenderOrchestrator =
             (float32 camera.Viewport.Height)
             camera.Zoom
 
-        // Collect terrain commands via TerrainEmitter
+        // Collect terrain commands conditionally based on MapSource
         let struct (terrainBG, terrainFG) =
-          TerrainEmitter.emitAll renderCore terrainData map viewBounds
+          match res.MapSource |> MapSource.tryGetTileMap with
+          | ValueSome map ->
+            TerrainEmitter.emitAll renderCore terrainData map viewBounds
+          | ValueNone -> struct (Array.empty, Array.empty)
 
-        // Collect block mesh commands via BlockEmitter
+        // Collect block mesh commands conditionally based on MapSource
         let meshCommandsBlocks =
-          match res.BlockMap with
+          match res.MapSource |> MapSource.tryGetBlockMap with
           | ValueSome blockMap ->
             let ppu = renderCore.PixelsPerUnit
-            // Use map height * cell size as visible range (see all layers)
             let visibleHeightRange = float32 blockMap.Height * BlockMap.CellSize
 
             BlockEmitter.emit
@@ -333,11 +333,14 @@ module RenderOrchestrator =
         // 1. Background terrain (no depth to avoid tile fighting)
         res.GraphicsDevice.DepthStencilState <- DepthStencilState.None
 
-        RenderPasses.renderTerrainBackground
-          res.SpriteBatch
-          &camera
-          map
-          terrainBG
+        res.MapSource
+        |> MapSource.tryGetTileMap
+        |> ValueOption.iter(fun map ->
+          RenderPasses.renderTerrainBackground
+            res.SpriteBatch
+            &camera
+            map
+            terrainBG)
 
         // Clear depth buffer after background terrain
         // This ensures entities always render on top of background
@@ -402,7 +405,7 @@ module RenderOrchestrator =
     (
       game: Game,
       env: PomoEnvironment,
-      mapKey: string,
+      mapSource: MapSource,
       playerId: Guid<EntityId>,
       drawOrder: int
     ) : DrawableGameComponent =
@@ -415,7 +418,6 @@ module RenderOrchestrator =
           base.Initialize()
           let fallback = new Texture2D(game.GraphicsDevice, 1, 1)
           fallback.SetData [| Color.White |]
-          let map = stores.MapStore.find mapKey
 
           // Load assets via domain emitters (each owns their loading logic)
           let entityModelCache =
@@ -438,19 +440,28 @@ module RenderOrchestrator =
           for kvp in particleTextureCache do
             textureCache[kvp.Key] <- Lazy<Texture2D>(fun () -> kvp.Value)
 
-          // Use TerrainEmitter to load tile textures and pre-compute render indices
-          let tileCache = TerrainEmitter.loadTileTextures game.Content map
-          let layerIndices = TerrainEmitter.computeLayerRenderIndices map
+          // Conditional tile loading based on MapSource
+          let tileCache, layerIndices =
+            match mapSource |> MapSource.tryGetTileMap with
+            | ValueSome map ->
+              TerrainEmitter.loadTileTextures game.Content map,
+              TerrainEmitter.computeLayerRenderIndices map
+            | ValueNone ->
+              Dictionary(), Dictionary() :> IReadOnlyDictionary<_, _>
 
-          let struct (totalAttempted, totalLoaded, totalFailed) =
+          // Asset preloading (use mapKey from TileMap if present)
+          mapSource
+          |> MapSource.tryGetTileMap
+          |> ValueOption.iter(fun map ->
             AssetPreloader.preloadAssets
               game.Content
               modelCache
               textureCache
-              mapKey
+              map.Key
               map
               stores.ModelStore
               stores.ParticleStore
+            |> ignore)
 
 
           // Main-thread load queue and pending sets
@@ -517,14 +528,6 @@ module RenderOrchestrator =
           // Create block model loader using BlockEmitter's lazy loader
           let getBlockModel = BlockEmitter.createLazyModelLoader game.Content
 
-          // Try to load block map for this map (if it exists)
-          let blockMapPath = $"Content/CustomMaps/{mapKey}.json"
-
-          let blockMap =
-            match BlockMapLoader.load blockMapPath with
-            | Ok bm -> ValueSome bm
-            | Error _ -> ValueNone // No block map for this level, that's fine
-
           res <-
             ValueSome {
               GraphicsDevice = game.GraphicsDevice
@@ -540,7 +543,7 @@ module RenderOrchestrator =
               GetTexture = getTexture
               GetTileTexture = fun gid -> tileCache |> Dictionary.tryFindV gid
               GetBlockModel = getBlockModel
-              BlockMap = blockMap
+              MapSource = mapSource
               LayerRenderIndices = layerIndices
               FallbackTexture = fallback
               HudFont = TextEmitter.loadFont game.Content
@@ -566,6 +569,6 @@ module RenderOrchestrator =
           res
           |> ValueOption.iter(fun r ->
             let originalViewport = r.GraphicsDevice.Viewport
-            renderFrame r env mapKey playerId
+            renderFrame r env playerId
             r.GraphicsDevice.Viewport <- originalViewport)
     }

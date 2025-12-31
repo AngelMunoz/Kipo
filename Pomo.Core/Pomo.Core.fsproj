@@ -44,6 +44,7 @@
     <Compile Include="Graphics/CommandQueue.fs" />
     <Compile Include="Graphics/QuadBatch.fs" />
     <Compile Include="Graphics/BillboardBatch.fs" />
+    <Compile Include="Rendering/MapSource.fs" />
     <Compile Include="Rendering/EmitterContext.fs" />
     <Compile Include="Rendering/PoseResolver.fs" />
     <Compile Include="Rendering/EntityEmitter.fs" />
@@ -83,6 +84,7 @@
     <Compile Include="Systems/MapLoader.fs" />
     <Compile Include="Systems/BlockMapLoader.fs" />
     <Compile Include="Systems/CameraSystem.fs" />
+    <Compile Include="Systems/BlockMapCameraSystem.fs" />
     <Compile Include="AssetPreloader.fs" />
     <Compile Include="Systems/RenderOrchestratorV2.fs" />
     <Compile Include="Systems/State.fs" />

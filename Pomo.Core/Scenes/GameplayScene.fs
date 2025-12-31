@@ -274,7 +274,7 @@ module GameplayScene =
         RenderOrchestrator.create(
           game,
           pomoEnv,
-          newMapKey,
+          Rendering.TileMap mapDef,
           playerId,
           Render.Layer.TerrainBase
         )
