@@ -7,6 +7,7 @@ open Pomo.Core
 open Pomo.Core.Domain.Units
 open Pomo.Core.Domain.Core
 open Pomo.Core.Domain.Spatial
+open Pomo.Core.Domain.Skill
 
 module BlockMap =
 
@@ -16,14 +17,6 @@ module BlockMap =
     | Mesh // Uses model's mesh for collision (slopes, stairs)
     | NoCollision
 
-  [<Struct>]
-  type ZoneEffect =
-    | Slow
-    | Damage
-    | Heal
-    | Ice
-    | Lava
-    | Water
 
   [<Struct>]
   type EngagementRules =
@@ -38,22 +31,37 @@ module BlockMap =
     StartingLayer: int
   }
 
+  [<Struct; RequireQualifiedAccess>]
+  type MapObjectShape =
+    | Box of size: Vector3
+    | Sphere of radius: float32
+
   [<Struct>]
-  type SpawnData = {
-    GroupId: string
-    SpawnChance: float32
+  type SpawnProperties = {
+    IsPlayerSpawn: bool
+    EntityGroup: string voption
+    MaxSpawns: int
+    Faction: int voption
+  }
+
+  [<Struct>]
+  type TeleportProperties = {
+    TargetMap: string voption
+    TargetObjectName: string
   }
 
   [<Struct>]
   type MapObjectData =
-    | Spawn of SpawnData
-    | Teleport of targetMapId: string
+    | Spawn of spawn: SpawnProperties
+    | Teleport of teleport: TeleportProperties
     | Trigger of triggerId: string
 
   type MapObject = {
     Id: int
+    Name: string
     Position: WorldPosition
-    Rotation: Quaternion
+    Rotation: Quaternion voption
+    Shape: MapObjectShape
     Data: MapObjectData
   }
 
@@ -70,7 +78,7 @@ module BlockMap =
     Model: string
     Category: string
     CollisionType: CollisionType
-    ZoneEffect: ZoneEffect voption
+    Effect: Effect voption
   }
 
   type BlockMapDefinition = {
@@ -84,7 +92,6 @@ module BlockMap =
     SpawnCell: GridCell3D voption
     Settings: MapSettings
     Objects: MapObject list
-    ZoneOverlay: Dictionary<GridCell3D, ZoneEffect>
   }
 
   let CellSize = 32.0f
@@ -110,22 +117,18 @@ module BlockMap =
         StartingLayer = 0
       }
       Objects = []
-      ZoneOverlay = Dictionary()
     }
 
-  let getZoneEffect
+  let getBlockEffect
     (cell: GridCell3D)
     (map: BlockMapDefinition)
-    : ZoneEffect voption =
-    map.ZoneOverlay
+    : Effect voption =
+    map.Blocks
     |> Dictionary.tryFindV cell
-    |> ValueOption.orElseWith(fun () ->
-      map.Blocks
-      |> Dictionary.tryFindV cell
-      |> ValueOption.bind(fun block ->
-        map.Palette
-        |> Dictionary.tryFindV block.BlockTypeId
-        |> ValueOption.bind(fun blockType -> blockType.ZoneEffect)))
+    |> ValueOption.bind(fun block ->
+      map.Palette
+      |> Dictionary.tryFindV block.BlockTypeId
+      |> ValueOption.bind(fun blockType -> blockType.Effect))
 
   let inline cellToWorldPosition(cell: GridCell3D) : WorldPosition = {
     X = float32 cell.X * CellSize + CellSize / 2.0f
@@ -227,36 +230,55 @@ module BlockMap =
 
         Json.object [ "Type", Encode.string typeString ]
 
-    let zoneEffectDecoder: Decoder<ZoneEffect> =
+    let vector3Decoder: Decoder<Vector3> =
       fun json -> decode {
-        let! typeString = Required.string json
+        let! x = Required.Property.get ("X", Decode.Required.float32) json
+        and! y = Required.Property.get ("Y", Decode.Required.float32) json
+        and! z = Required.Property.get ("Z", Decode.Required.float32) json
+        return Vector3(x, y, z)
+      }
+
+    let vector3Encoder: Encoder<Vector3> =
+      fun value ->
+        Json.object [
+          "X", Encode.float32 value.X
+          "Y", Encode.float32 value.Y
+          "Z", Encode.float32 value.Z
+        ]
+
+    let mapObjectShapeDecoder: Decoder<MapObjectShape> =
+      fun json -> decode {
+        let! typeString = Required.Property.get ("Type", Required.string) json
 
         match typeString with
-        | "Slow" -> return Slow
-        | "Damage" -> return Damage
-        | "Heal" -> return Heal
-        | "Ice" -> return Ice
-        | "Lava" -> return Lava
-        | "Water" -> return Water
+        | "Box" ->
+          let! size = Required.Property.get ("Size", vector3Decoder) json
+          return MapObjectShape.Box size
+        | "Sphere" ->
+          let! radius =
+            Required.Property.get ("Radius", Decode.Required.float32) json
+
+          return MapObjectShape.Sphere radius
         | _ ->
           return!
             Error(
-              DecodeError.ofError(json, $"Unknown ZoneEffect: {typeString}")
+              DecodeError.ofError(json, $"Unknown MapObjectShape: {typeString}")
             )
       }
 
-    let zoneEffectEncoder: Encoder<ZoneEffect> =
+    let mapObjectShapeEncoder: Encoder<MapObjectShape> =
       fun value ->
-        let str =
-          match value with
-          | Slow -> "Slow"
-          | Damage -> "Damage"
-          | Heal -> "Heal"
-          | Ice -> "Ice"
-          | Lava -> "Lava"
-          | Water -> "Water"
-
-        Encode.string str
+        match value with
+        | MapObjectShape.Box size ->
+          Json.object [
+            "Type", Encode.string "Box"
+            "Size", vector3Encoder size
+          ]
+        | MapObjectShape.Sphere radius ->
+          Json.object [
+            "Type", Encode.string "Sphere"
+            "Radius", Encode.float32 radius
+          ]
 
     let blockTypeDecoder: Decoder<BlockType> =
       fun json -> decode {
@@ -272,8 +294,10 @@ module BlockMap =
           VOptional.Property.get ("CollisionType", collisionTypeDecoder) json
           |> Result.map(ValueOption.defaultValue Box)
 
-        and! zoneEffect =
-          VOptional.Property.get ("ZoneEffect", zoneEffectDecoder) json
+        and! effect =
+          VOptional.Property.get
+            ("Effect", Skill.Serialization.Effect.decoder)
+            json
 
         return {
           Id = id * 1<BlockTypeId>
@@ -281,7 +305,7 @@ module BlockMap =
           Model = model
           Category = category
           CollisionType = collisionType
-          ZoneEffect = zoneEffect
+          Effect = effect
         }
       }
 
@@ -293,8 +317,9 @@ module BlockMap =
           "Model", Encode.string value.Model
           "Category", Encode.string value.Category
           "CollisionType", collisionTypeEncoder value.CollisionType
-          match value.ZoneEffect with
-          | ValueSome effect -> "ZoneEffect", zoneEffectEncoder effect
+          match value.Effect with
+          | ValueSome effect ->
+            "Effect", Skill.Serialization.Effect.encoder effect
           | ValueNone -> ()
         ]
 
@@ -397,28 +422,76 @@ module BlockMap =
           "Z", Encode.float32 value.Z
         ]
 
+    let spawnPropertiesDecoder: Decoder<SpawnProperties> =
+      fun json -> decode {
+        let! isPlayerSpawn =
+          VOptional.Property.get ("IsPlayerSpawn", Required.boolean) json
+          |> Result.map(ValueOption.defaultValue false)
+
+        and! entityGroup =
+          VOptional.Property.get ("EntityGroup", Required.string) json
+
+        and! maxSpawns =
+          VOptional.Property.get ("MaxSpawns", Required.int) json
+          |> Result.map(ValueOption.defaultValue 1)
+
+        and! faction = VOptional.Property.get ("Faction", Required.int) json
+
+        return {
+          IsPlayerSpawn = isPlayerSpawn
+          EntityGroup = entityGroup
+          MaxSpawns = maxSpawns
+          Faction = faction
+        }
+      }
+
+    let spawnPropertiesEncoder: Encoder<SpawnProperties> =
+      fun value ->
+        Json.object [
+          "IsPlayerSpawn", Encode.boolean value.IsPlayerSpawn
+          match value.EntityGroup with
+          | ValueSome g -> "EntityGroup", Encode.string g
+          | ValueNone -> ()
+          "MaxSpawns", Encode.int value.MaxSpawns
+          match value.Faction with
+          | ValueSome f -> "Faction", Encode.int f
+          | ValueNone -> ()
+        ]
+
+    let teleportPropertiesDecoder: Decoder<TeleportProperties> =
+      fun json -> decode {
+        let! targetMap =
+          VOptional.Property.get ("TargetMap", Required.string) json
+
+        and! targetObjectName =
+          Required.Property.get ("TargetObjectName", Required.string) json
+
+        return {
+          TargetMap = targetMap
+          TargetObjectName = targetObjectName
+        }
+      }
+
+    let teleportPropertiesEncoder: Encoder<TeleportProperties> =
+      fun value ->
+        Json.object [
+          match value.TargetMap with
+          | ValueSome m -> "TargetMap", Encode.string m
+          | ValueNone -> ()
+          "TargetObjectName", Encode.string value.TargetObjectName
+        ]
+
     let mapObjectDataDecoder: Decoder<MapObjectData> =
       fun json -> decode {
         let! typeString = Required.Property.get ("Type", Required.string) json
 
         match typeString with
         | "Spawn" ->
-          let! groupId = Required.Property.get ("GroupId", Required.string) json
-
-          and! chance =
-            VOptional.Property.get ("SpawnChance", Decode.Required.float32) json
-            |> Result.map(ValueOption.defaultValue 1.0f)
-
-          return
-            Spawn {
-              GroupId = groupId
-              SpawnChance = chance
-            }
+          let! props = spawnPropertiesDecoder json
+          return Spawn props
         | "Teleport" ->
-          let! target =
-            Required.Property.get ("TargetMapId", Required.string) json
-
-          return Teleport target
+          let! props = teleportPropertiesDecoder json
+          return Teleport props
         | "Trigger" ->
           let! triggerId =
             Required.Property.get ("TriggerId", Required.string) json
@@ -440,13 +513,22 @@ module BlockMap =
         | Spawn data ->
           Json.object [
             "Type", Encode.string "Spawn"
-            "GroupId", Encode.string data.GroupId
-            "SpawnChance", Encode.float32 data.SpawnChance
+            "IsPlayerSpawn", Encode.boolean data.IsPlayerSpawn
+            match data.EntityGroup with
+            | ValueSome g -> "EntityGroup", Encode.string g
+            | ValueNone -> ()
+            "MaxSpawns", Encode.int data.MaxSpawns
+            match data.Faction with
+            | ValueSome f -> "Faction", Encode.int f
+            | ValueNone -> ()
           ]
-        | Teleport target ->
+        | Teleport props ->
           Json.object [
             "Type", Encode.string "Teleport"
-            "TargetMapId", Encode.string target
+            match props.TargetMap with
+            | ValueSome m -> "TargetMap", Encode.string m
+            | ValueNone -> ()
+            "TargetObjectName", Encode.string props.TargetObjectName
           ]
         | Trigger id ->
           Json.object [
@@ -457,18 +539,18 @@ module BlockMap =
     let mapObjectDecoder: Decoder<MapObject> =
       fun json -> decode {
         let! id = Required.Property.get ("Id", Required.int) json
+        and! name = Required.Property.get ("Name", Required.string) json
         and! pos = Required.Property.get ("Position", worldPositionDecoder) json
-
-        and! rot =
-          VOptional.Property.get ("Rotation", quaternionDecoder) json
-          |> Result.map(ValueOption.defaultValue Quaternion.Identity)
-
+        and! rot = VOptional.Property.get ("Rotation", quaternionDecoder) json
+        and! shape = Required.Property.get ("Shape", mapObjectShapeDecoder) json
         and! data = Required.Property.get ("Data", mapObjectDataDecoder) json
 
         return {
           Id = id
+          Name = name
           Position = pos
           Rotation = rot
+          Shape = shape
           Data = data
         }
       }
@@ -477,9 +559,12 @@ module BlockMap =
       fun value ->
         Json.object [
           "Id", Encode.int value.Id
+          "Name", Encode.string value.Name
           "Position", worldPositionEncoder value.Position
-          if value.Rotation <> Quaternion.Identity then
-            "Rotation", quaternionEncoder value.Rotation
+          match value.Rotation with
+          | ValueSome rot -> "Rotation", quaternionEncoder rot
+          | ValueNone -> ()
+          "Shape", mapObjectShapeEncoder value.Shape
           "Data", mapObjectDataEncoder value.Data
         ]
 
@@ -548,25 +633,6 @@ module BlockMap =
             json
           |> Result.map(ValueOption.defaultValue [])
 
-        and! zoneOverlay =
-          VOptional.Property.get
-            ("ZoneOverlay",
-             fun j -> decode {
-               let inline decoder _ (elem: JsonElement) = decode {
-                 let! cell =
-                   Required.Property.get ("Cell", gridCell3DDecoder) elem
-
-                 and! effect =
-                   Required.Property.get ("Effect", zoneEffectDecoder) elem
-
-                 return struct (cell, effect)
-               }
-
-               let! arr = Decode.array decoder j |> Result.map Dictionary.ofSeqV
-               return arr
-             })
-            json
-
         return {
           Version = version
           Key = key
@@ -578,21 +644,12 @@ module BlockMap =
           SpawnCell = spawnCell
           Settings = settings
           Objects = objects
-          ZoneOverlay = defaultValueArg zoneOverlay (Dictionary())
         }
       }
 
     let encodeBlockMapDefinition(map: BlockMapDefinition) : JsonNode =
       let paletteEncoder = fun (key, value) -> $"{key}", blockTypeEncoder value
       let blocks = seq { for kv in map.Blocks -> kv.Value }
-
-      let zoneOverlaySeq = seq {
-        for kv in map.ZoneOverlay ->
-          Json.object [
-            "Cell", gridCell3DEncoder kv.Key
-            "Effect", zoneEffectEncoder kv.Value
-          ]
-      }
 
       Json.object [
         "Version", Encode.int map.Version
@@ -608,10 +665,4 @@ module BlockMap =
         "Settings", mapSettingsEncoder map.Settings
         if not(List.isEmpty map.Objects) then
           "Objects", Json.sequence(map.Objects, mapObjectEncoder)
-        if map.ZoneOverlay.Count > 0 then
-          "ZoneOverlay",
-          JsonArray(
-            zoneOverlaySeq |> Seq.map(fun x -> x :> JsonNode) |> Seq.toArray
-          )
-          :> JsonNode
       ]

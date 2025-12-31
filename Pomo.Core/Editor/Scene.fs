@@ -44,7 +44,7 @@ module EditorScene =
             Model = model
             Category = cat
             CollisionType = BlockMap.Box
-            ZoneEffect = ValueNone
+            Effect = ValueNone
           }
         )
 

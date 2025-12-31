@@ -88,16 +88,43 @@ The following files contain `Vector2.Distance` or `Vector2` position logic:
 
 > [!NOTE]
 > Extending the domain to support strongly typed map objects and settings.
+> **Design Decision**: Zone effects use existing `Skill.Effect` type for seamless integration with ActiveEffect system.
 
-- [ ] Task: Update `Domain/BlockMap.fs`
-  - Add `MapSettings` struct with `BattleMode`, `MaxEnemyEntities`
-  - Add `MapObject` struct with `WorldPosition` and `MapObjectData`
-  - Add `MapObjectData` DU (Spawn, Zone, Teleport, Trigger)
-  - Add `BlockMapDefinition.Settings` and `.Objects` fields
-- [ ] Task: Update `Systems/BlockMapLoader.fs`
-  - Add JDeck encoders/decoders for new types
-  - Ensure backward compatibility or version bump if needed
-- [ ] Task: Update serialization tests
+#### BlockType Effect Extension
+
+- [x] Task: Extend `BlockType` in `Domain/BlockMap.fs`
+  - Add `Effect: Skill.Effect voption` to `BlockType`
+  - Reuse existing `Skill.Effect` from `Pomo.Core.Domain.Skill` (includes Duration, Modifiers, etc.)
+  - Add JDeck encoder/decoder for `Effect` field referencing `Skill.Serialization.Effect.decoder`
+
+> [!TIP]
+> Using `Skill.Effect` means lava blocks can have DoT with elemental damage, ice blocks can apply speed debuffs with stacking rules, etc.
+
+#### Map Settings
+
+- [x] Task: Add `MapSettings` to `Domain/BlockMap.fs`
+  - `EngagementMode` DU: `Peaceful | PvE | PvP | FFA`
+  - `MapSettings` struct: `{ EngagementMode; MaxEnemyEntities }`
+  - Add `Settings: MapSettings` field to `BlockMapDefinition`
+
+#### Map Objects
+
+- [x] Task: Add `MapObject` types to `Domain/BlockMap.fs`
+  - `MapObjectShape` DU: `Box of Vector3 | Sphere of float32` (no Point)
+  - `SpawnProperties` struct: `{ IsPlayerSpawn; EntityGroup; MaxSpawns; Faction }`
+  - `TeleportProperties` struct: `{ TargetMap; TargetObjectName }`
+  - `MapObjectData` DU: `Spawn | Teleport | Trigger` (no Zone – handled by BlockType.Effect)
+  - `MapObject` struct: `{ Id; Name; Position; Rotation; Shape; Data }`
+  - Add `Objects: Dictionary<int, MapObject>` to `BlockMapDefinition`
+
+#### Persistence Updates
+
+- [x] Task: Update `Systems/BlockMapLoader.fs`
+
+  - Add JDeck encoders/decoders for all new types
+  - Reference existing `Skill.Serialization.Effect.decoder` for block effects
+
+- [x] Task: Update serialization roundtrip tests
 
 ---
 
@@ -159,6 +186,7 @@ The following files contain `Vector2.Distance` or `Vector2` position logic:
 
 > [!NOTE]
 > Full 3D versions of systems. **Requirements:**
+>
 > - Module functions over class methods
 > - Factory functions returning object expressions
 > - GC-friendly, avoid allocations in hot paths
@@ -168,6 +196,7 @@ The following files contain `Vector2.Distance` or `Vector2` position logic:
 ### Domain Updates
 
 - [ ] Task: Extend `SpawnData` in `BlockMap.fs`
+
   ```fsharp
   type SpawnData = {
     GroupId: string
@@ -178,6 +207,7 @@ The following files contain `Vector2.Distance` or `Vector2` position logic:
   ```
 
 - [ ] Task: Add `ProjectileTarget3D` to `Projectile.fs`
+
   ```fsharp
   type ProjectileTarget3D =
     | EntityTarget of Guid<EntityId>
@@ -216,7 +246,7 @@ The following files contain `Vector2.Distance` or `Vector2` position logic:
 ### Pathfinding3D Module
 
 - [ ] Task: Create `Algorithms/Pathfinding3D.fs`
-  - 3D A* on BlockMap grid
+  - 3D A\* on BlockMap grid
   - Walkable = empty cell OR `NoCollision` block, with solid floor below
   ```fsharp
   module Pathfinding3D =

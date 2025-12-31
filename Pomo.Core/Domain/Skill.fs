@@ -752,6 +752,229 @@ module Skill =
           }
         }
 
+      open JDeck.Encoding
+
+      let private effectKindEncoder: Encoder<EffectKind> =
+        fun value ->
+          let str =
+            match value with
+            | Buff -> "Buff"
+            | Debuff -> "Debuff"
+            | DamageOverTime -> "DamageOverTime"
+            | ResourceOverTime -> "ResourceOverTime"
+            | Stun -> "Stun"
+            | Silence -> "Silence"
+            | Taunt -> "Taunt"
+
+          Encode.string str
+
+      let private stackingRuleEncoder: Encoder<StackingRule> =
+        fun value ->
+          match value with
+          | NoStack -> Json.object [ "Type", Encode.string "NoStack" ]
+          | RefreshDuration ->
+            Json.object [ "Type", Encode.string "RefreshDuration" ]
+          | AddStack count ->
+            Json.object [
+              "Type", Encode.string "AddStack"
+              "StackCount", Encode.int count
+            ]
+
+      let private durationEncoder: Encoder<Duration> =
+        fun value ->
+          match value with
+          | Duration.Instant -> Json.object [ "Type", Encode.string "Instant" ]
+          | Timed ts ->
+            Json.object [
+              "Type", Encode.string "Timed"
+              "Seconds", Encode.float ts.TotalSeconds
+            ]
+          | Loop(interval, duration) ->
+            Json.object [
+              "Type", Encode.string "Loop"
+              "Interval", Encode.float interval.TotalSeconds
+              "Duration", Encode.float duration.TotalSeconds
+            ]
+          | PermanentLoop interval ->
+            Json.object [
+              "Type", Encode.string "PermanentLoop"
+              "Interval", Encode.float interval.TotalSeconds
+            ]
+          | Permanent -> Json.object [ "Type", Encode.string "Permanent" ]
+
+      let private damageSourceEncoder: Encoder<DamageSource> =
+        fun value ->
+          let str =
+            match value with
+            | Physical -> "Physical"
+            | Magical -> "Magical"
+
+          Encode.string str
+
+      let private elementEncoder: Encoder<Element> =
+        fun value ->
+          let str =
+            match value with
+            | Fire -> "Fire"
+            | Water -> "Water"
+            | Earth -> "Earth"
+            | Air -> "Air"
+            | Lightning -> "Lightning"
+            | Light -> "Light"
+            | Dark -> "Dark"
+            | Neutral -> "Neutral"
+
+          Encode.string str
+
+      let private statEncoder: Encoder<Stat> =
+        fun value ->
+          let str =
+            match value with
+            | Stat.AP -> "AP"
+            | Stat.AC -> "AC"
+            | Stat.DX -> "DX"
+            | Stat.MP -> "MP"
+            | Stat.MA -> "MA"
+            | Stat.MD -> "MD"
+            | Stat.WT -> "WT"
+            | Stat.DA -> "DA"
+            | Stat.LK -> "LK"
+            | Stat.HP -> "HP"
+            | Stat.DP -> "DP"
+            | Stat.HV -> "HV"
+            | Stat.MS -> "MS"
+            | Stat.HPRegen -> "HPRegen"
+            | Stat.MPRegen -> "MPRegen"
+            | Stat.ElementResistance elem -> $"ElementRes:{elementEncoder elem}"
+            | Stat.ElementAttribute elem -> $"ElementAttr:{elementEncoder elem}"
+
+          Encode.string str
+
+      let private statModifierEncoder: Encoder<StatModifier> =
+        fun value ->
+          match value with
+          | Additive(stat, v) ->
+            Json.object [
+              "Type", Encode.string "Additive"
+              "Stat", statEncoder stat
+              "Value", Encode.float v
+            ]
+          | Multiplicative(stat, v) ->
+            Json.object [
+              "Type", Encode.string "Multiplicative"
+              "Stat", statEncoder stat
+              "Value", Encode.float v
+            ]
+
+      let private resourceTypeEncoder: Encoder<ResourceType> =
+        fun value ->
+          let str =
+            match value with
+            | ResourceType.HP -> "HP"
+            | ResourceType.MP -> "MP"
+
+          Encode.string str
+
+      let rec private formulaEncoder(expr: Formula.MathExpr) : string =
+        match expr with
+        | Formula.Const c -> string c
+        | Formula.Var v ->
+          match v with
+          | Formula.VarId.AP -> "AP"
+          | Formula.VarId.AC -> "AC"
+          | Formula.VarId.DX -> "DX"
+          | Formula.VarId.MP -> "MP"
+          | Formula.VarId.MA -> "MA"
+          | Formula.VarId.MD -> "MD"
+          | Formula.VarId.WT -> "WT"
+          | Formula.VarId.DA -> "DA"
+          | Formula.VarId.LK -> "LK"
+          | Formula.VarId.HP -> "HP"
+          | Formula.VarId.DP -> "DP"
+          | Formula.VarId.HV -> "HV"
+          | Formula.VarId.Fire -> "FireA"
+          | Formula.VarId.FireRes -> "FireR"
+          | Formula.VarId.Water -> "WaterA"
+          | Formula.VarId.WaterRes -> "WaterR"
+          | Formula.VarId.Earth -> "EarthA"
+          | Formula.VarId.EarthRes -> "EarthR"
+          | Formula.VarId.Air -> "AirA"
+          | Formula.VarId.AirRes -> "AirR"
+          | Formula.VarId.Lightning -> "LightningA"
+          | Formula.VarId.LightningRes -> "LightningR"
+          | Formula.VarId.Light -> "LightA"
+          | Formula.VarId.LightRes -> "LightR"
+          | Formula.VarId.Dark -> "DarkA"
+          | Formula.VarId.DarkRes -> "DarkR"
+          | Formula.VarId.Unknown s -> s
+        | Formula.Add(l, r) -> $"({formulaEncoder l} + {formulaEncoder r})"
+        | Formula.Sub(l, r) -> $"({formulaEncoder l} - {formulaEncoder r})"
+        | Formula.Mul(l, r) -> $"({formulaEncoder l} * {formulaEncoder r})"
+        | Formula.Div(l, r) -> $"({formulaEncoder l} / {formulaEncoder r})"
+        | Formula.Pow(l, r) -> $"({formulaEncoder l} ^ {formulaEncoder r})"
+        | Formula.Log e -> $"log({formulaEncoder e})"
+        | Formula.Log10 e -> $"log10({formulaEncoder e})"
+
+      let private effectModifierEncoder: Encoder<EffectModifier> =
+        fun value ->
+          match value with
+          | StaticMod sm ->
+            Json.object [
+              "Type", Encode.string "StaticMod"
+              "StatModifier", statModifierEncoder sm
+            ]
+          | DynamicMod(expr, stat) ->
+            Json.object [
+              "Type", Encode.string "DynamicMod"
+              "Expression", Encode.string(formulaEncoder expr)
+              "TargetStat", statEncoder stat
+            ]
+          | AbilityDamageMod(expr, elem) ->
+            Json.object [
+              "Type", Encode.string "AbilityDamageMod"
+              "AbilityDamageValue", Encode.string(formulaEncoder expr)
+              match elem with
+              | ValueSome e -> "Element", elementEncoder e
+              | ValueNone -> ()
+            ]
+          | ResourceChange(res, amount) ->
+            Json.object [
+              "Type", Encode.string "ResourceChange"
+              "Resource", resourceTypeEncoder res
+              "Amount", Encode.string(formulaEncoder amount)
+            ]
+
+      let private visualManifestEncoder: Encoder<VisualManifest> =
+        fun value ->
+          Json.object [
+            match value.ModelId with
+            | ValueSome m -> "Model", Encode.string m
+            | ValueNone -> ()
+            match value.VfxId with
+            | ValueSome v -> "Vfx", Encode.string v
+            | ValueNone -> ()
+            match value.AnimationId with
+            | ValueSome a -> "Animation", Encode.string a
+            | ValueNone -> ()
+            match value.AttachmentPoint with
+            | ValueSome ap -> "Attachment", Encode.string ap
+            | ValueNone -> ()
+          ]
+
+      let encoder: Encoder<Effect> =
+        fun value ->
+          Json.object [
+            "Name", Encode.string value.Name
+            "Kind", effectKindEncoder value.Kind
+            "DamageSource", damageSourceEncoder value.DamageSource
+            "Stacking", stackingRuleEncoder value.Stacking
+            "Duration", durationEncoder value.Duration
+            if value.Visuals <> VisualManifest.empty then
+              "Visuals", visualManifestEncoder value.Visuals
+            "Modifiers", Json.sequence(value.Modifiers, effectModifierEncoder)
+          ]
+
+
     module SkillIntent =
       let decoder: Decoder<SkillIntent> =
         fun json -> decode {

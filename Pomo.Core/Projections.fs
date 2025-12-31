@@ -373,7 +373,7 @@ module Projections =
 
   module PhysicsCache =
 
-    type IService =
+    type PhysicsCacheService =
       abstract GetMovementSnapshot: Guid<ScenarioId> -> MovementSnapshot
       abstract GetMovement3DSnapshot: Guid<ScenarioId> -> Movement3DSnapshot
       abstract RefreshAllCaches: unit -> unit
@@ -520,11 +520,11 @@ module Projections =
         ModelConfigIds = modelConfigBuilder
       }
 
-    let create(world: World) : IService =
+    let create(world: World) : PhysicsCacheService =
       let snapshotCache = Dictionary<Guid<ScenarioId>, MovementSnapshot>()
       let snapshot3DCache = Dictionary<Guid<ScenarioId>, Movement3DSnapshot>()
 
-      { new IService with
+      { new PhysicsCacheService with
           member _.GetMovementSnapshot(scenarioId) =
             match snapshotCache |> Dictionary.tryFindV scenarioId with
             | ValueSome snapshot -> snapshot
@@ -610,8 +610,11 @@ module Projections =
     })
 
   let create
-    (itemStore: ItemStore, world: World, physicsCache: PhysicsCache.IService)
-    =
+    (
+      itemStore: ItemStore,
+      world: World,
+      physicsCache: PhysicsCache.PhysicsCacheService
+    ) =
     let derivedStats = calculateDerivedStats itemStore world
 
 

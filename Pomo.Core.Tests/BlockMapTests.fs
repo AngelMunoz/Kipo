@@ -25,6 +25,7 @@ type BlockMapTests() =
       Model = "Tiles/kaykit_blocks/grass"
       Category = "Terrain"
       CollisionType = Box
+      Effect = ValueNone
     }
 
     map.Palette.Add(blockId, blockType)

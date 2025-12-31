@@ -8,8 +8,7 @@ Built-in WYSIWYG 3D block map editor using a **True 3D** world architecture. The
 
 ## Core Architecture Decision
 
-> [!IMPORTANT]
-> **The camera is just a view.** The world is fully 3D with `Vector3` positions, 3D collision, and 3D pathfinding. The isometric projection is the default gameplay camera, but the engine supports any camera mode.
+> [!IMPORTANT] > **The camera is just a view.** The world is fully 3D with `Vector3` positions, 3D collision, and 3D pathfinding. The isometric projection is the default gameplay camera, but the engine supports any camera mode.
 
 ```
 ┌─────────────────────────────────────┐
@@ -31,6 +30,7 @@ Built-in WYSIWYG 3D block map editor using a **True 3D** world architecture. The
 ## Functional Requirements
 
 ### 1. World Position System
+
 - **WorldPosition**: Core coordinate type replacing `Vector2`
   ```fsharp
   [<Struct>]
@@ -40,6 +40,7 @@ Built-in WYSIWYG 3D block map editor using a **True 3D** world architecture. The
 - **X/Z plane**: Ground plane (maps to current X/Y in isometric view)
 
 ### 2. Editor Scene
+
 - **Separate Scene**: Standalone editor (like MainMenu)
 - **Block Placement**: Click grid to place blocks in 3D space
 - **Block Removal**: Right-click removes blocks
@@ -48,40 +49,52 @@ Built-in WYSIWYG 3D block map editor using a **True 3D** world architecture. The
 - **Cursor Preview**: Ghost block at hovered cell
 
 ### 3. Camera System
+
 - **Isometric Camera**: Default orthographic projection (existing)
 - **Free-Fly Camera**: Optional for detailed 3D placement
 - **Camera Abstraction**: `CameraService` supports multiple projection modes
 
 ### 4. Block Palette
+
 - **Self-Contained**: Palette embedded in map file
 - **Categories**: Terrain, Decoration, Structure
-- **Block Properties**: Name, Model path, IsSolid, CanStack
+- **Block Properties**: Name, Model path, CollisionType, Effect
+- **Terrain Effects**: Blocks can have optional `Skill.Effect` for terrain modifiers
+  - Lava block → DoT with fire element
+  - Ice block → Speed debuff with stacking
+  - Healing fountain → HoT effect
 
 ### 5. Map Objects & Settings
-- **Map Settings**: Global properties (BattleMode, MaxEnemies)
-- **Map Objects**: Logical entities distinct from blocks (Spawns, Zones, Teleports)
+
+- **Map Settings**: Global properties (EngagementMode, MaxEnemies)
+- **EngagementMode**: Peaceful, PvE, PvP, FFA
+- **Map Objects**: Logical entities distinct from blocks (Spawns, Teleports, Triggers)
 - **Object Types**:
   - **Spawn**: Player/Enemy spawn points with group/faction data
-  - **Zone**: 3D volumes for effects (Speed, Heal, Damage)
-  - **Teleport**: localized teleports or map transitions
-- **Object Properties**: Strongly typed per object kind (no generic dictionaries)
+  - **Teleport**: Localized teleports or map transitions
+  - **Trigger**: Invisible event triggers (cutscenes, boss spawns)
+- **Object Shapes**: Box, Sphere (no Point)
+- **Note**: Zone effects are handled by BlockType.Effect using `Skill.Effect`
 
 ### 6. 3D Collision System
+
 - **Dual-strategy**: Fast AABB for regular blocks, mesh collision for slopes
 - **CollisionType per BlockType**: `Box | Mesh | NoCollision`
 - **3D Spatial Grid**: Extends current 2D grid to 3D (`GridCell3D`)
 - **Mesh Collision**: For rotated slope blocks, ray-surface intersection
 
 ### 7. 3D Pathfinding
+
 - **3D Navigation Grid**: Walkable cells with height transitions
 - **Ramps/Stairs**: Transition blocks between Y-levels
-- **A* with Height**: Path considers vertical movement
+- **A\* with Height**: Path considers vertical movement
 
 ### 8. 3D System Alternatives (Phase 5b)
 
 > Full 3D versions of gameplay systems. All use module functions + factory object expressions, GC-friendly.
 
 #### SpawnData (Extended)
+
 ```fsharp
 [<Struct>]
 type SpawnData = {
@@ -93,6 +106,7 @@ type SpawnData = {
 ```
 
 #### ProjectileTarget3D
+
 ```fsharp
 [<Struct>]
 type ProjectileTarget3D =
@@ -101,6 +115,7 @@ type ProjectileTarget3D =
 ```
 
 #### MovementState3D
+
 ```fsharp
 type MovementState =
   | ...
@@ -108,6 +123,7 @@ type MovementState =
 ```
 
 #### Camera3D Module
+
 ```fsharp
 module Camera3D =
   type State = { Position: Vector3; Yaw: float32; Pitch: float32; Zoom: float32 }
@@ -122,6 +138,7 @@ module Camera3D =
 ```
 
 #### Pathfinding3D Module
+
 ```fsharp
 module Pathfinding3D =
   type NavGrid3D = { BlockMap: BlockMapDefinition; CellSize: float32 }
@@ -132,12 +149,14 @@ module Pathfinding3D =
 ```
 
 #### Navigation3D Module
+
 ```fsharp
 module Navigation3D =
   val create: EventBus * IStateWriteService * ProjectionService -> CoreEventListener
 ```
 
 #### BlockMapSpawning Module
+
 ```fsharp
 module BlockMapSpawning =
   val getSpawnPoints: BlockMapDefinition -> MapObject list
@@ -146,6 +165,7 @@ module BlockMapSpawning =
 ```
 
 #### Projectile3D Module
+
 ```fsharp
 module Projectile3D =
   type WorldContext = {
@@ -157,6 +177,7 @@ module Projectile3D =
 ```
 
 #### Combat3D Module
+
 ```fsharp
 module Combat3D =
   type EntityContext3D = {
@@ -172,11 +193,13 @@ module Combat3D =
 ```
 
 ### 9. Preview Mode
+
 - **Play Button**: Test map with player entity
 - **Spawn Point**: Designated block for player spawn
 - **Stop Button**: Return to editor, map intact
 
 ### 10. Persistence
+
 - **JSON Format**: JDeck encoders/decoders
 - **Schema Version**: `Version: int` field for future migrations
 - **Self-Contained Palette**: Block types in map file
@@ -187,31 +210,35 @@ module Combat3D =
 ## Data Structures
 
 ### WorldPosition
+
 ```fsharp
 [<Struct>]
 type WorldPosition = { X: float32; Y: float32; Z: float32 }
 ```
 
 ### GridCell3D
+
 ```fsharp
 [<Struct>]
 type GridCell3D = { X: int; Y: int; Z: int }  // Y = height
 ```
 
 ### Map Objects & Settings
+
+> [!IMPORTANT] > **Design Decision**: Zone effects use existing `Skill.Effect` for seamless integration with the ActiveEffect system.
+> This provides full effect flexibility: DoT, stat modifiers, stacking rules, duration, visuals, etc.
+
 ```fsharp
-type BattleMode = PVE | PVP
+/// Engagement semantics for the map
+[<Struct>]
+type EngagementMode =
+    | Peaceful  // No combat allowed
+    | PvE       // Player vs Environment only
+    | PvP       // Player vs Player enabled
+    | FFA       // Free For All - everyone can attack everyone
 
-[<RequireQualifiedAccess>]
-type ZoneEffect =
-    | Speed of multiplier: float32
-    | Heal of amount: float32
-    | Damage of amount: float32
-    | ResourceChange of resource: string * amount: float32
-
-[<RequireQualifiedAccess>]
+[<Struct; RequireQualifiedAccess>]
 type MapObjectShape =
-    | Point
     | Box of size: Vector3
     | Sphere of radius: float32
 
@@ -224,20 +251,15 @@ type SpawnProperties = {
 }
 
 [<Struct>]
-type ZoneProperties = {
-    Effect: ZoneEffect
-}
-
-[<Struct>]
 type TeleportProperties = {
     TargetMap: string voption
     TargetObjectName: string
 }
 
+/// Map object types (Zone effects handled by BlockType.Effect)
 [<RequireQualifiedAccess>]
 type MapObjectData =
     | Spawn of SpawnProperties
-    | Zone of ZoneProperties
     | Teleport of TeleportProperties
     | Trigger
 
@@ -253,12 +275,13 @@ type MapObject = {
 
 [<Struct>]
 type MapSettings = {
-    BattleMode: BattleMode
+    EngagementMode: EngagementMode
     MaxEnemyEntities: int
 }
 ```
 
 ### BlockMap
+
 ```fsharp
 [<Struct>]
 type CollisionType =
@@ -279,6 +302,7 @@ type BlockType = {
   Model: string
   Category: string
   CollisionType: CollisionType
+  Effect: Skill.Effect voption  // Terrain effect using existing effect system
 }
 
 type BlockMapDefinition = {
@@ -294,6 +318,7 @@ type BlockMapDefinition = {
 ```
 
 ### Editor State (FDA Reactive)
+
 ```fsharp
 type EditorState = {
   CurrentBlockTypeId: cval<int<BlockTypeId> voption>
@@ -325,19 +350,23 @@ type EditorState = {
 ## Migration Strategy
 
 ### Phase 1: Position Migration
+
 - Replace `Vector2` position storage with `WorldPosition`
 - Initially, all entities have `Y = 0`
 - Existing systems continue working (2D = XZ plane at Y=0)
 
 ### Phase 2: 3D Collision
+
 - Add `BlockGridCollision` for solid block checks
 - Entities blocked by blocks at same height
 
 ### Phase 3: 3D Rendering
+
 - `BlockEmitter` renders blocks at correct 3D positions
 - Camera renders all heights
 
 ### Phase 4: Editor
+
 - Full WYSIWYG block placement
 - Save/load 3D maps
 
@@ -356,11 +385,13 @@ type EditorState = {
 ## Acceptance Criteria
 
 ### Core Migration
+
 - [ ] `WorldPosition` replaces `Vector2` for entity positions
 - [ ] All existing systems work with Y=0 (no regression)
 - [ ] `GridCell3D` used for 3D spatial queries
 
 ### Editor
+
 - [ ] Editor scene launches from main menu
 - [ ] Blocks placed/removed in 3D grid
 - [ ] Layer up/down changes active Y-level
@@ -370,11 +401,13 @@ type EditorState = {
 - [ ] **Map Objects** (Spawn, Zone) placement and property editing
 
 ### Collision
+
 - [ ] Box collision for standard blocks
 - [ ] Mesh collision for rotated slope blocks
 - [ ] Height differences respected
 - [ ] 3D spatial grid for collision queries
 
 ### Camera
+
 - [ ] Isometric camera works with 3D world
 - [ ] Free-fly camera available in editor
