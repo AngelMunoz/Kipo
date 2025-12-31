@@ -16,6 +16,7 @@ open Pomo.Core.Domain.Item
 open Pomo.Core.Domain.Spatial
 open Pomo.Core.Domain.Projectile
 open Pomo.Core.Domain.Skill
+open Pomo.Core.Systems
 
 module Projections =
   let private liveEntities(world: World) =
@@ -459,6 +460,7 @@ module Projections =
       (rotations: IReadOnlyDictionary<Guid<EntityId>, float32>)
       (modelConfigIds: HashMap<Guid<EntityId>, string>)
       (entityScenarios: HashMap<Guid<EntityId>, Guid<ScenarioId>>)
+      (blockMap: BlockMap.BlockMapDefinition voption)
       (scenarioId: Guid<ScenarioId>)
       =
       let dt = float32 time.TotalSeconds
@@ -473,11 +475,16 @@ module Projections =
         | ValueSome sId when sId = scenarioId ->
           let currentPos =
             match velocities |> Dictionary.tryFindV id with
-            | ValueSome v -> {
-                WorldPosition.X = startPos.X + v.X * dt
-                Y = startPos.Y
-                Z = startPos.Z + v.Y * dt
-              }
+            | ValueSome v ->
+              match blockMap with
+              | ValueSome map ->
+                BlockCollision.applyCollision map startPos v dt 1.0f
+              | ValueNone ->
+                  {
+                    WorldPosition.X = startPos.X + v.X * dt
+                    Y = startPos.Y
+                    Z = startPos.Z + v.Y * dt
+                  }
             | ValueNone -> startPos
 
           positionsBuilder[id] <- currentPos
@@ -544,7 +551,7 @@ module Projections =
             let entityScenarios = world.EntityScenario |> AMap.force
             let scenarios = world.Scenarios |> AMap.force
 
-            for (sId, _) in scenarios do
+            for (sId, scenario) in scenarios do
               let snapshot =
                 calculateSnapshot
                   time
@@ -565,6 +572,7 @@ module Projections =
                   rotations
                   modelConfigIds
                   entityScenarios
+                  scenario.BlockMap
                   sId
 
               snapshot3DCache[sId] <- snapshot3D

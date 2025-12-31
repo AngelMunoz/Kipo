@@ -261,7 +261,13 @@ module GameplayScene =
 
       // Create Scenario
       let scenarioId = Guid.NewGuid() |> UMX.tag<ScenarioId>
-      let scenario: World.Scenario = { Id = scenarioId; Map = mapDef }
+
+      let scenario: World.Scenario = {
+        Id = scenarioId
+        Map = mapDef
+        BlockMap = ValueNone
+      }
+
       mutableWorld.Scenarios[scenarioId] <- scenario
 
       let renderOrchestrator =
