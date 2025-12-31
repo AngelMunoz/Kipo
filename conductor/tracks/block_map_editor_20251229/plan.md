@@ -223,6 +223,62 @@ The following files contain `Vector2.Distance` or `Vector2` position logic:
 
 ---
 
+### Collision Strategy (Critical)
+
+> [!WARNING] > **MTV collision DOES NOT work for 3D map objects like trees.** It produces invisible wall effects.
+
+| Collision Type                  | System                                                                                  | Use For                                      |
+| ------------------------------- | --------------------------------------------------------------------------------------- | -------------------------------------------- |
+| `BlockCollision.applyCollision` | [BlockCollision.fs](file:///home/amunoz/repos/Kipo/Pomo.Core/Systems/BlockCollision.fs) | Map/terrain collision (blocks, trees, walls) |
+| MTV Sliding                     | [Physics.fs](file:///home/amunoz/repos/Kipo/Pomo.Core/Algorithms/Physics.fs)            | Entity-entity collision only                 |
+
+**Within BlockCollision (dual-strategy):**
+
+| CollisionType | Method                   | Use For                          |
+| ------------- | ------------------------ | -------------------------------- |
+| `Box`         | Fast AABB check          | Regular solid blocks             |
+| `Mesh`        | Ray-surface intersection | Rotated slopes, complex geometry |
+| `NoCollision` | Skip                     | Decorations, passthrough         |
+
+- [ ] Task: Update `calculate3DSnapshot` in `Projections.fs`
+  - Call `BlockCollision.applyCollision` for each entity
+  - MTV sliding remains for entity-entity separation in `CollisionSystem`
+
+---
+
+### 3D Skill Targeting (Critical)
+
+> [!IMPORTANT]
+> Current skill targeting uses 2D shapes (`Vector2`). All skills need 3D equivalents:
+
+| 2D Shape | 3D Replacement | Use Case               |
+| -------- | -------------- | ---------------------- |
+| `Circle` | `Sphere`       | AOE centered on target |
+| `Cone`   | `Cone3D`       | Frontal attacks        |
+| `Line`   | `Cylinder`     | Beam/projectile path   |
+
+- [ ] Task: Create `Domain/Spatial3D.fs`
+
+  ```fsharp
+  module Spatial3D =
+    [<Struct>] type Sphere = { Center: WorldPosition; Radius: float32 }
+    [<Struct>] type Cone3D = { Origin: WorldPosition; Direction: Vector3; AngleDeg: float32; Length: float32 }
+    [<Struct>] type Cylinder = { Base: WorldPosition; Height: float32; Radius: float32 }
+
+    module Search =
+      type SearchContext3D = {
+        GetNearbyEntities: WorldPosition -> float32 -> IndexList<EntityId * WorldPosition>
+      }
+      val findTargetsInSphere: SearchContext3D -> SphereRequest -> IndexList<EntityId>
+      val findTargetsInCone3D: SearchContext3D -> Cone3DRequest -> IndexList<EntityId>
+      val findTargetsInCylinder: SearchContext3D -> CylinderRequest -> IndexList<EntityId>
+  ```
+
+- [ ] Task: Update skill definitions to use 3D targeting types
+- [ ] Task: Update `AbilityActivation.fs` to use `GetNearbyEntities3DSnapshot`
+
+---
+
 ### Camera3D Module
 
 - [ ] Task: Add `Camera3D` module to `Domain/Camera.fs`

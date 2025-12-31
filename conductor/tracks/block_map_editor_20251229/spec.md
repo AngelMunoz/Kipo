@@ -78,18 +78,55 @@ Built-in WYSIWYG 3D block map editor using a **True 3D** world architecture. The
 
 ### 6. 3D Collision System
 
-- **Dual-strategy**: Fast AABB for regular blocks, mesh collision for slopes
-- **CollisionType per BlockType**: `Box | Mesh | NoCollision`
-- **3D Spatial Grid**: Extends current 2D grid to 3D (`GridCell3D`)
-- **Mesh Collision**: For rotated slope blocks, ray-surface intersection
+> [!WARNING] > **MTV collision produces invisible wall effects for 3D objects.** Use appropriate collision type:
 
-### 7. 3D Pathfinding
+| Collision Type                  | Module              | Use For                            |
+| ------------------------------- | ------------------- | ---------------------------------- |
+| `BlockCollision.applyCollision` | `BlockCollision.fs` | Map/terrain (blocks, trees, walls) |
+| MTV Sliding                     | `Physics.fs`        | Entity-entity pushing only         |
+
+**Within BlockCollision (dual-strategy):**
+
+| CollisionType | Method                   | Use For                                |
+| ------------- | ------------------------ | -------------------------------------- |
+| `Box`         | Fast AABB check          | Regular solid blocks                   |
+| `Mesh`        | Ray-surface intersection | Rotated slope blocks, complex geometry |
+| `NoCollision` | Skip                     | Decorations, passthrough               |
+
+- **BlockCollision**: Checks solid blocks, adjusts Y to surface height
+- **3D Spatial Grid**: Extends current 2D grid to 3D (`GridCell3D`)
+- **Mesh Collision**: For rotated slopes - projects entity position onto mesh surface
+
+### 7. 3D Skill Targeting
+
+> [!IMPORTANT]
+> Current skills use 2D shapes (`Vector2`). 3D versions required:
+
+| 2D Shape | 3D Replacement | Use Case               |
+| -------- | -------------- | ---------------------- |
+| `Circle` | `Sphere`       | AOE centered on target |
+| `Cone`   | `Cone3D`       | Frontal attacks        |
+| `Line`   | `Cylinder`     | Beam/projectile path   |
+
+```fsharp
+module Spatial3D =
+  [<Struct>] type Sphere = { Center: WorldPosition; Radius: float32 }
+  [<Struct>] type Cone3D = { Origin: WorldPosition; Direction: Vector3; AngleDeg: float32; Length: float32 }
+  [<Struct>] type Cylinder = { Base: WorldPosition; Height: float32; Radius: float32 }
+
+  module Search =
+    val findTargetsInSphere: SearchContext3D -> SphereRequest -> IndexList<EntityId>
+    val findTargetsInCone3D: SearchContext3D -> Cone3DRequest -> IndexList<EntityId>
+    val findTargetsInCylinder: SearchContext3D -> CylinderRequest -> IndexList<EntityId>
+```
+
+### 8. 3D Pathfinding
 
 - **3D Navigation Grid**: Walkable cells with height transitions
 - **Ramps/Stairs**: Transition blocks between Y-levels
 - **A\* with Height**: Path considers vertical movement
 
-### 8. 3D System Alternatives (Phase 5b)
+### 9. 3D System Alternatives (Phase 5b)
 
 > Full 3D versions of gameplay systems. All use module functions + factory object expressions, GC-friendly.
 
@@ -192,13 +229,13 @@ module Combat3D =
     val resolveBox: EntityContext3D -> center:WorldPosition -> halfExtents:Vector3 -> EntityId list
 ```
 
-### 9. Preview Mode
+### 10. Preview Mode
 
 - **Play Button**: Test map with player entity
 - **Spawn Point**: Designated block for player spawn
 - **Stop Button**: Return to editor, map intact
 
-### 10. Persistence
+### 11. Persistence
 
 - **JSON Format**: JDeck encoders/decoders
 - **Schema Version**: `Version: int` field for future migrations
