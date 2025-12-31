@@ -69,8 +69,19 @@ module EditorScene =
     let camera = EditorCameraState()
     camera.Zoom <- 2.0f // Initial zoom adjusted for 1:1 scale (blocks look taller now)
 
+    // P key playtest callback
+    let onPlaytest() =
+      let currentMap = state.BlockMap |> AVal.force
+      sceneTransitionSubject.OnNext(BlockMapPlaytest currentMap)
+
     let inputSystem =
-      EditorInput.createSystem game state camera uiService pixelsPerUnit
+      EditorInput.createSystem
+        game
+        state
+        camera
+        uiService
+        pixelsPerUnit
+        onPlaytest
 
     let renderSystem =
       EditorRender.createSystem game state camera pixelsPerUnit game.Content

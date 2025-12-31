@@ -162,3 +162,14 @@ module CompositionRoot =
           scope.UIService
           sceneTransitionSubject
           mapKey
+      | Scene.BlockMapPlaytest blockMap ->
+        Scenes.BlockMapScene.create
+          game
+          scope.Stores
+          scope.MonoGame
+          scope.Random
+          scope.UIService
+          scope.HUDService
+          sceneTransitionSubject
+          playerId
+          blockMap

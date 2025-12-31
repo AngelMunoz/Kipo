@@ -585,11 +585,20 @@ module Projections =
 
       match scenario with
       | Some s ->
+        // Get key from TileMap or BlockMap, whichever exists
+        let mapKey =
+          match s.Map with
+          | ValueSome m -> m.Key
+          | ValueNone ->
+            match s.BlockMap with
+            | ValueSome b -> b.Key
+            | ValueNone -> "unknown"
+
         return
           Some {
             ScenarioId = scenarioId
             Scenario = s
-            MapKey = s.Map.Key
+            MapKey = mapKey
           }
       | None -> return None
     })

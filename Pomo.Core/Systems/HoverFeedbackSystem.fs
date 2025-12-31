@@ -96,7 +96,10 @@ module HoverFeedback =
                 let pixelsPerUnit =
                   match scenarios |> HashMap.tryFindV scenarioId with
                   | ValueSome s ->
-                    Vector2(float32 s.Map.TileWidth, float32 s.Map.TileHeight)
+                    match s.Map with
+                    | ValueSome map ->
+                      Vector2(float32 map.TileWidth, float32 map.TileHeight)
+                    | ValueNone -> Vector2(64f, 64f) // BlockMap scenario
                   | ValueNone -> Constants.DefaultPixelsPerUnit
 
                 let squishFactor = pixelsPerUnit.X / pixelsPerUnit.Y

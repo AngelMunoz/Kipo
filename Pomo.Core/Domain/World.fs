@@ -26,7 +26,7 @@ module World =
   [<Struct>]
   type Scenario = {
     Id: Guid<ScenarioId>
-    Map: MapDefinition
+    Map: MapDefinition voption
     BlockMap: BlockMap.BlockMapDefinition voption
   }
 

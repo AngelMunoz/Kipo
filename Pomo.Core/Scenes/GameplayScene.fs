@@ -264,7 +264,7 @@ module GameplayScene =
 
       let scenario: World.Scenario = {
         Id = scenarioId
-        Map = mapDef
+        Map = ValueSome mapDef
         BlockMap = ValueNone
       }
 

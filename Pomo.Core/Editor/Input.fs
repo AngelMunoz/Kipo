@@ -105,11 +105,11 @@ module EditorInput =
         cam.ResetToIsometric()
         state.CameraMode.Value <- Isometric)
 
-  /// Handle editor actions (block placement, layer changes, etc.)
   let handleEditorInput
     (state: EditorState)
     (cam: EditorCameraState)
     (uiService: Pomo.Core.Environment.IUIService)
+    (onPlaytest: unit -> unit)
     (ctx: EditorInputContext)
     =
     // Destructure context for easier access
@@ -133,6 +133,10 @@ module EditorInput =
         let newMode = if cam.Mode = Isometric then FreeFly else Isometric
         cam.Mode <- newMode
         state.CameraMode.Value <- newMode)
+
+    // P key: Enter playtest mode
+    if isKeyJustPressed prevKeyboard keyboard Keys.P then
+      onPlaytest()
 
     // Undo/Redo (Continuous)
     ctx.UndoRedoTimer <- ctx.UndoRedoTimer - deltaTime
@@ -307,6 +311,7 @@ module EditorInput =
     (cam: EditorCameraState)
     (uiService: Pomo.Core.Environment.IUIService)
     (pixelsPerUnit: Vector2)
+    (onPlaytest: unit -> unit)
     : GameComponent =
 
     // Input context with mutable state
@@ -343,5 +348,5 @@ module EditorInput =
             inputContext.PrevMouse
             inputContext.DeltaTime
 
-          handleEditorInput state cam uiService inputContext
+          handleEditorInput state cam uiService onPlaytest inputContext
     }

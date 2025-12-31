@@ -20,6 +20,7 @@
     <Compile Include="Domain/Map.fs" />
     <Compile Include="Domain/AssetManifest.fs" />
     <Compile Include="Domain/Spatial.fs" />
+    <Compile Include="Domain/Spatial3D.fs" />
     <Compile Include="Domain/BlockMap.fs" />
     <Compile Include="Domain/Navigation.fs" />
     <Compile Include="Domain/AI.fs" />
@@ -35,6 +36,7 @@
     <Compile Include="Serialization.fs" />
     <Compile Include="Stores.fs" />
     <Compile Include="MapSpawning.fs" />
+    <Compile Include="BlockMapSpawning.fs" />
     <Compile Include="Projections.fs" />
     <Compile Include="Graphics/RenderMath.fs" />
     <Compile Include="Graphics/RenderCommands.fs" />
@@ -63,6 +65,7 @@
     <Compile Include="Systems/ResourceManager.fs" />
     <Compile Include="Systems/Combat.fs" />
     <Compile Include="Systems/MovementLogic.fs" />
+    <Compile Include="Systems/MovementLogic3D.fs" />
     <Compile Include="Systems/InputMapping.fs" />
     <Compile Include="Systems/PlayerMovement.fs" />
     <Compile Include="Systems/Notification.fs" />
@@ -73,6 +76,7 @@
     <Compile Include="Systems/RawInput.fs" />
     <Compile Include="Systems/ActionHandler.fs" />
     <Compile Include="Systems/Navigation.fs" />
+    <Compile Include="Systems/Navigation3D.fs" />
     <Compile Include="Systems/Movement.fs" />
     <Compile Include="Systems/UnitMovement.fs" />
     <Compile Include="Systems/Collision.fs" />
@@ -107,6 +111,7 @@
     <Compile Include="Editor/Scene.fs" />
     <Compile Include="Scenes.fs" />
     <Compile Include="Scenes/GameplayScene.fs" />
+    <Compile Include="Scenes/BlockMapScene.fs" />
     <Compile Include="CompositionRoot.fs" />
     <Compile Include="PomoGame.fs" />
   </ItemGroup>

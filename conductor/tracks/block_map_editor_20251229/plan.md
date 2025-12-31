@@ -175,7 +175,7 @@ The following files contain `Vector2.Distance` or `Vector2` position logic:
 - [x] Task: Add `Movement3DSnapshot` to `Projections.fs`
   - `SpatialGrid3D: Dictionary<GridCell3D, EntityId[]>`
   - `GetNearbyEntities3DSnapshot` with GC-friendly iteration
-- [ ] Task: Integrate into movement system
+- [x] Task: Integrate into movement system
   - Entity Y follows surface height on mesh blocks (slopes)
   - Entity blocked by Box blocks at same height
 - [ ] Task: Verification - Walk up/down rotated slope blocks
@@ -257,7 +257,7 @@ The following files contain `Vector2.Distance` or `Vector2` position logic:
 | `Cone`   | `Cone3D`       | Frontal attacks        |
 | `Line`   | `Cylinder`     | Beam/projectile path   |
 
-- [ ] Task: Create `Domain/Spatial3D.fs`
+- [x] Task: Create `Domain/Spatial3D.fs`
 
   ```fsharp
   module Spatial3D =

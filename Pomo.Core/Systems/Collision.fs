@@ -275,17 +275,23 @@ module Collision =
         let positions = snapshot.Positions
         let getNearbyTo = getNearbyEntities grid
 
-        // Create map collision context (once per scenario)
-        let mapCtx: MapCollisionContext = {
-          MapDef = scenario.Map
-          ObjectGrid = getMapObjectGrid scenario.Map
-          PolygonObjects = getPolygonObjects scenario.Map
-          PolylineObjects = getPolylineObjects scenario.Map
-        }
+        // Create map collision context only for TileMap scenarios
+        let mapCtxOpt =
+          scenario.Map
+          |> ValueOption.map(fun map -> {
+            MapDef = map
+            ObjectGrid = getMapObjectGrid map
+            PolygonObjects = getPolygonObjects map
+            PolylineObjects = getPolylineObjects map
+          })
 
         // Check for entity-entity collisions
         for KeyValue(entityId, pos) in positions do
-          let cell = getGridCell Core.Constants.Collision.GridCellSize (WorldPosition.toVector2 pos)
+          let cell =
+            getGridCell
+              Core.Constants.Collision.GridCellSize
+              (WorldPosition.toVector2 pos)
+
           let nearbyEntities = getNearbyTo cell
 
           for otherId in nearbyEntities do
@@ -305,198 +311,181 @@ module Collision =
                   )
               | ValueNone -> ()
 
-        // Check for map object collisions per scenario
-        // Get dependencies for CCD
-        let velocities = core.World.Velocities
-        let time = core.World.Time |> AVal.force
-        let dt = float32 time.Delta.TotalSeconds
+        // Check for map object collisions per scenario (TileMap only)
+        mapCtxOpt
+        |> ValueOption.iter(fun mapCtx ->
+          // Get dependencies for CCD
+          let velocities = core.World.Velocities
+          let time = core.World.Time |> AVal.force
+          let dt = float32 time.Delta.TotalSeconds
 
-        // Cache object lookup for this frame/map to avoid repeated list searches
-        // We can just construct a flat map of (GroupId, ObjectId) -> MapObject once per map load
-        // But for now, let's do a fast lookup helper that scans just the necessary group
-        let findObj(key: CacheKey) =
-          // Optim: scenario.Map.ObjectGroups is IndexList.
-          // We can assume it's small enough or valid.
-          // Let's rely on `getMapObjectFromId` optimization later if needed.
-          mapCtx.MapDef.ObjectGroups
-          |> IndexList.tryFind(fun _ g -> g.Id = key.GroupId)
-          |> Option.bind(fun g ->
-            g.Objects |> IndexList.tryFind(fun _ o -> o.Id = key.ObjectId))
+          // Cache object lookup for this frame/map
+          let findObj(key: CacheKey) =
+            mapCtx.MapDef.ObjectGroups
+            |> IndexList.tryFind(fun _ g -> g.Id = key.GroupId)
+            |> Option.bind(fun g ->
+              g.Objects |> IndexList.tryFind(fun _ o -> o.Id = key.ObjectId))
 
-        for KeyValue(entityId, targetPos) in positions do
-          // Check if this entity is a projectile and how it should handle terrain
-          let projectileOpt = liveProjectiles |> HashMap.tryFindV entityId
+          for KeyValue(entityId, targetPos) in positions do
+            let projectileOpt = liveProjectiles |> HashMap.tryFindV entityId
 
-          // Skip wall collision entirely for projectiles with IgnoreTerrain
-          let shouldCheckWalls =
-            match projectileOpt with
-            | ValueSome proj -> proj.Info.Collision = BlockedByTerrain
-            | ValueNone -> true // Non-projectiles always check walls
-
-          if shouldCheckWalls then
-            let startPos =
-              match velocities.TryFindV entityId with
-              | ValueSome v ->
-                  { X = targetPos.X - v.X * dt
-                    Y = targetPos.Y
-                    Z = targetPos.Z - v.Y * dt }
-              | ValueNone -> targetPos
-
-            // 2. Determine Steps
-            let displacement = WorldPosition.toVector2 targetPos - WorldPosition.toVector2 startPos
-            let dist = displacement.Length()
-            // Step size reduced for tighter precision with smaller radius
-            let stepSize = 3.0f
-
-            let numSteps =
-              if dist > 0.0f then
-                max 1 (int(MathF.Ceiling(dist / stepSize)))
-              else
-                1 // Always run at least one check to resolve static overlaps
-
-            let stepMove =
-              if numSteps > 1 then
-                displacement / float32 numSteps
-              else
-                displacement
-
-            // State for the stepping loop
-            let mutable currentPos = startPos
-            let mutable totalMTV = Vector2.Zero
-            let mutable globalHasCollision = false
-            let mutable lastCollidedObj = ValueNone
-
-            // 3. Step Loop
-            for step = 1 to numSteps do
-              // Advance position
-              if numSteps > 1 || dist > 0.0f then
-                currentPos <-
-                    { X = currentPos.X + stepMove.X
-                      Y = currentPos.Y
-                      Z = currentPos.Z + stepMove.Y }
-              else
-                // Static case: just use targetPos (which equals startPos)
-                currentPos <- targetPos
-
-              // Run Iterative Solver at this step
-              let mutable iteration = 0
-              let maxIterations = 4
-              let mutable doneIterating = false
-
-              while not doneIterating && iteration < maxIterations do
-                iteration <- iteration + 1
-                let mutable iterationMTV = Vector2.Zero
-                let mutable iterationHasCollision = false
-
-                let currentPos2d = WorldPosition.toVector2 currentPos
-                let entityPoly = getEntityPolygon currentPos2d
-                let entityAxes = getAxes entityPoly
-
-                // SPATIAL LOOKUP
-                // 1. Get current cell
-                let cell =
-                  getGridCell Core.Constants.Collision.GridCellSize currentPos2d
-
-                // 2. Collect potential collision objects from neighbor cells (GC-friendly)
-                nearbyObjectsSet.Clear()
-
-                for struct (dx, dy) in neighborOffsets do
-                  let neighbor = { X = cell.X + dx; Y = cell.Y + dy }
-
-                  match mapCtx.ObjectGrid |> HashMap.tryFindV neighbor with
-                  | ValueSome keys ->
-                    for key in keys do
-                      nearbyObjectsSet.Add(key) |> ignore
-                  | ValueNone -> ()
-
-                for cacheKey in nearbyObjectsSet do
-                  // We need the actual object data for triggers (PortalData) and Type
-                  // Since we only have the CacheKey here, we need to look it up.
-                  // The polygon/polyline caches have the shape data, that's fast.
-                  // But we need the 'isTrigger' and 'PortalData' info.
-                  // Let's peek at the shape caches first to see if we hit geometry.
-                  // Wait, we need to know if it's a trigger BEFORE collision check?
-                  // No, usually triggers are shapes too.
-
-                  // Check geometry collision using cached shapes
-                  let hitMTV =
-                    checkShapeCollision
-                      mapCtx.PolygonObjects
-                      mapCtx.PolylineObjects
-                      entityPoly
-                      entityAxes
-                      currentPos2d
-                      entityRadius
-                      cacheKey
-
-                  match hitMTV with
-                  | ValueSome mtv ->
-                    match processHitResult findObj cacheKey mtv with
-                    | TriggerHit portalData ->
-                      core.EventBus.Publish(
-                        GameEvent.Intent(
-                          IntentEvent.Portal {
-                            EntityId = entityId
-                            TargetMap = portalData.TargetMap
-                            TargetSpawn = portalData.TargetSpawn
-                          }
-                        )
-                      )
-                    | WallHit(wallMtv, obj) ->
-                      iterationMTV <- iterationMTV + wallMtv
-                      iterationHasCollision <- true
-                      lastCollidedObj <- ValueSome obj
-                    | NoHit -> ()
-                  | ValueNone -> ()
-
-                if iterationHasCollision then
-                  currentPos <-
-                    { X = currentPos.X + iterationMTV.X
-                      Y = currentPos.Y
-                      Z = currentPos.Z + iterationMTV.Y }
-                  totalMTV <- totalMTV + iterationMTV
-                  globalHasCollision <- true
-                else
-                  doneIterating <- true
-
-            // 4. Publish Results
-            if globalHasCollision then
-              // Check if this is a projectile - they get destroyed on wall hit
+            let shouldCheckWalls =
               match projectileOpt with
-              | ValueSome proj ->
-                // Projectile hit a wall - trigger impact and remove
-                let impact: SystemCommunications.ProjectileImpacted = {
-                  ProjectileId = entityId
-                  CasterId = proj.Caster
-                  ImpactPosition = WorldPosition.toVector2 currentPos
-                  TargetEntity = ValueNone
-                  SkillId = proj.SkillId
-                  RemainingJumps = ValueNone
-                }
+              | ValueSome proj -> proj.Info.Collision = BlockedByTerrain
+              | ValueNone -> true
 
-                // Spawn terrain impact VFX if defined
-                match proj.Info.TerrainImpactVisuals with
-                | ValueSome visuals ->
-                  match visuals.VfxId with
-                  | ValueSome vfxId -> spawnTerrainImpactEffect vfxId currentPos
+            if shouldCheckWalls then
+              let startPos =
+                match velocities.TryFindV entityId with
+                | ValueSome v -> {
+                    X = targetPos.X - v.X * dt
+                    Y = targetPos.Y
+                    Z = targetPos.Z - v.Y * dt
+                  }
+                | ValueNone -> targetPos
+
+              let displacement =
+                WorldPosition.toVector2 targetPos
+                - WorldPosition.toVector2 startPos
+
+              let dist = displacement.Length()
+              let stepSize = 3.0f
+
+              let numSteps =
+                if dist > 0.0f then
+                  max 1 (int(MathF.Ceiling(dist / stepSize)))
+                else
+                  1
+
+              let stepMove =
+                if numSteps > 1 then
+                  displacement / float32 numSteps
+                else
+                  displacement
+
+              let mutable currentPos = startPos
+              let mutable totalMTV = Vector2.Zero
+              let mutable globalHasCollision = false
+              let mutable lastCollidedObj = ValueNone
+
+              for step = 1 to numSteps do
+                if numSteps > 1 || dist > 0.0f then
+                  currentPos <- {
+                    X = currentPos.X + stepMove.X
+                    Y = currentPos.Y
+                    Z = currentPos.Z + stepMove.Y
+                  }
+                else
+                  currentPos <- targetPos
+
+                let mutable iteration = 0
+                let maxIterations = 4
+                let mutable doneIterating = false
+
+                while not doneIterating && iteration < maxIterations do
+                  iteration <- iteration + 1
+                  let mutable iterationMTV = Vector2.Zero
+                  let mutable iterationHasCollision = false
+
+                  let currentPos2d = WorldPosition.toVector2 currentPos
+                  let entityPoly = getEntityPolygon currentPos2d
+                  let entityAxes = getAxes entityPoly
+
+                  let cell =
+                    getGridCell
+                      Core.Constants.Collision.GridCellSize
+                      currentPos2d
+
+                  nearbyObjectsSet.Clear()
+
+                  for struct (dx, dy) in neighborOffsets do
+                    let neighbor = { X = cell.X + dx; Y = cell.Y + dy }
+
+                    match mapCtx.ObjectGrid |> HashMap.tryFindV neighbor with
+                    | ValueSome keys ->
+                      for key in keys do
+                        nearbyObjectsSet.Add(key) |> ignore
+                    | ValueNone -> ()
+
+                  for cacheKey in nearbyObjectsSet do
+                    let hitMTV =
+                      checkShapeCollision
+                        mapCtx.PolygonObjects
+                        mapCtx.PolylineObjects
+                        entityPoly
+                        entityAxes
+                        currentPos2d
+                        entityRadius
+                        cacheKey
+
+                    match hitMTV with
+                    | ValueSome mtv ->
+                      match processHitResult findObj cacheKey mtv with
+                      | TriggerHit portalData ->
+                        core.EventBus.Publish(
+                          GameEvent.Intent(
+                            IntentEvent.Portal {
+                              EntityId = entityId
+                              TargetMap = portalData.TargetMap
+                              TargetSpawn = portalData.TargetSpawn
+                            }
+                          )
+                        )
+                      | WallHit(wallMtv, obj) ->
+                        iterationMTV <- iterationMTV + wallMtv
+                        iterationHasCollision <- true
+                        lastCollidedObj <- ValueSome obj
+                      | NoHit -> ()
+                    | ValueNone -> ()
+
+                  if iterationHasCollision then
+                    currentPos <- {
+                      X = currentPos.X + iterationMTV.X
+                      Y = currentPos.Y
+                      Z = currentPos.Z + iterationMTV.Y
+                    }
+
+                    totalMTV <- totalMTV + iterationMTV
+                    globalHasCollision <- true
+                  else
+                    doneIterating <- true
+
+              if globalHasCollision then
+                match projectileOpt with
+                | ValueSome proj ->
+                  let impact: SystemCommunications.ProjectileImpacted = {
+                    ProjectileId = entityId
+                    CasterId = proj.Caster
+                    ImpactPosition = WorldPosition.toVector2 currentPos
+                    TargetEntity = ValueNone
+                    SkillId = proj.SkillId
+                    RemainingJumps = ValueNone
+                  }
+
+                  match proj.Info.TerrainImpactVisuals with
+                  | ValueSome visuals ->
+                    match visuals.VfxId with
+                    | ValueSome vfxId ->
+                      spawnTerrainImpactEffect vfxId currentPos
+                    | ValueNone -> ()
                   | ValueNone -> ()
-                | ValueNone -> ()
 
-                core.EventBus.Publish(
-                  GameEvent.Lifecycle(LifecycleEvent.ProjectileImpacted impact)
-                )
-
-                stateWrite.RemoveEntity(entityId)
-              | ValueNone ->
-                // Regular entity - apply position correction using StateWriteService
-                stateWrite.UpdatePosition(entityId, currentPos)
-
-                match lastCollidedObj with
-                | ValueSome obj ->
                   core.EventBus.Publish(
-                    GameEvent.Collision(
-                      SystemCommunications.MapObjectCollision
-                        struct (entityId, obj, totalMTV)
+                    GameEvent.Lifecycle(
+                      LifecycleEvent.ProjectileImpacted impact
                     )
                   )
-                | ValueNone -> ()
+
+                  stateWrite.RemoveEntity(entityId)
+                | ValueNone ->
+                  stateWrite.UpdatePosition(entityId, currentPos)
+
+                  match lastCollidedObj with
+                  | ValueSome obj ->
+                    core.EventBus.Publish(
+                      GameEvent.Collision(
+                        SystemCommunications.MapObjectCollision
+                          struct (entityId, obj, totalMTV)
+                      )
+                    )
+                  | ValueNone -> ())

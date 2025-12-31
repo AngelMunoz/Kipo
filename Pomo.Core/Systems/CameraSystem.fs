@@ -10,6 +10,7 @@ open Pomo.Core.Domain.Core
 open Pomo.Core.Domain.Units
 open Pomo.Core.Domain.Camera
 open Pomo.Core.Domain.World
+open Pomo.Core.Domain.BlockMap
 open Pomo.Core.Projections
 open Pomo.Core.Graphics
 
@@ -76,10 +77,12 @@ module CameraSystem =
                 let ppu =
                   match scenarios |> HashMap.tryFindV scenarioId with
                   | ValueSome scenario ->
-                    Vector2(
-                      float32 scenario.Map.TileWidth,
-                      float32 scenario.Map.TileHeight
-                    )
+                    match scenario.Map with
+                    | ValueSome map ->
+                      Vector2(float32 map.TileWidth, float32 map.TileHeight)
+                    | ValueNone ->
+                      // BlockMap scenario - use 64x64 for 1:1 rendering
+                      Vector2(64f, 64f)
                   | ValueNone -> Vector2(64.0f, 32.0f) // Fallback
 
                 pos, ppu

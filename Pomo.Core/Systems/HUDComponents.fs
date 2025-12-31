@@ -1160,7 +1160,9 @@ module HUDComponents =
     (factions: amap<Guid<EntityId>, FSharp.Data.Adaptive.HashSet<Faction>>)
     (camera: Pomo.Core.Domain.Camera.Camera option aval)
     =
-    let mapDef = scenario |> AVal.map(Option.map _.Map)
+    let mapDef =
+      scenario |> AVal.map(Option.bind(fun s -> s.Map |> ValueOption.toOption))
+
     let factMap = factions |> AMap.toAVal
 
     // Compute view bounds from camera for frustum culling
