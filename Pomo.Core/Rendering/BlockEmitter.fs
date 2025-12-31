@@ -64,15 +64,9 @@ module BlockEmitter =
     // View bounds need to be adjusted for center offset
     let struct (viewLeft, viewRight, viewTop, viewBottom) = viewBounds
 
-    let adjustedBounds =
-      struct (viewLeft - centerOffset.X * ppu,
-              viewRight - centerOffset.X * ppu,
-              viewTop - centerOffset.Z * ppu,
-              viewBottom - centerOffset.Z * ppu)
-
     let cellBounds =
       RenderMath.Camera.getViewCellBounds3D
-        adjustedBounds
+        viewBounds
         cameraY
         CellSize
         visibleHeightRange

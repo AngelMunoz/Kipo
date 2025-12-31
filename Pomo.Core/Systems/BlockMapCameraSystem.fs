@@ -79,8 +79,15 @@ module BlockMapCameraSystem =
         member _.ScreenToWorld(screenPos: Vector2, entityId: Guid<EntityId>) =
           if entityId = playerId then
             let viewport = game.GraphicsDevice.Viewport
-            // Pick at ground plane (Y = 0)
-            ValueSome(Camera3D.screenToWorld camState screenPos viewport ppu 0f)
+            let pos = Camera3D.screenToWorld camState screenPos viewport ppu 0f
+
+            let adjusted = {
+              pos with
+                X = pos.X - centerOffset.X * ppu
+                Z = pos.Z - centerOffset.Z * ppu
+            }
+
+            ValueSome adjusted
           else
             ValueNone
 

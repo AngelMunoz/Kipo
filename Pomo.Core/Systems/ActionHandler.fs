@@ -22,8 +22,10 @@ module ActionHandler =
   open Pomo.Core.Environment
 
   open Pomo.Core.Rendering
+  open Pomo.Core.Graphics
   open Pomo.Core.Domain.Entity
   open System.Collections.Generic
+  open System
 
   let private findHoveredEntity
     (world: World)
@@ -32,6 +34,46 @@ module ActionHandler =
     (cameraService: CameraService)
     (playerId: Guid<EntityId>)
     =
+    let pickBlockMapEntity
+      (blockMap: BlockMap.BlockMapDefinition)
+      (ray: Ray)
+      : Guid<EntityId> voption =
+      let ppu = Constants.BlockMap3DPixelsPerUnit.X
+      let centerOffset =
+        RenderMath.BlockMap3D.calcCenterOffset blockMap.Width blockMap.Depth ppu
+
+      let modelScale = Constants.Entity.ModelScale
+      let mutable nearest = ValueNone
+      let mutable nearestDistance = Single.MaxValue
+
+      for KeyValue(entityId, logicPos) in positions do
+        if entityId <> playerId then
+          let renderPos =
+            RenderMath.BlockMap3D.toRender logicPos ppu centerOffset
+
+          let sphereCenter = renderPos + Vector3(0.0f, modelScale * 0.5f, 0.0f)
+          let broadPhaseSphere = BoundingSphere(sphereCenter, modelScale * 2.0f)
+
+          if ray.Intersects(broadPhaseSphere).HasValue then
+            let facing =
+              rotations
+              |> Dictionary.tryFindV entityId
+              |> ValueOption.defaultValue 0.0f
+
+            let worldMatrix =
+              RenderMath.WorldMatrix.createMesh renderPos facing modelScale 1.0f
+
+            let worldBox =
+              Picking.transformBoundingBox Picking.EntityHitBox worldMatrix
+
+            match Picking.rayIntersects ray worldBox with
+            | ValueSome distance when distance < nearestDistance ->
+              nearestDistance <- distance
+              nearest <- ValueSome entityId
+            | _ -> ()
+
+      nearest
+
     let mouseStateOpt =
       world.RawInputStates
       |> AMap.tryFind playerId
@@ -47,29 +89,31 @@ module ActionHandler =
         let entityScenarios = world.EntityScenario |> AMap.force
         let scenarios = world.Scenarios |> AMap.force
 
-        let pixelsPerUnit =
-          match entityScenarios |> HashMap.tryFindV playerId with
-          | ValueSome scenarioId ->
-            match scenarios |> HashMap.tryFindV scenarioId with
-            | ValueSome s ->
-              match s.Map with
-              | ValueSome map ->
+        entityScenarios
+        |> HashMap.tryFindV playerId
+        |> ValueOption.bind(fun scenarioId ->
+          scenarios
+          |> HashMap.tryFindV scenarioId
+          |> ValueOption.bind(fun scenario ->
+            match scenario.BlockMap, scenario.Map with
+            | ValueSome blockMap, _ ->
+              pickBlockMapEntity blockMap ray
+            | ValueNone, ValueSome map ->
+              let pixelsPerUnit =
                 Vector2(float32 map.TileWidth, float32 map.TileHeight)
-              | ValueNone -> Vector2(64f, 64f) // BlockMap scenario
-            | ValueNone -> Constants.DefaultPixelsPerUnit
-          | ValueNone -> Constants.DefaultPixelsPerUnit
 
-        let squishFactor = pixelsPerUnit.X / pixelsPerUnit.Y
-        let modelScale = Constants.Entity.ModelScale
+              let squishFactor = pixelsPerUnit.X / pixelsPerUnit.Y
+              let modelScale = Constants.Entity.ModelScale
 
-        EntityPicker.pickEntity
-          ray
-          pixelsPerUnit
-          modelScale
-          squishFactor
-          positions
-          rotations
-          playerId
+              EntityPicker.pickEntity
+                ray
+                pixelsPerUnit
+                modelScale
+                squishFactor
+                positions
+                rotations
+                playerId
+            | _ -> ValueNone))
         |> ValueOption.map Some
         |> ValueOption.defaultValue None
 

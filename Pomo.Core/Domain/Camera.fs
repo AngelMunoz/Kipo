@@ -53,7 +53,7 @@ module Camera3D =
         Position = state.Position + Vector3(deltaX, 0f, deltaZ)
   }
 
-  let inline moveFreeFly (state: State) (delta: Vector3) : State =
+  let moveFreeFly (state: State) (delta: Vector3) : State =
     let rotation = Matrix.CreateFromYawPitchRoll(state.Yaw, state.Pitch, 0f)
     let forward = Vector3.Transform(Vector3.Forward, rotation)
     let right = Vector3.Transform(Vector3.Right, rotation)

@@ -1,6 +1,7 @@
 namespace Pomo.Core.Editor
 
 open System
+open System.IO
 open Microsoft.Xna.Framework
 open System.Reactive.Disposables
 open FSharp.Data.Adaptive
@@ -72,6 +73,15 @@ module EditorScene =
     // P key playtest callback
     let onPlaytest() =
       let currentMap = state.BlockMap |> AVal.force
+
+      let path = $"Content/CustomMaps/{currentMap.Key}.json"
+      let directory = Path.GetDirectoryName path
+
+      if not (String.IsNullOrWhiteSpace directory) then
+        Directory.CreateDirectory directory |> ignore
+
+      BlockMapLoader.save path currentMap |> ignore
+
       sceneTransitionSubject.OnNext(BlockMapPlaytest currentMap)
 
     let inputSystem =
