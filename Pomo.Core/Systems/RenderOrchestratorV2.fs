@@ -220,7 +220,7 @@ module RenderOrchestrator =
       System.Collections.Generic.IReadOnlyDictionary<int, int[]>)
     =
     let ppu = MapSource.getPixelsPerUnit mapSource
-    let renderCore = RenderCore.create ppu
+    let renderCore = RenderCore.createFromMapSource mapSource
     let squish = RenderMath.WorldMatrix.getSquishFactor ppu
 
     let entityData = {

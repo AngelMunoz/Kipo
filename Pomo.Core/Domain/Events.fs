@@ -51,7 +51,7 @@ module SystemCommunications =
     EntityId: Guid<EntityId>
     ScenarioId: Guid<ScenarioId>
     Type: SpawnType
-    Position: Vector2
+    Position: WorldPosition
   }
 
   [<Struct>]

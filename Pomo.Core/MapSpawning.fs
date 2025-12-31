@@ -12,6 +12,7 @@ open Pomo.Core.Domain.Events
 open Pomo.Core.Stores
 open Pomo.Core.Domain.Navigation
 open Pomo.Core.Domain.Spatial
+open Pomo.Core.Domain.Core
 open Pomo.Core.Algorithms.Pathfinding
 
 /// Module containing map-related spawning logic
@@ -508,7 +509,7 @@ module MapSpawning =
             EntityId = enemyId
             ScenarioId = ctx.ScenarioId
             Type = SystemCommunications.SpawnType.Faction zone.SpawnInfo
-            Position = zone.SpawnPositions[i]
+            Position = WorldPosition.fromVector2 zone.SpawnPositions[i]
           }
 
           totalEnemyCount <- totalEnemyCount + 1

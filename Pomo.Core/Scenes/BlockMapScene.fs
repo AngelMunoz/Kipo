@@ -71,7 +71,8 @@ module BlockMapScene =
       Projections.create(stores.ItemStore, worldView, physicsCacheService)
 
     // Use BlockMap 3D camera instead of TileMap camera
-    let cameraService = BlockMapCameraSystem.create game projections playerId
+    let cameraService =
+      BlockMapCameraSystem.create game projections blockMap playerId
 
     let targetingService =
       Targeting.create(
@@ -186,7 +187,7 @@ module BlockMapScene =
       EntityId = playerId
       ScenarioId = scenarioId
       Type = SystemCommunications.SpawnType.Player 0
-      Position = Vector2(playerPos.X, playerPos.Z) // XZ to Vector2
+      Position = playerPos // Full 3D position preserved
     }
 
     eventBus.Publish(GameEvent.Spawn(SpawningEvent.SpawnEntity playerIntent))
@@ -200,6 +201,20 @@ module BlockMapScene =
         playerId,
         Render.Layer.TerrainBase
       )
+
+    let mutable hudDesktop: Desktop voption = ValueNone
+
+    let publishHudGuiAction(action: GuiAction) =
+      match action with
+      | GuiAction.BackToMainMenu -> sceneTransitionSubject.OnNext MainMenu
+      | GuiAction.ToggleCharacterSheet ->
+        hudService.TogglePanelVisible HUDPanelId.CharacterSheet
+      | GuiAction.ToggleEquipment ->
+        hudService.TogglePanelVisible HUDPanelId.EquipmentPanel
+      | GuiAction.StartNewGame
+      | GuiAction.OpenSettings
+      | GuiAction.OpenMapEditor
+      | GuiAction.ExitGame -> ()
 
     let subs = new CompositeDisposable()
 
@@ -220,6 +235,35 @@ module BlockMapScene =
         sceneTransitionSubject.OnNext(MapEditor(ValueSome blockMap.Key)))
     )
 
+    subs.Add(
+      eventBus.Observable
+      |> Observable.choose(fun e ->
+        match e with
+        | GameEvent.Scene(SceneEvent.Transition t) -> Some t
+        | _ -> None)
+      |> Observable.subscribe(fun event ->
+        sceneTransitionSubject.OnNext event.Scene)
+    )
+
+    subs.Add(actionHandler.StartListening())
+    subs.Add(navigation3DService.StartListening())
+    subs.Add(targetingService.StartListening())
+    subs.Add(effectApplication.StartListening())
+    subs.Add(inventoryService.StartListening())
+    subs.Add(equipmentService.StartListening())
+
+    let cursorService = CursorSystem.create game
+
+    let hoverFeedbackSystem =
+      HoverFeedback.create
+        game
+        cameraService
+        cursorService
+        targetingService
+        projections
+        worldView
+        playerId
+
     // World update component
     let worldUpdateComponent =
       { new GameComponent(game) with
@@ -234,6 +278,26 @@ module BlockMapScene =
               })
 
             eventBus.FlushToObservable()
+
+            hudDesktop
+            |> ValueOption.iter(fun d ->
+              uiService.SetMouseOverUI d.IsMouseOverGUI)
+      }
+
+    let hudDrawComponent =
+      { new DrawableGameComponent(game, DrawOrder = Render.Layer.UI) with
+          override _.LoadContent() =
+            let root =
+              Pomo.Core.Systems.GameplayUI.build
+                game
+                pomoEnv
+                playerId
+                publishHudGuiAction
+
+            hudDesktop <- ValueSome(new Desktop(Root = root))
+
+          override _.Draw(gameTime) =
+            hudDesktop |> ValueOption.iter(fun d -> d.Render())
       }
 
     // State flush component
@@ -244,7 +308,9 @@ module BlockMapScene =
             physicsCacheService.RefreshAllCaches()
       }
 
+    baseComponents.Add(hoverFeedbackSystem)
     baseComponents.Add(worldUpdateComponent)
+    baseComponents.Add(hudDrawComponent)
     baseComponents.Add(renderOrchestrator)
     baseComponents.Add(stateWriteFlushComponent)
 
@@ -256,6 +322,7 @@ module BlockMapScene =
             subs.Dispose()
             (eventBus :> IDisposable).Dispose()
             stateWriteService.Dispose()
+            hudDesktop |> ValueOption.iter(fun d -> d.Dispose())
       }
 
     struct (allComponents, disposable)

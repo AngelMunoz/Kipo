@@ -9,6 +9,8 @@ open Pomo.Core
 open Pomo.Core.Domain
 open Pomo.Core.Domain.Core
 open Pomo.Core.Domain.Units
+open Pomo.Core.Domain.BlockMap
+open Pomo.Core.Graphics
 open Pomo.Core.Projections
 
 /// Camera system for BlockMap 3D scenes.
@@ -20,12 +22,16 @@ module BlockMapCameraSystem =
   let create
     (game: Game)
     (projections: ProjectionService)
+    (blockMap: BlockMapDefinition)
     (playerId: Guid<EntityId>)
     : Camera.CameraService =
 
     // Mutable camera state - updated each frame following player
     let mutable camState = Camera3D.defaultState
     let ppu = Constants.BlockMap3DPixelsPerUnit.X // Use X component for uniform scale
+
+    let centerOffset =
+      RenderMath.BlockMap3D.calcCenterOffset blockMap.Width blockMap.Depth ppu
 
     { new Camera.CameraService with
         member _.GetCamera(entityId: Guid<EntityId>) =
@@ -45,16 +51,12 @@ module BlockMapCameraSystem =
                 |> Dictionary.tryFindV playerId)
               |> ValueOption.defaultValue WorldPosition.zero
 
-            // Update camera to follow player (convert WorldPosition to Vector3)
-            camState <- {
-              camState with
-                  Position =
-                    Vector3(
-                      position.X / ppu,
-                      position.Y / ppu,
-                      position.Z / ppu
-                    )
-            }
+            // Convert world position to render position using centralized math
+            let renderPos =
+              RenderMath.BlockMap3D.toRender position ppu centerOffset
+
+            // Update camera to follow player in render space
+            camState <- { camState with Position = renderPos }
 
             let view = Camera3D.getViewMatrix camState
             let proj = Camera3D.getProjectionMatrix camState viewport ppu

@@ -26,7 +26,7 @@ module EntitySpawnerLogic =
     EntityId: Guid<EntityId>
     ScenarioId: Guid<ScenarioId>
     Type: SystemCommunications.SpawnType
-    Position: Vector2
+    Position: WorldPosition
     SpawnStartTime: TimeSpan
     Duration: TimeSpan
   }
@@ -183,7 +183,7 @@ module EntitySpawnerLogic =
     let snapshot: EntitySnapshot = {
       Id = entityId
       ScenarioId = pending.ScenarioId
-      Position = WorldPosition.fromVector2 pos
+      Position = pos
       Velocity = Vector2.Zero
     }
 
@@ -255,7 +255,7 @@ module EntitySpawnerLogic =
         archetypeId = info.ArchetypeId
         currentState = AIState.Idle
         stateEnterTime = TimeSpan.Zero
-        spawnPosition = pos
+        spawnPosition = WorldPosition.toVector2 pos // AI uses XZ as 2D
         absoluteWaypoints =
           if
             archetype.behaviorType = BehaviorType.Patrol
@@ -263,12 +263,13 @@ module EntitySpawnerLogic =
           then
             // Generate a simple square patrol path relative to spawn
             let offset = 100.0f
+            let pos2D = WorldPosition.toVector2 pos
 
             let waypoints = [|
-              pos // Start at spawn
-              pos + Vector2(offset, 0.0f)
-              pos + Vector2(offset, offset)
-              pos + Vector2(0.0f, offset)
+              pos2D // Start at spawn
+              pos2D + Vector2(offset, 0.0f)
+              pos2D + Vector2(offset, offset)
+              pos2D + Vector2(0.0f, offset)
             |]
 
             ValueSome waypoints
@@ -518,7 +519,7 @@ module EntitySpawnerLogic =
                   info.SpawnInfo with
                       SpawnZoneName = ValueSome zone.ZoneName
                 }
-              Position = newPosition
+              Position = WorldPosition.fromVector2 newPosition
             }
 
             core.EventBus.Publish(

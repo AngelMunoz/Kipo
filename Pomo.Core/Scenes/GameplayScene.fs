@@ -14,6 +14,7 @@ open Pomo.Core.EventBus
 open Pomo.Core.Domain
 open Pomo.Core.Domain.Events
 open Pomo.Core.Domain.Units
+open Pomo.Core.Domain.Core
 open Pomo.Core.Domain.Map
 open Pomo.Core.Domain.Scenes
 open Pomo.Core.Domain.UI
@@ -223,7 +224,7 @@ module GameplayScene =
         EntityId = spawnPlayerId
         ScenarioId = scenarioId
         Type = SystemCommunications.SpawnType.Player 0
-        Position = playerPos
+        Position = WorldPosition.fromVector2 playerPos
       }
 
       eventBus.Publish(GameEvent.Spawn(SpawningEvent.SpawnEntity playerIntent))

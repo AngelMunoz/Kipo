@@ -43,21 +43,8 @@ module BlockEmitter =
 
       loader.Value
 
-  /// Computes render offset to center the map at origin.
-  /// Matches EditorRender.calcRenderOffsets.
-  let inline private calcCenterOffset
-    (width: int)
-    (depth: int)
-    (scaleFactor: float32)
-    : Vector3 =
-    Vector3(
-      -float32 width * scaleFactor * 0.5f,
-      0f,
-      -float32 depth * scaleFactor * 0.5f
-    )
-
   /// Emits MeshCommands for all visible blocks in the BlockMapDefinition.
-  /// Coordinate math matches EditorRender.populateCommands exactly.
+  /// Uses centralized RenderMath.BlockMap3D for coordinate conversion.
   let emit
     (getLoadedModel: string -> LoadedModel voption)
     (blockMap: BlockMapDefinition)
@@ -67,23 +54,21 @@ module BlockEmitter =
     (pixelsPerUnit: Vector2)
     : MeshCommand[] =
 
-    // Render scale: CellSize / PPU (same as editor)
-    let scaleFactor = CellSize / pixelsPerUnit.X
+    let ppu = pixelsPerUnit.X // Uniform scale for 3D
+    let scaleFactor = CellSize / ppu
 
     let centerOffset =
-      calcCenterOffset blockMap.Width blockMap.Depth scaleFactor
-
-    let halfCell = scaleFactor * 0.5f
+      RenderMath.BlockMap3D.calcCenterOffset blockMap.Width blockMap.Depth ppu
 
     // Calculate cell bounds for culling
     // View bounds need to be adjusted for center offset
     let struct (viewLeft, viewRight, viewTop, viewBottom) = viewBounds
 
     let adjustedBounds =
-      struct (viewLeft - centerOffset.X * pixelsPerUnit.X,
-              viewRight - centerOffset.X * pixelsPerUnit.X,
-              viewTop - centerOffset.Z * pixelsPerUnit.X,
-              viewBottom - centerOffset.Z * pixelsPerUnit.X)
+      struct (viewLeft - centerOffset.X * ppu,
+              viewRight - centerOffset.X * ppu,
+              viewTop - centerOffset.Z * ppu,
+              viewBottom - centerOffset.Z * ppu)
 
     let cellBounds =
       RenderMath.Camera.getViewCellBounds3D
@@ -102,13 +87,16 @@ module BlockEmitter =
           | ValueSome blockType ->
             match getLoadedModel blockType.Model with
             | ValueSome loadedModel ->
-              // Direct cell -> render position (matches editor)
-              let x = float32 cell.X * scaleFactor + halfCell
-              let y = float32 cell.Y * scaleFactor + halfCell
-              let z = float32 cell.Z * scaleFactor + halfCell
-              let pos = Vector3(x, y, z) + centerOffset
+              // Use centralized cell->render conversion
+              let pos =
+                RenderMath.BlockMap3D.cellToRender
+                  cell.X
+                  cell.Y
+                  cell.Z
+                  ppu
+                  centerOffset
 
-              // World matrix: scale * rotation * translation (matches editor)
+              // World matrix: scale * rotation * translation
               let scale = Matrix.CreateScale(scaleFactor * ModelScale)
 
               let rot =

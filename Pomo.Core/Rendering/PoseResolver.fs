@@ -161,9 +161,8 @@ module PoseResolver =
         let altitude =
           computeAltitude data.LiveProjectiles entityId core.PixelsPerUnit.Y
 
-        // Use logicPos directly - Y already contains altitude
-        let renderPos =
-          RenderMath.LogicRender.toRender logicPos core.PixelsPerUnit
+        // Use RenderCore's ToRenderPos which routes to 2D or 3D path correctly
+        let renderPos = core.ToRenderPos logicPos
 
         let entityBaseMatrix =
           if isProjectile then

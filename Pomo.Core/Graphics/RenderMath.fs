@@ -422,3 +422,49 @@ module RenderMath =
         struct (px, py)
 
       | _ -> struct (float32 x * tileW, float32 y * tileH)
+
+  /// 3D BlockMap coordinate conversions (True 3D, no isometric squish)
+  /// Uses uniform scale: all dimensions divided by same PPU value
+  module BlockMap3D =
+    open Pomo.Core.Domain.BlockMap
+
+    /// Calculates render offset to center a BlockMap at origin.
+    /// Returns render-space center offset vector.
+    let inline calcCenterOffset
+      (width: int)
+      (depth: int)
+      (ppu: float32)
+      : Vector3 =
+      let scaleFactor = CellSize / ppu
+
+      Vector3(
+        -float32 width * scaleFactor * 0.5f,
+        0f,
+        -float32 depth * scaleFactor * 0.5f
+      )
+
+    /// Converts WorldPosition to render-space position.
+    /// WorldPosition is in units of (cell * CellSize).
+    /// Uses uniform scale (PPU.X only) for true 3D rendering.
+    let inline toRender
+      (pos: WorldPosition)
+      (ppu: float32)
+      (centerOffset: Vector3)
+      : Vector3 =
+      Vector3(pos.X / ppu, pos.Y / ppu, pos.Z / ppu) + centerOffset
+
+    /// Converts cell indices to render-space position (centered).
+    /// Used by BlockEmitter for block positioning.
+    let inline cellToRender
+      (cellX: int)
+      (cellY: int)
+      (cellZ: int)
+      (ppu: float32)
+      (centerOffset: Vector3)
+      : Vector3 =
+      let scaleFactor = CellSize / ppu
+      let halfCell = scaleFactor * 0.5f
+      let x = float32 cellX * scaleFactor + halfCell
+      let y = float32 cellY * scaleFactor + halfCell
+      let z = float32 cellZ * scaleFactor + halfCell
+      Vector3(x, y, z) + centerOffset
