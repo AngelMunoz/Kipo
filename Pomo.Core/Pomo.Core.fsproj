@@ -29,6 +29,7 @@
     <Compile Include="Domain/World.fs" />
     <Compile Include="Algorithms/Physics.fs" />
     <Compile Include="Algorithms/Pathfinding.fs" />
+    <Compile Include="Algorithms/Pathfinding3D.fs" />
     <Compile Include="EventBus.fs" />
     <Compile Include="Serialization.fs" />
     <Compile Include="Stores.fs" />
@@ -74,6 +75,7 @@
     <Compile Include="Systems/Movement.fs" />
     <Compile Include="Systems/UnitMovement.fs" />
     <Compile Include="Systems/Collision.fs" />
+    <Compile Include="Systems/BlockCollision.fs" />
     <Compile Include="Systems/MapLoader.fs" />
     <Compile Include="Systems/BlockMapLoader.fs" />
     <Compile Include="Systems/CameraSystem.fs" />

@@ -137,6 +137,12 @@ module Core =
     let inline fromVector3(v: Vector3) = { X = v.X; Y = v.Y; Z = v.Z }
     let inline toVector3(p: WorldPosition) = Vector3(p.X, p.Y, p.Z)
 
+    let inline distance (a: WorldPosition) (b: WorldPosition) =
+      let dx = a.X - b.X
+      let dy = a.Y - b.Y
+      let dz = a.Z - b.Z
+      sqrt(dx * dx + dy * dy + dz * dz)
+
   [<Struct>]
   type Element =
     | Fire

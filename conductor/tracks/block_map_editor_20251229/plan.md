@@ -137,19 +137,176 @@ The following files contain `Vector2.Distance` or `Vector2` position logic:
 
 ## Phase 5: 3D Collision
 
-- [ ] Task: Extend `Domain/Spatial.fs` with `GridCell3D`
+- [x] Task: Extend `Domain/Spatial.fs` with `GridCell3D`
   - 3D spatial grid (extends existing 2D pattern)
   - `getCellsInRadius3D`, `getGridCell3D`
-- [ ] Task: Create `Systems/BlockCollision.fs`
+- [x] Task: Create `Systems/BlockCollision.fs`
   - **Box collision**: Fast AABB for `CollisionType.Box`
   - **Mesh collision**: Ray-surface for `CollisionType.Mesh`
-    - Load collision mesh, apply block rotation
-    - Raycast down to find surface height
   - Skip blocks with `CollisionType.NoCollision`
+  - `getSurfaceHeight`, `isBlocked`, `applyCollision` functions
+- [x] Task: Add `Movement3DSnapshot` to `Projections.fs`
+  - `SpatialGrid3D: Dictionary<GridCell3D, EntityId[]>`
+  - `GetNearbyEntities3DSnapshot` with GC-friendly iteration
 - [ ] Task: Integrate into movement system
   - Entity Y follows surface height on mesh blocks (slopes)
   - Entity blocked by Box blocks at same height
 - [ ] Task: Verification - Walk up/down rotated slope blocks
+
+---
+
+## Phase 5b: 3D System Alternatives
+
+> [!NOTE]
+> Full 3D versions of systems. **Requirements:**
+> - Module functions over class methods
+> - Factory functions returning object expressions
+> - GC-friendly, avoid allocations in hot paths
+
+---
+
+### Domain Updates
+
+- [ ] Task: Extend `SpawnData` in `BlockMap.fs`
+  ```fsharp
+  type SpawnData = {
+    GroupId: string
+    SpawnChance: float32
+    Faction: Faction voption        // NEW
+    ArchetypeId: string voption     // NEW
+  }
+  ```
+
+- [ ] Task: Add `ProjectileTarget3D` to `Projectile.fs`
+  ```fsharp
+  type ProjectileTarget3D =
+    | EntityTarget of Guid<EntityId>
+    | PositionTarget of WorldPosition
+  ```
+
+- [ ] Task: Add `MovingAlongPath3D` to `Navigation.fs` domain
+  ```fsharp
+  type MovementState =
+    | ...
+    | MovingAlongPath3D of WorldPosition list
+  ```
+
+---
+
+### Camera3D Module
+
+- [ ] Task: Add `Camera3D` module to `Domain/Camera.fs`
+  - Move logic from `Editor/Camera.fs`
+  - Immutable state, pass-through updates
+  ```fsharp
+  module Camera3D =
+    type State = { Position: Vector3; Yaw: float32; Pitch: float32; Zoom: float32 }
+    val getViewMatrix: State -> Matrix
+    val getProjectionMatrix: State -> Viewport -> pixelsPerUnit:float32 -> Matrix
+    val getPickRay: State -> Vector2 -> Viewport -> pixelsPerUnit:float32 -> Ray
+    val screenToWorld: State -> Vector2 -> Viewport -> pixelsPerUnit:float32 -> layer:float32 -> WorldPosition
+    val panXZ: State -> deltaX:float32 -> deltaZ:float32 -> State
+    val moveFreeFly: State -> Vector3 -> State
+    val rotate: State -> deltaYaw:float32 -> deltaPitch:float32 -> State
+    val zoom: State -> delta:float32 -> State
+  ```
+
+---
+
+### Pathfinding3D Module
+
+- [ ] Task: Create `Algorithms/Pathfinding3D.fs`
+  - 3D A* on BlockMap grid
+  - Walkable = empty cell OR `NoCollision` block, with solid floor below
+  ```fsharp
+  module Pathfinding3D =
+    type NavGrid3D = { BlockMap: BlockMapDefinition; CellSize: float32 }
+    val isWalkable: NavGrid3D -> GridCell3D -> bool
+    val getNeighbors: NavGrid3D -> GridCell3D -> GridCell3D[]  // 6 or 26 neighbors
+    val findPath: NavGrid3D -> WorldPosition -> WorldPosition -> WorldPosition list voption
+    val hasLineOfSight: NavGrid3D -> WorldPosition -> WorldPosition -> bool
+  ```
+
+---
+
+### Navigation3D Module
+
+- [ ] Task: Create `Systems/Navigation3D.fs`
+  - Factory returning `CoreEventListener`
+  - Uses `Pathfinding3D` and `Movement3DSnapshot`
+  ```fsharp
+  module Navigation3D =
+    val create:
+      eventBus: EventBus *
+      stateWrite: IStateWriteService *
+      projections: ProjectionService -> CoreEventListener
+  ```
+
+---
+
+### BlockMapSpawning Module
+
+- [ ] Task: Create `BlockMapSpawning.fs`
+  - Read spawn points from `BlockMapDefinition.Objects`
+  ```fsharp
+  module BlockMapSpawning =
+    val getSpawnPoints: BlockMapDefinition -> MapObject list
+    val getSpawnsByGroup: BlockMapDefinition -> groupId:string -> MapObject list
+    val getSpawnsByFaction: BlockMapDefinition -> Faction -> MapObject list
+  ```
+
+---
+
+### Projectile3D Module
+
+- [ ] Task: Create `Systems/Projectile3D.fs`
+  - 3D projectile movement and targeting
+  - Uses `GetNearbyEntities3DSnapshot` for chain targeting
+  ```fsharp
+  module Projectile3D =
+    type WorldContext = {
+      Positions: IReadOnlyDictionary<EntityId, WorldPosition>
+      LiveEntities: HashSet<EntityId>
+    }
+    type ProjectileContext = {
+      Id: Guid<EntityId>
+      Position: WorldPosition
+      TargetPosition: WorldPosition
+      Projectile: LiveProjectile
+    }
+    val processProjectile: IStateWriteService -> WorldContext -> dt:float32 -> EntityId -> LiveProjectile -> IndexList<GameEvent>
+    val findChainTargets: WorldContext -> WorldPosition -> maxRange:float32 -> excludeId:EntityId -> struct (EntityId * float32)[]
+  ```
+
+---
+
+### Combat3D Targeting Module
+
+- [ ] Task: Create `Systems/Combat3D.fs` or extend `Combat.fs`
+  - 3D skill targeting resolution
+  ```fsharp
+  module Combat3D =
+    type EntityContext3D = {
+      Positions: IReadOnlyDictionary<EntityId, WorldPosition>
+      DerivedStats: HashMap<EntityId, DerivedStats>
+      Factions: HashMap<EntityId, Faction>
+    }
+    module Targeting =
+      val resolveSphere: EntityContext3D -> center:WorldPosition -> radius:float32 -> EntityId list
+      val resolveCone3D: EntityContext3D -> casterId:EntityId -> target:WorldPosition -> aperture:float32 -> range:float32 -> EntityId list
+      val resolveLine3D: EntityContext3D -> start:WorldPosition -> end:WorldPosition -> width:float32 -> EntityId list
+      val resolveBox: EntityContext3D -> center:WorldPosition -> halfExtents:Vector3 -> EntityId list
+  ```
+
+---
+
+### Verification
+
+- [ ] Build after each module
+- [ ] Camera3D: View/projection matrix test
+- [ ] Pathfinding3D: Unit test path finding
+- [ ] Navigation3D: Entity movement toward 3D target
+- [ ] Projectile3D: Projectile flies in 3D space
 
 ---
 

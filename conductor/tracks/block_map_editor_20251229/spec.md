@@ -77,12 +77,106 @@ Built-in WYSIWYG 3D block map editor using a **True 3D** world architecture. The
 - **Ramps/Stairs**: Transition blocks between Y-levels
 - **A* with Height**: Path considers vertical movement
 
-### 8. Preview Mode
+### 8. 3D System Alternatives (Phase 5b)
+
+> Full 3D versions of gameplay systems. All use module functions + factory object expressions, GC-friendly.
+
+#### SpawnData (Extended)
+```fsharp
+[<Struct>]
+type SpawnData = {
+  GroupId: string
+  SpawnChance: float32
+  Faction: Faction voption
+  ArchetypeId: string voption  // References AIArchetype
+}
+```
+
+#### ProjectileTarget3D
+```fsharp
+[<Struct>]
+type ProjectileTarget3D =
+  | EntityTarget of Guid<EntityId>
+  | PositionTarget of WorldPosition
+```
+
+#### MovementState3D
+```fsharp
+type MovementState =
+  | ...
+  | MovingAlongPath3D of WorldPosition list
+```
+
+#### Camera3D Module
+```fsharp
+module Camera3D =
+  type State = { Position: Vector3; Yaw: float32; Pitch: float32; Zoom: float32 }
+  val getViewMatrix: State -> Matrix
+  val getProjectionMatrix: State -> Viewport -> pixelsPerUnit:float32 -> Matrix
+  val getPickRay: State -> Vector2 -> Viewport -> pixelsPerUnit:float32 -> Ray
+  val screenToWorld: State -> Vector2 -> Viewport -> pixelsPerUnit:float32 -> layer:float32 -> WorldPosition
+  val panXZ: State -> deltaX:float32 -> deltaZ:float32 -> State
+  val moveFreeFly: State -> Vector3 -> State
+  val rotate: State -> deltaYaw:float32 -> deltaPitch:float32 -> State
+  val zoom: State -> delta:float32 -> State
+```
+
+#### Pathfinding3D Module
+```fsharp
+module Pathfinding3D =
+  type NavGrid3D = { BlockMap: BlockMapDefinition; CellSize: float32 }
+  val isWalkable: NavGrid3D -> GridCell3D -> bool
+  val getNeighbors: NavGrid3D -> GridCell3D -> GridCell3D[]
+  val findPath: NavGrid3D -> WorldPosition -> WorldPosition -> WorldPosition list voption
+  val hasLineOfSight: NavGrid3D -> WorldPosition -> WorldPosition -> bool
+```
+
+#### Navigation3D Module
+```fsharp
+module Navigation3D =
+  val create: EventBus * IStateWriteService * ProjectionService -> CoreEventListener
+```
+
+#### BlockMapSpawning Module
+```fsharp
+module BlockMapSpawning =
+  val getSpawnPoints: BlockMapDefinition -> MapObject list
+  val getSpawnsByGroup: BlockMapDefinition -> groupId:string -> MapObject list
+  val getSpawnsByFaction: BlockMapDefinition -> Faction -> MapObject list
+```
+
+#### Projectile3D Module
+```fsharp
+module Projectile3D =
+  type WorldContext = {
+    Positions: IReadOnlyDictionary<EntityId, WorldPosition>
+    LiveEntities: HashSet<EntityId>
+  }
+  val processProjectile: IStateWriteService -> WorldContext -> dt:float32 -> EntityId -> LiveProjectile -> IndexList<GameEvent>
+  val findChainTargets: WorldContext -> WorldPosition -> maxRange:float32 -> excludeId:EntityId -> struct (EntityId * float32)[]
+```
+
+#### Combat3D Module
+```fsharp
+module Combat3D =
+  type EntityContext3D = {
+    Positions: IReadOnlyDictionary<EntityId, WorldPosition>
+    DerivedStats: HashMap<EntityId, DerivedStats>
+    Factions: HashMap<EntityId, Faction>
+  }
+  module Targeting =
+    val resolveSphere: EntityContext3D -> center:WorldPosition -> radius:float32 -> EntityId list
+    val resolveCone3D: EntityContext3D -> casterId:EntityId -> target:WorldPosition -> aperture:float32 -> range:float32 -> EntityId list
+    val resolveLine3D: EntityContext3D -> start:WorldPosition -> end:WorldPosition -> width:float32 -> EntityId list
+    val resolveBox: EntityContext3D -> center:WorldPosition -> halfExtents:Vector3 -> EntityId list
+```
+
+### 9. Preview Mode
 - **Play Button**: Test map with player entity
 - **Spawn Point**: Designated block for player spawn
 - **Stop Button**: Return to editor, map intact
 
-### 9. Persistence
+### 10. Persistence
 - **JSON Format**: JDeck encoders/decoders
 - **Schema Version**: `Version: int` field for future migrations
 - **Self-Contained Palette**: Block types in map file
