@@ -100,7 +100,7 @@ module EditorScene =
         onPlaytest
 
     let renderSystem =
-      EditorRender.createSystem game state camera pixelsPerUnit game.Content
+      EditorRenderer.createSystem game state camera pixelsPerUnit
 
     let uiSystem = EditorUI.createSystem game state uiService camera
 

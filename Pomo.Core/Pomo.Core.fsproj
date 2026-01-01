@@ -52,6 +52,7 @@
     <Compile Include="Rendering/ParticleEmitter.fs" />
     <Compile Include="Rendering/TerrainEmitter.fs" />
     <Compile Include="Rendering/BlockEmitter.fs" />
+    <Compile Include="Rendering/EditorEmitter.fs" />
     <Compile Include="Rendering/TextEmitter.fs" />
     <Compile Include="Rendering/UIEmitter.fs" />
     <Compile Include="Rendering/LightEmitter.fs" />
@@ -109,7 +110,7 @@
     <Compile Include="Editor/State.fs" />
     <Compile Include="Editor/Camera.fs" />
     <Compile Include="Editor/Input.fs" />
-    <Compile Include="Editor/Render.fs" />
+    <Compile Include="Editor/EditorRenderer.fs" />
     <Compile Include="Editor/UI.fs" />
     <Compile Include="Editor/Scene.fs" />
     <Compile Include="Scenes.fs" />

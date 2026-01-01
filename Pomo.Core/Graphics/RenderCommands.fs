@@ -53,3 +53,9 @@ type TerrainCommand = {
   Position: Vector3
   Size: Vector2
 }
+
+[<Struct>]
+type LineCommand = {
+  Vertices: VertexPositionColor[]
+  VertexCount: int
+}

@@ -61,12 +61,16 @@ module RenderOrchestrator =
       (view: inref<Matrix>)
       (projection: inref<Matrix>)
       (commands: MeshCommand[])
+      (count: int voption)
       =
       device.DepthStencilState <- DepthStencilState.Default
       device.BlendState <- BlendState.Opaque
       device.RasterizerState <- RasterizerState.CullNone
 
-      for cmd in commands do
+      let len = defaultValueArg count commands.Length
+
+      for i = 0 to len - 1 do
+        let cmd = commands.[i]
         let loadedModel = cmd.LoadedModel
         let model = loadedModel.Model
         let world = cmd.WorldMatrix
@@ -205,6 +209,65 @@ module RenderOrchestrator =
 
         batch.End()
 
+    /// Render line primitives (grid, cursor wireframe)
+    let inline renderLines
+      (device: GraphicsDevice)
+      (effect: BasicEffect)
+      (view: inref<Matrix>)
+      (projection: inref<Matrix>)
+      (vertices: VertexPositionColor[])
+      (vertexCount: int)
+      =
+      if vertexCount > 0 then
+        effect.World <- Matrix.Identity
+        effect.View <- view
+        effect.Projection <- projection
+
+        for pass in effect.CurrentTechnique.Passes do
+          pass.Apply()
+
+          device.DrawUserPrimitives(
+            PrimitiveType.LineList,
+            vertices,
+            0,
+            vertexCount / 2
+          )
+
+    /// Render a ghost mesh with transparency
+    let inline renderGhost
+      (device: GraphicsDevice)
+      (view: inref<Matrix>)
+      (projection: inref<Matrix>)
+      (cmd: MeshCommand)
+      =
+      device.DepthStencilState <- DepthStencilState.DepthRead
+      device.BlendState <- BlendState.AlphaBlend
+      device.RasterizerState <- RasterizerState.CullNone
+
+      for mesh in cmd.LoadedModel.Model.Meshes do
+        for eff in mesh.Effects do
+          match eff with
+          | :? BasicEffect as be ->
+            be.World <- cmd.WorldMatrix
+            be.View <- view
+            be.Projection <- projection
+            be.Alpha <- 0.6f
+
+            if cmd.LoadedModel.HasNormals then
+              LightEmitter.applyDefaultLighting &be
+            else
+              be.LightingEnabled <- false
+              be.TextureEnabled <- true
+          | _ -> ()
+
+        mesh.Draw()
+
+        // Reset alpha
+        for eff in mesh.Effects do
+          match eff with
+          | :? BasicEffect as be -> be.Alpha <- 1.0f
+          | _ -> ()
+
   let inline private prepareContexts
     (res: RenderResources)
     (stores: StoreServices)
@@ -341,7 +404,7 @@ module RenderOrchestrator =
                 visibleHeightRange
               |> ValueOption.defaultValue viewBounds2D
 
-            BlockEmitter.emit
+            BlockEmitter.emitToArray
               res.GetBlockModel
               blockMap
               viewBounds3D
@@ -375,6 +438,7 @@ module RenderOrchestrator =
           &view
           &projection
           meshCommandsBlocks
+          ValueNone
 
         // 3. Entities and mesh particles (with depth testing)
         res.GraphicsDevice.DepthStencilState <- DepthStencilState.Default
@@ -384,12 +448,14 @@ module RenderOrchestrator =
           &view
           &projection
           meshCommandsEntities
+          ValueNone
 
         RenderPasses.renderMeshes
           res.GraphicsDevice
           &view
           &projection
           meshCommandsParticles
+          ValueNone
 
         // 3. Billboard particles
         RenderPasses.renderBillboards
