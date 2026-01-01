@@ -12,6 +12,7 @@ open Pomo.Core.Domain.Units
 open Pomo.Core.Domain.BlockMap
 open Pomo.Core.Graphics
 open Pomo.Core.Projections
+open Pomo.Core.Algorithms
 
 /// Camera system for BlockMap 3D scenes.
 /// Uses Camera3D module for true 3D orthographic projection.
@@ -89,8 +90,8 @@ module BlockMapCameraSystem =
             let inline isInBounds(pos: WorldPosition) =
               pos.X >= 0f
               && pos.Z >= 0f
-              && pos.X < float32 blockMap.Width * CellSize
-              && pos.Z < float32 blockMap.Depth * CellSize
+              && pos.X < float32 blockMap.Width * BlockMap.CellSize
+              && pos.Z < float32 blockMap.Depth * BlockMap.CellSize
 
             let mutable planeY = 0f
             let mutable lastPlaneY = Single.NaN

@@ -3,6 +3,7 @@ namespace Pomo.Core
 open Pomo.Core.Domain.Core
 open Pomo.Core.Domain.BlockMap
 open Pomo.Core.Domain.Entity
+open Pomo.Core.Algorithms
 
 /// Spawning utilities for BlockMap-based scenarios
 module BlockMapSpawning =
@@ -37,9 +38,9 @@ module BlockMapSpawning =
       map
     |> ValueOption.map _.Position
     |> ValueOption.defaultValue {
-      X = float32 map.Width * CellSize / 2f
-      Y = CellSize
-      Z = float32 map.Depth * CellSize / 2f
+      X = float32 map.Width * BlockMap.CellSize / 2f
+      Y = BlockMap.CellSize
+      Z = float32 map.Depth * BlockMap.CellSize / 2f
     }
 
   /// Collect all spawn objects into provided list (avoids allocation)

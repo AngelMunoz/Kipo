@@ -31,7 +31,8 @@
     <Compile Include="Algorithms/Physics.fs" />
     <Compile Include="Algorithms/Pathfinding.fs" />
     <Compile Include="Algorithms/Pathfinding3D.fs" />
-    <Compile Include="Systems/BlockCollision.fs" />
+    <Compile Include="Algorithms/BlockMap.fs" />
+    <Compile Include="Algorithms/BlockCollision.fs" />
     <Compile Include="EventBus.fs" />
     <Compile Include="Serialization.fs" />
     <Compile Include="Stores.fs" />

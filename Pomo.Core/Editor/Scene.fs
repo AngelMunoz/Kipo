@@ -10,6 +10,7 @@ open Pomo.Core.Domain.Units
 open Pomo.Core.Domain.Scenes
 open Pomo.Core.Systems
 open Pomo.Core.Environment
+open Pomo.Core.Algorithms
 
 module EditorScene =
 

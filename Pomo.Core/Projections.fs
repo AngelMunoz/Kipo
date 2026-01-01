@@ -16,7 +16,7 @@ open Pomo.Core.Domain.Item
 open Pomo.Core.Domain.Spatial
 open Pomo.Core.Domain.Projectile
 open Pomo.Core.Domain.Skill
-open Pomo.Core.Systems
+open Pomo.Core.Algorithms
 
 module Projections =
   let private liveEntities(world: World) =

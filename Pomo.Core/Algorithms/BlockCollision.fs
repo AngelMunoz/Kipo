@@ -1,15 +1,16 @@
-namespace Pomo.Core.Systems
+namespace Pomo.Core.Algorithms
 
 open Microsoft.Xna.Framework
 open Pomo.Core
 open Pomo.Core.Domain.Core
 open Pomo.Core.Domain.Spatial
 open Pomo.Core.Domain.BlockMap
+open Pomo.Core.Algorithms
 
 module BlockCollision =
 
   let inline private getCellAtXZ(pos: WorldPosition) : struct (int * int) =
-    struct (int(pos.X / CellSize), int(pos.Z / CellSize))
+    struct (int(pos.X / BlockMap.CellSize), int(pos.Z / BlockMap.CellSize))
 
   let getSurfaceHeight
     (map: BlockMapDefinition)
@@ -32,7 +33,7 @@ module BlockCollision =
           | ValueSome blockType ->
             match blockType.CollisionType with
             | Box
-            | Mesh -> found <- ValueSome(float32(y + 1) * CellSize)
+            | Mesh -> found <- ValueSome(float32(y + 1) * BlockMap.CellSize)
             | NoCollision -> ()
           | ValueNone -> ()
         | ValueNone -> ()
@@ -51,7 +52,7 @@ module BlockCollision =
     if cx < 0 || cx >= map.Width || cz < 0 || cz >= map.Depth then
       false
     else
-      let entityCellY = int(pos.Y / CellSize)
+      let entityCellY = int(pos.Y / BlockMap.CellSize)
       let cell: GridCell3D = { X = cx; Y = entityCellY; Z = cz }
 
       match map.Blocks |> Dictionary.tryFindV cell with

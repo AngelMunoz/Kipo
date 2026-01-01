@@ -11,9 +11,9 @@ open Pomo.Core.Domain.Core
 open Pomo.Core.Domain.Spatial
 open Pomo.Core.Graphics
 open Pomo.Core.Rendering
+open Pomo.Core.Algorithms
 
 module EditorRender =
-  open Pomo.Core.Domain
 
   type DrawContext = {
     Device: GraphicsDevice
@@ -44,7 +44,7 @@ module EditorRender =
     (pixelsPerUnit: Vector2)
     (centerOffset: Vector3)
     : int =
-    let scaleFactor = CellSize / pixelsPerUnit.X
+    let scaleFactor = BlockMap.CellSize / pixelsPerUnit.X
     let renderWidth = float32 width * scaleFactor
     let renderDepth = float32 depth * scaleFactor
     let layerHeight = float32 layer * scaleFactor
@@ -102,7 +102,7 @@ module EditorRender =
     (pixelsPerUnit: Vector2)
     (centerOffset: Vector3)
     =
-    let scaleFactor = CellSize / pixelsPerUnit.X
+    let scaleFactor = BlockMap.CellSize / pixelsPerUnit.X
 
     let x = float32 cell.X * scaleFactor
     let y = float32 cell.Y * scaleFactor
@@ -232,12 +232,12 @@ module EditorRender =
     =
     let logicCenter =
       Vector3(
-        -float32 width * CellSize * 0.5f,
+        -float32 width * BlockMap.CellSize * 0.5f,
         0f,
-        -float32 depth * CellSize * 0.5f
+        -float32 depth * BlockMap.CellSize * 0.5f
       )
 
-    let scale = CellSize / ppu.X
+    let scale = BlockMap.CellSize / ppu.X
 
     let renderCenter =
       Vector3(logicCenter.X / ppu.X, logicCenter.Y, logicCenter.Z / ppu.X)
@@ -364,7 +364,7 @@ module EditorRender =
       RenderMath.Camera.getViewCellBounds3D
         adjustedBounds
         cam.Position.Y
-        CellSize
+        BlockMap.CellSize
         2000.0f
 
     // Rent and Populate

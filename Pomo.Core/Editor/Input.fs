@@ -8,6 +8,7 @@ open Pomo.Core.Domain
 open Pomo.Core.Domain.Core
 open Pomo.Core.Domain.Spatial
 open Pomo.Core.Domain.BlockMap
+open Pomo.Core.Algorithms
 
 module EditorInput =
   open Pomo.Core.Domain.Spatial
@@ -216,9 +217,9 @@ module EditorInput =
     // Inverse of render offset to map world coord back to logical map coord
     let centerOffset =
       Vector3(
-        -float32 map.Width * CellSize * 0.5f,
+        -float32 map.Width * BlockMap.CellSize * 0.5f,
         0f,
-        -float32 map.Depth * CellSize * 0.5f
+        -float32 map.Depth * BlockMap.CellSize * 0.5f
       )
 
     let screenPos = Vector2(float32 mouse.X, float32 mouse.Y)

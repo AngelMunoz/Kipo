@@ -19,6 +19,7 @@ open Pomo.Core.Graphics
 open Pomo.Core.Rendering
 open Pomo.Core.AssetPreloader
 open Pomo.Core.Domain.Core
+open Pomo.Core.Algorithms
 
 module RenderOrchestrator =
 

@@ -4,6 +4,7 @@ open System
 open Microsoft.Xna.Framework
 open Microsoft.Xna.Framework.Graphics
 open Pomo.Core.Domain.Core
+open Pomo.Core.Algorithms
 
 /// Coordinate Space Transformations for Isometric Rendering
 ///
@@ -604,7 +605,6 @@ module RenderMath =
   /// 3D BlockMap coordinate conversions (True 3D, no isometric squish)
   /// Uses uniform scale: all dimensions divided by same PPU value
   module BlockMap3D =
-    open Pomo.Core.Domain.BlockMap
 
     /// Calculates render offset to center a BlockMap at origin.
     /// Returns render-space center offset vector.
@@ -613,7 +613,7 @@ module RenderMath =
       (depth: int)
       (ppu: float32)
       : Vector3 =
-      let scaleFactor = CellSize / ppu
+      let scaleFactor = BlockMap.CellSize / ppu
 
       Vector3(
         -float32 width * scaleFactor * 0.5f,
@@ -640,7 +640,7 @@ module RenderMath =
       (ppu: float32)
       (centerOffset: Vector3)
       : Vector3 =
-      let scaleFactor = CellSize / ppu
+      let scaleFactor = BlockMap.CellSize / ppu
       let halfCell = scaleFactor * 0.5f
       let x = float32 cellX * scaleFactor + halfCell
       let y = float32 cellY * scaleFactor + halfCell

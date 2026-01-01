@@ -17,6 +17,7 @@ open Pomo.Core.Systems.Systems
 open Pomo.Core.Environment
 open Pomo.Core.Domain.Animation
 open Pomo.Core.Domain.Core
+open Pomo.Core.Algorithms
 
 module Projectile =
 

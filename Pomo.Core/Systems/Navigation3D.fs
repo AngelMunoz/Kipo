@@ -23,7 +23,7 @@ module Navigation3D =
   /// Build NavGrid3D from BlockMap
   let inline private buildNavGrid(blockMap: BlockMapDefinition) : NavGrid3D = {
     BlockMap = blockMap
-    CellSize = CellSize
+    CellSize = BlockMap.CellSize
   }
 
   /// Try to get entity's 3D position from snapshot
@@ -55,8 +55,8 @@ module Navigation3D =
     : bool =
     pos.X >= 0f
     && pos.Z >= 0f
-    && pos.X < float32 blockMap.Width * CellSize
-    && pos.Z < float32 blockMap.Depth * CellSize
+    && pos.X < float32 blockMap.Width * BlockMap.CellSize
+    && pos.Z < float32 blockMap.Depth * BlockMap.CellSize
 
   let private trySnapToNearestWalkable
     (blockMap: BlockMapDefinition)

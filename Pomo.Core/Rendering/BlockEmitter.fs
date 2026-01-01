@@ -6,9 +6,9 @@ open Microsoft.Xna.Framework.Content
 open Microsoft.Xna.Framework.Graphics
 open Pomo.Core.Domain.BlockMap
 open Pomo.Core.Graphics
+open Pomo.Core.Algorithms
 
 module BlockEmitter =
-  open Pomo.Core.Domain.Core
 
   [<Literal>]
   let private ModelScale = 0.5f // KayKit models are 2x2 units, scale to 1x1
@@ -55,7 +55,7 @@ module BlockEmitter =
     : MeshCommand[] =
 
     let ppu = pixelsPerUnit.X // Uniform scale for 3D
-    let scaleFactor = CellSize / ppu
+    let scaleFactor = BlockMap.CellSize / ppu
 
     let centerOffset =
       RenderMath.BlockMap3D.calcCenterOffset blockMap.Width blockMap.Depth ppu
@@ -68,7 +68,7 @@ module BlockEmitter =
       RenderMath.Camera.getViewCellBounds3D
         viewBounds
         cameraY
-        CellSize
+        BlockMap.CellSize
         visibleHeightRange
 
     [|
@@ -77,7 +77,7 @@ module BlockEmitter =
         let cell = block.Cell
 
         if RenderMath.Camera.isInCellBounds cell.X cell.Y cell.Z cellBounds then
-          match getBlockType blockMap block with
+          match BlockMap.getBlockType blockMap block with
           | ValueSome blockType ->
             match getLoadedModel blockType.Model with
             | ValueSome loadedModel ->
