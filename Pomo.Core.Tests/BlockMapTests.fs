@@ -14,7 +14,7 @@ type BlockMapTests() =
   [<TestMethod>]
   member _.TestSerializationRoundtrip() =
     // 1. Create a dummy block map
-    let map = BlockMap.createEmpty "test_map" 10 5 10
+    let map = Pomo.Core.Algorithms.BlockMap.createEmpty "test_map" 10 5 10
 
     // 2. Add a palette item
     let blockId = %1
