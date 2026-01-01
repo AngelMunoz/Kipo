@@ -15,7 +15,7 @@ open Pomo.Core.Graphics
 open Pomo.Core.Domain.Core
 
 /// Shared rendering core - used by all emitters
-/// 
+///
 /// Note: This type intentionally carries a small amount of render-space knowledge
 /// so emitters can avoid isometric-specific math when rendering BlockMap3D.
 [<Struct>]
