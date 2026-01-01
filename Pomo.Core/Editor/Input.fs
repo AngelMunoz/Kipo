@@ -41,7 +41,7 @@ module EditorInput =
   /// Handle camera movement based on mode
   let handleCameraInput
     (state: EditorState) // Added state
-    (cam: EditorCameraState)
+    (cam: MutableCamera)
     (keyboard: KeyboardState)
     (mouse: MouseState)
     (prevMouse: MouseState)
@@ -109,7 +109,7 @@ module EditorInput =
 
   let handleEditorInput
     (state: EditorState)
-    (cam: EditorCameraState)
+    (cam: MutableCamera)
     (uiService: Pomo.Core.Environment.IUIService)
     (onPlaytest: unit -> unit)
     (ctx: EditorInputContext)
@@ -230,8 +230,8 @@ module EditorInput =
         cam
         screenPos
         viewport
-        pixelsPerUnit
-        state.CurrentLayer.Value
+        pixelsPerUnit.X
+        (float32 state.CurrentLayer.Value * Constants.BlockMap.CellSize)
 
     // Adjust world position to logical position
     // RenderPos = LogicalPos + Offset
@@ -310,7 +310,7 @@ module EditorInput =
   let createSystem
     (game: Game)
     (state: EditorState)
-    (cam: EditorCameraState)
+    (cam: MutableCamera)
     (uiService: Pomo.Core.Environment.IUIService)
     (pixelsPerUnit: Vector2)
     (onPlaytest: unit -> unit)

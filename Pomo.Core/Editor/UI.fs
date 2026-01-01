@@ -198,11 +198,11 @@ module EditorUI =
     (game: Game)
     (state: EditorState)
     (uiService: Pomo.Core.Environment.IUIService)
-    (cam: EditorCameraState)
+    (cam: MutableCamera)
     : DrawableGameComponent =
 
     let mutable desktop: Desktop voption = ValueNone
-    let camPos = cval cam.Position
+    let camPos = cval cam.Params.Position
 
     { new DrawableGameComponent(game, DrawOrder = 1000) with
         override _.LoadContent() =
@@ -211,8 +211,8 @@ module EditorUI =
 
         override _.Update _ =
           transact(fun () ->
-            if camPos.Value <> cam.Position then
-              camPos.Value <- cam.Position)
+            if camPos.Value <> cam.Params.Position then
+              camPos.Value <- cam.Params.Position)
 
           desktop
           |> ValueOption.iter(fun d ->

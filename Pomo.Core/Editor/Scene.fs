@@ -78,8 +78,8 @@ module EditorScene =
     // Use Square PPU for True 3D (1:1 Aspect Ratio)
     let pixelsPerUnit = Vector2(64f, 64f)
 
-    let camera = EditorCameraState()
-    camera.Zoom <- 2.0f // Initial zoom adjusted for 1:1 scale (blocks look taller now)
+    let camera = MutableCamera()
+    camera.Params <- { camera.Params with Zoom = 2.0f } // Initial zoom adjusted for 1:1 scale
 
     // P key playtest callback
     let onPlaytest() =

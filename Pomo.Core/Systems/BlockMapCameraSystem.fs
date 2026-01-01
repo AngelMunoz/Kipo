@@ -16,7 +16,7 @@ open Pomo.Core.Algorithms
 open Pomo.Core.Domain.Core.Constants
 
 /// Camera system for BlockMap 3D scenes.
-/// Uses Camera3D module for true 3D orthographic projection.
+/// Uses Graphics.Camera module for true 3D orthographic projection.
 module BlockMapCameraSystem =
 
   /// Creates a CameraService for BlockMap3D gameplay.
@@ -29,8 +29,8 @@ module BlockMapCameraSystem =
     : Camera.CameraService =
 
     // Mutable camera state - updated each frame following player
-    let mutable camState = Camera3D.defaultState
-    let ppu = Constants.BlockMap3DPixelsPerUnit.X // Use X component for uniform scale
+    let mutable camParams = Graphics.Camera.Defaults.defaultParams
+    let ppu = Constants.BlockMap3DPixelsPerUnit.X
 
     let centerOffset =
       RenderMath.BlockMap3D.calcCenterOffset blockMap.Width blockMap.Depth ppu
@@ -58,14 +58,16 @@ module BlockMapCameraSystem =
               RenderMath.BlockMap3D.toRender position ppu centerOffset
 
             // Update camera to follow player in render space
-            camState <- { camState with Position = renderPos }
+            camParams <- { camParams with Position = renderPos }
 
-            let view = Camera3D.getViewMatrix camState
-            let proj = Camera3D.getProjectionMatrix camState viewport ppu
+            let view = Graphics.Camera.Compute.getViewMatrix camParams
+
+            let proj =
+              Graphics.Camera.Compute.getProjectionMatrix camParams viewport ppu
 
             ValueSome {
               Position = position
-              Zoom = camState.Zoom
+              Zoom = camParams.Zoom
               Viewport = viewport
               View = view
               Projection = proj
@@ -99,7 +101,12 @@ module BlockMapCameraSystem =
             let mutable iterations = 0
 
             let mutable pos =
-              Camera3D.screenToWorld camState screenPos viewport ppu planeY
+              Graphics.Camera.Compute.screenToWorld
+                camParams
+                screenPos
+                viewport
+                ppu
+                planeY
               |> adjustCenter
 
             while iterations < 3 && planeY <> lastPlaneY do
@@ -118,7 +125,12 @@ module BlockMapCameraSystem =
                 planeY <- surfaceY
 
                 pos <-
-                  Camera3D.screenToWorld camState screenPos viewport ppu planeY
+                  Graphics.Camera.Compute.screenToWorld
+                    camParams
+                    screenPos
+                    viewport
+                    ppu
+                    planeY
                   |> adjustCenter
               else
                 planeY <- lastPlaneY
@@ -130,7 +142,14 @@ module BlockMapCameraSystem =
         member _.CreatePickRay(screenPos: Vector2, entityId: Guid<EntityId>) =
           if entityId = playerId then
             let viewport = game.GraphicsDevice.Viewport
-            ValueSome(Camera3D.getPickRay camState screenPos viewport ppu)
+
+            ValueSome(
+              Graphics.Camera.Compute.getPickRay
+                camParams
+                screenPos
+                viewport
+                ppu
+            )
           else
             ValueNone
     }

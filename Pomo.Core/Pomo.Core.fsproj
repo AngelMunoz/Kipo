@@ -40,6 +40,7 @@
     <Compile Include="BlockMapSpawning.fs" />
     <Compile Include="Projections.fs" />
     <Compile Include="Graphics/RenderMath.fs" />
+    <Compile Include="Graphics/Camera.fs" />
     <Compile Include="Graphics/RenderCommands.fs" />
     <Compile Include="Graphics/Picking.fs" />
     <Compile Include="Graphics/CommandQueue.fs" />

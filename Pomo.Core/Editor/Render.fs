@@ -26,16 +26,16 @@ module EditorRender =
     CursorBuffer: VertexPositionColor[]
   }
 
-  let getViewBounds (cam: EditorCameraState) (viewport: Viewport) =
+  let getViewBounds (cam: MutableCamera) (viewport: Viewport) =
     RenderMath.Camera.getViewBounds
       {
-        X = cam.Position.X
-        Y = cam.Position.Y
-        Z = cam.Position.Z
+        X = cam.Params.Position.X
+        Y = cam.Params.Position.Y
+        Z = cam.Params.Position.Z
       }
       (float32 viewport.Width)
       (float32 viewport.Height)
-      cam.Zoom
+      cam.Params.Zoom
 
   let private populateGridVerts
     (buffer: VertexPositionColor[])
@@ -342,7 +342,7 @@ module EditorRender =
     (getModel: string -> LoadedModel voption)
     (effect: BasicEffect)
     (state: EditorState)
-    (cam: EditorCameraState)
+    (cam: MutableCamera)
     =
     let blockMap = state.BlockMap |> AVal.force
     let layer = state.CurrentLayer |> AVal.force
@@ -364,7 +364,7 @@ module EditorRender =
     let cellBounds =
       RenderMath.Camera.getViewCellBounds3D
         adjustedBounds
-        cam.Position.Y
+        cam.Params.Position.Y
         BlockMap.CellSize
         2000.0f
 
@@ -421,7 +421,7 @@ module EditorRender =
   let createSystem
     (game: Game)
     (state: EditorState)
-    (cam: EditorCameraState)
+    (cam: MutableCamera)
     (pixelsPerUnit: Vector2)
     (content: ContentManager)
     : DrawableGameComponent =
@@ -471,7 +471,7 @@ module EditorRender =
             drawContext.View <- EditorCamera.getViewMatrix cam
 
             drawContext.Projection <-
-              EditorCamera.getProjectionMatrix cam viewport pixelsPerUnit
+              EditorCamera.getProjectionMatrix cam viewport pixelsPerUnit.X
 
             draw drawContext getModel effect state cam
           | _ -> ()
