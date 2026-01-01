@@ -165,7 +165,8 @@ module PoseResolver =
         let renderPos = core.ToRenderPos logicPos
 
         let entityBaseMatrix =
-          if isProjectile then
+          match core.Space, isProjectile with
+          | RenderSpace.Isometric, true ->
             let struct (tilt, projFacing) =
               getProjectileTiltAndFacing altitude facing
 
@@ -175,12 +176,26 @@ module PoseResolver =
               tilt
               data.ModelScale
               data.SquishFactor
-          else
+
+          | RenderSpace.Isometric, false ->
             RenderMath.WorldMatrix.createMesh
               renderPos
               facing
               data.ModelScale
               data.SquishFactor
+
+          | RenderSpace.True3D, true ->
+            let struct (tilt, projFacing) =
+              getProjectileTiltAndFacing altitude facing
+
+            RenderMath.WorldMatrix3D.createProjectile
+              renderPos
+              projFacing
+              tilt
+              data.ModelScale
+
+          | RenderSpace.True3D, false ->
+            RenderMath.WorldMatrix3D.createMesh renderPos facing data.ModelScale
 
         nodeTransformsPool.Clear()
         nodesBuffer.Clear()

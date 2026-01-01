@@ -35,7 +35,9 @@ let isoPpu = Vector2(32.0f, 16.0f)
 /// Creates a RenderCore with standard settings
 let createRenderCore() : RenderCore = {
   PixelsPerUnit = isoPpu
+  Space = RenderSpace.Isometric
   ToRenderPos = fun pos -> RenderMath.LogicRender.toRender pos isoPpu
+  ToRenderParticlePos = fun particlePos -> RenderMath.ParticleSpace.toRender particlePos isoPpu
 }
 
 // ============================================================================

@@ -8,9 +8,53 @@ open Pomo.Core
 open Pomo.Core.Domain.Units
 open Pomo.Core.Domain.Core
 open Pomo.Core.Graphics
+open Pomo.Core.Domain.BlockMap
 
 module EntityPicker =
   open System.Collections.Generic
+
+  let pickEntityBlockMap3D
+    (ray: Ray)
+    (ppu: float32)
+    (blockMap: BlockMapDefinition)
+    (modelScale: float32)
+    (positions: IReadOnlyDictionary<Guid<EntityId>, WorldPosition>)
+    (rotations: IReadOnlyDictionary<Guid<EntityId>, float32>)
+    (excludeEntityId: Guid<EntityId>)
+    : Guid<EntityId> voption =
+
+    let centerOffset =
+      RenderMath.BlockMap3D.calcCenterOffset blockMap.Width blockMap.Depth ppu
+
+    let mutable nearestEntity = ValueNone
+    let mutable nearestDistance = Single.MaxValue
+
+    for KeyValue(entityId, logicPos) in positions do
+      if entityId <> excludeEntityId then
+        let renderPos = RenderMath.BlockMap3D.toRender logicPos ppu centerOffset
+
+        let sphereCenter = renderPos + Vector3(0.0f, modelScale * 0.5f, 0.0f)
+        let broadPhaseSphere = BoundingSphere(sphereCenter, modelScale * 2.0f)
+
+        if ray.Intersects(broadPhaseSphere).HasValue then
+          let facing =
+            match rotations |> Dictionary.tryFindV entityId with
+            | ValueSome r -> r
+            | ValueNone -> 0.0f
+
+          let worldMatrix =
+            RenderMath.WorldMatrix3D.createMesh renderPos facing modelScale
+
+          let worldBox =
+            Picking.transformBoundingBox Picking.EntityHitBox worldMatrix
+
+          match Picking.rayIntersects ray worldBox with
+          | ValueSome distance when distance < nearestDistance ->
+            nearestDistance <- distance
+            nearestEntity <- ValueSome entityId
+          | _ -> ()
+
+    nearestEntity
 
   let pickEntity
     (ray: Ray)

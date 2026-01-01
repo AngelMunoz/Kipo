@@ -349,6 +349,46 @@ module RenderMath =
       |> applySquish squishFactor
       |> translateTo renderPos
 
+  module WorldMatrix3D =
+    let inline createMesh
+      (renderPos: Vector3)
+      (facing: float32)
+      (scale: float32)
+      : Matrix =
+      Matrix.CreateRotationY(facing)
+      * Matrix.CreateScale(scale)
+      * Matrix.CreateTranslation(renderPos)
+
+    let inline createProjectile
+      (renderPos: Vector3)
+      (facing: float32)
+      (tilt: float32)
+      (scale: float32)
+      : Matrix =
+      Matrix.CreateRotationX(tilt)
+      * Matrix.CreateRotationY(facing)
+      * Matrix.CreateScale(scale)
+      * Matrix.CreateTranslation(renderPos)
+
+    let inline createMeshParticle
+      (renderPos: Vector3)
+      (rotation: Quaternion)
+      (baseScale: float32)
+      (scaleAxis: Vector3)
+      (pivot: Vector3)
+      : Matrix =
+      let s =
+        Matrix.CreateScale(
+          1.0f + (baseScale - 1.0f) * scaleAxis.X,
+          1.0f + (baseScale - 1.0f) * scaleAxis.Y,
+          1.0f + (baseScale - 1.0f) * scaleAxis.Z
+        )
+
+      Matrix.CreateFromQuaternion(rotation)
+      * s
+      * Matrix.CreateTranslation(pivot)
+      * Matrix.CreateTranslation(renderPos)
+
   /// Skeletal animation transforms
   module Rig =
     /// Applies rig node transform with pivot-based rotation.

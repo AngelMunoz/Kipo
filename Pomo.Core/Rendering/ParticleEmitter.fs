@@ -133,7 +133,7 @@ module ParticleEmitter =
     (config: EmitterConfig)
     (effectPos: Vector3)
     (effectRotation: Quaternion)
-    (pixelsPerUnit: Vector2)
+    (core: RenderCore)
     (modelScale: float32)
     (particle: Particle)
     : BillboardCommand =
@@ -144,7 +144,7 @@ module ParticleEmitter =
         effectPos
         effectRotation
 
-    let renderPos = RenderMath.ParticleSpace.toRender worldPos pixelsPerUnit
+    let renderPos = core.ToRenderParticlePos worldPos
 
     {
       Texture = texture
@@ -159,7 +159,7 @@ module ParticleEmitter =
     (config: EmitterConfig)
     (effectPos: Vector3)
     (effectRotation: Quaternion)
-    (pixelsPerUnit: Vector2)
+    (core: RenderCore)
     (modelScale: float32)
     (squishFactor: float32)
     (particle: MeshParticle)
@@ -171,16 +171,25 @@ module ParticleEmitter =
         effectPos
         effectRotation
 
-    let renderPos = RenderMath.ParticleSpace.toRender worldPos pixelsPerUnit
+    let renderPos = core.ToRenderParticlePos worldPos
 
     let worldMatrix =
-      RenderMath.WorldMatrix.createMeshParticle
-        renderPos
-        particle.Rotation
-        (particle.Scale * modelScale)
-        config.ScaleAxis
-        config.ScalePivot
-        squishFactor
+      match core.Space with
+      | RenderSpace.Isometric ->
+        RenderMath.WorldMatrix.createMeshParticle
+          renderPos
+          particle.Rotation
+          (particle.Scale * modelScale)
+          config.ScaleAxis
+          config.ScalePivot
+          squishFactor
+      | RenderSpace.True3D ->
+        RenderMath.WorldMatrix3D.createMeshParticle
+          renderPos
+          particle.Rotation
+          (particle.Scale * modelScale)
+          config.ScaleAxis
+          config.ScalePivot
 
     {
       LoadedModel = loadedModel
@@ -239,7 +248,7 @@ module ParticleEmitter =
                   emitter.Config
                   effectPos
                   effectRotation
-                  core.PixelsPerUnit
+                  core
                   data.ModelScale
                   particle
 
@@ -275,7 +284,7 @@ module ParticleEmitter =
                 meshEmitter.Config
                 effectPos
                 effectRotation
-                core.PixelsPerUnit
+                core
                 data.ModelScale
                 data.SquishFactor
                 particle

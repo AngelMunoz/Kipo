@@ -91,32 +91,48 @@ module HoverFeedback =
               match entityScenarios |> HashMap.tryFindV playerId with
               | ValueNone -> cursorService.SetCursor Arrow
               | ValueSome scenarioId ->
-                let snapshot = projections.ComputeMovementSnapshot scenarioId
-
-                let pixelsPerUnit =
-                  match scenarios |> HashMap.tryFindV scenarioId with
-                  | ValueSome s ->
-                    match s.Map with
-                    | ValueSome map ->
-                      Vector2(float32 map.TileWidth, float32 map.TileHeight)
-                    | ValueNone -> Vector2(64f, 64f) // BlockMap scenario
-                  | ValueNone -> Constants.DefaultPixelsPerUnit
-
-                let squishFactor = pixelsPerUnit.X / pixelsPerUnit.Y
                 let modelScale = Constants.Entity.ModelScale
 
                 let hoveredEntity =
                   match cameraService.CreatePickRay(screenPos, playerId) with
-                  | ValueSome ray ->
-                    EntityPicker.pickEntity
-                      ray
-                      pixelsPerUnit
-                      modelScale
-                      squishFactor
-                      snapshot.Positions
-                      snapshot.Rotations
-                      playerId
                   | ValueNone -> ValueNone
+                  | ValueSome ray ->
+                    match scenarios |> HashMap.tryFindV scenarioId with
+                    | ValueSome scenario when scenario.BlockMap.IsSome ->
+                      let snapshot =
+                        projections.ComputeMovement3DSnapshot scenarioId
+
+                      let blockMap = scenario.BlockMap |> ValueOption.get
+
+                      EntityPicker.pickEntityBlockMap3D
+                        ray
+                        Constants.BlockMap3DPixelsPerUnit.X
+                        blockMap
+                        modelScale
+                        snapshot.Positions
+                        snapshot.Rotations
+                        playerId
+                    | ValueSome scenario ->
+                      match scenario.Map with
+                      | ValueSome map ->
+                        let pixelsPerUnit =
+                          Vector2(float32 map.TileWidth, float32 map.TileHeight)
+
+                        let squishFactor = pixelsPerUnit.X / pixelsPerUnit.Y
+
+                        let snapshot =
+                          projections.ComputeMovementSnapshot scenarioId
+
+                        EntityPicker.pickEntity
+                          ray
+                          pixelsPerUnit
+                          modelScale
+                          squishFactor
+                          snapshot.Positions
+                          snapshot.Rotations
+                          playerId
+                      | ValueNone -> ValueNone
+                    | ValueNone -> ValueNone
 
                 let targetingMode = targetingService.TargetingMode |> AVal.force
 

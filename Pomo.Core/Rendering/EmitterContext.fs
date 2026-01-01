@@ -15,9 +15,19 @@ open Pomo.Core.Graphics
 open Pomo.Core.Domain.Core
 
 /// Shared rendering core - used by all emitters
+/// 
+/// Note: This type intentionally carries a small amount of render-space knowledge
+/// so emitters can avoid isometric-specific math when rendering BlockMap3D.
+[<Struct>]
+type RenderSpace =
+  | Isometric
+  | True3D
+
 type RenderCore = {
   PixelsPerUnit: Vector2
+  Space: RenderSpace
   ToRenderPos: WorldPosition -> Vector3
+  ToRenderParticlePos: Vector3 -> Vector3
 }
 
 /// Entity-specific rendering data
@@ -66,9 +76,14 @@ module RenderCore =
     let toRenderPos(pos: WorldPosition) =
       RenderMath.LogicRender.toRender pos pixelsPerUnit
 
+    let toRenderParticlePos(particlePos: Vector3) =
+      RenderMath.ParticleSpace.toRender particlePos pixelsPerUnit
+
     {
       PixelsPerUnit = pixelsPerUnit
+      Space = Isometric
       ToRenderPos = toRenderPos
+      ToRenderParticlePos = toRenderParticlePos
     }
 
   /// Creates the shared RenderCore for BlockMap3D (true 3D) rendering
@@ -85,9 +100,21 @@ module RenderCore =
     let toRenderPos(pos: WorldPosition) =
       RenderMath.BlockMap3D.toRender pos ppu centerOffset
 
+    let toRenderParticlePos(particlePos: Vector3) =
+      RenderMath.BlockMap3D.toRender
+        {
+          X = particlePos.X
+          Y = particlePos.Y
+          Z = particlePos.Z
+        }
+        ppu
+        centerOffset
+
     {
       PixelsPerUnit = pixelsPerUnit
+      Space = True3D
       ToRenderPos = toRenderPos
+      ToRenderParticlePos = toRenderParticlePos
     }
 
   /// Creates the shared RenderCore based on MapSource

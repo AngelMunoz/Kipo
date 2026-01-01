@@ -34,46 +34,6 @@ module ActionHandler =
     (cameraService: CameraService)
     (playerId: Guid<EntityId>)
     =
-    let pickBlockMapEntity
-      (blockMap: BlockMap.BlockMapDefinition)
-      (ray: Ray)
-      : Guid<EntityId> voption =
-      let ppu = Constants.BlockMap3DPixelsPerUnit.X
-      let centerOffset =
-        RenderMath.BlockMap3D.calcCenterOffset blockMap.Width blockMap.Depth ppu
-
-      let modelScale = Constants.Entity.ModelScale
-      let mutable nearest = ValueNone
-      let mutable nearestDistance = Single.MaxValue
-
-      for KeyValue(entityId, logicPos) in positions do
-        if entityId <> playerId then
-          let renderPos =
-            RenderMath.BlockMap3D.toRender logicPos ppu centerOffset
-
-          let sphereCenter = renderPos + Vector3(0.0f, modelScale * 0.5f, 0.0f)
-          let broadPhaseSphere = BoundingSphere(sphereCenter, modelScale * 2.0f)
-
-          if ray.Intersects(broadPhaseSphere).HasValue then
-            let facing =
-              rotations
-              |> Dictionary.tryFindV entityId
-              |> ValueOption.defaultValue 0.0f
-
-            let worldMatrix =
-              RenderMath.WorldMatrix.createMesh renderPos facing modelScale 1.0f
-
-            let worldBox =
-              Picking.transformBoundingBox Picking.EntityHitBox worldMatrix
-
-            match Picking.rayIntersects ray worldBox with
-            | ValueSome distance when distance < nearestDistance ->
-              nearestDistance <- distance
-              nearest <- ValueSome entityId
-            | _ -> ()
-
-      nearest
-
     let mouseStateOpt =
       world.RawInputStates
       |> AMap.tryFind playerId
@@ -97,7 +57,14 @@ module ActionHandler =
           |> ValueOption.bind(fun scenario ->
             match scenario.BlockMap, scenario.Map with
             | ValueSome blockMap, _ ->
-              pickBlockMapEntity blockMap ray
+              EntityPicker.pickEntityBlockMap3D
+                ray
+                Constants.BlockMap3DPixelsPerUnit.X
+                blockMap
+                Constants.Entity.ModelScale
+                positions
+                rotations
+                playerId
             | ValueNone, ValueSome map ->
               let pixelsPerUnit =
                 Vector2(float32 map.TileWidth, float32 map.TileHeight)
@@ -234,14 +201,22 @@ module ActionHandler =
 
                 // Get the entity under the cursor AT THIS MOMENT by forcing the projection.
                 let entityScenarios = projections.EntityScenarios |> AMap.force
+                let scenarios = world.Scenarios |> AMap.force
 
                 let positions, rotations =
                   match entityScenarios |> HashMap.tryFindV entityId with
                   | ValueSome scenarioId ->
-                    let snapshot =
-                      projections.ComputeMovementSnapshot(scenarioId)
+                    match scenarios |> HashMap.tryFindV scenarioId with
+                    | ValueSome scenario when scenario.BlockMap.IsSome ->
+                      let snapshot =
+                        projections.ComputeMovement3DSnapshot(scenarioId)
 
-                    snapshot.Positions, snapshot.Rotations
+                      snapshot.Positions, snapshot.Rotations
+                    | _ ->
+                      let snapshot =
+                        projections.ComputeMovementSnapshot(scenarioId)
+
+                      snapshot.Positions, snapshot.Rotations
                   | ValueNone -> Dictionary(), Dictionary()
 
                 let clickedEntity =
