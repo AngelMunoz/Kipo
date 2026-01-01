@@ -20,6 +20,7 @@ open Pomo.Core.Domain.UI
 open Pomo.Core.Domain.Core
 open Pomo.Core.Stores
 open Pomo.Core.Environment
+open Pomo.Core.MapSpawning
 
 open Pomo.Core.Systems
 open Pomo.Core.Systems.Effects
@@ -40,6 +41,20 @@ open Pomo.Core.Systems.Collision
 /// BlockMap-based gameplay scene for 3D voxel worlds
 /// Mirrors GameplayScene but uses BlockMaps for collision/navigation
 module BlockMapScene =
+
+  let inline private clamp (minV: float32) (maxV: float32) (v: float32) =
+    if v < minV then minV elif v > maxV then maxV else v
+
+  let private clampToMapBounds (map: BlockMapDefinition) (pos: WorldPosition) =
+    let maxX = float32 map.Width * BlockMap.CellSize
+    let maxY = float32 map.Height * BlockMap.CellSize
+    let maxZ = float32 map.Depth * BlockMap.CellSize
+
+    {
+      X = clamp 0.0f maxX pos.X
+      Y = clamp 0.0f maxY pos.Y
+      Z = clamp 0.0f maxZ pos.Z
+    }
 
   /// Get BlockMap for a scenario (used by Navigation3D)
   let private createBlockMapProvider
@@ -181,7 +196,9 @@ module BlockMapScene =
     baseComponents.Add(new MotionStateAnimationSystem(game, pomoEnv))
 
     // 7. Spawn player at BlockMap spawn point
-    let playerPos = BlockMapSpawning.findPlayerSpawnPosition blockMap
+    let playerPos =
+      BlockMapSpawning.findPlayerSpawnPosition blockMap
+      |> clampToMapBounds blockMap
 
     let playerIntent: SystemCommunications.SpawnEntityIntent = {
       EntityId = playerId
@@ -191,6 +208,78 @@ module BlockMapScene =
     }
 
     eventBus.Publish(GameEvent.Spawn(SpawningEvent.SpawnEntity playerIntent))
+
+    let tryFindEnemySpawn(map: BlockMapDefinition) =
+      map.Objects
+      |> List.tryPick(fun obj ->
+        match obj.Data with
+        | MapObjectData.Spawn props when not props.IsPlayerSpawn ->
+          props.EntityGroup
+          |> ValueOption.map(fun group -> struct (obj, group))
+          |> ValueOption.toOption
+        | _ -> None)
+
+    let trySpawnSingleEnemy() =
+      let mapEntityGroupStore =
+        match MapSpawning.tryLoadMapEntityGroupStore blockMap.Key with
+        | Some store -> Some store
+        | None -> MapSpawning.tryLoadMapEntityGroupStore "Proto"
+
+      let struct (spawnObj, groupName) =
+        tryFindEnemySpawn blockMap
+        |> Option.defaultValue(
+          struct ({
+                    Id = 0
+                    Name = "Playtest Enemy"
+                    Position = {
+                      X = playerPos.X + BlockMap.CellSize * 4.0f
+                      Y = playerPos.Y
+                      Z = playerPos.Z
+                    }
+                    Rotation = ValueNone
+                    Shape = MapObjectShape.Box(Vector3(BlockMap.CellSize))
+                    Data =
+                      MapObjectData.Spawn {
+                        IsPlayerSpawn = false
+                        EntityGroup = ValueSome "magic_casters"
+                        MaxSpawns = 1
+                        Faction = ValueNone
+                      }
+                  },
+                  "magic_casters")
+        )
+
+      let resolved =
+        MapSpawning.tryResolveEntityFromGroup
+          random
+          mapEntityGroupStore
+          stores.AIEntityStore
+          groupName
+
+      resolved
+      |> ValueOption.iter(fun resolved ->
+        let enemyId = Guid.NewGuid() |> UMX.tag
+
+        let info: SystemCommunications.FactionSpawnInfo = {
+          ArchetypeId = resolved.ArchetypeId
+          EntityDefinitionKey = ValueSome resolved.EntityKey
+          MapOverride = resolved.MapOverride
+          Faction = resolved.Faction
+          SpawnZoneName = ValueSome spawnObj.Name
+        }
+
+        let enemyIntent: SystemCommunications.SpawnEntityIntent = {
+          EntityId = enemyId
+          ScenarioId = scenarioId
+          Type = SystemCommunications.SpawnType.Faction info
+          Position = spawnObj.Position |> clampToMapBounds blockMap
+        }
+
+        eventBus.Publish(
+          GameEvent.Spawn(SpawningEvent.SpawnEntity enemyIntent)
+        ))
+
+    trySpawnSingleEnemy()
 
     // 8. RenderOrchestrator for BlockMap
     let renderOrchestrator =

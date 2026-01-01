@@ -2,6 +2,7 @@ namespace Pomo.Core
 
 open Pomo.Core.Domain.Core
 open Pomo.Core.Domain.BlockMap
+open Pomo.Core.Domain.Entity
 
 /// Spawning utilities for BlockMap-based scenarios
 module BlockMapSpawning =
@@ -56,7 +57,7 @@ module BlockMapSpawning =
   /// Get spawn points by faction (iterates directly)
   let inline collectSpawnsByFaction
     (map: BlockMapDefinition)
-    (faction: int)
+    (faction: Faction)
     (output: ResizeArray<MapObject>)
     =
     output.Clear()

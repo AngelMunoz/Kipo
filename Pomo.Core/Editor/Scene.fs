@@ -23,15 +23,25 @@ module EditorScene =
 
     let subs = new CompositeDisposable()
 
+    let defaultMapKey = "NewMap"
+
+    let tryLoadOrEmpty(key: string) =
+      let path = $"Content/CustomMaps/{key}.json"
+
+      match BlockMapLoader.load path with
+      | Ok map -> map
+      | Error _ -> BlockMap.createEmpty key 16 8 16
+
     let blockMap =
       match mapKey with
-      | ValueSome key ->
-        let path = $"Content/CustomMaps/{key}.json"
+      | ValueSome key -> tryLoadOrEmpty key
+      | ValueNone ->
+        let map = tryLoadOrEmpty defaultMapKey
 
-        match BlockMapLoader.load path with
-        | Ok map -> map
-        | Error _ -> BlockMap.createEmpty key 16 8 16
-      | ValueNone -> BlockMap.createEmpty "NewMap" 16 8 16
+        if map.MapKey.IsSome then
+          map
+        else
+          { map with MapKey = ValueSome map.Key }
 
     let state = EditorState.create blockMap
 
@@ -75,11 +85,6 @@ module EditorScene =
       let currentMap = state.BlockMap |> AVal.force
 
       let path = $"Content/CustomMaps/{currentMap.Key}.json"
-      let directory = Path.GetDirectoryName path
-
-      if not (String.IsNullOrWhiteSpace directory) then
-        Directory.CreateDirectory directory |> ignore
-
       BlockMapLoader.save path currentMap |> ignore
 
       sceneTransitionSubject.OnNext(BlockMapPlaytest currentMap)

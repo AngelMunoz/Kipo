@@ -281,8 +281,7 @@ The following files contain `Vector2.Distance` or `Vector2` position logic:
 
 ### Camera3D Module
 
-- [ ] Task: Add `Camera3D` module to `Domain/Camera.fs`
-  - Move logic from `Editor/Camera.fs`
+- [x] Task: Add `Camera3D` module to `Domain/Camera.fs`
   - Immutable state, pass-through updates
   ```fsharp
   module Camera3D =
@@ -301,7 +300,7 @@ The following files contain `Vector2.Distance` or `Vector2` position logic:
 
 ### Pathfinding3D Module
 
-- [ ] Task: Create `Algorithms/Pathfinding3D.fs`
+- [x] Task: Create `Algorithms/Pathfinding3D.fs`
   - 3D A\* on BlockMap grid
   - Walkable = empty cell OR `NoCollision` block, with solid floor below
   ```fsharp
@@ -317,7 +316,7 @@ The following files contain `Vector2.Distance` or `Vector2` position logic:
 
 ### Navigation3D Module
 
-- [ ] Task: Create `Systems/Navigation3D.fs`
+- [x] Task: Create `Systems/Navigation3D.fs`
   - Factory returning `CoreEventListener`
   - Uses `Pathfinding3D` and `Movement3DSnapshot`
   ```fsharp
@@ -332,7 +331,7 @@ The following files contain `Vector2.Distance` or `Vector2` position logic:
 
 ### BlockMapSpawning Module
 
-- [ ] Task: Create `BlockMapSpawning.fs`
+- [x] Task: Create `BlockMapSpawning.fs`
   - Read spawn points from `BlockMapDefinition.Objects`
   ```fsharp
   module BlockMapSpawning =
@@ -398,26 +397,24 @@ The following files contain `Vector2.Distance` or `Vector2` position logic:
 
 ## Phase 6: Camera Abstraction
 
-- [ ] Task: Extend `CameraService` interface
-  - Support multiple camera modes
-  - Add free-fly camera for editor
-- [ ] Task: Implement `FreeFlyCamera`
-  - WASD + mouse for 3D navigation
-  - Toggle in editor UI
-- [ ] Task: Isometric camera unchanged for gameplay
+- [x] Task: Implement true-3D camera math in `Domain/Camera.fs` (`Camera3D`)
+- [x] Task: Implement BlockMap gameplay camera service (`BlockMapCameraSystem`)
+- [x] Task: Implement editor camera modes (isometric + free-fly) using the editor camera state
+- [ ] Task: Optional future: unify camera modes behind a single runtime-switchable camera service
 
 ---
 
 ## Phase 7: Editor Integration & UI
 
-- [ ] Task: Register `EditorScene` in `Scenes.fs` / `CompositionRoot.fs`
-- [ ] Task: Add "Map Editor" menu entry in MainMenu
-- [ ] Task: Wire editor input bindings in `InputMapping.fs`
-- [ ] Task: Block palette UI (minimal list)
-- [ ] Task: Layer indicator and controls
-- [ ] Task: Brush mode buttons
+- [x] Task: Register `EditorScene` in `Scenes.fs` / `CompositionRoot.fs`
+- [x] Task: Add "Map Editor" menu entry in MainMenu
+- [x] Task: Editor input bindings handled in editor input system (separate from gameplay `InputMappingSystem`)
+- [x] Task: Block palette UI (minimal list)
+- [x] Task: Layer indicator and controls
+- [x] Task: Brush mode buttons
 - [ ] Task: Save/Load buttons with file dialogs
-- [ ] Task: Preview mode (spawn player, test map)
+- [x] Task: Preview mode (playtest from editor)
+- [ ] Task: BlockMap playtest parity: spawn AI entities from non-player spawn objects
 - [ ] Task: **Map Settings UI** (Side panel for global map properties)
 - [ ] Task: **Object Tool**
   - Separate tool mode for placing Objects vs Blocks
@@ -432,8 +429,8 @@ The following files contain `Vector2.Distance` or `Vector2` position logic:
 > [!NOTE]
 > Defer until needed. Block collision + XZ pathfinding works initially.
 
-- [ ] Task: Create `BlockNavGrid` for 3D pathfinding
-- [ ] Task: Handle ramp/stair transitions
+- [x] Task: Create `BlockNavGrid` for 3D pathfinding
+- [x] Task: Handle ramp/stair transitions
 - [ ] Task: Update AI pathfinding for height
 
 ---

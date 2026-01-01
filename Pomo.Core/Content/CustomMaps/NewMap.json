@@ -1,0 +1,97 @@
+{
+  "Version": 1,
+  "Key": "NewMap",
+  "MapKey": "NewMap",
+  "Width": 32,
+  "Height": 10,
+  "Depth": 32,
+  "Palette": {},
+  "Blocks": [],
+  "SpawnCell": { "X": 16, "Y": 1, "Z": 16 },
+  "Settings": {
+    "EngagementRules": "PvE",
+    "MaxEnemyEntities": 20,
+    "StartingLayer": 0
+  },
+  "Objects": [
+    {
+      "Id": 1,
+      "Name": "GateA_Spawn",
+      "Position": { "X": 512.0, "Y": 32.0, "Z": 512.0 },
+      "Shape": { "Type": "Box", "Size": { "X": 32.0, "Y": 32.0, "Z": 32.0 } },
+      "Data": { "Type": "Spawn", "IsPlayerSpawn": true, "MaxSpawns": 1 }
+    },
+    {
+      "Id": 2,
+      "Name": "Magic Casters Spawn",
+      "Position": { "X": 640.0, "Y": 32.0, "Z": 512.0 },
+      "Shape": { "Type": "Box", "Size": { "X": 96.0, "Y": 32.0, "Z": 96.0 } },
+      "Data": {
+        "Type": "Spawn",
+        "IsPlayerSpawn": false,
+        "EntityGroup": "magic_casters",
+        "MaxSpawns": 1
+      }
+    },
+    {
+      "Id": 3,
+      "Name": "Fire Mages Spawn",
+      "Position": { "X": 384.0, "Y": 32.0, "Z": 384.0 },
+      "Shape": { "Type": "Box", "Size": { "X": 96.0, "Y": 32.0, "Z": 96.0 } },
+      "Data": {
+        "Type": "Spawn",
+        "IsPlayerSpawn": false,
+        "EntityGroup": "fire_mages",
+        "MaxSpawns": 1
+      }
+    },
+    {
+      "Id": 4,
+      "Name": "Melee Fighters Spawn",
+      "Position": { "X": 448.0, "Y": 32.0, "Z": 640.0 },
+      "Shape": { "Type": "Box", "Size": { "X": 96.0, "Y": 32.0, "Z": 96.0 } },
+      "Data": {
+        "Type": "Spawn",
+        "IsPlayerSpawn": false,
+        "EntityGroup": "melee_fighters",
+        "MaxSpawns": 1
+      }
+    },
+    {
+      "Id": 5,
+      "Name": "Ranged Attackers Spawn",
+      "Position": { "X": 704.0, "Y": 32.0, "Z": 448.0 },
+      "Shape": { "Type": "Box", "Size": { "X": 96.0, "Y": 32.0, "Z": 96.0 } },
+      "Data": {
+        "Type": "Spawn",
+        "IsPlayerSpawn": false,
+        "EntityGroup": "ranged_attackers",
+        "MaxSpawns": 1
+      }
+    },
+    {
+      "Id": 6,
+      "Name": "Support Units Spawn",
+      "Position": { "X": 512.0, "Y": 32.0, "Z": 704.0 },
+      "Shape": { "Type": "Box", "Size": { "X": 96.0, "Y": 32.0, "Z": 96.0 } },
+      "Data": {
+        "Type": "Spawn",
+        "IsPlayerSpawn": false,
+        "EntityGroup": "support_units",
+        "MaxSpawns": 1
+      }
+    },
+    {
+      "Id": 7,
+      "Name": "Defense Towers Spawn",
+      "Position": { "X": 320.0, "Y": 32.0, "Z": 704.0 },
+      "Shape": { "Type": "Box", "Size": { "X": 96.0, "Y": 32.0, "Z": 96.0 } },
+      "Data": {
+        "Type": "Spawn",
+        "IsPlayerSpawn": false,
+        "EntityGroup": "defense_towers",
+        "MaxSpawns": 1
+      }
+    }
+  ]
+}

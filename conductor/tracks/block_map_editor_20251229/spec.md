@@ -102,6 +102,11 @@ Built-in WYSIWYG 3D block map editor using a **True 3D** world architecture. The
 > [!IMPORTANT]
 > Current skills use 2D shapes (`Vector2`). 3D versions required:
 
+Current status:
+
+- The world and movement are true 3D (`WorldPosition`), and BlockMap playtest runs in true 3D.
+- Combat/targeting still resolves primarily in the XZ plane (2.5D). Full 3D targeting primitives are not yet wired into skill definitions and ability activation.
+
 | 2D Shape | 3D Replacement | Use Case               |
 | -------- | -------------- | ---------------------- |
 | `Circle` | `Sphere`       | AOE centered on target |
@@ -203,6 +208,8 @@ module BlockMapSpawning =
 
 #### Projectile3D Module
 
+Status: Not implemented. Current projectile system runs with `WorldPosition` (XZ targeting + Y used for height/visuals). A dedicated 3D projectile targeting/movement module is future work.
+
 ```fsharp
 module Projectile3D =
   type WorldContext = {
@@ -214,6 +221,8 @@ module Projectile3D =
 ```
 
 #### Combat3D Module
+
+Status: Not implemented. Current combat uses XZ-centric targeting/range checks with 3D positions used for movement/collision and visuals. A dedicated `Combat3D` targeting module is future work.
 
 ```fsharp
 module Combat3D =
@@ -231,9 +240,20 @@ module Combat3D =
 
 ### 10. Preview Mode
 
-- **Play Button**: Test map with player entity
-- **Spawn Point**: Designated block for player spawn
-- **Stop Button**: Return to editor, map intact
+Preview mode is implemented as an in-editor transition into a dedicated BlockMap gameplay scene.
+
+- **Enter Playtest**: Press `P` in the editor to save the current BlockMap JSON and transition to `Scene.BlockMapPlaytest`.
+- **Gameplay Scene**: The playtest scene uses:
+  - BlockMap scenario (`Scenario.BlockMap = ValueSome blockMap`, no TileMap)
+  - `BlockMapCameraSystem` (true 3D orthographic)
+  - `Navigation3D` + Block collision/movement 3D snapshots
+  - `RenderOrchestrator` with `Rendering.BlockMap3D`
+- **Spawn Point**: Player spawns at the first `MapObjectData.Spawn` with `IsPlayerSpawn=true`, otherwise falls back to map center.
+- **Exit Playtest**: Press `Escape` to return to the editor for the same map key.
+
+Remaining parity gap vs `GameplayScene`:
+
+- Non-player spawns (AI/enemies) are not yet spawned in BlockMap playtest. The `AISystem` is present, but no enemy entities are created.
 
 ### 11. Persistence
 

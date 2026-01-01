@@ -6,6 +6,7 @@ open FSharp.UMX
 open Pomo.Core
 open Pomo.Core.Domain.Units
 open Pomo.Core.Domain.Core
+open Pomo.Core.Domain.Entity
 open Pomo.Core.Domain.Spatial
 open Pomo.Core.Domain.Skill
 
@@ -41,7 +42,7 @@ module BlockMap =
     IsPlayerSpawn: bool
     EntityGroup: string voption
     MaxSpawns: int
-    Faction: int voption
+    Faction: Faction voption
   }
 
   [<Struct>]
@@ -84,6 +85,7 @@ module BlockMap =
   type BlockMapDefinition = {
     Version: int
     Key: string
+    MapKey: string voption
     Width: int
     Height: int
     Depth: int
@@ -105,6 +107,7 @@ module BlockMap =
     {
       Version = 1
       Key = key
+      MapKey = ValueSome key
       Width = width
       Height = height
       Depth = depth
@@ -435,7 +438,10 @@ module BlockMap =
           VOptional.Property.get ("MaxSpawns", Required.int) json
           |> Result.map(ValueOption.defaultValue 1)
 
-        and! faction = VOptional.Property.get ("Faction", Required.int) json
+        and! faction =
+          VOptional.Property.get
+            ("Faction", Pomo.Core.Domain.Entity.Serialization.Faction.decoder)
+            json
 
         return {
           IsPlayerSpawn = isPlayerSpawn
@@ -454,7 +460,8 @@ module BlockMap =
           | ValueNone -> ()
           "MaxSpawns", Encode.int value.MaxSpawns
           match value.Faction with
-          | ValueSome f -> "Faction", Encode.int f
+          | ValueSome f ->
+            "Faction", Pomo.Core.Domain.Entity.Serialization.Faction.encoder f
           | ValueNone -> ()
         ]
 
@@ -519,7 +526,8 @@ module BlockMap =
             | ValueNone -> ()
             "MaxSpawns", Encode.int data.MaxSpawns
             match data.Faction with
-            | ValueSome f -> "Faction", Encode.int f
+            | ValueSome f ->
+              "Faction", Pomo.Core.Domain.Entity.Serialization.Faction.encoder f
             | ValueNone -> ()
           ]
         | Teleport props ->
@@ -575,6 +583,8 @@ module BlockMap =
           |> Result.map(ValueOption.defaultValue 1)
 
         and! key = Required.Property.get ("Key", Required.string) json
+
+        and! mapKey = VOptional.Property.get ("MapKey", Required.string) json
         and! width = Required.Property.get ("Width", Required.int) json
         and! height = Required.Property.get ("Height", Required.int) json
         and! depth = Required.Property.get ("Depth", Required.int) json
@@ -636,6 +646,7 @@ module BlockMap =
         return {
           Version = version
           Key = key
+          MapKey = mapKey
           Width = width
           Height = height
           Depth = depth
@@ -654,6 +665,9 @@ module BlockMap =
       Json.object [
         "Version", Encode.int map.Version
         "Key", Encode.string map.Key
+        match map.MapKey with
+        | ValueSome k -> "MapKey", Encode.string k
+        | ValueNone -> ()
         "Width", Encode.int map.Width
         "Height", Encode.int map.Height
         "Depth", Encode.int map.Depth

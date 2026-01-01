@@ -163,6 +163,28 @@ module Entity =
               |> Error
         }
 
+      let encoder: Encoder<Faction> =
+        fun value ->
+          let str =
+            match value with
+            | Player -> "Player"
+            | NPC -> "NPC"
+            | Ally -> "Ally"
+            | Enemy -> "Enemy"
+            | AIControlled -> "AIControlled"
+            | TeamRed -> "TeamRed"
+            | TeamBlue -> "TeamBlue"
+            | TeamGreen -> "TeamGreen"
+            | TeamYellow -> "TeamYellow"
+            | TeamOrange -> "TeamOrange"
+            | TeamPurple -> "TeamPurple"
+            | TeamPink -> "TeamPink"
+            | TeamCyan -> "TeamCyan"
+            | TeamWhite -> "TeamWhite"
+            | TeamBlack -> "TeamBlack"
+
+          Encode.string str
+
     module Family =
       let decoder: Decoder<Family> =
         fun json -> decode {
