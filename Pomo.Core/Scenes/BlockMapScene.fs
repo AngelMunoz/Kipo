@@ -221,12 +221,23 @@ module BlockMapScene =
           |> ValueOption.toOption
         | _ -> None)
 
-    let trySpawnSingleEnemy() =
-      let mapEntityGroupStore =
-        match MapSpawning.tryLoadMapEntityGroupStore blockMap.Key with
-        | Some store -> Some store
-        | None -> MapSpawning.tryLoadMapEntityGroupStore "Proto"
+    let tryResolvePlaytestEnemy
+      (groupName: string)
+      : MapSpawning.ResolvedEntityInfo voption =
+      let tryResolveFrom(store: MapEntityGroupStore option) =
+        MapSpawning.tryResolveEntityFromGroup
+          random
+          store
+          stores.AIEntityStore
+          groupName
 
+      let primary = MapSpawning.tryLoadMapEntityGroupStore blockMap.Key
+
+      tryResolveFrom primary
+      |> ValueOption.orElseWith(fun () ->
+        tryResolveFrom(MapSpawning.tryLoadMapEntityGroupStore "Proto"))
+
+    let trySpawnSingleEnemy() =
       let struct (spawnObj, groupName) =
         tryFindEnemySpawn blockMap
         |> Option.defaultValue(
@@ -251,12 +262,7 @@ module BlockMapScene =
                   "magic_casters")
         )
 
-      let resolved =
-        MapSpawning.tryResolveEntityFromGroup
-          random
-          mapEntityGroupStore
-          stores.AIEntityStore
-          groupName
+      let resolved = tryResolvePlaytestEnemy groupName
 
       resolved
       |> ValueOption.iter(fun resolved ->
