@@ -202,6 +202,12 @@ module BlockMapScene =
       BlockMapSpawning.findPlayerSpawnPosition blockMap
       |> clampToMapBounds blockMap
 
+    let mutable playtestEnemyId: Guid<EntityId> voption = ValueNone
+
+    let mutable playtestEnemySpawn
+      : struct (WorldPosition * SystemCommunications.FactionSpawnInfo) voption =
+      ValueNone
+
     let playerIntent: SystemCommunications.SpawnEntityIntent = {
       EntityId = playerId
       ScenarioId = scenarioId
@@ -283,6 +289,9 @@ module BlockMapScene =
           Position = spawnObj.Position |> clampToMapBounds blockMap
         }
 
+        playtestEnemyId <- ValueSome enemyId
+        playtestEnemySpawn <- ValueSome struct (enemyIntent.Position, info)
+
         eventBus.Publish(
           GameEvent.Spawn(SpawningEvent.SpawnEntity enemyIntent)
         ))
@@ -314,6 +323,34 @@ module BlockMapScene =
       | GuiAction.ExitGame -> ()
 
     let subs = new CompositeDisposable()
+
+    subs.Add(
+      eventBus.Observable
+      |> Observable.choose(fun e ->
+        match e with
+        | GameEvent.Lifecycle(LifecycleEvent.EntityDied died) -> Some died
+        | _ -> None)
+      |> Observable.subscribe(fun died ->
+        match playtestEnemyId, playtestEnemySpawn with
+        | ValueSome currentId, ValueSome struct (spawnPos, info) when
+          died.EntityId = currentId
+          ->
+          let newEnemyId = Guid.NewGuid() |> UMX.tag
+
+          let respawnIntent: SystemCommunications.SpawnEntityIntent = {
+            EntityId = newEnemyId
+            ScenarioId = scenarioId
+            Type = SystemCommunications.SpawnType.Faction info
+            Position = spawnPos
+          }
+
+          playtestEnemyId <- ValueSome newEnemyId
+
+          eventBus.Publish(
+            GameEvent.Spawn(SpawningEvent.SpawnEntity respawnIntent)
+          )
+        | _ -> ())
+    )
 
     // Listen for Escape to return to editor
     subs.Add(
