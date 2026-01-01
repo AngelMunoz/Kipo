@@ -299,18 +299,28 @@ module RenderOrchestrator =
         let view = camera.View
         let projection = camera.Projection
 
-        let viewBounds =
+        let viewBoundsFallback =
           RenderMath.Camera.getViewBounds
             camera.Position
             (float32 camera.Viewport.Width)
             (float32 camera.Viewport.Height)
             camera.Zoom
 
+        let viewBounds2D =
+          RenderMath.Camera.tryGetViewBoundsFromMatrices
+            camera.Position
+            camera.Viewport
+            camera.Zoom
+            view
+            projection
+            0.0f
+          |> ValueOption.defaultValue viewBoundsFallback
+
         // Collect terrain commands conditionally based on MapSource
         let struct (terrainBG, terrainFG) =
           match res.MapSource |> MapSource.tryGetTileMap with
           | ValueSome map ->
-            TerrainEmitter.emitAll renderCore terrainData map viewBounds
+            TerrainEmitter.emitAll renderCore terrainData map viewBounds2D
           | ValueNone -> struct (Array.empty, Array.empty)
 
         // Collect block mesh commands conditionally based on MapSource
@@ -320,10 +330,20 @@ module RenderOrchestrator =
             let ppu = renderCore.PixelsPerUnit
             let visibleHeightRange = float32 blockMap.Height * BlockMap.CellSize
 
+            let viewBounds3D =
+              RenderMath.Camera.tryGetViewBoundsFromMatrices
+                camera.Position
+                camera.Viewport
+                camera.Zoom
+                view
+                projection
+                visibleHeightRange
+              |> ValueOption.defaultValue viewBounds2D
+
             BlockEmitter.emit
               res.GetBlockModel
               blockMap
-              viewBounds
+              viewBounds3D
               camera.Position.Y
               visibleHeightRange
               ppu
@@ -388,7 +408,7 @@ module RenderOrchestrator =
           terrainFG
 
         // 5. World text (notifications, damage numbers - rendered in 2D)
-        let textCommands = TextEmitter.emit world.Notifications viewBounds
+        let textCommands = TextEmitter.emit world.Notifications viewBounds2D
 
         RenderPasses.renderText
           res.SpriteBatch

@@ -1194,26 +1194,33 @@ module private Culling =
     while i < cameras.Length && not result do
       let struct (_, cam) = cameras.[i]
 
-      let struct (left, right, top, bottom) =
+      let boundsFallback =
         RenderMath.Camera.getViewBounds
           cam.Position
           (float32 cam.Viewport.Width)
           (float32 cam.Viewport.Height)
           cam.Zoom
 
+      let struct (left, right, top, bottom) =
+        RenderMath.Camera.tryGetViewBoundsFromMatrices
+          cam.Position
+          cam.Viewport
+          cam.Zoom
+          cam.View
+          cam.Projection
+          0.0f
+        |> ValueOption.defaultValue boundsFallback
+
+      let centerX = (left + right) / 2.0f
+      let centerZ = (top + bottom) / 2.0f
       let halfW = (right - left) / 2.0f * Constants.AI.ActiveZoneMargin
       let halfH = (bottom - top) / 2.0f * Constants.AI.ActiveZoneMargin
 
-      // cam.Position is WorldPosition where X/Z is the ground plane
-      // pos is Vector2 where X is X and Y is the 2D Y (maps to WorldPosition.Z)
-      let camX = cam.Position.X
-      let camY = cam.Position.Z // Z is the 2D Y coordinate
-
       if
-        pos.X >= camX - halfW
-        && pos.X <= camX + halfW
-        && pos.Y >= camY - halfH
-        && pos.Y <= camY + halfH
+        pos.X >= centerX - halfW
+        && pos.X <= centerX + halfW
+        && pos.Y >= centerZ - halfH
+        && pos.Y <= centerZ + halfH
       then
         result <- true
 

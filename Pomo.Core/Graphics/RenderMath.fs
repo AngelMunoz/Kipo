@@ -229,6 +229,144 @@ module RenderMath =
               cameraPos.Z - halfH,
               cameraPos.Z + halfH)
 
+    let inline private tryGetPixelsPerUnit
+      (viewport: Viewport)
+      (zoom: float32)
+      (projection: Matrix)
+      : struct (float32 * float32) voption =
+      if zoom <= 0.0f || projection.M11 = 0.0f || projection.M22 = 0.0f then
+        ValueNone
+      else
+        let ppuX = float32 viewport.Width * projection.M11 / (2.0f * zoom)
+        let ppuZ = float32 viewport.Height * projection.M22 / (2.0f * zoom)
+
+        if
+          ppuX <= 0.0f || ppuZ <= 0.0f || Single.IsNaN ppuX || Single.IsNaN ppuZ
+        then
+          ValueNone
+        else
+          ValueSome(struct (ppuX, ppuZ))
+
+    let inline private tryIntersectPlaneY
+      (viewport: Viewport)
+      (view: Matrix)
+      (projection: Matrix)
+      (screenPos: Vector2)
+      (planeYRender: float32)
+      : Vector3 voption =
+      let nearSource = Vector3(screenPos.X, screenPos.Y, 0f)
+      let farSource = Vector3(screenPos.X, screenPos.Y, 1f)
+
+      let nearPoint =
+        viewport.Unproject(nearSource, projection, view, Matrix.Identity)
+
+      let farPoint =
+        viewport.Unproject(farSource, projection, view, Matrix.Identity)
+
+      let dir = Vector3.Normalize(farPoint - nearPoint)
+      let ray = Ray(nearPoint, dir)
+      let plane = Plane(Vector3.Up, -planeYRender)
+      let dist = ray.Intersects plane
+
+      if dist.HasValue then
+        let p = ray.Position + ray.Direction * dist.Value
+
+        if Single.IsNaN p.X || Single.IsNaN p.Y || Single.IsNaN p.Z then
+          ValueNone
+        else
+          ValueSome p
+      else
+        ValueNone
+
+    let tryGetViewBoundsFromMatrices
+      (cameraPos: WorldPosition)
+      (viewport: Viewport)
+      (zoom: float32)
+      (view: Matrix)
+      (projection: Matrix)
+      (visibleHeightRange: float32)
+      : struct (float32 * float32 * float32 * float32) voption =
+      tryGetPixelsPerUnit viewport zoom projection
+      |> ValueOption.bind(fun struct (ppuX, ppuZ) ->
+        let cx = float32 viewport.X + float32 viewport.Width / 2.0f
+        let cy = float32 viewport.Y + float32 viewport.Height / 2.0f
+        let centerScreen = Vector2(cx, cy)
+
+        let planeYCenter = cameraPos.Y / ppuZ
+
+        tryIntersectPlaneY viewport view projection centerScreen planeYCenter
+        |> ValueOption.bind(fun centerHit ->
+          let centerOffsetX = centerHit.X - (cameraPos.X / ppuX)
+          let centerOffsetZ = centerHit.Z - (cameraPos.Z / ppuZ)
+
+          let x0 = float32 viewport.X
+          let y0 = float32 viewport.Y
+          let x1 = x0 + float32 viewport.Width
+          let y1 = y0 + float32 viewport.Height
+
+          let corners = [|
+            Vector2(x0, y0)
+            Vector2(x1, y0)
+            Vector2(x0, y1)
+            Vector2(x1, y1)
+          |]
+
+          let minY = cameraPos.Y - visibleHeightRange
+          let maxY = cameraPos.Y + visibleHeightRange
+
+          let planeYs =
+            if visibleHeightRange > 0.0f then
+              [| minY / ppuZ; maxY / ppuZ |]
+            else
+              [| cameraPos.Y / ppuZ |]
+
+          let mutable minX = Single.PositiveInfinity
+          let mutable maxX = Single.NegativeInfinity
+          let mutable minZ = Single.PositiveInfinity
+          let mutable maxZ = Single.NegativeInfinity
+
+          let mutable ok = true
+          let mutable i = 0
+
+          while ok && i < corners.Length do
+            let corner = corners.[i]
+            let mutable j = 0
+
+            while ok && j < planeYs.Length do
+              let planeY = planeYs.[j]
+
+              match
+                tryIntersectPlaneY viewport view projection corner planeY
+              with
+              | ValueSome hit ->
+                let lx = (hit.X - centerOffsetX) * ppuX
+                let lz = (hit.Z - centerOffsetZ) * ppuZ
+
+                if Single.IsNaN lx || Single.IsNaN lz then
+                  ok <- false
+                else
+                  if lx < minX then
+                    minX <- lx
+
+                  if lx > maxX then
+                    maxX <- lx
+
+                  if lz < minZ then
+                    minZ <- lz
+
+                  if lz > maxZ then
+                    maxZ <- lz
+              | ValueNone -> ok <- false
+
+              j <- j + 1
+
+            i <- i + 1
+
+          if ok && minX <= maxX && minZ <= maxZ then
+            ValueSome(struct (minX, maxX, minZ, maxZ))
+          else
+            ValueNone))
+
     /// Computes 3D cell bounds for block map culling.
     /// Converts view bounds to grid cell indices with margin for large models.
     /// Y bounds are based on camera elevation with visible height range.
