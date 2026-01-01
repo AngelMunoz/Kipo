@@ -79,15 +79,55 @@ module BlockMapCameraSystem =
         member _.ScreenToWorld(screenPos: Vector2, entityId: Guid<EntityId>) =
           if entityId = playerId then
             let viewport = game.GraphicsDevice.Viewport
-            let pos = Camera3D.screenToWorld camState screenPos viewport ppu 0f
 
-            let adjusted = {
-              pos with
-                X = pos.X - centerOffset.X * ppu
-                Z = pos.Z - centerOffset.Z * ppu
-            }
+            let inline adjustCenter(pos: WorldPosition) : WorldPosition =
+              {
+                pos with
+                    X = pos.X - centerOffset.X * ppu
+                    Z = pos.Z - centerOffset.Z * ppu
+              }
 
-            ValueSome adjusted
+            let inline isInBounds(pos: WorldPosition) =
+              pos.X >= 0f
+              && pos.Z >= 0f
+              && pos.X < float32 blockMap.Width * CellSize
+              && pos.Z < float32 blockMap.Depth * CellSize
+
+            let mutable planeY = 0f
+            let mutable lastPlaneY = Single.NaN
+            let mutable iterations = 0
+
+            let mutable pos =
+              Camera3D.screenToWorld camState screenPos viewport ppu planeY
+              |> adjustCenter
+
+            while iterations < 3 && planeY <> lastPlaneY do
+              iterations <- iterations + 1
+              lastPlaneY <- planeY
+
+              if isInBounds pos then
+                let surfaceY =
+                  BlockCollision.getSurfaceHeight
+                    blockMap
+                    {
+                      X = pos.X
+                      Y = 0f
+                      Z = pos.Z
+                    }
+                  |> ValueOption.defaultValue 0f
+
+                planeY <- surfaceY
+
+                pos <-
+                  Camera3D.screenToWorld camState screenPos viewport ppu planeY
+                  |> adjustCenter
+              else
+                planeY <- lastPlaneY
+
+            if isInBounds pos then
+              ValueSome pos
+            else
+              ValueNone
           else
             ValueNone
 

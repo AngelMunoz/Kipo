@@ -34,12 +34,21 @@ module Navigation3D =
     : WorldPosition voption =
     snapshot.Positions |> Dictionary.tryFindV entityId
 
-  /// Convert 2D click target to 3D position (Y=0, will be adjusted by collision)
-  let inline private clickTo3D(target: Vector2) : WorldPosition = {
-    X = target.X
-    Y = 0f
-    Z = target.Y
-  }
+  let inline private clickTo3D
+    (blockMap: BlockMapDefinition)
+    (target: Vector2)
+    : WorldPosition =
+    let basePos = WorldPosition.fromVector2 target
+
+    let surfaceY =
+      BlockCollision.getSurfaceHeight blockMap basePos
+      |> ValueOption.defaultValue 0f
+
+    {
+      X = basePos.X
+      Y = surfaceY
+      Z = basePos.Z
+    }
 
   /// Publish path update for entity
   let inline private publishPath
@@ -86,7 +95,6 @@ module Navigation3D =
     (target: SystemCommunications.SetMovementTarget)
     : MovementContext voption =
     let entityId = target.EntityId
-    let targetPos = clickTo3D target.Target
 
     projections.EntityScenarioContexts
     |> AMap.force
@@ -94,6 +102,7 @@ module Navigation3D =
     |> ValueOption.bind(fun ctx ->
       getBlockMap ctx.ScenarioId
       |> ValueOption.bind(fun blockMap ->
+        let targetPos = clickTo3D blockMap target.Target
         let snapshot = projections.ComputeMovement3DSnapshot(ctx.ScenarioId)
 
         tryGetPosition3D snapshot entityId

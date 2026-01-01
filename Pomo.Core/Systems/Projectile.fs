@@ -12,6 +12,7 @@ open Pomo.Core.Domain.Events
 open Pomo.Core.Domain.Projectile
 open Pomo.Core.Domain.Particles
 open Pomo.Core.Domain.Skill
+open Pomo.Core.Domain.BlockMap
 open Pomo.Core.Systems.Systems
 open Pomo.Core.Environment
 open Pomo.Core.Domain.Animation
@@ -25,6 +26,7 @@ module Projectile =
     Rng: Random
     Positions: Collections.Generic.IReadOnlyDictionary<Guid<EntityId>, WorldPosition>
     LiveEntities: HashSet<Guid<EntityId>>
+    TryGetSurfaceHeight: WorldPosition -> float32 voption
   }
 
   /// A projectile being processed with its resolved positions.
@@ -82,6 +84,7 @@ module Projectile =
     (stateWrite: IStateWriteService)
     (dt: float32)
     (ctx: ProjectileContext)
+    (baseHeight: float32)
     (currentAltitude: float32)
     (fallSpeed: float32)
     =
@@ -103,7 +106,7 @@ module Projectile =
       stateWrite.RemoveEntity(ctx.Id)
 
       // Update Y position to match altitude
-      let newPos = { ctx.Position with Y = newAltitude }
+      let newPos = { ctx.Position with Y = baseHeight + newAltitude }
 
       stateWrite.CreateProjectile(
         ctx.Id,
@@ -250,7 +253,26 @@ module Projectile =
 
       match projectile.Info.Variations with
       | ValueSome(Descending(currentAltitude, fallSpeed)) ->
-        processDescendingProjectile stateWrite dt ctx currentAltitude fallSpeed
+        let baseHeight =
+          match projectile.Target with
+          | Projectile.PositionTarget pos ->
+            let p = WorldPosition.fromVector2 pos
+
+            world.TryGetSurfaceHeight {
+              X = p.X
+              Y = 0f
+              Z = p.Z
+            }
+            |> ValueOption.defaultValue 0f
+          | Projectile.EntityTarget _ ->
+            world.TryGetSurfaceHeight {
+              X = targetPos.X
+              Y = 0f
+              Z = targetPos.Z
+            }
+            |> ValueOption.defaultValue targetPos.Y
+
+        processDescendingProjectile stateWrite dt ctx baseHeight currentAltitude fallSpeed
       | _ -> processHorizontalProjectile stateWrite world ctx
 
 
@@ -262,6 +284,7 @@ module Projectile =
     VisualEffects: ResizeArray<Particles.VisualEffect>
     Positions: Collections.Generic.IReadOnlyDictionary<Guid<EntityId>, WorldPosition>
     EffectOwners: Collections.Generic.HashSet<Guid<EntityId>>
+    BlockMap: BlockMapDefinition voption
   }
 
   /// Calculates rotation quaternion for impact visuals based on projectile direction
@@ -287,11 +310,11 @@ module Projectile =
         else Quaternion.Identity
     | _ -> Quaternion.Identity
 
-  let inline spawnEffect
+  let inline private spawnEffect3D
     (particleStore: Pomo.Core.Stores.ParticleStore)
     (visualEffects: ResizeArray<Particles.VisualEffect>)
     (vfxId: string)
-    (pos: Vector2)
+    (pos: WorldPosition)
     (rotation: Quaternion)
     (owner: Guid<EntityId> voption)
     (area: SkillArea voption)
@@ -305,7 +328,7 @@ module Projectile =
         Id = System.Guid.NewGuid().ToString()
         Emitters = billboardEmitters
         MeshEmitters = meshEmitters
-        Position = ref(Vector3(pos.X, 0.0f, pos.Y))
+        Position = ref(Vector3(pos.X, pos.Y, pos.Z))
         Rotation = ref rotation
         Scale = ref Vector3.One
         IsAlive = ref true
@@ -319,6 +342,24 @@ module Projectile =
 
       visualEffects.Add(effect)
     | ValueNone -> ()
+
+  let inline private spawnEffect2D
+    (particleStore: Pomo.Core.Stores.ParticleStore)
+    (visualEffects: ResizeArray<Particles.VisualEffect>)
+    (vfxId: string)
+    (pos: Vector2)
+    (rotation: Quaternion)
+    (owner: Guid<EntityId> voption)
+    (area: SkillArea voption)
+    =
+    spawnEffect3D
+      particleStore
+      visualEffects
+      vfxId
+      (WorldPosition.fromVector2 pos)
+      rotation
+      owner
+      area
 
   let inline ensureProjectileAnimation
     (stateWrite: IStateWriteService)
@@ -348,11 +389,11 @@ module Projectile =
       if not(ctx.EffectOwners.Contains projectileId) then
         match ctx.Positions |> Dictionary.tryFindV projectileId with
         | ValueSome pos ->
-          spawnEffect
+          spawnEffect3D
             ctx.ParticleStore
             ctx.VisualEffects
             vfxId
-            (WorldPosition.toVector2 pos)
+            pos
             Quaternion.Identity
             (ValueSome projectileId)
             ValueNone
@@ -374,11 +415,33 @@ module Projectile =
             impact.ProjectileId
             impact.ImpactPosition
 
-        spawnEffect
+        let impactPos3D =
+          match ctx.BlockMap with
+          | ValueSome blockMap ->
+            let p = WorldPosition.fromVector2 impact.ImpactPosition
+
+            let surfaceY =
+              BlockCollision.getSurfaceHeight
+                blockMap
+                {
+                  X = p.X
+                  Y = 0f
+                  Z = p.Z
+                }
+              |> ValueOption.defaultValue 0f
+
+            {
+              X = p.X
+              Y = surfaceY
+              Z = p.Z
+            }
+          | ValueNone -> WorldPosition.fromVector2 impact.ImpactPosition
+
+        spawnEffect3D
           ctx.ParticleStore
           ctx.VisualEffects
           vfxId
-          impact.ImpactPosition
+          impactPos3D
           rotation
           ValueNone
           (ValueSome skill.Area)
@@ -406,6 +469,7 @@ module Projectile =
       let liveEntities = gameplay.Projections.LiveEntities |> ASet.force
       let liveProjectiles = core.World.LiveProjectiles |> AMap.force
       let entityScenarios = core.World.EntityScenario |> AMap.force
+      let scenarios = core.World.Scenarios |> AMap.force
       let activeAnims = core.World.ActiveAnimations
       let visualEffects = core.World.VisualEffects
 
@@ -431,12 +495,23 @@ module Projectile =
       let stateEvents = ResizeArray()
 
       for scenarioId, projectiles in projectilesByScenario do
-        let snapshot = gameplay.Projections.ComputeMovementSnapshot(scenarioId)
+        let struct (positions, rotations, blockMapOpt) =
+          match scenarios |> HashMap.tryFindV scenarioId with
+          | ValueSome scenario when scenario.BlockMap.IsSome ->
+            let snapshot3d = gameplay.Projections.ComputeMovement3DSnapshot(scenarioId)
+            snapshot3d.Positions, snapshot3d.Rotations, scenario.BlockMap
+          | _ ->
+            let snapshot2d = gameplay.Projections.ComputeMovementSnapshot(scenarioId)
+            snapshot2d.Positions, snapshot2d.Rotations, ValueNone
 
         let worldCtx = {
           Rng = core.World.Rng
-          Positions = snapshot.Positions
+          Positions = positions
           LiveEntities = liveEntities
+          TryGetSurfaceHeight =
+            match blockMapOpt with
+            | ValueSome blockMap -> fun pos -> BlockCollision.getSurfaceHeight blockMap pos
+            | ValueNone -> fun _ -> ValueNone
         }
 
         // Create visual effect context once per scenario
@@ -444,8 +519,9 @@ module Projectile =
           ParticleStore = stores.ParticleStore
           SkillStore = stores.SkillStore
           VisualEffects = visualEffects
-          Positions = snapshot.Positions
+          Positions = positions
           EffectOwners = effectOwners
+          BlockMap = blockMapOpt
         }
 
         for _, (projectileId, projectile) in projectiles do

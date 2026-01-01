@@ -193,75 +193,94 @@ module ActionHandler =
                     )
 
                   match cameraService.ScreenToWorld(rawMousePos, entityId) with
-                  | ValueSome worldPos -> worldPos
-                  | ValueNone -> WorldPosition.fromVector2 rawMousePos // Fallback if no camera found (shouldn't happen for local player)
+                  | ValueSome worldPos -> ValueSome worldPos
+                  | ValueNone -> ValueNone
 
-                let targetingMode =
-                  targetingService.TargetingMode |> AVal.force
+                match mousePosition with
+                | ValueNone -> ()
+                | ValueSome mousePosition ->
 
-                // Get the entity under the cursor AT THIS MOMENT by forcing the projection.
-                let entityScenarios = projections.EntityScenarios |> AMap.force
-                let scenarios = world.Scenarios |> AMap.force
+                  let targetingMode =
+                    targetingService.TargetingMode |> AVal.force
 
-                let positions, rotations =
-                  match entityScenarios |> HashMap.tryFindV entityId with
-                  | ValueSome scenarioId ->
-                    match scenarios |> HashMap.tryFindV scenarioId with
-                    | ValueSome scenario when scenario.BlockMap.IsSome ->
-                      let snapshot =
-                        projections.ComputeMovement3DSnapshot(scenarioId)
+                  // Get the entity under the cursor AT THIS MOMENT by forcing the projection.
+                  let entityScenarios = projections.EntityScenarios |> AMap.force
+                  let scenarios = world.Scenarios |> AMap.force
 
-                      snapshot.Positions, snapshot.Rotations
-                    | _ ->
-                      let snapshot =
-                        projections.ComputeMovementSnapshot(scenarioId)
+                  let positions, rotations =
+                    match entityScenarios |> HashMap.tryFindV entityId with
+                    | ValueSome scenarioId ->
+                      match scenarios |> HashMap.tryFindV scenarioId with
+                      | ValueSome scenario when scenario.BlockMap.IsSome ->
+                        let snapshot =
+                          projections.ComputeMovement3DSnapshot(scenarioId)
 
-                      snapshot.Positions, snapshot.Rotations
-                  | ValueNone -> Dictionary(), Dictionary()
+                        snapshot.Positions, snapshot.Rotations
+                      | _ ->
+                        let snapshot =
+                          projections.ComputeMovementSnapshot(scenarioId)
 
-                let clickedEntity =
-                  findHoveredEntity
-                    world
-                    positions
-                    rotations
-                    cameraService
-                    entityId
+                        snapshot.Positions, snapshot.Rotations
+                    | ValueNone -> Dictionary(), Dictionary()
 
+                  let clickedEntity =
+                    findHoveredEntity
+                      world
+                      positions
+                      rotations
+                      cameraService
+                      entityId
 
-                match targetingMode with
-                | ValueNone ->
-                  // NOT targeting: This is a click to move or attack
-                  match clickedEntity with
-                  | Some clickedEntityId ->
-                    // An entity was clicked, publish an attack intent
-                    eventBus.Publish(
-                      GameEvent.Intent(
-                        IntentEvent.Attack {
-                          Attacker = entityId
-                          Target = clickedEntityId
-                        }
+                  match targetingMode with
+                  | ValueNone ->
+                    // NOT targeting: This is a click to move or attack
+                    match clickedEntity with
+                    | Some clickedEntityId ->
+                      // An entity was clicked, publish an attack intent
+                      eventBus.Publish(
+                        GameEvent.Intent(
+                          IntentEvent.Attack {
+                            Attacker = entityId
+                            Target = clickedEntityId
+                          }
+                        )
                       )
-                    )
-                  | None ->
-                    // Nothing was clicked, publish a movement command
-                    eventBus.Publish(
-                      GameEvent.Intent(
-                        IntentEvent.MovementTarget {
-                          EntityId = entityId
-                          Target = WorldPosition.toVector2 mousePosition
-                        }
+                    | None ->
+                      // Nothing was clicked, publish a movement command
+                      eventBus.Publish(
+                        GameEvent.Intent(
+                          IntentEvent.MovementTarget {
+                            EntityId = entityId
+                            Target = WorldPosition.toVector2 mousePosition
+                          }
+                        )
                       )
-                    )
 
-                | ValueSome Self ->
-                  // This case should be handled immediately on key press, not click.
-                  ()
+                  | ValueSome Self ->
+                    // This case should be handled immediately on key press, not click.
+                    ()
 
-                | ValueSome TargetEntity ->
-                  match clickedEntity with
-                  | Some clickedEntityId ->
-                    // TODO: Validate if it's an ally/enemy
-                    let selection = SelectedEntity clickedEntityId
+                  | ValueSome TargetEntity ->
+                    match clickedEntity with
+                    | Some clickedEntityId ->
+                      // TODO: Validate if it's an ally/enemy
+                      let selection = SelectedEntity clickedEntityId
+
+                      eventBus.Publish(
+                        GameEvent.Intent(
+                          IntentEvent.TargetSelection {
+                            Selector = entityId
+                            Selection = selection
+                          }
+                        )
+                      )
+                    | None ->
+                      // Invalid target, do nothing for now
+                      ()
+
+                  | ValueSome TargetPosition ->
+                    let selection =
+                      SelectedPosition(WorldPosition.toVector2 mousePosition)
 
                     eventBus.Publish(
                       GameEvent.Intent(
@@ -271,34 +290,18 @@ module ActionHandler =
                         }
                       )
                     )
-                  | None ->
-                    // Invalid target, do nothing for now
-                    ()
+                  | ValueSome TargetDirection ->
+                    let selection =
+                      SelectedPosition(WorldPosition.toVector2 mousePosition)
 
-                | ValueSome TargetPosition ->
-                  let selection =
-                    SelectedPosition(WorldPosition.toVector2 mousePosition)
-
-                  eventBus.Publish(
-                    GameEvent.Intent(
-                      IntentEvent.TargetSelection {
-                        Selector = entityId
-                        Selection = selection
-                      }
+                    eventBus.Publish(
+                      GameEvent.Intent(
+                        IntentEvent.TargetSelection {
+                          Selector = entityId
+                          Selection = selection
+                        }
+                      )
                     )
-                  )
-                | ValueSome TargetDirection ->
-                  let selection =
-                    SelectedPosition(WorldPosition.toVector2 mousePosition)
-
-                  eventBus.Publish(
-                    GameEvent.Intent(
-                      IntentEvent.TargetSelection {
-                        Selector = entityId
-                        Selection = selection
-                      }
-                    )
-                  )
               | ValueSome _
               | ValueNone -> ())
     }
