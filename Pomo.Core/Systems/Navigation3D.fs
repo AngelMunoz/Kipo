@@ -11,6 +11,7 @@ open Pomo.Core.Domain.Units
 open Pomo.Core.Domain.Events
 open Pomo.Core.Domain.BlockMap
 open Pomo.Core.Algorithms
+open Pomo.Core.Algorithms.Pathfinding3D
 open Pomo.Core.Projections
 open Pomo.Core.Environment
 open Pomo.Core.Domain.Spatial
@@ -20,13 +21,10 @@ open Pomo.Core.Domain.Spatial
 module Navigation3D =
 
   /// Build NavGrid3D from BlockMap
-  let inline private buildNavGrid
-    (blockMap: BlockMapDefinition)
-    : Pathfinding3D.NavGrid3D =
-    {
-      BlockMap = blockMap
-      CellSize = CellSize
-    }
+  let inline private buildNavGrid(blockMap: BlockMapDefinition) : NavGrid3D = {
+    BlockMap = blockMap
+    CellSize = CellSize
+  }
 
   /// Try to get entity's 3D position from snapshot
   let inline private tryGetPosition3D
@@ -62,11 +60,11 @@ module Navigation3D =
 
   let private trySnapToNearestWalkable
     (blockMap: BlockMapDefinition)
-    (navGrid: Pathfinding3D.NavGrid3D)
+    (navGrid: NavGrid3D)
     (pos: WorldPosition)
     : WorldPosition voption =
 
-    let startCell = Pathfinding3D.cellOfPosition navGrid pos
+    let startCell = Grid.worldToCell navGrid pos
 
     let inline tryCandidate(cell: GridCell3D) =
       if
@@ -77,7 +75,7 @@ module Navigation3D =
       then
         ValueNone
       else
-        let candidatePos = Pathfinding3D.positionOfCell navGrid cell
+        let candidatePos = Grid.cellToWorld navGrid cell
 
         if isInXZBounds blockMap candidatePos then
           let surfaceYOpt =
@@ -90,9 +88,7 @@ module Navigation3D =
           surfaceYOpt
           |> ValueOption.map(fun surfaceY -> { candidatePos with Y = surfaceY })
           |> ValueOption.filter(fun snapped ->
-            Pathfinding3D.isWalkable
-              navGrid
-              (Pathfinding3D.cellOfPosition navGrid snapped))
+            Grid.isWalkable navGrid (Grid.worldToCell navGrid snapped))
         else
           ValueNone
 
@@ -138,10 +134,10 @@ module Navigation3D =
     (stateWrite: IStateWriteService)
     (eventBus: EventBus)
     (entityId: Guid<EntityId>)
-    (path: WorldPosition list)
+    (path: WorldPosition[])
     =
     // Convert to Vector2 path for current MovementState compatibility
-    let path2D = path |> List.map(fun p -> Vector2(p.X, p.Z))
+    let path2D = path |> Array.map(fun p -> Vector2(p.X, p.Z)) |> Array.toList
     stateWrite.UpdateMovementState(entityId, MovingAlongPath path2D)
 
     eventBus.Publish(
@@ -205,15 +201,15 @@ module Navigation3D =
     let navGrid = buildNavGrid ctx.BlockMap
 
     let startPos =
-      let startCell = Pathfinding3D.cellOfPosition navGrid ctx.CurrentPos
+      let startCell = Grid.worldToCell navGrid ctx.CurrentPos
 
-      if Pathfinding3D.isWalkable navGrid startCell then
+      if Grid.isWalkable navGrid startCell then
         ctx.CurrentPos
       else
         trySnapToNearestWalkable ctx.BlockMap navGrid ctx.CurrentPos
         |> ValueOption.defaultValue ctx.CurrentPos
 
-    match Pathfinding3D.findPath navGrid startPos ctx.TargetPos with
+    match AStar.findPath navGrid startPos ctx.TargetPos with
     | ValueSome path -> publishPath stateWrite eventBus ctx.EntityId path
     | ValueNone -> publishNoPath stateWrite eventBus ctx.EntityId
 
