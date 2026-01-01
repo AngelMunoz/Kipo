@@ -43,7 +43,9 @@ open Pomo.Core.Systems.Collision
 module BlockMapScene =
 
   let inline private clamp (minV: float32) (maxV: float32) (v: float32) =
-    if v < minV then minV elif v > maxV then maxV else v
+    if v < minV then minV
+    elif v > maxV then maxV
+    else v
 
   let private clampToMapBounds (map: BlockMapDefinition) (pos: WorldPosition) =
     let maxX = float32 map.Width * BlockMap.CellSize
