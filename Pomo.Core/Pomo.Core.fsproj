@@ -20,7 +20,6 @@
     <Compile Include="Domain/Map.fs" />
     <Compile Include="Domain/AssetManifest.fs" />
     <Compile Include="Domain/Spatial.fs" />
-    <Compile Include="Domain/Spatial3D.fs" />
     <Compile Include="Domain/BlockMap.fs" />
     <Compile Include="Domain/Navigation.fs" />
     <Compile Include="Domain/AI.fs" />

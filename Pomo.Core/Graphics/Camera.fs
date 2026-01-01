@@ -24,7 +24,7 @@ module Camera =
       Position = Vector3.Zero
       Yaw = isometricYaw
       Pitch = isometricPitch
-      Zoom = 2.5f
+      Zoom = 1.5f
     }
 
   /// Pure transformation functions
