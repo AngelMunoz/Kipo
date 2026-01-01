@@ -6,6 +6,7 @@ open Pomo.Core.Domain
 open Pomo.Core.Domain.BlockMap
 
 module BlockMapLoader =
+  open System.Text.Json
 
   let private resolvePath(filePath: string) =
     if Path.IsPathRooted filePath then
@@ -38,7 +39,11 @@ module BlockMapLoader =
   let save (filePath: string) (map: BlockMapDefinition) : Result<unit, string> =
     try
       let resolvedPath = resolvePath filePath
-      let json = (Serialization.encodeBlockMapDefinition map).ToJsonString()
+
+      let json =
+        (Serialization.encodeBlockMapDefinition map)
+          .ToJsonString(JsonSerializerOptions(WriteIndented = true))
+
       let dir = Path.GetDirectoryName(resolvedPath)
 
       if
