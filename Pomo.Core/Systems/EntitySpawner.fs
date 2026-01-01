@@ -429,6 +429,25 @@ module EntitySpawnerLogic =
         | GameEvent.Spawn(SpawningEvent.SpawnEntity spawn) -> Some spawn
         | _ -> None)
       |> Observable.subscribe(fun intent ->
+        let adjustedPosition =
+          let scenarios = core.World.Scenarios |> AMap.force
+
+          match scenarios |> HashMap.tryFindV intent.ScenarioId with
+          | ValueSome scenario ->
+            match scenario.BlockMap with
+            | ValueSome blockMap ->
+              let surfaceY =
+                BlockCollision.getSurfaceHeight blockMap {
+                  X = intent.Position.X
+                  Y = 0f
+                  Z = intent.Position.Z
+                }
+                |> ValueOption.defaultValue BlockMap.CellSize
+
+              { intent.Position with Y = surfaceY }
+            | ValueNone -> intent.Position
+          | ValueNone -> intent.Position
+
         let totalGameTime =
           core.World.Time |> AVal.map _.TotalGameTime |> AVal.force
 
@@ -441,7 +460,7 @@ module EntitySpawnerLogic =
           EntityId = intent.EntityId
           ScenarioId = intent.ScenarioId
           Type = intent.Type
-          Position = intent.Position
+          Position = adjustedPosition
           SpawnStartTime = totalGameTime
           Duration = duration
         }
