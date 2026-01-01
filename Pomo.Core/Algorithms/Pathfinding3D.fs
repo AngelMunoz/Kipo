@@ -26,7 +26,27 @@ module Pathfinding3D =
       Z = int(pos.Z / grid.CellSize)
     }
 
+  let inline cellOfPosition
+    (grid: NavGrid3D)
+    (pos: WorldPosition)
+    : GridCell3D =
+    {
+      X = int(pos.X / grid.CellSize)
+      Y = int(pos.Y / grid.CellSize)
+      Z = int(pos.Z / grid.CellSize)
+    }
+
   let inline private toWorldPosition
+    (grid: NavGrid3D)
+    (cell: GridCell3D)
+    : WorldPosition =
+    {
+      X = (float32 cell.X + 0.5f) * grid.CellSize
+      Y = float32 cell.Y * grid.CellSize
+      Z = (float32 cell.Z + 0.5f) * grid.CellSize
+    }
+
+  let inline positionOfCell
     (grid: NavGrid3D)
     (cell: GridCell3D)
     : WorldPosition =

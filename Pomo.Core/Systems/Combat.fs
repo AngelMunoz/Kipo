@@ -259,6 +259,7 @@ module Combat =
       (activeSkill: ActiveSkill)
       =
       let result = applySkillDamage ctx casterId targetId activeSkill
+
       let targetPos =
         ctx.EntityContext.Positions
         |> Dictionary.tryFindV targetId
@@ -372,6 +373,7 @@ module Combat =
     let spawnEffect
       (ctx: WorldContext)
       (vfxId: string)
+      (owner: Guid<EntityId> voption)
       (pos: Vector2)
       (rotation: Quaternion)
       (area: SkillArea)
@@ -389,7 +391,7 @@ module Combat =
           Rotation = ref rotation
           Scale = ref Vector3.One
           IsAlive = ref true
-          Owner = ValueNone
+          Owner = owner
           Overrides = {
             EffectOverrides.empty with
                 Rotation = ValueSome rotation
@@ -594,6 +596,13 @@ module Combat =
       match targetCenter with
       | ValueNone -> () // No center to apply AoE
       | ValueSome center ->
+        let effectOwner =
+          match target with
+          | SystemCommunications.TargetEntity targetId -> ValueSome targetId
+          | SystemCommunications.TargetDirection _
+          | SystemCommunications.TargetSelf -> ValueSome casterId
+          | SystemCommunications.TargetPosition _ -> ValueNone
+
         // Spawn Visuals
         match activeSkill.ImpactVisuals.VfxId with
         | ValueSome vfxId ->
@@ -642,7 +651,13 @@ module Combat =
 
           let rotation = yaw * pitch
 
-          Visuals.spawnEffect ctx vfxId center rotation activeSkill.Area
+          Visuals.spawnEffect
+            ctx
+            vfxId
+            effectOwner
+            center
+            rotation
+            activeSkill.Area
         | ValueNone -> ()
 
         let targets =
@@ -1018,12 +1033,11 @@ module Combat =
               // Compensate for altitude (3D Y) - in 2:1 isometric, altitude
               // visually raises the coin on screen. To match that position with
               // a grounded projectile, we subtract half the altitude from logic Y.
-              let spawnPos =
-                {
-                    WorldPosition.X = spawnPos3D.X
-                    Y = spawnPos3D.Y
-                    Z = spawnPos3D.Z
-                }
+              let spawnPos = {
+                WorldPosition.X = spawnPos3D.X
+                Y = spawnPos3D.Y
+                Z = spawnPos3D.Z
+              }
 
               // Determine specific target for this projectile
               let target =

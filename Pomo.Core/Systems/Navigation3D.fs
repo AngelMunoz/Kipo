@@ -13,6 +13,7 @@ open Pomo.Core.Domain.BlockMap
 open Pomo.Core.Algorithms
 open Pomo.Core.Projections
 open Pomo.Core.Environment
+open Pomo.Core.Domain.Spatial
 
 /// 3D Navigation system for BlockMap scenarios
 /// Uses Pathfinding3D for click-to-move on block-based terrain
@@ -49,6 +50,88 @@ module Navigation3D =
       Y = surfaceY
       Z = basePos.Z
     }
+
+  let inline private isInXZBounds
+    (blockMap: BlockMapDefinition)
+    (pos: WorldPosition)
+    : bool =
+    pos.X >= 0f
+    && pos.Z >= 0f
+    && pos.X < float32 blockMap.Width * CellSize
+    && pos.Z < float32 blockMap.Depth * CellSize
+
+  let private trySnapToNearestWalkable
+    (blockMap: BlockMapDefinition)
+    (navGrid: Pathfinding3D.NavGrid3D)
+    (pos: WorldPosition)
+    : WorldPosition voption =
+
+    let startCell = Pathfinding3D.cellOfPosition navGrid pos
+
+    let inline tryCandidate(cell: GridCell3D) =
+      if
+        cell.X < 0
+        || cell.X >= blockMap.Width
+        || cell.Z < 0
+        || cell.Z >= blockMap.Depth
+      then
+        ValueNone
+      else
+        let candidatePos = Pathfinding3D.positionOfCell navGrid cell
+
+        if isInXZBounds blockMap candidatePos then
+          let surfaceYOpt =
+            BlockCollision.getSurfaceHeight blockMap {
+              X = candidatePos.X
+              Y = 0f
+              Z = candidatePos.Z
+            }
+
+          surfaceYOpt
+          |> ValueOption.map(fun surfaceY -> { candidatePos with Y = surfaceY })
+          |> ValueOption.filter(fun snapped ->
+            Pathfinding3D.isWalkable
+              navGrid
+              (Pathfinding3D.cellOfPosition navGrid snapped))
+        else
+          ValueNone
+
+    let maxRadius = 6
+
+    let mutable found = ValueNone
+    let mutable r = 0
+
+    while found.IsNone && r <= maxRadius do
+      let mutable dx = -r
+
+      while found.IsNone && dx <= r do
+        let absDx = if dx < 0 then -dx else dx
+        let dzMax = r - absDx
+        let dz1 = -dzMax
+        let dz2 = dzMax
+
+        let cell1 = {
+          X = startCell.X + dx
+          Y = startCell.Y
+          Z = startCell.Z + dz1
+        }
+
+        found <- tryCandidate cell1
+
+        if found.IsNone && dz2 <> dz1 then
+          let cell2 = {
+            X = startCell.X + dx
+            Y = startCell.Y
+            Z = startCell.Z + dz2
+          }
+
+          found <- tryCandidate cell2
+
+        dx <- dx + 1
+
+      r <- r + 1
+
+    found
 
   /// Publish path update for entity
   let inline private publishPath
@@ -121,7 +204,16 @@ module Navigation3D =
     =
     let navGrid = buildNavGrid ctx.BlockMap
 
-    match Pathfinding3D.findPath navGrid ctx.CurrentPos ctx.TargetPos with
+    let startPos =
+      let startCell = Pathfinding3D.cellOfPosition navGrid ctx.CurrentPos
+
+      if Pathfinding3D.isWalkable navGrid startCell then
+        ctx.CurrentPos
+      else
+        trySnapToNearestWalkable ctx.BlockMap navGrid ctx.CurrentPos
+        |> ValueOption.defaultValue ctx.CurrentPos
+
+    match Pathfinding3D.findPath navGrid startPos ctx.TargetPos with
     | ValueSome path -> publishPath stateWrite eventBus ctx.EntityId path
     | ValueNone -> publishNoPath stateWrite eventBus ctx.EntityId
 
