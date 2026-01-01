@@ -21,6 +21,7 @@ open Pomo.Core.Environment
 open Pomo.Core.Graphics
 open Pomo.Core.Domain.Spatial
 open Systems
+open Pomo.Core.Domain.Core.Constants
 
 /// Shared context and result types for AI system
 
@@ -321,7 +322,7 @@ module Perception =
   let gatherCues (ctx: PerceptionContext) (world: WorldSnapshot) =
     let cells =
       Spatial.getCellsInRadius
-        Constants.Collision.GridCellSize
+        BlockMap.CellSize
         ctx.Entity.Position
         ctx.Archetype.perceptionConfig.visualRange
 

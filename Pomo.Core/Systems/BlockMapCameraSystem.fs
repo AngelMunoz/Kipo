@@ -13,6 +13,7 @@ open Pomo.Core.Domain.BlockMap
 open Pomo.Core.Graphics
 open Pomo.Core.Projections
 open Pomo.Core.Algorithms
+open Pomo.Core.Domain.Core.Constants
 
 /// Camera system for BlockMap 3D scenes.
 /// Uses Camera3D module for true 3D orthographic projection.

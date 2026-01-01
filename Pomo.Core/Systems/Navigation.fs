@@ -35,8 +35,7 @@ module Navigation =
       | false, _ ->
         let mapDef = mapStore.find mapKey
 
-        let grid =
-          Grid.generate mapDef Constants.Navigation.GridCellSize entitySize
+        let grid = Grid.generate mapDef Constants.BlockMap.CellSize entitySize
 
         gridCache[mapKey] <- grid
         grid

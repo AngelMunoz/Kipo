@@ -16,6 +16,7 @@ open Pomo.Core.Stores
 open Pomo.Core.Domain.Events
 open Pomo.Core.Systems.Systems
 open Pomo.Core.Domain.Core
+open Pomo.Core.Domain.Core.Constants
 
 module Collision =
   open Pomo.Core.Domain
@@ -162,7 +163,7 @@ module Collision =
       | ValueSome grid -> grid
       | ValueNone ->
         // Build the spatial grid for static map objects
-        let cellSize = Core.Constants.Collision.GridCellSize
+        let cellSize = BlockMap.CellSize
 
         let grid =
           map.ObjectGroups
@@ -287,10 +288,7 @@ module Collision =
 
         // Check for entity-entity collisions
         for KeyValue(entityId, pos) in positions do
-          let cell =
-            getGridCell
-              Core.Constants.Collision.GridCellSize
-              (WorldPosition.toVector2 pos)
+          let cell = getGridCell BlockMap.CellSize (WorldPosition.toVector2 pos)
 
           let nearbyEntities = getNearbyTo cell
 
@@ -391,10 +389,7 @@ module Collision =
                   let entityPoly = getEntityPolygon currentPos2d
                   let entityAxes = getAxes entityPoly
 
-                  let cell =
-                    getGridCell
-                      Core.Constants.Collision.GridCellSize
-                      currentPos2d
+                  let cell = getGridCell BlockMap.CellSize currentPos2d
 
                   nearbyObjectsSet.Clear()
 

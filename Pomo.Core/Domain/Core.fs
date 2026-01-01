@@ -71,9 +71,13 @@ module Core =
 
 
   module Constants =
+    module BlockMap =
+      [<Literal>]
+      let CellSize = 64.0f
+
     let DefaultPixelsPerUnit = Vector2(64.0f, 32.0f)
     /// Pixels per unit for BlockMap 3D rendering (1:1 aspect ratio)
-    let BlockMap3DPixelsPerUnit = Vector2(64.0f, 64.0f)
+    let BlockMap3DPixelsPerUnit = Vector2(BlockMap.CellSize, BlockMap.CellSize)
 
     module Entity =
       let Size = Vector2(16.0f, 16.0f)
@@ -94,14 +98,7 @@ module Core =
     module UI =
       let TargetingIndicatorSize = Vector2(20.0f, 20.0f)
 
-    module Collision =
-      [<Literal>]
-      let GridCellSize = 64.0f
-
     module Navigation =
-      [<Literal>]
-      let GridCellSize = 8.0f
-
       let EntitySize = Vector2(4.0f, 4.0f)
 
     module Spawning =

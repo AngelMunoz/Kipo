@@ -38,6 +38,7 @@ open Pomo.Core.Systems.EntitySpawnerLogic
 open Pomo.Core.Systems.StateWrite
 open Pomo.Core.Systems.Collision
 open Pomo.Core.Algorithms
+open Pomo.Core.Domain.Core.Constants
 
 /// BlockMap-based gameplay scene for 3D voxel worlds
 /// Mirrors GameplayScene but uses BlockMaps for collision/navigation

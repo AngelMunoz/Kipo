@@ -17,6 +17,7 @@ open Pomo.Core.Domain.Spatial
 open Pomo.Core.Domain.Projectile
 open Pomo.Core.Domain.Skill
 open Pomo.Core.Algorithms
+open Pomo.Core.Domain.Core.Constants
 
 module Projections =
   let private liveEntities(world: World) =
@@ -432,7 +433,7 @@ module Projections =
           // Calculate Grid Cell
           let cell =
             Spatial.getGridCell
-              Core.Constants.Collision.GridCellSize
+              BlockMap.CellSize
               (WorldPosition.toVector2 currentPos)
 
           // Add to Grid (O(1) amortized with ResizeArray)
@@ -656,11 +657,7 @@ module Projections =
         member _.GetNearbyEntitiesSnapshot
           (snapshot, liveEntities, center, radius)
           =
-          let cells =
-            Spatial.getCellsInRadius
-              Constants.Collision.GridCellSize
-              center
-              radius
+          let cells = Spatial.getCellsInRadius BlockMap.CellSize center radius
 
           let potentialTargets =
             cells

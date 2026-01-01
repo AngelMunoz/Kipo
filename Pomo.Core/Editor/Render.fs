@@ -12,6 +12,7 @@ open Pomo.Core.Domain.Spatial
 open Pomo.Core.Graphics
 open Pomo.Core.Rendering
 open Pomo.Core.Algorithms
+open Pomo.Core.Domain.Core.Constants
 
 module EditorRender =
 

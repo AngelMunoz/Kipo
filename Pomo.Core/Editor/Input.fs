@@ -8,6 +8,7 @@ open Pomo.Core.Domain
 open Pomo.Core.Domain.Core
 open Pomo.Core.Domain.Spatial
 open Pomo.Core.Domain.BlockMap
+open Pomo.Core.Domain.Core.Constants
 open Pomo.Core.Algorithms
 
 module EditorInput =

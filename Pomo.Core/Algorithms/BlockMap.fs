@@ -5,10 +5,9 @@ open Pomo.Core.Domain.Core
 open Pomo.Core.Domain.BlockMap
 open Pomo.Core.Domain.Skill
 open Pomo.Core.Domain.Spatial
+open Pomo.Core.Domain.Core.Constants
 
 module BlockMap =
-
-  let CellSize = 32.0f
 
   let inline createEmpty
     (key: string)
@@ -46,15 +45,15 @@ module BlockMap =
       |> ValueOption.bind(fun blockType -> blockType.Effect))
 
   let inline cellToWorldPosition(cell: GridCell3D) : WorldPosition = {
-    X = float32 cell.X * CellSize + CellSize / 2.0f
-    Y = float32 cell.Y * CellSize + CellSize / 2.0f
-    Z = float32 cell.Z * CellSize + CellSize / 2.0f
+    X = float32 cell.X * BlockMap.CellSize + BlockMap.CellSize / 2.0f
+    Y = float32 cell.Y * BlockMap.CellSize + BlockMap.CellSize / 2.0f
+    Z = float32 cell.Z * BlockMap.CellSize + BlockMap.CellSize / 2.0f
   }
 
   let inline worldPositionToCell(pos: WorldPosition) : GridCell3D = {
-    X = int(pos.X / CellSize)
-    Y = int(pos.Y / CellSize)
-    Z = int(pos.Z / CellSize)
+    X = int(pos.X / BlockMap.CellSize)
+    Y = int(pos.Y / BlockMap.CellSize)
+    Z = int(pos.Z / BlockMap.CellSize)
   }
 
   let inline tryGetBlock

@@ -3,7 +3,7 @@ namespace Pomo.Core
 open Pomo.Core.Domain.Core
 open Pomo.Core.Domain.BlockMap
 open Pomo.Core.Domain.Entity
-open Pomo.Core.Algorithms
+open Pomo.Core.Domain.Core.Constants
 
 /// Spawning utilities for BlockMap-based scenarios
 module BlockMapSpawning =

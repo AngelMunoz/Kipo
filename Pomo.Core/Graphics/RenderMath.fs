@@ -4,7 +4,7 @@ open System
 open Microsoft.Xna.Framework
 open Microsoft.Xna.Framework.Graphics
 open Pomo.Core.Domain.Core
-open Pomo.Core.Algorithms
+open Pomo.Core.Domain.Core.Constants
 
 /// Coordinate Space Transformations for Isometric Rendering
 ///

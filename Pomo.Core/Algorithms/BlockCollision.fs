@@ -5,7 +5,7 @@ open Pomo.Core
 open Pomo.Core.Domain.Core
 open Pomo.Core.Domain.Spatial
 open Pomo.Core.Domain.BlockMap
-open Pomo.Core.Algorithms
+open Pomo.Core.Domain.Core.Constants
 
 module BlockCollision =
 

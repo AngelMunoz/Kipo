@@ -15,6 +15,7 @@ open Pomo.Core.Algorithms.Pathfinding3D
 open Pomo.Core.Projections
 open Pomo.Core.Environment
 open Pomo.Core.Domain.Spatial
+open Pomo.Core.Domain.Core.Constants
 
 /// 3D Navigation system for BlockMap scenarios
 /// Uses Pathfinding3D for click-to-move on block-based terrain

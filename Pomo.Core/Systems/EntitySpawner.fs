@@ -19,6 +19,7 @@ open Pomo.Core
 open Systems
 open Pomo.Core.Environment
 open Pomo.Core.Algorithms
+open Pomo.Core.Domain.Core.Constants
 
 module EntitySpawnerLogic =
   [<Struct>]

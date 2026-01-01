@@ -6,6 +6,7 @@ open Microsoft.Xna.Framework.Content
 open Microsoft.Xna.Framework.Graphics
 open Pomo.Core.Domain.BlockMap
 open Pomo.Core.Graphics
+open Pomo.Core.Domain.Core.Constants
 open Pomo.Core.Algorithms
 
 module BlockEmitter =

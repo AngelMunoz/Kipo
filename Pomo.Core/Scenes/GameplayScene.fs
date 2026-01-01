@@ -21,6 +21,7 @@ open Pomo.Core.Domain.UI
 open Pomo.Core.Stores
 open Pomo.Core.Environment
 open Pomo.Core.Algorithms
+open Pomo.Core.Domain.Core.Constants
 
 // System Imports
 open Pomo.Core.Systems
@@ -212,8 +213,8 @@ module GameplayScene =
       let navGrid =
         Algorithms.Pathfinding.Grid.generate
           mapDef
-          Domain.Core.Constants.Navigation.GridCellSize
-          Domain.Core.Constants.Navigation.EntitySize
+          BlockMap.CellSize
+          Navigation.EntitySize
 
       let candidates = MapSpawning.extractSpawnCandidates mapDef navGrid random
 
