@@ -67,3 +67,25 @@ module BlockMapSpawning =
       | MapObjectData.Spawn props when props.Faction = ValueSome faction ->
         output.Add(obj)
       | _ -> ()
+
+  let extractSpawnCandidates
+    (map: BlockMapDefinition)
+    : MapSpawning.SpawnCandidate array =
+    let output = ResizeArray<MapSpawning.SpawnCandidate>()
+
+    for obj in map.Objects do
+      match obj.Data with
+      | MapObjectData.Spawn props ->
+        let count = max 1 props.MaxSpawns
+        let pos = WorldPosition.toVector2 obj.Position
+
+        for _ in 1..count do
+          output.Add {
+            Name = obj.Name
+            IsPlayerSpawn = props.IsPlayerSpawn
+            EntityGroup = props.EntityGroup
+            Position = pos
+          }
+      | _ -> ()
+
+    output.ToArray()

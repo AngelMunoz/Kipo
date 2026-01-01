@@ -202,12 +202,6 @@ module BlockMapScene =
       BlockMapSpawning.findPlayerSpawnPosition blockMap
       |> clampToMapBounds blockMap
 
-    let mutable playtestEnemyId: Guid<EntityId> voption = ValueNone
-
-    let mutable playtestEnemySpawn
-      : struct (WorldPosition * SystemCommunications.FactionSpawnInfo) voption =
-      ValueNone
-
     let playerIntent: SystemCommunications.SpawnEntityIntent = {
       EntityId = playerId
       ScenarioId = scenarioId
@@ -217,86 +211,60 @@ module BlockMapScene =
 
     eventBus.Publish(GameEvent.Spawn(SpawningEvent.SpawnEntity playerIntent))
 
-    let tryFindEnemySpawn(map: BlockMapDefinition) =
-      map.Objects
-      |> List.tryPick(fun obj ->
-        match obj.Data with
-        | MapObjectData.Spawn props when not props.IsPlayerSpawn ->
-          props.EntityGroup
-          |> ValueOption.map(fun group -> struct (obj, group))
-          |> ValueOption.toOption
-        | _ -> None)
+    let mapKey = blockMap.MapKey |> ValueOption.defaultValue blockMap.Key
 
-    let tryResolvePlaytestEnemy
-      (groupName: string)
-      : MapSpawning.ResolvedEntityInfo voption =
-      let tryResolveFrom(store: MapEntityGroupStore option) =
-        MapSpawning.tryResolveEntityFromGroup
-          random
-          store
-          stores.AIEntityStore
-          groupName
+    let mapEntityGroupStore =
+      let primary = MapSpawning.tryLoadMapEntityGroupStore mapKey
+      let proto = MapSpawning.tryLoadMapEntityGroupStore "Proto"
 
-      let primary = MapSpawning.tryLoadMapEntityGroupStore blockMap.Key
+      match primary, proto with
+      | Some p, Some pr ->
+        let tryFindMerged groupName =
+          p.tryFind groupName
+          |> ValueOption.orElseWith(fun () -> pr.tryFind groupName)
 
-      tryResolveFrom primary
-      |> ValueOption.orElseWith(fun () ->
-        tryResolveFrom(MapSpawning.tryLoadMapEntityGroupStore "Proto"))
+        Some(
+          { new MapEntityGroupStore with
+              member _.tryFind groupName = tryFindMerged groupName
 
-    let trySpawnSingleEnemy() =
-      let struct (spawnObj, groupName) =
-        tryFindEnemySpawn blockMap
-        |> Option.defaultValue(
-          struct ({
-                    Id = 0
-                    Name = "Playtest Enemy"
-                    Position = {
-                      X = playerPos.X + BlockMap.CellSize * 4.0f
-                      Y = playerPos.Y
-                      Z = playerPos.Z
-                    }
-                    Rotation = ValueNone
-                    Shape = MapObjectShape.Box(Vector3(BlockMap.CellSize))
-                    Data =
-                      MapObjectData.Spawn {
-                        IsPlayerSpawn = false
-                        EntityGroup = ValueSome "magic_casters"
-                        MaxSpawns = 1
-                        Faction = ValueNone
-                      }
-                  },
-                  "magic_casters")
+              member _.find groupName =
+                match tryFindMerged groupName with
+                | ValueSome g -> g
+                | ValueNone -> failwith $"MapEntityGroup not found: {groupName}"
+
+              member _.all() = seq {
+                yield! p.all()
+                yield! pr.all()
+              }
+          }
         )
+      | Some p, None -> Some p
+      | None, Some pr -> Some pr
+      | None, None -> None
 
-      let resolved = tryResolvePlaytestEnemy groupName
+    let candidates = BlockMapSpawning.extractSpawnCandidates blockMap
 
-      resolved
-      |> ValueOption.iter(fun resolved ->
-        let enemyId = Guid.NewGuid() |> UMX.tag
+    let maxEnemies =
+      candidates |> Array.sumBy(fun c -> if c.IsPlayerSpawn then 0 else 1)
 
-        let info: SystemCommunications.FactionSpawnInfo = {
-          ArchetypeId = resolved.ArchetypeId
-          EntityDefinitionKey = ValueSome resolved.EntityKey
-          MapOverride = resolved.MapOverride
-          Faction = resolved.Faction
-          SpawnZoneName = ValueSome spawnObj.Name
-        }
+    let spawnCtx: MapSpawning.SpawnContext = {
+      Random = random
+      MapEntityGroupStore = mapEntityGroupStore
+      EntityStore = stores.AIEntityStore
+      ScenarioId = scenarioId
+      MaxEnemies = maxEnemies
+    }
 
-        let enemyIntent: SystemCommunications.SpawnEntityIntent = {
-          EntityId = enemyId
-          ScenarioId = scenarioId
-          Type = SystemCommunications.SpawnType.Faction info
-          Position = spawnObj.Position |> clampToMapBounds blockMap
-        }
+    let publisher: MapSpawning.SpawnEventPublisher = {
+      RegisterZones =
+        fun zones ->
+          eventBus.Publish(GameEvent.Spawn(SpawningEvent.RegisterZones zones))
+      SpawnEntity =
+        fun entity ->
+          eventBus.Publish(GameEvent.Spawn(SpawningEvent.SpawnEntity entity))
+    }
 
-        playtestEnemyId <- ValueSome enemyId
-        playtestEnemySpawn <- ValueSome struct (enemyIntent.Position, info)
-
-        eventBus.Publish(
-          GameEvent.Spawn(SpawningEvent.SpawnEntity enemyIntent)
-        ))
-
-    trySpawnSingleEnemy()
+    MapSpawning.spawnEnemiesForScenario spawnCtx candidates publisher
 
     // 8. RenderOrchestrator for BlockMap
     let renderOrchestrator =
@@ -323,34 +291,6 @@ module BlockMapScene =
       | GuiAction.ExitGame -> ()
 
     let subs = new CompositeDisposable()
-
-    subs.Add(
-      eventBus.Observable
-      |> Observable.choose(fun e ->
-        match e with
-        | GameEvent.Lifecycle(LifecycleEvent.EntityDied died) -> Some died
-        | _ -> None)
-      |> Observable.subscribe(fun died ->
-        match playtestEnemyId, playtestEnemySpawn with
-        | ValueSome currentId, ValueSome struct (spawnPos, info) when
-          died.EntityId = currentId
-          ->
-          let newEnemyId = Guid.NewGuid() |> UMX.tag
-
-          let respawnIntent: SystemCommunications.SpawnEntityIntent = {
-            EntityId = newEnemyId
-            ScenarioId = scenarioId
-            Type = SystemCommunications.SpawnType.Faction info
-            Position = spawnPos
-          }
-
-          playtestEnemyId <- ValueSome newEnemyId
-
-          eventBus.Publish(
-            GameEvent.Spawn(SpawningEvent.SpawnEntity respawnIntent)
-          )
-        | _ -> ())
-    )
 
     // Listen for Escape to return to editor
     subs.Add(
