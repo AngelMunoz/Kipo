@@ -24,7 +24,8 @@ module Projectile =
   [<Struct>]
   type WorldContext = {
     Rng: Random
-    Positions: Collections.Generic.IReadOnlyDictionary<Guid<EntityId>, WorldPosition>
+    Positions:
+      Collections.Generic.IReadOnlyDictionary<Guid<EntityId>, WorldPosition>
     LiveEntities: HashSet<Guid<EntityId>>
     TryGetSurfaceHeight: WorldPosition -> float32 voption
   }
@@ -58,7 +59,8 @@ module Projectile =
         && id <> casterId
         && id <> currentTargetId
       then
-        let distanceSq = Vector2.DistanceSquared(originPos2d, WorldPosition.toVector2 pos)
+        let distanceSq =
+          Vector2.DistanceSquared(originPos2d, WorldPosition.toVector2 pos)
 
         if distanceSq <= maxRangeSq then
           candidates.Add(struct (id, distanceSq))
@@ -106,13 +108,12 @@ module Projectile =
       stateWrite.RemoveEntity(ctx.Id)
 
       // Update Y position to match altitude
-      let newPos = { ctx.Position with Y = baseHeight + newAltitude }
+      let newPos = {
+        ctx.Position with
+            Y = baseHeight + newAltitude
+      }
 
-      stateWrite.CreateProjectile(
-        ctx.Id,
-        updatedProjectile,
-        ValueSome newPos
-      )
+      stateWrite.CreateProjectile(ctx.Id, updatedProjectile, ValueSome newPos)
 
     commEvents |> IndexList.ofSeq
 
@@ -228,7 +229,7 @@ module Projectile =
     let targetPos =
       match projectile.Target with
       | EntityTarget entityId -> world.Positions.TryFindV entityId
-      | PositionTarget pos -> ValueSome (WorldPosition.fromVector2 pos)
+      | PositionTarget pos -> ValueSome(WorldPosition.fromVector2 pos)
 
     let targetEntity =
       match projectile.Target with
@@ -258,11 +259,7 @@ module Projectile =
           | Projectile.PositionTarget pos ->
             let p = WorldPosition.fromVector2 pos
 
-            world.TryGetSurfaceHeight {
-              X = p.X
-              Y = 0f
-              Z = p.Z
-            }
+            world.TryGetSurfaceHeight { X = p.X; Y = 0f; Z = p.Z }
             |> ValueOption.defaultValue 0f
           | Projectile.EntityTarget _ ->
             world.TryGetSurfaceHeight {
@@ -272,7 +269,13 @@ module Projectile =
             }
             |> ValueOption.defaultValue targetPos.Y
 
-        processDescendingProjectile stateWrite dt ctx baseHeight currentAltitude fallSpeed
+        processDescendingProjectile
+          stateWrite
+          dt
+          ctx
+          baseHeight
+          currentAltitude
+          fallSpeed
       | _ -> processHorizontalProjectile stateWrite world ctx
 
 
@@ -282,32 +285,39 @@ module Projectile =
     ParticleStore: Pomo.Core.Stores.ParticleStore
     SkillStore: Pomo.Core.Stores.SkillStore
     VisualEffects: ResizeArray<Particles.VisualEffect>
-    Positions: Collections.Generic.IReadOnlyDictionary<Guid<EntityId>, WorldPosition>
+    Positions:
+      Collections.Generic.IReadOnlyDictionary<Guid<EntityId>, WorldPosition>
     EffectOwners: Collections.Generic.HashSet<Guid<EntityId>>
     BlockMap: BlockMapDefinition voption
   }
 
   /// Calculates rotation quaternion for impact visuals based on projectile direction
   let inline calculateImpactRotation
-    (positions: Collections.Generic.IReadOnlyDictionary<Guid<EntityId>, WorldPosition>)
+    (positions:
+      Collections.Generic.IReadOnlyDictionary<Guid<EntityId>, WorldPosition>)
     (projectileId: Guid<EntityId>)
     (targetPos: Vector2)
     =
     match positions |> Dictionary.tryFindV projectileId with
     | ValueSome projPos ->
-        let projPos2d = WorldPosition.toVector2 projPos
-        if projPos2d <> targetPos then
-          let dir = Vector2.Normalize(targetPos - projPos2d)
-          let angle = MathF.Atan2(dir.Y, dir.X)
+      let projPos2d = WorldPosition.toVector2 projPos
 
-          let yaw =
-            Quaternion.CreateFromAxisAngle(Vector3.Up, -angle + MathHelper.PiOver2)
+      if projPos2d <> targetPos then
+        let dir = Vector2.Normalize(targetPos - projPos2d)
+        let angle = MathF.Atan2(dir.Y, dir.X)
 
-          let pitch =
-            Quaternion.CreateFromAxisAngle(Vector3.UnitX, MathHelper.PiOver2)
+        let yaw =
+          Quaternion.CreateFromAxisAngle(
+            Vector3.Up,
+            -angle + MathHelper.PiOver2
+          )
 
-          yaw * pitch
-        else Quaternion.Identity
+        let pitch =
+          Quaternion.CreateFromAxisAngle(Vector3.UnitX, MathHelper.PiOver2)
+
+        yaw * pitch
+      else
+        Quaternion.Identity
     | _ -> Quaternion.Identity
 
   let inline private spawnEffect3D
@@ -421,20 +431,14 @@ module Projectile =
             let p = WorldPosition.fromVector2 impact.ImpactPosition
 
             let surfaceY =
-              BlockCollision.getSurfaceHeight
-                blockMap
-                {
-                  X = p.X
-                  Y = 0f
-                  Z = p.Z
-                }
+              BlockCollision.getSurfaceHeight blockMap {
+                X = p.X
+                Y = 0f
+                Z = p.Z
+              }
               |> ValueOption.defaultValue 0f
 
-            {
-              X = p.X
-              Y = surfaceY
-              Z = p.Z
-            }
+            { X = p.X; Y = surfaceY; Z = p.Z }
           | ValueNone -> WorldPosition.fromVector2 impact.ImpactPosition
 
         spawnEffect3D
@@ -498,10 +502,14 @@ module Projectile =
         let struct (positions, rotations, blockMapOpt) =
           match scenarios |> HashMap.tryFindV scenarioId with
           | ValueSome scenario when scenario.BlockMap.IsSome ->
-            let snapshot3d = gameplay.Projections.ComputeMovement3DSnapshot(scenarioId)
+            let snapshot3d =
+              gameplay.Projections.ComputeMovement3DSnapshot(scenarioId)
+
             snapshot3d.Positions, snapshot3d.Rotations, scenario.BlockMap
           | _ ->
-            let snapshot2d = gameplay.Projections.ComputeMovementSnapshot(scenarioId)
+            let snapshot2d =
+              gameplay.Projections.ComputeMovementSnapshot(scenarioId)
+
             snapshot2d.Positions, snapshot2d.Rotations, ValueNone
 
         let worldCtx = {
@@ -510,7 +518,8 @@ module Projectile =
           LiveEntities = liveEntities
           TryGetSurfaceHeight =
             match blockMapOpt with
-            | ValueSome blockMap -> fun pos -> BlockCollision.getSurfaceHeight blockMap pos
+            | ValueSome blockMap ->
+              fun pos -> BlockCollision.getSurfaceHeight blockMap pos
             | ValueNone -> fun _ -> ValueNone
         }
 

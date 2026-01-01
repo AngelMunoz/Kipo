@@ -80,12 +80,11 @@ module BlockMapCameraSystem =
           if entityId = playerId then
             let viewport = game.GraphicsDevice.Viewport
 
-            let inline adjustCenter(pos: WorldPosition) : WorldPosition =
-              {
-                pos with
-                    X = pos.X - centerOffset.X * ppu
-                    Z = pos.Z - centerOffset.Z * ppu
-              }
+            let inline adjustCenter(pos: WorldPosition) : WorldPosition = {
+              pos with
+                  X = pos.X - centerOffset.X * ppu
+                  Z = pos.Z - centerOffset.Z * ppu
+            }
 
             let inline isInBounds(pos: WorldPosition) =
               pos.X >= 0f
@@ -107,13 +106,11 @@ module BlockMapCameraSystem =
 
               if isInBounds pos then
                 let surfaceY =
-                  BlockCollision.getSurfaceHeight
-                    blockMap
-                    {
-                      X = pos.X
-                      Y = 0f
-                      Z = pos.Z
-                    }
+                  BlockCollision.getSurfaceHeight blockMap {
+                    X = pos.X
+                    Y = 0f
+                    Z = pos.Z
+                  }
                   |> ValueOption.defaultValue 0f
 
                 planeY <- surfaceY
@@ -124,10 +121,7 @@ module BlockMapCameraSystem =
               else
                 planeY <- lastPlaneY
 
-            if isInBounds pos then
-              ValueSome pos
-            else
-              ValueNone
+            if isInBounds pos then ValueSome pos else ValueNone
           else
             ValueNone
 

@@ -204,7 +204,9 @@ module ActionHandler =
                     targetingService.TargetingMode |> AVal.force
 
                   // Get the entity under the cursor AT THIS MOMENT by forcing the projection.
-                  let entityScenarios = projections.EntityScenarios |> AMap.force
+                  let entityScenarios =
+                    projections.EntityScenarios |> AMap.force
+
                   let scenarios = world.Scenarios |> AMap.force
 
                   let positions, rotations =
