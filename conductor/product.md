@@ -22,6 +22,8 @@ For the moment this is not intended to be a fully fledged videogame that one can
 - **Advanced AI System:** Data-driven AI using archetypes and decision trees for complex entity behaviors.
 - **Adaptive Game State:** Utilization of `FSharp.Data.Adaptive` for efficient change propagation and derived computations.
 - **Core RPG Mechanics:** Deep implementation of stats, skills, damage calculations, and inventory systems.
+- **True 3D World Architecture:** Full 3D logic for physics, collision, and pathfinding, decoupled from the camera view.
+- **Integrated Map Editor:** Built-in 3D block map editor.
 - **High-Performance Rendering:** Parallelized, command-based rendering pipeline separating logic from isometric presentation.
 - **Advanced VFX System:** Support for hybrid particle systems including billboard textures and 3D mesh particles (e.g., domes, columns).
 - **Cross-Platform Architecture:** Shared core logic across Windows, Android, iOS, and DesktopGL.

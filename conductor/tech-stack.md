@@ -27,5 +27,5 @@
 ## Rendering Engine
 
 - **Architecture:** Parallelized Command-Based Rendering (Emitters -> Command Arrays -> Batch Renderer).
-- **Coordinate System:** Strict separation of Logic Space (2D) and Render Space (Isometric 3D) via centralized `RenderMath`.
+- **Coordinate System:** True 3D Logic Space (`WorldPosition`) with decoupled Camera Views (Isometric, Free-Fly) via `RenderMath`.
 - **Optimization:** Thread-safe parallel emission, zero-allocation command structs, and aggressive buffer reuse.
