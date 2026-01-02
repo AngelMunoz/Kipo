@@ -2,7 +2,7 @@
 
 An ARPG engine prototype, built as a playground for exploring functional game development patterns in F# and MonoGame.
 
-![Demo](./2025-12-23%2009-10-54.gif)
+![Demo](./2026-01-01%2023-33-39.gif)
 
 ## What is This?
 
