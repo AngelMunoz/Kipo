@@ -7,6 +7,7 @@ open FSharp.UMX
 open Pomo.Core.Domain.BlockMap
 open Pomo.Core.Domain.Spatial
 open Pomo.Core.Domain.Units
+open Pomo.Core.Domain.Core.Constants
 open Pomo.Core.Graphics
 
 /// Editor-specific rendering emitters for grid, cursor, and ghost block overlays.
@@ -158,8 +159,7 @@ module EditorEmitter =
           let z = float32 cell.Z * scaleFactor + halfCell
           let pos = Vector3(x, y, z) + centerOffset
 
-          let modelScale = 0.5f // KayKit 2x2 models -> 1x1
-          let scale = Matrix.CreateScale(scaleFactor * modelScale)
+          let scale = Matrix.CreateScale(scaleFactor * BlockMap.KayKitBlockModelScale)
           let rot = Matrix.CreateFromQuaternion(currentRotation)
           let trans = Matrix.CreateTranslation(pos)
 

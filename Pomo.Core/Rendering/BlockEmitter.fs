@@ -12,9 +12,6 @@ open Pomo.Core.Algorithms
 
 module BlockEmitter =
 
-  [<Literal>]
-  let private ModelScale = 0.5f // KayKit models are 2x2 units, scale to 1x1
-
   let createLazyModelLoader
     (content: ContentManager)
     : string -> LoadedModel voption =
@@ -101,7 +98,7 @@ module BlockEmitter =
                 centerOffset
 
             // World matrix: scale * rotation * translation
-            let scale = Matrix.CreateScale(scaleFactor * ModelScale)
+            let scale = Matrix.CreateScale(scaleFactor * BlockMap.KayKitBlockModelScale)
 
             let rot =
               match block.Rotation with

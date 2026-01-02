@@ -18,10 +18,6 @@ open Pomo.Core.Algorithms.Pathfinding
 /// Module containing map-related spawning logic
 module MapSpawning =
 
-  /// Border padding to offset spawns from zone edges
-  [<Literal>]
-  let SpawnBorderPadding = 8.0f
-
   /// Maximum spiral search radius (in grid cells) for finding walkable position
   [<Literal>]
   let MaxWalkableSearchRadius = 10
@@ -185,14 +181,19 @@ module MapSpawning =
                 Vector2(obj.X + rotatedOffset.X, obj.Y + rotatedOffset.Y)
               | ValueSome(RectangleShape(width, height)) ->
                 // Random point within rectangle bounds with padding
-                let insetW = max 0f (width - 2.0f * SpawnBorderPadding)
-                let insetH = max 0f (height - 2.0f * SpawnBorderPadding)
+                let insetW =
+                  max 0f (width - 2.0f * Constants.Spawning.BorderPadding)
+
+                let insetH =
+                  max 0f (height - 2.0f * Constants.Spawning.BorderPadding)
 
                 let offsetX =
-                  SpawnBorderPadding + float32(random.NextDouble()) * insetW
+                  Constants.Spawning.BorderPadding
+                  + float32(random.NextDouble()) * insetW
 
                 let offsetY =
-                  SpawnBorderPadding + float32(random.NextDouble()) * insetH
+                  Constants.Spawning.BorderPadding
+                  + float32(random.NextDouble()) * insetH
 
                 // Local offset before rotation
                 let localOffset = Vector2(offsetX, offsetY)
@@ -202,14 +203,23 @@ module MapSpawning =
               | _ ->
                 // Fallback: use object's width/height if defined with padding
                 if obj.Width > 0.0f && obj.Height > 0.0f then
-                  let insetW = max 0f (obj.Width - 2.0f * SpawnBorderPadding)
-                  let insetH = max 0f (obj.Height - 2.0f * SpawnBorderPadding)
+                  let insetW =
+                    max
+                      0f
+                      (obj.Width - 2.0f * Constants.Spawning.BorderPadding)
+
+                  let insetH =
+                    max
+                      0f
+                      (obj.Height - 2.0f * Constants.Spawning.BorderPadding)
 
                   let offsetX =
-                    SpawnBorderPadding + float32(random.NextDouble()) * insetW
+                    Constants.Spawning.BorderPadding
+                    + float32(random.NextDouble()) * insetW
 
                   let offsetY =
-                    SpawnBorderPadding + float32(random.NextDouble()) * insetH
+                    Constants.Spawning.BorderPadding
+                    + float32(random.NextDouble()) * insetH
 
                   let localOffset = Vector2(offsetX, offsetY)
                   let rotatedOffset = rotateVector localOffset radians

@@ -75,6 +75,9 @@ module Core =
       [<Literal>]
       let CellSize = 64.0f
 
+      [<Literal>]
+      let KayKitBlockModelScale = 0.5f
+
     let DefaultPixelsPerUnit = Vector2(64.0f, 32.0f)
     /// Pixels per unit for BlockMap 3D rendering (1:1 aspect ratio)
     let BlockMap3DPixelsPerUnit = Vector2(BlockMap.CellSize, BlockMap.CellSize)
@@ -103,6 +106,9 @@ module Core =
 
     module Spawning =
       let DefaultDuration = TimeSpan.FromSeconds 1.0
+
+      [<Literal>]
+      let BorderPadding = 8.0f
 
     module AI =
       [<Literal>]

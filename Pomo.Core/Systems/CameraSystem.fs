@@ -81,12 +81,11 @@ module CameraSystem =
                     | ValueSome map ->
                       Vector2(float32 map.TileWidth, float32 map.TileHeight)
                     | ValueNone ->
-                      // BlockMap scenario - use 64x64 for 1:1 rendering
-                      Vector2(64f, 64f)
-                  | ValueNone -> Vector2(64.0f, 32.0f) // Fallback
+                      Constants.BlockMap3DPixelsPerUnit
+                  | ValueNone -> Constants.DefaultPixelsPerUnit
 
                 pos, ppu
-              | ValueNone -> WorldPosition.zero, Vector2(64.0f, 32.0f)
+              | ValueNone -> WorldPosition.zero, Constants.DefaultPixelsPerUnit
 
             let view = RenderMath.Camera.getViewMatrix position pixelsPerUnit
 

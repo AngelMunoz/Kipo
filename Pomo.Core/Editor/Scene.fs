@@ -8,6 +8,7 @@ open FSharp.Data.Adaptive
 open Pomo.Core.Domain
 open Pomo.Core.Domain.Units
 open Pomo.Core.Domain.Scenes
+open Pomo.Core.Domain.Core
 open Pomo.Core.Systems
 open Pomo.Core.Environment
 open Pomo.Core.Algorithms
@@ -75,8 +76,7 @@ module EditorScene =
       transact(fun () ->
         state.SelectedBlockType.Value <- ValueSome 1<BlockTypeId>)
 
-    // Use Square PPU for True 3D (1:1 Aspect Ratio)
-    let pixelsPerUnit = Vector2(64f, 64f)
+    let pixelsPerUnit = Constants.BlockMap3DPixelsPerUnit
 
     let camera = MutableCamera()
     camera.Params <- { camera.Params with Zoom = 2.0f } // Initial zoom adjusted for 1:1 scale

@@ -354,24 +354,6 @@ module Projectile =
       visualEffects.Add(effect)
     | ValueNone -> ()
 
-  let inline private spawnEffect2D
-    (particleStore: Pomo.Core.Stores.ParticleStore)
-    (visualEffects: ResizeArray<Particles.VisualEffect>)
-    (vfxId: string)
-    (pos: Vector2)
-    (rotation: Quaternion)
-    (owner: Guid<EntityId> voption)
-    (area: SkillArea voption)
-    =
-    spawnEffect3D
-      particleStore
-      visualEffects
-      vfxId
-      (WorldPosition.fromVector2 pos)
-      rotation
-      owner
-      area
-
   let inline ensureProjectileAnimation
     (stateWrite: IStateWriteService)
     (activeAnims:
