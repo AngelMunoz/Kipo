@@ -90,7 +90,7 @@ module Core =
       let CollisionRadius = 8.0f
 
       [<Literal>]
-      let CollisionDistance = 32.0f
+      let CollisionDistance = 16.0f
 
       [<Literal>]
       let SkillActivationRangeBuffer = 5.0f

@@ -35,30 +35,27 @@ module BlockMapCameraSystem =
     let centerOffset =
       RenderMath.BlockMap3D.calcCenterOffset blockMap.Width blockMap.Depth ppu
 
+    let inline refreshCameraPosition() : WorldPosition =
+      let scenarioIdOpt =
+        projections.EntityScenarios |> AMap.force |> HashMap.tryFindV playerId
+
+      let position =
+        scenarioIdOpt
+        |> ValueOption.bind(fun sid ->
+          projections.ComputeMovementSnapshot(sid).Positions
+          |> Dictionary.tryFindV playerId)
+        |> ValueOption.defaultValue WorldPosition.zero
+
+      let renderPos = RenderMath.BlockMap3D.toRender position ppu centerOffset
+      camParams <- { camParams with Position = renderPos }
+      position
+
     { new Camera.CameraService with
         member _.GetCamera(entityId: Guid<EntityId>) =
           if entityId = playerId then
             let viewport = game.GraphicsDevice.Viewport
 
-            // Get player position from projections
-            let scenarioIdOpt =
-              projections.EntityScenarios
-              |> AMap.force
-              |> HashMap.tryFindV playerId
-
-            let position =
-              scenarioIdOpt
-              |> ValueOption.bind(fun sid ->
-                projections.ComputeMovementSnapshot(sid).Positions
-                |> Dictionary.tryFindV playerId)
-              |> ValueOption.defaultValue WorldPosition.zero
-
-            // Convert world position to render position using centralized math
-            let renderPos =
-              RenderMath.BlockMap3D.toRender position ppu centerOffset
-
-            // Update camera to follow player in render space
-            camParams <- { camParams with Position = renderPos }
+            let position = refreshCameraPosition()
 
             let view = Graphics.Camera.Compute.getViewMatrix camParams
 
@@ -83,6 +80,8 @@ module BlockMapCameraSystem =
         member _.ScreenToWorld(screenPos: Vector2, entityId: Guid<EntityId>) =
           if entityId = playerId then
             let viewport = game.GraphicsDevice.Viewport
+
+            refreshCameraPosition() |> ignore
 
             let inline adjustCenter(pos: WorldPosition) : WorldPosition = {
               pos with
@@ -142,6 +141,8 @@ module BlockMapCameraSystem =
         member _.CreatePickRay(screenPos: Vector2, entityId: Guid<EntityId>) =
           if entityId = playerId then
             let viewport = game.GraphicsDevice.Viewport
+
+            refreshCameraPosition() |> ignore
 
             ValueSome(
               Graphics.Camera.Compute.getPickRay

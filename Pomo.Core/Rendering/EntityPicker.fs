@@ -33,8 +33,17 @@ module EntityPicker =
       if entityId <> excludeEntityId then
         let renderPos = RenderMath.BlockMap3D.toRender logicPos ppu centerOffset
 
-        let sphereCenter = renderPos + Vector3(0.0f, modelScale * 0.5f, 0.0f)
-        let broadPhaseSphere = BoundingSphere(sphereCenter, modelScale * 2.0f)
+        let hitBoxCenterY =
+          (Picking.EntityHitBox.Min.Y + Picking.EntityHitBox.Max.Y) * 0.5f
+
+        let hitBoxExtents = Picking.EntityHitBox.Max - Picking.EntityHitBox.Min
+
+        let broadPhaseRadius = hitBoxExtents.Length() * 0.5f * modelScale
+
+        let sphereCenter =
+          renderPos + Vector3(0.0f, hitBoxCenterY * modelScale, 0.0f)
+
+        let broadPhaseSphere = BoundingSphere(sphereCenter, broadPhaseRadius)
 
         if ray.Intersects(broadPhaseSphere).HasValue then
           let facing =
