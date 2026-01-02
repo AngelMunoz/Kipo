@@ -173,7 +173,6 @@ module BlockMapScene =
 
     let scenario: World.Scenario = {
       Id = scenarioId
-      Map = ValueNone // No TileMap for BlockMap scenarios
       BlockMap = ValueSome blockMap
     }
 
@@ -378,6 +377,7 @@ module BlockMapScene =
                 publishHudGuiAction
 
             hudDesktop <- ValueSome(new Desktop(Root = root))
+            hudService.HideLoadingOverlay()
 
           override _.Draw(gameTime) =
             hudDesktop |> ValueOption.iter(fun d -> d.Render())

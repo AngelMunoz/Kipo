@@ -19,9 +19,7 @@ open Pomo.Core.Domain.Core
 /// Note: This type intentionally carries a small amount of render-space knowledge
 /// so emitters can avoid isometric-specific math when rendering BlockMap3D.
 [<Struct>]
-type RenderSpace =
-  | Isometric
-  | True3D
+type RenderSpace = | True3D
 
 type RenderCore = {
   PixelsPerUnit: Vector2
@@ -36,7 +34,6 @@ type EntityRenderData = {
   GetLoadedModelByAsset: string -> LoadedModel voption
   EntityPoses: IReadOnlyDictionary<Guid<EntityId>, Dictionary<string, Matrix>>
   LiveProjectiles: HashMap<Guid<EntityId>, LiveProjectile>
-  SquishFactor: float32
   ModelScale: float32
 }
 
@@ -45,16 +42,8 @@ type ParticleRenderData = {
   GetTexture: string -> Texture2D voption
   GetLoadedModelByAsset: string -> LoadedModel voption
   EntityPositions: IReadOnlyDictionary<Guid<EntityId>, WorldPosition>
-  SquishFactor: float32
   ModelScale: float32
   FallbackTexture: Texture2D
-}
-
-/// Terrain-specific rendering data
-type TerrainRenderData = {
-  GetTileTexture: int -> Texture2D voption
-  /// Pre-computed tile render indices per layer (for correct staggered overlap order)
-  LayerRenderIndices: IReadOnlyDictionary<int, int[]>
 }
 
 /// Render command for text (after culling and transform)
@@ -70,21 +59,6 @@ type TextCommand = {
 module RenderCore =
   open Pomo.Core.Graphics
   open Pomo.Core.Domain.BlockMap
-
-  /// Creates the shared RenderCore for TileMap (2D isometric) rendering
-  let createForTileMap(pixelsPerUnit: Vector2) : RenderCore =
-    let toRenderPos(pos: WorldPosition) =
-      RenderMath.LogicRender.toRender pos pixelsPerUnit
-
-    let toRenderParticlePos(particlePos: Vector3) =
-      RenderMath.ParticleSpace.toRender particlePos pixelsPerUnit
-
-    {
-      PixelsPerUnit = pixelsPerUnit
-      Space = Isometric
-      ToRenderPos = toRenderPos
-      ToRenderParticlePos = toRenderParticlePos
-    }
 
   /// Creates the shared RenderCore for BlockMap3D (true 3D) rendering
   let createForBlockMap3D
@@ -122,6 +96,5 @@ module RenderCore =
     let ppu = MapSource.getPixelsPerUnit mapSource
 
     match mapSource with
-    | MapSource.TileMap _ -> createForTileMap ppu
     | MapSource.BlockMap3D blockMap ->
       createForBlockMap3D ppu blockMap.Width blockMap.Depth

@@ -167,7 +167,7 @@ module StateUpdate =
         | ValueNone ->
           match projectile.Target with
           | Projectile.PositionTarget targetPos ->
-              ValueSome (WorldPosition.fromVector2 targetPos)
+            ValueSome(WorldPosition.fromVector2 targetPos)
           | Projectile.EntityTarget _ ->
             match world.Positions.TryGetValue projectile.Caster with
             | true, pos -> ValueSome pos

@@ -59,11 +59,14 @@ module TextEmitter =
 
             let struct (color, scale) =
               match notif.Type with
-              | SystemCommunications.Normal -> struct (palette.TextNormal, 1.0f)
-              | SystemCommunications.Damage -> struct (palette.TextDamage, 1.5f)
+              | SystemCommunications.Normal ->
+                struct (palette.TextNormal, 1.0f)
+              | SystemCommunications.Damage ->
+                struct (palette.TextDamage, 1.5f)
               | SystemCommunications.Crit -> struct (palette.TextCrit, 2.0f)
               | SystemCommunications.Heal -> struct (palette.TextHeal, 1.2f)
-              | SystemCommunications.Status -> struct (palette.TextStatus, 0.8f)
+              | SystemCommunications.Status ->
+                struct (palette.TextStatus, 0.8f)
               | SystemCommunications.Miss -> struct (palette.TextMiss, 1.0f)
 
             Some {

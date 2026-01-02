@@ -11,7 +11,6 @@ open Pomo.Core.Domain.Units
 open Pomo.Core.Domain.Units
 open Pomo.Core.Domain.Item
 open Pomo.Core.Domain.AI
-open Pomo.Core.Domain.Map
 open Pomo.Core.Domain.Animation
 open Pomo.Core.Domain.Particles
 
@@ -26,7 +25,6 @@ module World =
   [<Struct>]
   type Scenario = {
     Id: Guid<ScenarioId>
-    Map: MapDefinition voption
     BlockMap: BlockMap.BlockMapDefinition voption
   }
 

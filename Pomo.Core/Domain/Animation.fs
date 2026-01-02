@@ -82,14 +82,12 @@ module Animation =
 
           let offsetVector =
             match offset with
-            | ValueSome map ->
-              vec3FromMap map
+            | ValueSome map -> vec3FromMap map
             | ValueNone -> Vector3.Zero
 
           let pivotVector =
             match pivot with
-            | ValueSome map ->
-              vec3FromMap map
+            | ValueSome map -> vec3FromMap map
             | ValueNone -> Vector3.Zero
 
           return {

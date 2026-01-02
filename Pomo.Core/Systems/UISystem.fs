@@ -11,7 +11,6 @@ open Pomo.Core
 open Pomo.Core.Domain
 open Pomo.Core.Domain.Units
 open Pomo.Core.Domain.Events
-open Pomo.Core.Domain.Map
 open Pomo.Core.Systems
 open Pomo.Core.Environment.Patterns
 open Pomo.Core.EventBus

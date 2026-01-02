@@ -159,7 +159,9 @@ module EditorEmitter =
           let z = float32 cell.Z * scaleFactor + halfCell
           let pos = Vector3(x, y, z) + centerOffset
 
-          let scale = Matrix.CreateScale(scaleFactor * BlockMap.KayKitBlockModelScale)
+          let scale =
+            Matrix.CreateScale(scaleFactor * BlockMap.KayKitBlockModelScale)
+
           let rot = Matrix.CreateFromQuaternion(currentRotation)
           let trans = Matrix.CreateTranslation(pos)
 

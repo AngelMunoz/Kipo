@@ -91,8 +91,8 @@ module ActionHandler =
     : Guid<EntityId> voption =
     cameraService.CreatePickRay(rawMousePos, entityId)
     |> ValueOption.bind(fun ray ->
-      match scenario.BlockMap, scenario.Map with
-      | ValueSome blockMap, _ ->
+      match scenario.BlockMap with
+      | ValueSome blockMap ->
         EntityPicker.pickEntityBlockMap3D
           ray
           getPickBounds
@@ -103,22 +103,7 @@ module ActionHandler =
           ctx.Rotations
           ctx.ModelConfigIds
           entityId
-      | ValueNone, ValueSome map ->
-        let pixelsPerUnit =
-          Vector2(float32 map.TileWidth, float32 map.TileHeight)
-
-        let squishFactor = pixelsPerUnit.X / pixelsPerUnit.Y
-        let modelScale = Constants.Entity.ModelScale
-
-        EntityPicker.pickEntity
-          ray
-          pixelsPerUnit
-          modelScale
-          squishFactor
-          ctx.Positions
-          ctx.Rotations
-          entityId
-      | _ -> ValueNone)
+      | ValueNone -> ValueNone)
 
   let inline private publishMovement
     (eventBus: EventBus)

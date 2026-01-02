@@ -82,29 +82,7 @@ module PlayerMovement =
     // A mutable variable scoped to the system is acceptable for this kind of internal bookkeeping.
     let mutable lastVelocity = Vector2.Zero
 
-    let mutable sub: IDisposable = null
-
-    let collisionEvents =
-      System.Collections.Concurrent.ConcurrentQueue<
-        SystemCommunications.CollisionEvents
-       >()
-
-    override _.Initialize() =
-      base.Initialize()
-
-      sub <-
-        core.EventBus.Observable
-        |> Observable.choose(fun e ->
-          match e with
-          | GameEvent.Collision(collision) -> Some collision
-          | _ -> None)
-        |> Observable.subscribe(fun e -> collisionEvents.Enqueue(e))
-
-    override _.Dispose(disposing) =
-      if disposing then
-        sub.Dispose()
-
-      base.Dispose(disposing)
+    override _.Initialize() = base.Initialize()
 
     override this.Update _ =
       let entityScenarios = gameplay.Projections.EntityScenarios |> AMap.force
@@ -121,19 +99,7 @@ module PlayerMovement =
               ModelConfigIds = Dictionary()
             }
 
-      // Process collisions
-      let mutable accumulatedMtv = Vector2.Zero
-
-      let mutable collisionEvent =
-        Unchecked.defaultof<SystemCommunications.CollisionEvents>
-
-      while collisionEvents.TryDequeue(&collisionEvent) do
-        match collisionEvent with
-        | SystemCommunications.CollisionEvents.MapObjectCollision(eId, _, mtv) when
-          eId = playerId
-          ->
-          accumulatedMtv <- accumulatedMtv + mtv
-        | _ -> ()
+      let accumulatedMtv = Vector2.Zero
 
       let currentVelocity = velocity |> AVal.force
       let statuses = playerCombatStatuses |> AVal.force

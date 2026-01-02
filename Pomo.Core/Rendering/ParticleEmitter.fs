@@ -161,7 +161,6 @@ module ParticleEmitter =
     (effectRotation: Quaternion)
     (core: RenderCore)
     (modelScale: float32)
-    (squishFactor: float32)
     (particle: MeshParticle)
     : MeshCommand =
     let worldPos =
@@ -174,22 +173,12 @@ module ParticleEmitter =
     let renderPos = core.ToRenderParticlePos worldPos
 
     let worldMatrix =
-      match core.Space with
-      | RenderSpace.Isometric ->
-        RenderMath.WorldMatrix.createMeshParticle
-          renderPos
-          particle.Rotation
-          (particle.Scale * modelScale)
-          config.ScaleAxis
-          config.ScalePivot
-          squishFactor
-      | RenderSpace.True3D ->
-        RenderMath.WorldMatrix3D.createMeshParticle
-          renderPos
-          particle.Rotation
-          (particle.Scale * modelScale)
-          config.ScaleAxis
-          config.ScalePivot
+      RenderMath.WorldMatrix3D.createMeshParticle
+        renderPos
+        particle.Rotation
+        (particle.Scale * modelScale)
+        config.ScaleAxis
+        config.ScalePivot
 
     {
       LoadedModel = loadedModel
@@ -286,7 +275,6 @@ module ParticleEmitter =
                 effectRotation
                 core
                 data.ModelScale
-                data.SquishFactor
                 particle
 
             idx <- idx + 1)

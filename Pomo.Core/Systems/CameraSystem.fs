@@ -76,12 +76,7 @@ module CameraSystem =
 
                 let ppu =
                   match scenarios |> HashMap.tryFindV scenarioId with
-                  | ValueSome scenario ->
-                    match scenario.Map with
-                    | ValueSome map ->
-                      Vector2(float32 map.TileWidth, float32 map.TileHeight)
-                    | ValueNone ->
-                      Constants.BlockMap3DPixelsPerUnit
+                  | ValueSome _ -> Constants.BlockMap3DPixelsPerUnit
                   | ValueNone -> Constants.DefaultPixelsPerUnit
 
                 pos, ppu

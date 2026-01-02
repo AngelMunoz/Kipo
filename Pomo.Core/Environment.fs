@@ -133,7 +133,6 @@ module Environment =
   type StoreServices =
     abstract SkillStore: SkillStore
     abstract ItemStore: ItemStore
-    abstract MapStore: MapStore
     abstract AIArchetypeStore: AIArchetypeStore
     abstract AIFamilyStore: AIFamilyStore
     abstract AIEntityStore: AIEntityStore

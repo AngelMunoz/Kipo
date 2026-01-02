@@ -17,7 +17,6 @@ open Pomo.Core.Domain.Units
 open Pomo.Core.Domain.Particles
 open Pomo.Core.Graphics
 open Pomo.Core.Rendering
-open Pomo.Core.AssetPreloader
 open Pomo.Core.Domain.Core
 open Pomo.Core.Domain.Core.Constants
 
@@ -32,13 +31,10 @@ module RenderOrchestrator =
     NodeTransformsPool: Dictionary<string, Matrix>
     ModelCache: ConcurrentDictionary<string, Lazy<LoadedModel>>
     TextureCache: ConcurrentDictionary<string, Lazy<Texture2D>>
-    TileTextureCache: Dictionary<int, Texture2D>
     GetLoadedModel: string -> LoadedModel voption
     GetTexture: string -> Texture2D voption
-    GetTileTexture: int -> Texture2D voption
     GetBlockModel: string -> LoadedModel voption
     MapSource: MapSource
-    LayerRenderIndices: IReadOnlyDictionary<int, int[]>
     FallbackTexture: Texture2D
     HudFont: SpriteFont
     HudPalette: UI.HUDColorPalette
@@ -116,58 +112,6 @@ module RenderOrchestrator =
             batch.Draw(cmd.Position, cmd.Size, 0.0f, cmd.Color, right, up)
 
           batch.End()
-
-    let inline renderTerrainBackground
-      (batch: SpriteBatch)
-      (camera: inref<Camera.Camera>)
-      (map: Map.MapDefinition)
-      (commands: TerrainCommand[])
-      =
-      // 2D SpriteBatch rendering for background - no depth buffer, no fighting
-      let transform =
-        RenderMath.Camera.get2DViewMatrix
-          camera.Position
-          camera.Zoom
-          camera.Viewport
-
-      batch.Begin(
-        SpriteSortMode.Deferred,
-        BlendState.AlphaBlend,
-        SamplerState.PointClamp,
-        DepthStencilState.None,
-        RasterizerState.CullNone,
-        transformMatrix = transform
-      )
-
-      for cmd in commands do
-        // Convert 3D position back to pixel position for SpriteBatch
-        let drawX = cmd.Position.X * float32 map.TileWidth
-        let drawY = cmd.Position.Z * float32 map.TileHeight
-
-        let destRect =
-          Rectangle(
-            int drawX,
-            int drawY,
-            int(cmd.Size.X * float32 map.TileWidth),
-            int(cmd.Size.Y * float32 map.TileHeight)
-          )
-
-        batch.Draw(cmd.Texture, destRect, Color.White)
-
-      batch.End()
-
-    let inline renderTerrainForeground
-      (batch: QuadBatch)
-      (view: inref<Matrix>)
-      (projection: inref<Matrix>)
-      (commands: TerrainCommand[])
-      =
-      batch.Begin(&view, &projection)
-
-      for cmd in commands do
-        batch.Draw(cmd.Texture, cmd.Position, cmd.Size)
-
-      batch.End()
 
     let inline renderText
       (batch: SpriteBatch)
@@ -272,19 +216,15 @@ module RenderOrchestrator =
        >)
     (projectiles:
       HashMap<Guid<EntityId>, Pomo.Core.Domain.Projectile.LiveProjectile>)
-    (layerRenderIndices:
-      System.Collections.Generic.IReadOnlyDictionary<int, int[]>)
     =
     let ppu = MapSource.getPixelsPerUnit mapSource
     let renderCore = RenderCore.createFromMapSource mapSource
-    let squish = RenderMath.WorldMatrix.getSquishFactor ppu
 
     let entityData = {
       ModelStore = stores.ModelStore
       GetLoadedModelByAsset = res.GetLoadedModel
       EntityPoses = poses
       LiveProjectiles = projectiles
-      SquishFactor = squish
       ModelScale = Core.Constants.Entity.ModelScale
     }
 
@@ -292,17 +232,11 @@ module RenderOrchestrator =
       GetTexture = res.GetTexture
       GetLoadedModelByAsset = res.GetLoadedModel
       EntityPositions = snapshot.Positions
-      SquishFactor = squish
       ModelScale = Core.Constants.Entity.ModelScale
       FallbackTexture = res.FallbackTexture
     }
 
-    let terrainData = {
-      GetTileTexture = res.GetTileTexture
-      LayerRenderIndices = layerRenderIndices
-    }
-
-    struct (renderCore, entityData, particleData, terrainData)
+    struct (renderCore, entityData, particleData)
 
   let private renderFrame
     (res: RenderResources)
@@ -323,7 +257,7 @@ module RenderOrchestrator =
     | Some scenarioId ->
       let snapshot = projections.ComputeMovementSnapshot scenarioId
 
-      let struct (renderCore, entityData, particleData, terrainData) =
+      let struct (renderCore, entityData, particleData) =
         prepareContexts
           res
           stores
@@ -331,7 +265,6 @@ module RenderOrchestrator =
           snapshot
           world.Poses
           (world.LiveProjectiles |> AMap.force)
-          res.LayerRenderIndices
 
       let meshCommandsEntities =
         EntityEmitter.emitAll
@@ -372,13 +305,6 @@ module RenderOrchestrator =
             0.0f
           |> ValueOption.defaultValue viewBoundsFallback
 
-        // Collect terrain commands conditionally based on MapSource
-        let struct (terrainBG, terrainFG) =
-          match res.MapSource |> MapSource.tryGetTileMap with
-          | ValueSome map ->
-            TerrainEmitter.emitAll renderCore terrainData map viewBounds2D
-          | ValueNone -> struct (Array.empty, Array.empty)
-
         // Collect block mesh commands conditionally based on MapSource
         let meshCommandsBlocks =
           match res.MapSource |> MapSource.tryGetBlockMap with
@@ -406,23 +332,7 @@ module RenderOrchestrator =
           | ValueNone -> Array.empty
 
         // Render passes in correct order
-        // 1. Background terrain (no depth to avoid tile fighting)
-        res.GraphicsDevice.DepthStencilState <- DepthStencilState.None
-
-        res.MapSource
-        |> MapSource.tryGetTileMap
-        |> ValueOption.iter(fun map ->
-          RenderPasses.renderTerrainBackground
-            res.SpriteBatch
-            &camera
-            map
-            terrainBG)
-
-        // Clear depth buffer after background terrain
-        // This ensures entities always render on top of background
-        res.GraphicsDevice.Clear(ClearOptions.DepthBuffer, Color.Black, 1.0f, 0)
-
-        // 2. Blocks first (they form the ground/structures)
+        // 1. Blocks first (they form the ground/structures)
         res.GraphicsDevice.DepthStencilState <- DepthStencilState.Default
 
         RenderPasses.renderMeshes
@@ -432,7 +342,7 @@ module RenderOrchestrator =
           meshCommandsBlocks
           ValueNone
 
-        // 3. Entities and mesh particles (with depth testing)
+        // 2. Entities and mesh particles (with depth testing)
         res.GraphicsDevice.DepthStencilState <- DepthStencilState.Default
         // Render entity meshes and particle meshes separately to avoid Array.append allocation
         RenderPasses.renderMeshes
@@ -457,16 +367,7 @@ module RenderOrchestrator =
           &projection
           billboardCommandsParticles
 
-        // 4. Foreground terrain/decorations (with depth testing for occlusion)
-        res.GraphicsDevice.DepthStencilState <- DepthStencilState.Default
-
-        RenderPasses.renderTerrainForeground
-          res.QuadBatch
-          &view
-          &projection
-          terrainFG
-
-        // 5. World text (notifications, damage numbers - rendered in 2D)
+        // 4. World text (notifications, damage numbers - rendered in 2D)
         let textCommands =
           TextEmitter.emit
             renderCore
@@ -524,29 +425,6 @@ module RenderOrchestrator =
 
           for kvp in particleTextureCache do
             textureCache[kvp.Key] <- Lazy<Texture2D>(fun () -> kvp.Value)
-
-          // Conditional tile loading based on MapSource
-          let tileCache, layerIndices =
-            match mapSource |> MapSource.tryGetTileMap with
-            | ValueSome map ->
-              TerrainEmitter.loadTileTextures game.Content map,
-              TerrainEmitter.computeLayerRenderIndices map
-            | ValueNone ->
-              Dictionary(), Dictionary() :> IReadOnlyDictionary<_, _>
-
-          // Asset preloading (use mapKey from TileMap if present)
-          mapSource
-          |> MapSource.tryGetTileMap
-          |> ValueOption.iter(fun map ->
-            AssetPreloader.preloadAssets
-              game.Content
-              modelCache
-              textureCache
-              map.Key
-              map
-              stores.ModelStore
-              stores.ParticleStore
-            |> ignore)
 
 
           // Main-thread load queue and pending sets
@@ -623,13 +501,10 @@ module RenderOrchestrator =
               NodeTransformsPool = Dictionary()
               ModelCache = modelCache
               TextureCache = textureCache
-              TileTextureCache = tileCache
               GetLoadedModel = getLoadedModel
               GetTexture = getTexture
-              GetTileTexture = fun gid -> tileCache |> Dictionary.tryFindV gid
               GetBlockModel = getBlockModel
               MapSource = mapSource
-              LayerRenderIndices = layerIndices
               FallbackTexture = fallback
               HudFont = TextEmitter.loadFont game.Content
               HudPalette =

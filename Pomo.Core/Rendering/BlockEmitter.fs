@@ -98,7 +98,8 @@ module BlockEmitter =
                 centerOffset
 
             // World matrix: scale * rotation * translation
-            let scale = Matrix.CreateScale(scaleFactor * BlockMap.KayKitBlockModelScale)
+            let scale =
+              Matrix.CreateScale(scaleFactor * BlockMap.KayKitBlockModelScale)
 
             let rot =
               match block.Rotation with

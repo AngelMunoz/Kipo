@@ -8,12 +8,11 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <Compile Include="RenderMathTests.fs" />
     <Compile Include="CommandQueueTests.fs" />
-    <Compile Include="EmitterTests.fs" />
     <Compile Include="DamageCalculatorTests.fs" />
     <Compile Include="ProjectionsTests.fs" />
     <Compile Include="BlockMapTests.fs" />
+    <Compile Include="RenderMath3DTests.fs" />
   </ItemGroup>
 
   <ItemGroup>

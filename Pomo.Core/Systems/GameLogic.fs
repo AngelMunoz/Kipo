@@ -22,7 +22,7 @@ module GameLogic =
       else
         // Rule 1: Same faction NEVER attacks same faction
         let hasOverlap =
-          not (HashSet.isEmpty (HashSet.intersect sourceFactions targetFactions))
+          not(HashSet.isEmpty(HashSet.intersect sourceFactions targetFactions))
 
         if hasOverlap then
           Relation.Ally

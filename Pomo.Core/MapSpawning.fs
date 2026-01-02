@@ -6,67 +6,13 @@ open FSharp.UMX
 open FSharp.Data.Adaptive
 open Pomo.Core.Domain.Units
 open Pomo.Core.Domain.Entity
-open Pomo.Core.Domain.Map
 open Pomo.Core.Domain.AI
 open Pomo.Core.Domain.Events
 open Pomo.Core.Stores
-open Pomo.Core.Domain.Navigation
-open Pomo.Core.Domain.Spatial
 open Pomo.Core.Domain.Core
-open Pomo.Core.Algorithms.Pathfinding
 
 /// Module containing map-related spawning logic
 module MapSpawning =
-
-  /// Maximum spiral search radius (in grid cells) for finding walkable position
-  [<Literal>]
-  let MaxWalkableSearchRadius = 10
-
-  /// Rotate a vector by angle in radians
-  let inline private rotateVector (v: Vector2) (radians: float32) =
-    let cos = MathF.Cos radians
-    let sin = MathF.Sin radians
-    Vector2(v.X * cos - v.Y * sin, v.X * sin + v.Y * cos)
-
-  /// Get a random point inside a polygon
-  let getRandomPointInPolygon (poly: IndexList<Vector2>) (random: Random) =
-    if poly.IsEmpty then
-      Vector2.Zero
-    else
-      let minX = poly |> IndexList.map(fun v -> v.X) |> Seq.min
-      let maxX = poly |> IndexList.map(fun v -> v.X) |> Seq.max
-      let minY = poly |> IndexList.map(fun v -> v.Y) |> Seq.min
-      let maxY = poly |> IndexList.map(fun v -> v.Y) |> Seq.max
-
-      let isPointInPolygon(p: Vector2) =
-        let mutable inside = false
-        let count = poly.Count
-        let mutable j = count - 1
-
-        for i = 0 to count - 1 do
-          let pi = poly[i]
-          let pj = poly[j]
-
-          if
-            ((pi.Y > p.Y) <> (pj.Y > p.Y))
-            && (p.X < (pj.X - pi.X) * (p.Y - pi.Y) / (pj.Y - pi.Y) + pi.X)
-          then
-            inside <- not inside
-
-          j <- i
-
-        inside
-
-      let rec findPoint attempts =
-        if attempts <= 0 then
-          Vector2((minX + maxX) / 2.0f, (minY + maxY) / 2.0f)
-        else
-          let x = minX + float32(random.NextDouble()) * (maxX - minX)
-          let y = minY + float32(random.NextDouble()) * (maxY - minY)
-          let p = Vector2(x, y)
-          if isPointInPolygon p then p else findPoint(attempts - 1)
-
-      findPoint 20
 
   /// Select a random entity from a group using weighted selection
   let selectEntityFromGroup
@@ -100,34 +46,6 @@ module MapSpawning =
 
       ValueSome selected
 
-  /// Find nearest walkable cell using spiral search from given position
-  let findNearestWalkable (navGrid: NavGrid) (pos: Vector2) : Vector2 voption =
-    let startCell = Grid.worldToGrid navGrid.CellSize pos
-
-    if Grid.isWalkable navGrid startCell then
-      ValueSome pos
-    else
-      // Spiral outward: check cells at increasing distance
-      let mutable found = ValueNone
-      let mutable radius = 1
-
-      while found.IsNone && radius <= MaxWalkableSearchRadius do
-        for dx in -radius .. radius do
-          for dy in -radius .. radius do
-            // Only check perimeter cells
-            if (abs dx = radius || abs dy = radius) && found.IsNone then
-              let cell: GridCell = {
-                X = startCell.X + dx
-                Y = startCell.Y + dy
-              }
-
-              if Grid.isWalkable navGrid cell then
-                found <- ValueSome(Grid.gridToWorld navGrid.CellSize cell)
-
-        radius <- radius + 1
-
-      found
-
   /// Represents a spawn candidate extracted from map objects
   type SpawnCandidate = {
     Name: string
@@ -135,139 +53,6 @@ module MapSpawning =
     EntityGroup: string voption
     Position: Vector2
   }
-
-  /// Extract spawn candidates from a map definition
-  /// Respects MaxSpawns property to generate multiple candidates per spawn area
-  /// Validates positions against NavGrid and finds nearest walkable if blocked
-  let extractSpawnCandidates
-    (mapDef: MapDefinition)
-    (navGrid: NavGrid)
-    (random: Random)
-    : SpawnCandidate array =
-    mapDef.ObjectGroups
-    |> IndexList.collect(fun group ->
-      group.Objects
-      |> IndexList.collect(fun obj ->
-        match obj.Type with
-        | ValueSome MapObjectType.Spawn ->
-          let isPlayerSpawn =
-            obj.Properties
-            |> HashMap.tryFindV "PlayerSpawn"
-            |> ValueOption.map(fun v -> v.ToLower() = "true")
-            |> ValueOption.defaultValue false
-
-          let entityGroup = obj.Properties |> HashMap.tryFindV "EntityGroup"
-
-          // Get MaxSpawns from properties, default to 1
-          let maxSpawns =
-            obj.Properties
-            |> HashMap.tryFindV "MaxSpawns"
-            |> ValueOption.bind(fun v ->
-              match Int32.TryParse v with
-              | true, n -> ValueSome n
-              | _ -> ValueNone)
-            |> ValueOption.defaultValue 1
-
-          // Generate a position within the spawn area with border padding
-          let getRandomPosition() =
-            let radians = MathHelper.ToRadians obj.Rotation
-
-            let rawPos =
-              match obj.CollisionShape with
-              | ValueSome(ClosedPolygon points) when not points.IsEmpty ->
-                let offset = getRandomPointInPolygon points random
-                // Rotate local offset around origin, then translate to world position
-                let rotatedOffset = rotateVector offset radians
-                Vector2(obj.X + rotatedOffset.X, obj.Y + rotatedOffset.Y)
-              | ValueSome(RectangleShape(width, height)) ->
-                // Random point within rectangle bounds with padding
-                let insetW =
-                  max 0f (width - 2.0f * Constants.Spawning.BorderPadding)
-
-                let insetH =
-                  max 0f (height - 2.0f * Constants.Spawning.BorderPadding)
-
-                let offsetX =
-                  Constants.Spawning.BorderPadding
-                  + float32(random.NextDouble()) * insetW
-
-                let offsetY =
-                  Constants.Spawning.BorderPadding
-                  + float32(random.NextDouble()) * insetH
-
-                // Local offset before rotation
-                let localOffset = Vector2(offsetX, offsetY)
-                // Rotate around origin, then translate to world position
-                let rotatedOffset = rotateVector localOffset radians
-                Vector2(obj.X + rotatedOffset.X, obj.Y + rotatedOffset.Y)
-              | _ ->
-                // Fallback: use object's width/height if defined with padding
-                if obj.Width > 0.0f && obj.Height > 0.0f then
-                  let insetW =
-                    max
-                      0f
-                      (obj.Width - 2.0f * Constants.Spawning.BorderPadding)
-
-                  let insetH =
-                    max
-                      0f
-                      (obj.Height - 2.0f * Constants.Spawning.BorderPadding)
-
-                  let offsetX =
-                    Constants.Spawning.BorderPadding
-                    + float32(random.NextDouble()) * insetW
-
-                  let offsetY =
-                    Constants.Spawning.BorderPadding
-                    + float32(random.NextDouble()) * insetH
-
-                  let localOffset = Vector2(offsetX, offsetY)
-                  let rotatedOffset = rotateVector localOffset radians
-                  Vector2(obj.X + rotatedOffset.X, obj.Y + rotatedOffset.Y)
-                else
-                  Vector2(obj.X, obj.Y)
-            // Validate position is walkable, find nearest walkable if not
-            match findNearestWalkable navGrid rawPos with
-            | ValueSome validPos -> validPos
-            | ValueNone -> rawPos // Fallback to raw position if no walkable found
-
-          // Create candidates for each spawn slot
-          seq {
-            for _ in 1..maxSpawns do
-              yield {
-                Name = obj.Name
-                IsPlayerSpawn = isPlayerSpawn
-                EntityGroup = entityGroup
-                Position = getRandomPosition()
-              }
-          }
-          |> IndexList.ofSeq
-        | _ -> IndexList.empty))
-    |> IndexList.toArray
-
-  /// Determine the player spawn position from candidates
-  let findPlayerSpawnPosition
-    (targetSpawn: string voption)
-    (candidates: SpawnCandidate seq)
-    =
-    let byTargetName =
-      match targetSpawn with
-      | ValueSome targetName ->
-        candidates
-        |> Seq.tryFind(fun c -> c.Name = targetName)
-        |> Option.map(fun c -> c.Position)
-      | ValueNone -> None
-
-    byTargetName
-    |> Option.orElse(
-      candidates
-      |> Seq.tryFind(fun c -> c.IsPlayerSpawn)
-      |> Option.map(fun c -> c.Position)
-    )
-    |> Option.orElse(
-      candidates |> Seq.tryHead |> Option.map(fun c -> c.Position)
-    )
-    |> Option.defaultValue Vector2.Zero
 
   /// Result of resolving an entity from a group
   [<Struct>]
@@ -313,16 +98,6 @@ module MapSpawning =
       )
     with _ ->
       None
-
-  /// Get max enemies allowed from map properties
-  let getMaxEnemies(mapDef: MapDefinition) =
-    mapDef.Properties
-    |> HashMap.tryFind "MaxEnemyEntities"
-    |> Option.bind(fun v ->
-      match System.Int32.TryParse v with
-      | true, i -> Some i
-      | _ -> None)
-    |> Option.defaultValue 0
 
   /// Apply family stat scaling to base stats
   let applyFamilyScaling

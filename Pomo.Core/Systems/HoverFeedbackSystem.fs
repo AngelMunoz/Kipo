@@ -19,7 +19,6 @@ module HoverFeedback =
   open Pomo.Core.Environment
   open Pomo.Core.Graphics
   open Pomo.Core.Domain.BlockMap
-  open Pomo.Core.Domain.Map
 
   let inline private tryPickEntityOnBlockMap3D
     ([<InlineIfLambda>] getPickBounds: string -> BoundingBox voption)
@@ -42,28 +41,6 @@ module HoverFeedback =
       snapshot.ModelConfigIds
       playerId
 
-  let inline private tryPickEntityOnTileMap
-    (projections: ProjectionService)
-    (scenarioId: Guid<ScenarioId>)
-    (ray: Ray)
-    (map: MapDefinition)
-    (playerId: Guid<EntityId>)
-    : Guid<EntityId> voption =
-    let pixelsPerUnit = Vector2(float32 map.TileWidth, float32 map.TileHeight)
-
-    let squishFactor = pixelsPerUnit.X / pixelsPerUnit.Y
-
-    let snapshot = projections.ComputeMovementSnapshot scenarioId
-
-    EntityPicker.pickEntity
-      ray
-      pixelsPerUnit
-      Constants.Entity.ModelScale
-      squishFactor
-      snapshot.Positions
-      snapshot.Rotations
-      playerId
-
   let inline private tryPickHoveredEntity
     (cameraService: CameraService)
     (getPickBounds: string -> BoundingBox voption)
@@ -78,8 +55,8 @@ module HoverFeedback =
       scenarios
       |> HashMap.tryFindV scenarioId
       |> ValueOption.bind(fun scenario ->
-        match scenario.BlockMap, scenario.Map with
-        | ValueSome blockMap, _ ->
+        match scenario.BlockMap with
+        | ValueSome blockMap ->
           tryPickEntityOnBlockMap3D
             getPickBounds
             projections
@@ -87,9 +64,7 @@ module HoverFeedback =
             ray
             blockMap
             playerId
-        | ValueNone, ValueSome map ->
-          tryPickEntityOnTileMap projections scenarioId ray map playerId
-        | _ -> ValueNone))
+        | ValueNone -> ValueNone))
 
   let private determineCursorForEntity
     (hoveredEntityId: Guid<EntityId>)
