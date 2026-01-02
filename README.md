@@ -56,7 +56,6 @@ Kipo/
 └── docs/                # Additional documentation
 ```
 
-
 ## Getting Started
 
 ### Prerequisites
@@ -92,7 +91,6 @@ dotnet run --project Pomo.DesktopGL/Pomo.DesktopGL.fsproj
 dotnet test Pomo.Core.Tests
 ```
 
-
 ### Feel curious? Give it a shot
 
 > [!NOTE]
@@ -109,7 +107,7 @@ Those keys contain the skills.
 Action Set 1
 
 Q -> press Q then click anywhere, no need to select enemy entity
-W, E, R -> Press the Key, then click on an enemy entity 
+W, E, R -> Press the Key, then click on an enemy entity
 A, S -> press to "activate buffs"
 
 Action Set 2
@@ -131,4 +129,4 @@ S -> Press Key then click anywhere to launch a charged attack in the selected po
 
 ## License
 
-This project is **not open source**, it is **source available**. The code is provided for viewing and educational purposes only. See [LICENSE](LICENSE) for details.
+See [LICENSE](LICENSE) for details.
