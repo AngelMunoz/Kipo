@@ -1,6 +1,7 @@
 namespace Pomo.Core
 
 open System
+open System.IO
 open Microsoft.Xna.Framework
 open FSharp.UMX
 open FSharp.Control.Reactive
@@ -45,12 +46,6 @@ module CompositionRoot =
     let decisionTreeStore =
       DecisionTree.create(JsonFileLoader.readDecisionTrees)
 
-    let mapStore =
-      Map.create MapLoader.loadMap [
-        "Content/Maps/Proto.xml"
-        "Content/Maps/Lobby.xml"
-      ]
-
     let modelStore = Model.create(JsonFileLoader.readModels deserializer)
 
     let animationStore =
@@ -63,7 +58,6 @@ module CompositionRoot =
       { new StoreServices with
           member _.SkillStore = skillStore
           member _.ItemStore = itemStore
-          member _.MapStore = mapStore
           member _.AIArchetypeStore = aiArchetypeStore
           member _.AIFamilyStore = aiFamilyStore
           member _.AIEntityStore = aiEntityStore
@@ -101,12 +95,14 @@ module CompositionRoot =
         match action with
         | GuiAction.StartNewGame ->
           scope.HUDService.ShowLoadingOverlay()
-          sceneTransitionSubject.OnNext(Scene.Gameplay("Lobby", ValueNone))
+          sceneTransitionSubject.OnNext(Scene.Gameplay("NewMap", ValueNone))
+        | GuiAction.OpenMapEditor ->
+          sceneTransitionSubject.OnNext(Scene.MapEditor ValueNone)
         | GuiAction.ExitGame -> game.Exit()
         | GuiAction.OpenSettings
         | GuiAction.BackToMainMenu
         | GuiAction.ToggleCharacterSheet
-        | GuiAction.ToggleEquipment -> () // Not applicable in MainMenu
+        | GuiAction.ToggleEquipment -> ()
 
       let uiComponent =
         { new DrawableGameComponent(game) with
@@ -139,10 +135,57 @@ module CompositionRoot =
       (playerId: Guid<EntityId>)
       (scene: Scene)
       =
+      let tryLoadBlockMap(mapKey: string) =
+        let candidatePaths = [
+          Path.Combine(
+            AppContext.BaseDirectory,
+            "Content",
+            "CustomMaps",
+            $"{mapKey}.json"
+          )
+          Path.Combine(
+            AppContext.BaseDirectory,
+            "Content",
+            "CustomMaps",
+            "NewMap.json"
+          )
+        ]
+
+        let rec loop paths =
+          match paths with
+          | [] -> ValueNone
+          | path :: rest ->
+            match Systems.BlockMapLoader.load path with
+            | Ok map -> ValueSome map
+            | Error _ -> loop rest
+
+        loop candidatePaths
+
       match scene with
       | Scene.MainMenu -> createMainMenu game scope
       | Scene.Gameplay(mapKey, targetSpawn) ->
-        Scenes.GameplayScene.create
+        match tryLoadBlockMap mapKey with
+        | ValueSome blockMap ->
+          Scenes.BlockMapScene.create
+            game
+            scope.Stores
+            scope.MonoGame
+            scope.Random
+            scope.UIService
+            scope.HUDService
+            sceneTransitionSubject
+            playerId
+            blockMap
+        | ValueNone -> failwith $"Failed to load BlockMap for key '{mapKey}'"
+      | Scene.MapEditor mapKey ->
+        Pomo.Core.Editor.EditorScene.create
+          game
+          scope.Stores
+          scope.UIService
+          sceneTransitionSubject
+          mapKey
+      | Scene.BlockMapPlaytest blockMap ->
+        Scenes.BlockMapScene.create
           game
           scope.Stores
           scope.MonoGame
@@ -151,5 +194,4 @@ module CompositionRoot =
           scope.HUDService
           sceneTransitionSubject
           playerId
-          mapKey
-          targetSpawn
+          blockMap

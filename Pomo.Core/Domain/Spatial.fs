@@ -5,9 +5,210 @@ open Microsoft.Xna.Framework
 open FSharp.UMX
 open FSharp.Data.Adaptive
 open Pomo.Core.Domain.Units
+open Pomo.Core.Domain.Core
 open Pomo.Core.Domain.Entity
 
 module Spatial =
+
+  [<Struct>]
+  type GridCell3D = { X: int; Y: int; Z: int } // Y is height
+
+  module GridCell3D =
+    let inline fromVector3 (v: Vector3) (cellSize: float32) = {
+      X = int(v.X / cellSize)
+      Y = int(v.Y / cellSize)
+      Z = int(v.Z / cellSize)
+    }
+
+    let inline toWorldPosition (c: GridCell3D) (cellSize: float32) =
+      Vector3(
+        float32 c.X * cellSize,
+        float32 c.Y * cellSize,
+        float32 c.Z * cellSize
+      )
+
+  [<Struct>]
+  type Sphere = {
+    Center: WorldPosition
+    Radius: float32
+  }
+
+  [<Struct>]
+  type Cone3D = {
+    Origin: WorldPosition
+    Direction: Vector3
+    AngleDegrees: float32
+    Length: float32
+  }
+
+  [<Struct>]
+  type Cylinder = {
+    Base: WorldPosition
+    Height: float32
+    Radius: float32
+  }
+
+  let inline isPointInSphere (sphere: Sphere) (point: WorldPosition) : bool =
+    let dx = point.X - sphere.Center.X
+    let dy = point.Y - sphere.Center.Y
+    let dz = point.Z - sphere.Center.Z
+    dx * dx + dy * dy + dz * dz <= sphere.Radius * sphere.Radius
+
+  let inline isPointInCone3D (cone: Cone3D) (point: WorldPosition) : bool =
+    let dx = point.X - cone.Origin.X
+    let dy = point.Y - cone.Origin.Y
+    let dz = point.Z - cone.Origin.Z
+    let distSq = dx * dx + dy * dy + dz * dz
+
+    // Outside length
+    if distSq > cone.Length * cone.Length then
+      false
+    // Point at origin is always in cone
+    elif distSq < 0.0001f then
+      true
+    else
+      // Check angle
+      let toPoint = Vector3(dx, dy, dz) |> Vector3.Normalize
+      let dir = cone.Direction |> Vector3.Normalize
+      let dot = Vector3.Dot(dir, toPoint)
+      let halfAngleRad = MathHelper.ToRadians(cone.AngleDegrees / 2.0f)
+      dot >= MathF.Cos halfAngleRad
+
+  let inline isPointInCylinder (cyl: Cylinder) (point: WorldPosition) : bool =
+    // Cylinder extends from Base.Y to Base.Y + Height
+    // Check height bounds
+    if point.Y < cyl.Base.Y || point.Y > cyl.Base.Y + cyl.Height then
+      false
+    else
+      // Check XZ distance from cylinder axis
+      let dx = point.X - cyl.Base.X
+      let dz = point.Z - cyl.Base.Z
+      dx * dx + dz * dz <= cyl.Radius * cyl.Radius
+
+  type SearchContext3D = {
+    /// Get entities near a world position within radius
+    GetNearbyEntities:
+      WorldPosition
+        -> float32
+        -> IndexList<struct (Guid<EntityId> * WorldPosition)>
+  }
+
+  [<Struct>]
+  type SphereSearchRequest = {
+    CasterId: Guid<EntityId>
+    Sphere: Sphere
+    MaxTargets: int
+  }
+
+  [<Struct>]
+  type Cone3DSearchRequest = {
+    CasterId: Guid<EntityId>
+    Cone: Cone3D
+    MaxTargets: int
+  }
+
+  [<Struct>]
+  type CylinderSearchRequest = {
+    CasterId: Guid<EntityId>
+    Cylinder: Cylinder
+    MaxTargets: int
+  }
+
+  module Search3D =
+
+    let findTargetsInSphere
+      (ctx: SearchContext3D)
+      (request: SphereSearchRequest)
+      : IndexList<Guid<EntityId>> =
+      let nearby =
+        ctx.GetNearbyEntities request.Sphere.Center request.Sphere.Radius
+
+      // Single pass: filter and collect (id, distSq) pairs
+      let candidates = ResizeArray<struct (Guid<EntityId> * float32)>()
+
+      for struct (id, pos) in nearby do
+        if id <> request.CasterId && isPointInSphere request.Sphere pos then
+          let dx = pos.X - request.Sphere.Center.X
+          let dy = pos.Y - request.Sphere.Center.Y
+          let dz = pos.Z - request.Sphere.Center.Z
+          candidates.Add(struct (id, dx * dx + dy * dy + dz * dz))
+
+      // Sort by distance
+      candidates.Sort(fun struct (_, d1) struct (_, d2) -> d1.CompareTo(d2))
+
+      // Take up to MaxTargets and convert to IndexList
+      let count = min request.MaxTargets candidates.Count
+      let result = Array.zeroCreate<Guid<EntityId>> count
+
+      for i in 0 .. count - 1 do
+        let struct (id, _) = candidates.[i]
+        result.[i] <- id
+
+      IndexList.ofArray result
+
+    let findTargetsInCone3D
+      (ctx: SearchContext3D)
+      (request: Cone3DSearchRequest)
+      : IndexList<Guid<EntityId>> =
+      let nearby = ctx.GetNearbyEntities request.Cone.Origin request.Cone.Length
+
+      let candidates = ResizeArray<struct (Guid<EntityId> * float32)>()
+
+      for struct (id, pos) in nearby do
+        if id <> request.CasterId && isPointInCone3D request.Cone pos then
+          let dx = pos.X - request.Cone.Origin.X
+          let dy = pos.Y - request.Cone.Origin.Y
+          let dz = pos.Z - request.Cone.Origin.Z
+          candidates.Add struct (id, dx * dx + dy * dy + dz * dz)
+
+      candidates.Sort(fun struct (_, d1) struct (_, d2) -> d1.CompareTo(d2))
+
+      let count = min request.MaxTargets candidates.Count
+      let result = Array.zeroCreate<Guid<EntityId>> count
+
+      for i in 0 .. count - 1 do
+        let struct (id, _) = candidates.[i]
+        result.[i] <- id
+
+      IndexList.ofArray result
+
+    let findTargetsInCylinder
+      (ctx: SearchContext3D)
+      (request: CylinderSearchRequest)
+      : IndexList<Guid<EntityId>> =
+      // Broad phase: search using max of radius and height/2 from center
+      let broadRadius =
+        max request.Cylinder.Radius (request.Cylinder.Height / 2.0f)
+
+      let centerY = request.Cylinder.Base.Y + request.Cylinder.Height / 2.0f
+
+      let searchCenter: WorldPosition = {
+        X = request.Cylinder.Base.X
+        Y = centerY
+        Z = request.Cylinder.Base.Z
+      }
+
+      let nearby = ctx.GetNearbyEntities searchCenter broadRadius
+
+      let candidates = ResizeArray<struct (Guid<EntityId> * float32)>()
+
+      for struct (id, pos) in nearby do
+        if id <> request.CasterId && isPointInCylinder request.Cylinder pos then
+          let dx = pos.X - request.Cylinder.Base.X
+          let dz = pos.Z - request.Cylinder.Base.Z
+          candidates.Add struct (id, dx * dx + dz * dz) // XZ distance from axis
+
+      candidates.Sort(fun struct (_, d1) struct (_, d2) -> d1.CompareTo(d2))
+
+      let count = min request.MaxTargets candidates.Count
+      let result = Array.zeroCreate<Guid<EntityId>> count
+
+      for i in 0 .. count - 1 do
+        let struct (id, _) = candidates.[i]
+        result.[i] <- id
+
+      IndexList.ofArray result
+
 
   [<Struct>]
   type GridCell = { X: int; Y: int }
@@ -51,7 +252,6 @@ module Spatial =
           { X = x; Y = y }
     |]
 
-  // SAT Helpers
   let getAxes(points: IndexList<Vector2>) =
     points
     |> IndexList.pairwise
@@ -69,7 +269,6 @@ module Spatial =
 
   let project (axis: Vector2) (points: IndexList<Vector2>) =
     let dots = points |> IndexList.map(fun p -> Vector2.Dot(p, axis))
-    // IndexList doesn't have min/max directly, so convert to seq or fold
     let min = dots |> Seq.min
     let max = dots |> Seq.max
     struct (min, max)
@@ -148,157 +347,6 @@ module Spatial =
       Vector2(pos.X + halfSize, pos.Y + halfSize)
       Vector2(pos.X - halfSize, pos.Y + halfSize)
     ]
-
-  let getEntityCollisionShape(pos: Vector2) =
-    // Standard circular collision for entities
-    Map.CollisionShape.Circle Core.Constants.Entity.CollisionRadius
-
-  let rotate (v: Vector2) (radians: float32) =
-    let cos = MathF.Cos radians
-    let sin = MathF.Sin radians
-    Vector2(v.X * cos - v.Y * sin, v.X * sin + v.Y * cos)
-
-  /// Gets the collision polygon for a map object (for closed shapes only)
-  /// Returns ValueNone for shapes that shouldn't use polygon collision (like polylines)
-  let getMapObjectPolygon(obj: Map.MapObject) : IndexList<Vector2> voption =
-    let radians = MathHelper.ToRadians obj.Rotation
-    let pos = Vector2(obj.X, obj.Y)
-
-    match obj.CollisionShape with
-    | ValueSome(Map.CollisionShape.Circle radius) ->
-      // Approximate circle as polygon with 16 segments
-      let segments = 16
-      let step = MathHelper.TwoPi / float32 segments
-      let centerOffset = Vector2(radius, radius) // Assume top-left origin
-
-      let points =
-        [
-          for i in 0 .. segments - 1 do
-            let theta = float32 i * step
-
-            let local =
-              Vector2(radius * cos theta, radius * sin theta) + centerOffset
-
-            rotate local radians + pos
-        ]
-        |> IndexList.ofList
-
-      ValueSome points
-    | ValueSome(Map.CollisionShape.ClosedPolygon points) ->
-      ValueSome(points |> IndexList.map(fun p -> rotate p radians + pos))
-    | ValueSome(Map.RectangleShape(w, h)) ->
-      let corners =
-        IndexList.ofList [
-          Vector2.Zero
-          Vector2(w, 0.0f)
-          Vector2(w, h)
-          Vector2(0.0f, h)
-        ]
-
-      ValueSome(corners |> IndexList.map(fun p -> rotate p radians + pos))
-    | ValueSome(Map.EllipseShape(w, h)) ->
-      // Approximate ellipse as polygon with 16 segments
-      let segments = 16
-      let radiusX = w / 2.0f
-      let radiusY = h / 2.0f
-      let centerOffset = Vector2(radiusX, radiusY)
-      let step = MathHelper.TwoPi / float32 segments
-
-      let points =
-        [
-          for i in 0 .. segments - 1 do
-            let theta = float32 i * step
-
-            let local =
-              Vector2(radiusX * cos theta, radiusY * sin theta) + centerOffset
-
-            rotate local radians + pos
-        ]
-        |> IndexList.ofList
-
-      ValueSome points
-    | ValueSome(Map.OpenPolyline _) ->
-      // Polylines should not be treated as closed polygons for SAT
-      ValueNone
-    | ValueNone -> ValueNone
-
-  /// Gets the polyline chain for a map object (for open polylines only)
-  let getMapObjectPolyline(obj: Map.MapObject) : IndexList<Vector2> voption =
-    let radians = MathHelper.ToRadians obj.Rotation
-    let pos = Vector2(obj.X, obj.Y)
-
-    match obj.CollisionShape with
-    | ValueSome(Map.OpenPolyline points) ->
-      ValueSome(points |> IndexList.map(fun p -> rotate p radians + pos))
-    | _ -> ValueNone
-
-  /// Calculates the AABB (Axis Aligned Bounding Box) for a map object
-  /// Returns struct (min, max) vectors
-  let getMapObjectAABB(obj: Map.MapObject) =
-    let radians = MathHelper.ToRadians obj.Rotation
-    let pos = Vector2(obj.X, obj.Y)
-
-    // Helper to get bounds of points
-    let getBounds(points: seq<Vector2>) =
-      let mutable minX = Single.MaxValue
-      let mutable minY = Single.MaxValue
-      let mutable maxX = Single.MinValue
-      let mutable maxY = Single.MinValue
-
-      for p in points do
-        let rotated = rotate p radians + pos
-        minX <- min minX rotated.X
-        minY <- min minY rotated.Y
-        maxX <- max maxX rotated.X
-        maxY <- max maxY rotated.Y
-
-      struct (Vector2(minX, minY), Vector2(maxX, maxY))
-
-    match obj.CollisionShape with
-    | ValueSome(Map.CollisionShape.Circle radius) ->
-      // Based on getMapObjectPolygon logic: centerOffset = Vector2(radius, radius)
-      let centerOffset = Vector2(radius, radius)
-      // The circle center in world space:
-      // We need to rotate the center offset
-      let worldCenter = rotate centerOffset radians + pos
-      let r = Vector2(radius, radius)
-      struct (worldCenter - r, worldCenter + r)
-
-    | ValueSome(Map.CollisionShape.ClosedPolygon points) -> getBounds points
-
-    | ValueSome(Map.OpenPolyline points) -> getBounds points
-
-    | ValueSome(Map.RectangleShape(w, h)) ->
-      let corners = [
-        Vector2.Zero
-        Vector2(w, 0.0f)
-        Vector2(w, h)
-        Vector2(0.0f, h)
-      ]
-
-      getBounds corners
-
-    | ValueSome(Map.EllipseShape(w, h)) ->
-      // Approximate like in polygon
-      let segments = 8
-      let radiusX = w / 2.0f
-      let radiusY = h / 2.0f
-      let centerOffset = Vector2(radiusX, radiusY)
-      let step = MathHelper.TwoPi / float32 segments
-
-      let points = [
-        for i in 0 .. segments - 1 do
-          let theta = float32 i * step
-          Vector2(radiusX * cos theta, radiusY * sin theta) + centerOffset
-      ]
-
-      getBounds points
-
-    | ValueNone -> struct (pos, pos)
-
-  // ============================================================================
-  // Segment-Based Collision for Polylines
-  // ============================================================================
 
   /// Calculates the closest point on a line segment to a given point
   let closestPointOnSegment (p: Vector2) (a: Vector2) (b: Vector2) : Vector2 =
@@ -423,145 +471,7 @@ module Spatial =
       let distSq = Vector2.DistanceSquared(point, projection)
       distSq <= line.Width / 2.0f * (line.Width / 2.0f)
 
-  module Isometric =
-    open Pomo.Core.Domain.Map
-
-    /// Converts from screen/world coordinates to isometric grid coordinates
-    let screenToGrid
-      (mapDef: MapDefinition)
-      (screenX: float32, screenY: float32)
-      =
-      let tileW = float32 mapDef.TileWidth
-      let tileH = float32 mapDef.TileHeight
-      let originX = float32 mapDef.Width * tileW / 2.0f
-
-      // Invert the isometric transformation:
-      // screenX = originX + (gridX - gridY) * tileW / 2
-      // screenY = (gridX + gridY) * tileH / 2
-      //
-      // Solving for gridX and gridY:
-      // From second equation: gridX + gridY = 2 * screenY / tileH
-      // From first equation: gridX - gridY = 2 * (screenX - originX) / tileW
-      //
-      // Adding: 2 * gridX = 2 * screenY / tileH + 2 * (screenX - originX) / tileW
-      // So: gridX = screenY / tileH + (screenX - originX) / tileW
-      //
-      // Subtracting: 2 * gridY = 2 * screenY / tileH - 2 * (screenX - originX) / tileW
-      // So: gridY = screenY / tileH - (screenX - originX) / tileW
-
-      let gridX = screenY / tileH + (screenX - originX) / tileW
-      let gridY = screenY / tileH - (screenX - originX) / tileW
-
-      Vector2(gridX, gridY)
-
-    /// Converts from isometric grid coordinates to screen/world coordinates
-    let gridToScreen (mapDef: MapDefinition) (gridX: float32, gridY: float32) =
-      let tileW = float32 mapDef.TileWidth
-      let tileH = float32 mapDef.TileHeight
-      let originX = float32 mapDef.Width * tileW / 2.0f
-
-      // screenX = originX + (gridX - gridY) * tileW / 2
-      // screenY = (gridX + gridY) * tileH / 2
-
-      let screenX = originX + (gridX - gridY) * tileW / 2.0f
-      let screenY = (gridX + gridY) * tileH / 2.0f
-
-      Vector2(screenX, screenY)
-
-    /// Checks if a point in screen coordinates is within an isometric line AOE
-    /// lineStart and lineEnd are in screen coordinates
-    /// Performs the check in isometric grid space to account for the projection
-    let isPointInIsometricLine
-      (mapDef: MapDefinition)
-      (line: LineSegment)
-      (point: Vector2)
-      =
-      // Convert all coordinates to isometric grid space
-      let startGrid = screenToGrid mapDef (line.Start.X, line.Start.Y)
-      let endGrid = screenToGrid mapDef (line.End.X, line.End.Y)
-      let pointGrid = screenToGrid mapDef (point.X, point.Y)
-
-      // Apply the same line algorithm but in isometric grid space
-      let lineVec = endGrid - startGrid
-      let lineLenSq = lineVec.LengthSquared()
-
-      if lineLenSq = 0.0f then
-        Vector2.DistanceSquared(startGrid, pointGrid)
-        <= line.Width / 2.0f * (line.Width / 2.0f)
-      else
-        let t = Vector2.Dot(pointGrid - startGrid, lineVec) / lineLenSq
-        let tClamped = System.Math.Clamp(t, 0.0f, 1.0f)
-        let projection = startGrid + lineVec * tClamped
-        let distSq = Vector2.DistanceSquared(pointGrid, projection)
-        distSq <= line.Width / 2.0f * (line.Width / 2.0f)
-
-    /// Checks if a point in screen coordinates is within an isometric cone AOE
-    /// origin, direction, and point are in screen coordinates
-    /// Performs the check in isometric grid space
-    let isPointInIsometricCone
-      (mapDef: MapDefinition)
-      (cone: Cone)
-      (point: Vector2)
-      =
-      // Convert coordinates to isometric grid space
-      let originGrid = screenToGrid mapDef (cone.Origin.X, cone.Origin.Y)
-      let pointGrid = screenToGrid mapDef (point.X, point.Y)
-
-      // The direction vector also needs to be converted to grid space
-      // To do this, we'll convert the destination point (origin + direction) to grid space,
-      // then calculate the difference
-      let originPlusDir = cone.Origin + cone.Direction
-
-      let originPlusDirGrid =
-        screenToGrid mapDef (originPlusDir.X, originPlusDir.Y)
-
-      let directionGrid = Vector2.Normalize(originPlusDirGrid - originGrid)
-
-      let distanceSquared = Vector2.DistanceSquared(originGrid, pointGrid)
-
-      if distanceSquared > cone.Length * cone.Length then
-        false
-      else
-        let offset = pointGrid - originGrid
-        // Handle the case where point is exactly at origin to avoid normalizing zero vector
-        if offset = Vector2.Zero then
-          true // Point at origin is always in the cone
-        else
-          let toPoint = Vector2.Normalize(offset)
-
-          let angleRadians =
-            Microsoft.Xna.Framework.MathHelper.ToRadians(
-              cone.AngleDegrees / 2.0f
-            )
-
-          let dot = Vector2.Dot(directionGrid, toPoint)
-          let cosAngle = System.MathF.Cos angleRadians
-          dot >= cosAngle
-
-    /// Checks if a point in screen coordinates is within an isometric circle AOE
-    let isPointInIsometricCircle
-      (mapDef: MapDefinition)
-      (circle: Circle)
-      (point: Vector2)
-      =
-      // Convert to grid space for comparison
-      let centerGrid = screenToGrid mapDef (circle.Center.X, circle.Center.Y)
-      let pointGrid = screenToGrid mapDef (point.X, point.Y)
-
-      // Apply anisotropic scaling to account for isometric distortion
-      // In isometric projection, distances along the X and Y axes are compressed
-      let dx = pointGrid.X - centerGrid.X
-      let dy = pointGrid.Y - centerGrid.Y
-
-      // The effective distance in isometric space needs to account for the projection
-      // Use a weighted distance that accounts for the isometric distortion
-      let effectiveDistance = sqrt((dx * dx) + (dy * dy))
-
-      effectiveDistance <= circle.Radius
-
   module Search =
-    open Pomo.Core.Domain.Map
-
     type SearchContext = {
       GetNearbyEntities:
         Vector2 -> float32 -> IndexList<struct (Guid<EntityId> * Vector2)>

@@ -8,6 +8,7 @@ open FSharp.Data.Adaptive
 open Pomo.Core.Domain
 open Pomo.Core.Domain.Action
 open Pomo.Core.Domain.Units
+open Pomo.Core.Domain.Core
 open Pomo.Core.Domain.Events
 open Pomo.Core.Domain.Entity
 open Pomo.Core.Domain.Skill
@@ -17,6 +18,8 @@ open Pomo.Core.Stores
 open Pomo.Core
 open Systems
 open Pomo.Core.Environment
+open Pomo.Core.Algorithms
+open Pomo.Core.Domain.Core.Constants
 
 module EntitySpawnerLogic =
   [<Struct>]
@@ -24,7 +27,7 @@ module EntitySpawnerLogic =
     EntityId: Guid<EntityId>
     ScenarioId: Guid<ScenarioId>
     Type: SystemCommunications.SpawnType
-    Position: Vector2
+    Position: WorldPosition
     SpawnStartTime: TimeSpan
     Duration: TimeSpan
   }
@@ -253,7 +256,7 @@ module EntitySpawnerLogic =
         archetypeId = info.ArchetypeId
         currentState = AIState.Idle
         stateEnterTime = TimeSpan.Zero
-        spawnPosition = pos
+        spawnPosition = WorldPosition.toVector2 pos // AI uses XZ as 2D
         absoluteWaypoints =
           if
             archetype.behaviorType = BehaviorType.Patrol
@@ -261,12 +264,13 @@ module EntitySpawnerLogic =
           then
             // Generate a simple square patrol path relative to spawn
             let offset = 100.0f
+            let pos2D = WorldPosition.toVector2 pos
 
             let waypoints = [|
-              pos // Start at spawn
-              pos + Vector2(offset, 0.0f)
-              pos + Vector2(offset, offset)
-              pos + Vector2(0.0f, offset)
+              pos2D // Start at spawn
+              pos2D + Vector2(offset, 0.0f)
+              pos2D + Vector2(offset, offset)
+              pos2D + Vector2(0.0f, offset)
             |]
 
             ValueSome waypoints
@@ -426,6 +430,25 @@ module EntitySpawnerLogic =
         | GameEvent.Spawn(SpawningEvent.SpawnEntity spawn) -> Some spawn
         | _ -> None)
       |> Observable.subscribe(fun intent ->
+        let adjustedPosition =
+          let scenarios = core.World.Scenarios |> AMap.force
+
+          match scenarios |> HashMap.tryFindV intent.ScenarioId with
+          | ValueSome scenario ->
+            match scenario.BlockMap with
+            | ValueSome blockMap ->
+              let surfaceY =
+                BlockCollision.getSurfaceHeight blockMap {
+                  X = intent.Position.X
+                  Y = 0f
+                  Z = intent.Position.Z
+                }
+                |> ValueOption.defaultValue BlockMap.CellSize
+
+              { intent.Position with Y = surfaceY }
+            | ValueNone -> intent.Position
+          | ValueNone -> intent.Position
+
         let totalGameTime =
           core.World.Time |> AVal.map _.TotalGameTime |> AVal.force
 
@@ -438,7 +461,7 @@ module EntitySpawnerLogic =
           EntityId = intent.EntityId
           ScenarioId = intent.ScenarioId
           Type = intent.Type
-          Position = intent.Position
+          Position = adjustedPosition
           SpawnStartTime = totalGameTime
           Duration = duration
         }
@@ -516,7 +539,7 @@ module EntitySpawnerLogic =
                   info.SpawnInfo with
                       SpawnZoneName = ValueSome zone.ZoneName
                 }
-              Position = newPosition
+              Position = WorldPosition.fromVector2 newPosition
             }
 
             core.EventBus.Publish(

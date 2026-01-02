@@ -10,6 +10,7 @@ open Pomo.Core.Domain.Core
 open Pomo.Core.Domain.Units
 open Pomo.Core.Domain.Camera
 open Pomo.Core.Domain.World
+open Pomo.Core.Domain.BlockMap
 open Pomo.Core.Projections
 open Pomo.Core.Graphics
 
@@ -71,19 +72,15 @@ module CameraSystem =
                 let pos =
                   projections.ComputeMovementSnapshot(scenarioId).Positions
                   |> Dictionary.tryFindV playerId
-                  |> ValueOption.defaultValue Vector2.Zero
+                  |> ValueOption.defaultValue WorldPosition.zero
 
                 let ppu =
                   match scenarios |> HashMap.tryFindV scenarioId with
-                  | ValueSome scenario ->
-                    Vector2(
-                      float32 scenario.Map.TileWidth,
-                      float32 scenario.Map.TileHeight
-                    )
-                  | ValueNone -> Vector2(64.0f, 32.0f) // Fallback
+                  | ValueSome _ -> Constants.BlockMap3DPixelsPerUnit
+                  | ValueNone -> Constants.DefaultPixelsPerUnit
 
                 pos, ppu
-              | ValueNone -> Vector2.Zero, Vector2(64.0f, 32.0f)
+              | ValueNone -> WorldPosition.zero, Constants.DefaultPixelsPerUnit
 
             let view = RenderMath.Camera.getViewMatrix position pixelsPerUnit
 

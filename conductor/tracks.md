@@ -14,5 +14,5 @@ This file tracks all major tracks for the project. Each track has its own detail
 
 ---
 
-## [ ] Track: Built-in WYSIWYG 3D block map editor with True 3D world architecture
+## [~] Track: Built-in WYSIWYG 3D block map editor with True 3D world architecture
 *Link: [./conductor/tracks/block_map_editor_20251229/](./conductor/tracks/block_map_editor_20251229/)*

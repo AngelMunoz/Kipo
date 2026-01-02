@@ -3,6 +3,7 @@ module RenderMathTests
 open Microsoft.VisualStudio.TestTools.UnitTesting
 open Microsoft.Xna.Framework
 open Pomo.Core.Graphics
+open Pomo.Core.Domain.Core
 open Pomo.Core.Domain.Map
 open FsCheck
 open FsCheck.FSharp
@@ -36,33 +37,31 @@ type LogicToRenderTests() =
 
   [<TestMethod>]
   member _.``origin maps to origin``() =
-    let result = RenderMath.LogicRender.toRender Vector2.Zero 0.0f isoPpu
+    let result = RenderMath.LogicRender.toRender WorldPosition.zero isoPpu
     Assert.AreEqual(Vector3.Zero, result)
 
   [<TestMethod>]
   member _.``X is scaled by PPU.X``() =
-    let logicPos = Vector2(64.0f, 0.0f)
-    let result = RenderMath.LogicRender.toRender logicPos 0.0f isoPpu
+    let logicPos = { WorldPosition.zero with X = 64.0f }
+    let result = RenderMath.LogicRender.toRender logicPos isoPpu
     Assert.AreEqual(2.0f, result.X) // 64 / 32 = 2
 
   [<TestMethod>]
   member _.``Z is scaled by PPU.Y``() =
-    let logicPos = Vector2(0.0f, 32.0f)
-    let result = RenderMath.LogicRender.toRender logicPos 0.0f isoPpu
+    let logicPos = { WorldPosition.zero with Z = 32.0f }
+    let result = RenderMath.LogicRender.toRender logicPos isoPpu
     Assert.AreEqual(2.0f, result.Z) // 32 / 16 = 2
 
   [<TestMethod>]
   member _.``Y includes altitude and depth bias``() =
-    let logicPos = Vector2(0.0f, 16.0f) // zBase = 1.0
-    let altitude = 5.0f
-    let result = RenderMath.LogicRender.toRender logicPos altitude isoPpu
+    let logicPos = { X = 0.0f; Y = 5.0f; Z = 16.0f } // zBase = 1.0, altitude = 5.0
+    let result = RenderMath.LogicRender.toRender logicPos isoPpu
     Assert.AreEqual(6.0f, result.Y) // altitude(5) + zBase(1) = 6
 
   [<TestMethod>]
   member _.``Z is reduced by altitude for depth sorting``() =
-    let logicPos = Vector2(0.0f, 16.0f) // zBase = 1.0
-    let altitude = 5.0f
-    let result = RenderMath.LogicRender.toRender logicPos altitude isoPpu
+    let logicPos = { X = 0.0f; Y = 5.0f; Z = 16.0f } // zBase = 1.0, altitude = 5.0
+    let result = RenderMath.LogicRender.toRender logicPos isoPpu
     Assert.AreEqual(-4.0f, result.Z) // zBase(1) - altitude(5) = -4
 
 
@@ -87,19 +86,19 @@ type ScreenToLogicTests() =
   member _.``screen center maps to camera position``() =
     let viewport = Microsoft.Xna.Framework.Graphics.Viewport(0, 0, 800, 600)
     let screenCenter = Vector2(400.0f, 300.0f)
-    let cameraPos = Vector2(100.0f, 200.0f)
+    let cameraPos = { X = 100.0f; Y = 0.0f; Z = 200.0f }
 
     let result =
       RenderMath.ScreenLogic.toLogic screenCenter viewport 1.0f cameraPos
 
     Assert.AreEqual(cameraPos.X, result.X, 0.001f)
-    Assert.AreEqual(cameraPos.Y, result.Y, 0.001f)
+    Assert.AreEqual(cameraPos.Z, result.Z, 0.001f)
 
   [<TestMethod>]
   member _.``offset from center is scaled by zoom``() =
     let viewport = Microsoft.Xna.Framework.Graphics.Viewport(0, 0, 800, 600)
     let screenPos = Vector2(500.0f, 300.0f) // 100 pixels right of center
-    let cameraPos = Vector2.Zero
+    let cameraPos = WorldPosition.zero
     let zoom = 2.0f
 
     let result =
@@ -110,9 +109,9 @@ type ScreenToLogicTests() =
   [<TestMethod>]
   member _.``round-trip logic to screen to logic``() =
     let viewport = Microsoft.Xna.Framework.Graphics.Viewport(0, 0, 800, 600)
-    let cameraPos = Vector2(1000.0f, 500.0f)
+    let cameraPos = { X = 1000.0f; Y = 0.0f; Z = 500.0f }
     let zoom = 2.5f
-    let logicPos = Vector2(1100.0f, 400.0f)
+    let logicPos = { X = 1100.0f; Y = 0.0f; Z = 400.0f }
 
     let screenPos =
       RenderMath.ScreenLogic.toScreen logicPos viewport zoom cameraPos
@@ -121,7 +120,7 @@ type ScreenToLogicTests() =
       RenderMath.ScreenLogic.toLogic screenPos viewport zoom cameraPos
 
     Assert.AreEqual(logicPos.X, actualLogicPos.X, 0.001f)
-    Assert.AreEqual(logicPos.Y, actualLogicPos.Y, 0.001f)
+    Assert.AreEqual(logicPos.Z, actualLogicPos.Z, 0.001f)
 
 
 [<TestClass>]
@@ -130,30 +129,49 @@ type PropertyTests() =
   [<TestMethod>]
   member _.``LogicToRender X component is always logicX div ppu.X``() =
     Prop.forAll fourInts (fun (lx, ly, px, py) ->
-      let logicPos = Vector2(float32 lx, float32 ly)
+      let logicPos = {
+        X = float32 lx
+        Y = 0.0f
+        Z = float32 ly
+      }
+
       let ppu = Vector2(float32(clampPpu px), float32(clampPpu py))
-      let result = RenderMath.LogicRender.toRender logicPos 0.0f ppu
+      let result = RenderMath.LogicRender.toRender logicPos ppu
       abs(result.X - logicPos.X / ppu.X) < 0.0001f)
     |> Check.QuickThrowOnFailure
 
   [<TestMethod>]
   member _.``LogicToRender Z at zero altitude equals logicY div ppu.Y``() =
     Prop.forAll fourInts (fun (lx, ly, px, py) ->
-      let logicPos = Vector2(float32 lx, float32 ly)
+      let logicPos = {
+        X = float32 lx
+        Y = 0.0f
+        Z = float32 ly
+      }
+
       let ppu = Vector2(float32(clampPpu px), float32(clampPpu py))
-      let result = RenderMath.LogicRender.toRender logicPos 0.0f ppu
-      abs(result.Z - logicPos.Y / ppu.Y) < 0.0001f)
+      let result = RenderMath.LogicRender.toRender logicPos ppu
+      abs(result.Z - logicPos.Z / ppu.Y) < 0.0001f)
     |> Check.QuickThrowOnFailure
 
   [<TestMethod>]
   member _.``altitude directly contributes to Y``() =
     Prop.forAll fourInts (fun (lx, ly, px, py) ->
-      let logicPos = Vector2(float32 lx, float32 ly)
+      let logicPosA = {
+        X = float32 lx
+        Y = 0.0f
+        Z = float32 ly
+      }
+
+      let logicPosB = {
+        X = float32 lx
+        Y = 10.0f
+        Z = float32 ly
+      }
+
       let ppu = Vector2(float32(clampPpu px), float32(clampPpu py))
-      let altA = 0.0f
-      let altB = 10.0f
-      let resultA = RenderMath.LogicRender.toRender logicPos altA ppu
-      let resultB = RenderMath.LogicRender.toRender logicPos altB ppu
+      let resultA = RenderMath.LogicRender.toRender logicPosA ppu
+      let resultB = RenderMath.LogicRender.toRender logicPosB ppu
       // Use larger tolerance for float32 precision with large zBase values
       abs(resultB.Y - resultA.Y - 10.0f) < 0.01f)
     |> Check.QuickThrowOnFailure
@@ -161,12 +179,21 @@ type PropertyTests() =
   [<TestMethod>]
   member _.``altitude inversely contributes to Z``() =
     Prop.forAll fourInts (fun (lx, ly, px, py) ->
-      let logicPos = Vector2(float32 lx, float32 ly)
+      let logicPosA = {
+        X = float32 lx
+        Y = 0.0f
+        Z = float32 ly
+      }
+
+      let logicPosB = {
+        X = float32 lx
+        Y = 10.0f
+        Z = float32 ly
+      }
+
       let ppu = Vector2(float32(clampPpu px), float32(clampPpu py))
-      let altA = 0.0f
-      let altB = 10.0f
-      let resultA = RenderMath.LogicRender.toRender logicPos altA ppu
-      let resultB = RenderMath.LogicRender.toRender logicPos altB ppu
+      let resultA = RenderMath.LogicRender.toRender logicPosA ppu
+      let resultB = RenderMath.LogicRender.toRender logicPosB ppu
       abs(resultA.Z - resultB.Z - 10.0f) < 0.0001f)
     |> Check.QuickThrowOnFailure
 
@@ -184,9 +211,15 @@ type PropertyTests() =
     Prop.forAll twoInts (fun (x, z) ->
       let ppu = Vector2(32.0f, 16.0f)
       let particle = Vector3(float32 x, 0.0f, float32 z)
-      let logic = Vector2(float32 x, float32 z)
+
+      let logic = {
+        X = float32 x
+        Y = 0.0f
+        Z = float32 z
+      }
+
       let fromParticle = RenderMath.ParticleSpace.toRender particle ppu
-      let fromLogic = RenderMath.LogicRender.toRender logic 0.0f ppu
+      let fromLogic = RenderMath.LogicRender.toRender logic ppu
 
       abs(fromParticle.X - fromLogic.X) < 0.0001f
       && abs(fromParticle.Y - fromLogic.Y) < 0.0001f
@@ -197,10 +230,20 @@ type PropertyTests() =
   member _.``tileToRender X and Z match toRender X and Z``() =
     Prop.forAll twoInts (fun (lx, ly) ->
       let ppu = Vector2(32.0f, 16.0f)
-      let logicPos = Vector2(float32 lx, float32 ly)
+      let logicPosV2 = Vector2(float32 lx, float32 ly)
       let depthY = 5.0f
-      let tileResult = RenderMath.LogicRender.tileToRender logicPos depthY ppu
-      let renderResult = RenderMath.LogicRender.toRender logicPos 0.0f ppu
+
+      let tileResult =
+        RenderMath.LogicRender.tileToRender logicPosV2 depthY ppu
+
+      let renderResult =
+        RenderMath.LogicRender.toRender
+          {
+            X = float32 lx
+            Y = 0.0f
+            Z = float32 ly
+          }
+          ppu
 
       abs(tileResult.X - renderResult.X) < 0.0001f
       && abs(tileResult.Z - renderResult.Z) < 0.0001f
@@ -274,7 +317,7 @@ type PropertyTests() =
   [<TestMethod>]
   member _.``getBillboardVectors returns orthogonal vectors``() =
     let ppu = Vector2(32.0f, 16.0f)
-    let view = RenderMath.Camera.getViewMatrix Vector2.Zero ppu
+    let view = RenderMath.Camera.getViewMatrix WorldPosition.zero ppu
     let struct (right, up) = RenderMath.Billboard.getVectors &view
     let dot = Vector3.Dot(right, up)
     Assert.IsTrue(abs(dot) < 0.0001f)
@@ -283,7 +326,13 @@ type PropertyTests() =
   member _.``getViewMatrix produces invertible matrix``() =
     Prop.forAll twoInts (fun (x, y) ->
       let ppu = Vector2(32.0f, 16.0f)
-      let pos = Vector2(float32 x, float32 y)
+
+      let pos = {
+        X = float32 x
+        Y = 0.0f
+        Z = float32 y
+      }
+
       let view = RenderMath.Camera.getViewMatrix pos ppu
       let det = view.Determinant()
       abs(det) > 0.0001f)
@@ -306,9 +355,17 @@ type PropertyTests() =
     Prop.forAll twoInts (fun (cx, cy) ->
       let zoom = 1.0f
       let viewport = Microsoft.Xna.Framework.Graphics.Viewport(0, 0, 800, 600)
-      let cameraPos = Vector2(float32 cx, float32 cy)
+
+      let cameraPos = {
+        X = float32 cx
+        Y = 0.0f
+        Z = float32 cy
+      }
+
       let matrix = RenderMath.Camera.get2DViewMatrix cameraPos zoom viewport
-      let transformed = Vector2.Transform(cameraPos, matrix)
+
+      let transformed =
+        Vector2.Transform(Vector2(cameraPos.X, cameraPos.Z), matrix)
 
       abs(transformed.X - 400.0f) < 0.0001f
       && abs(transformed.Y - 300.0f) < 0.0001f)
@@ -320,7 +377,7 @@ type GetViewBoundsTests() =
 
   [<TestMethod>]
   member _.``centered camera has symmetric bounds``() =
-    let cameraPos = Vector2(0.0f, 0.0f)
+    let cameraPos = WorldPosition.zero
 
     let struct (left, right, top, bottom) =
       RenderMath.Camera.getViewBounds cameraPos 800.0f 600.0f 1.0f
@@ -332,7 +389,7 @@ type GetViewBoundsTests() =
 
   [<TestMethod>]
   member _.``zoom shrinks visible area``() =
-    let cameraPos = Vector2(0.0f, 0.0f)
+    let cameraPos = WorldPosition.zero
 
     let struct (left, right, _, _) =
       RenderMath.Camera.getViewBounds cameraPos 800.0f 600.0f 2.0f
@@ -342,7 +399,7 @@ type GetViewBoundsTests() =
 
   [<TestMethod>]
   member _.``camera position offsets bounds``() =
-    let cameraPos = Vector2(100.0f, 50.0f)
+    let cameraPos = { X = 100.0f; Y = 0.0f; Z = 50.0f }
 
     let struct (left, right, top, bottom) =
       RenderMath.Camera.getViewBounds cameraPos 800.0f 600.0f 1.0f

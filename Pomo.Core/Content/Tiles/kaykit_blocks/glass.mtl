@@ -1,0 +1,13 @@
+# Blender MTL File: 'Block_Bits_Export.blend'
+# Material Count: 1
+
+newmtl transparent
+Ns 359.999993
+Ka 1.000000 1.000000 1.000000
+Kd 1.000000 1.000000 1.000000
+Ks 0.500000 0.500000 0.500000
+Ke 0.000000 0.000000 0.000000
+Ni 1.450000
+d 0.500000
+illum 9
+map_Kd block_bits_texture.png

@@ -191,7 +191,10 @@ module AbilityActivation =
   type PendingCastExecutionParams = {
     ValidationContext: ValidationContext
     Positions:
-      System.Collections.Generic.IReadOnlyDictionary<Guid<EntityId>, Vector2>
+      System.Collections.Generic.IReadOnlyDictionary<
+        Guid<EntityId>,
+        WorldPosition
+       >
     Skill: ActiveSkill
     Target: SystemCommunications.SkillTarget
   }
@@ -227,7 +230,9 @@ module AbilityActivation =
 
       match casterPos with
       | ValueNone -> () // Caster has no position, should not happen
-      | ValueSome casterPos ->
+      | ValueSome casterPosWorld ->
+        let casterPos = WorldPosition.toVector2 casterPosWorld
+
         let validationResult =
           Validation.validate args.ValidationContext args.Skill.Id
 
@@ -243,7 +248,7 @@ module AbilityActivation =
             GameEvent.Notification(
               NotificationEvent.ShowMessage {
                 Message = message
-                Position = casterPos
+                Position = casterPosWorld
                 Type = SystemCommunications.Miss
               }
             )
@@ -254,7 +259,7 @@ module AbilityActivation =
             match args.Target with
             | SystemCommunications.TargetEntity targetId ->
               match args.Positions |> Dictionary.tryFindV targetId with
-              | ValueSome pos -> ValueSome pos
+              | ValueSome pos -> ValueSome(WorldPosition.toVector2 pos)
               | ValueNone -> ValueNone
             | SystemCommunications.TargetPosition pos -> ValueSome pos
             | _ -> ValueNone // Should not happen for pending casts
@@ -281,7 +286,7 @@ module AbilityActivation =
                 GameEvent.Notification(
                   NotificationEvent.ShowMessage {
                     Message = "Target is out of range"
-                    Position = casterPos
+                    Position = casterPosWorld
                     Type = SystemCommunications.Miss
                   }
                 )
@@ -477,7 +482,7 @@ module AbilityActivation =
         let casterPos =
           snapshot.Positions
           |> Dictionary.tryFindV playerId
-          |> ValueOption.defaultValue Vector2.Zero
+          |> ValueOption.defaultValue WorldPosition.zero
 
         core.EventBus.Publish(
           GameEvent.Notification(

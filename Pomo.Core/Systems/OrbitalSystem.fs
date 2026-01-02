@@ -9,6 +9,7 @@ open FSharp.Data.Adaptive
 open Pomo.Core
 open Pomo.Core.Domain
 open Pomo.Core.Domain.Units
+open Pomo.Core.Domain.Core
 open Pomo.Core.Domain.World
 open Pomo.Core.Domain.Orbital
 open Pomo.Core.Domain.Events
@@ -28,7 +29,9 @@ module OrbitalSystem =
     (core: CoreServices)
     (stores: StoreServices)
     (orbital: ActiveOrbital)
-    (casterPos: Vector2)
+    (centerPos: Vector3)
+    (facingQuat: Quaternion)
+    (elapsed: float32)
     =
     match orbital.Config.Visual.VfxId with
     | ValueSome vfxId ->
@@ -42,12 +45,15 @@ module OrbitalSystem =
 
           let effectId = Guid.NewGuid().ToString()
 
-          let localOffset = Orbital.calculatePosition orbital.Config 0.0f i
+          let localOffset = Orbital.calculatePosition orbital.Config elapsed i
+
+          let rotatedCenterOffset =
+            Vector3.Transform(orbital.Config.CenterOffset, facingQuat)
 
           let worldPos =
-            Vector3(casterPos.X, 0.0f, casterPos.Y)
-            + orbital.Config.CenterOffset
-            + localOffset
+            centerPos
+            + rotatedCenterOffset
+            + Vector3.Transform(localOffset, facingQuat)
 
           let effect: Particles.VisualEffect = {
             Id = effectId
@@ -100,6 +106,7 @@ module OrbitalSystem =
       let activeOrbitals = core.World.ActiveOrbitals |> AMap.force
       let activeCharges = core.World.ActiveCharges |> AMap.force
       let entityScenarios = core.World.EntityScenario |> AMap.force
+      let scenarios = core.World.Scenarios |> AMap.force
       let entityExists = core.World.EntityExists
 
       // === CHARGE EXPIRY LOGIC ===
@@ -167,7 +174,10 @@ module OrbitalSystem =
 
         if orbitals.Count > 0 then
           let snapshot =
-            gameplay.Projections.ComputeMovementSnapshot(scenarioId)
+            match scenarios.TryFindV scenarioId with
+            | ValueSome scenario when scenario.BlockMap.IsSome ->
+              gameplay.Projections.ComputeMovement3DSnapshot(scenarioId)
+            | _ -> Pomo.Core.Projections.Movement3DSnapshot.Empty
 
           for struct (casterId, orbital) in orbitals do
             currentCasters.Add(casterId) |> ignore
@@ -175,8 +185,10 @@ module OrbitalSystem =
             // Get center position based on OrbitalCenter type
             let centerPosOpt =
               match orbital.Center with
-              | EntityCenter entityId -> snapshot.Positions.TryFindV entityId
-              | PositionCenter pos -> ValueSome pos
+              | EntityCenter entityId ->
+                snapshot.Positions.TryFindV entityId
+                |> ValueOption.map WorldPosition.toVector3
+              | PositionCenter pos -> ValueSome(Vector3(pos.X, 0.0f, pos.Y))
 
             // Get entity facing rotation (only for entity-centered orbitals)
             let entityRotation =
@@ -190,14 +202,21 @@ module OrbitalSystem =
               Quaternion.CreateFromAxisAngle(Vector3.Up, entityRotation)
 
             centerPosOpt
-            |> ValueOption.iter(fun casterPos ->
+            |> ValueOption.iter(fun centerPos ->
               let elapsed = totalTime - orbital.StartTime
 
               // Initialize effects if new
               let mutable effects = Unchecked.defaultof<OrbitalEffectEntry[]>
 
               if not(effectCache.TryGetValue(casterId, &effects)) then
-                effects <- spawnOrbitalEffects core stores orbital casterPos
+                effects <-
+                  spawnOrbitalEffects
+                    core
+                    stores
+                    orbital
+                    centerPos
+                    facingQuat
+                    elapsed
 
                 if effects.Length > 0 then
                   effectCache[casterId] <- effects
@@ -213,16 +232,15 @@ module OrbitalSystem =
                       elapsed
                       entry.Index
 
-                  // Only rotate CenterOffset to track "behind" the character
-                  // localOffset stays unrotated so the X-Z orbit renders as isometric ellipse
                   let rotatedCenterOffset =
                     Vector3.Transform(orbital.Config.CenterOffset, facingQuat)
 
+                  let rotatedLocalOffset =
+                    Vector3.Transform(localOffset, facingQuat)
+
                   // The orbital's world position
                   let worldPos =
-                    Vector3(casterPos.X, 0.0f, casterPos.Y)
-                    + rotatedCenterOffset
-                    + localOffset
+                    centerPos + rotatedCenterOffset + rotatedLocalOffset
 
                   // Update effect position (for billboard particles)
                   entry.Effect.Position.Value <- worldPos

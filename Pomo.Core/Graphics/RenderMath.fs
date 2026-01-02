@@ -3,6 +3,8 @@ namespace Pomo.Core.Graphics
 open System
 open Microsoft.Xna.Framework
 open Microsoft.Xna.Framework.Graphics
+open Pomo.Core.Domain.Core
+open Pomo.Core.Domain.Core.Constants
 
 /// Coordinate Space Transformations for Isometric Rendering
 ///
@@ -18,195 +20,12 @@ open Microsoft.Xna.Framework.Graphics
 ///   - Mesh rotations include 45° offset for camera alignment
 module RenderMath =
 
-  /// Internal coordinate space primitives
-  module private CoordSpace =
-    let inline toRenderX (ppu: Vector2) (logicX: float32) = logicX / ppu.X
-    let inline toRenderZBase (ppu: Vector2) (logicY: float32) = logicY / ppu.Y
-
-    let inline toVisualHeight (zBase: float32) (altitude: float32) =
-      altitude + zBase
-
-    let inline toCameraDepth (zBase: float32) (altitude: float32) =
-      zBase - altitude
-
-    let inline correctParticleAltitude (ppu: Vector2) (particleY: float32) =
-      (particleY / ppu.Y) * 2.0f
-
-  /// Internal isometric matrix pipeline stages
-  module private IsoPipeline =
-    let isoLookAt =
-      Matrix.CreateLookAt(
-        Vector3.Zero,
-        Vector3.Normalize(Vector3(-1.0f, -1.0f, -1.0f)),
-        Vector3.Up
-      )
-
-    let topDownLookAt =
-      Matrix.CreateLookAt(Vector3.Zero, Vector3.Down, Vector3.Forward)
-
-    let isoCorrection = isoLookAt * Matrix.Invert topDownLookAt
-
-    let inline alignToCamera(facing: float32) =
-      Matrix.CreateRotationY(facing + MathHelper.PiOver4)
-
-    let inline applyIsoCorrection(m: Matrix) = m * isoCorrection
-
-    let inline applySquish (squishFactor: float32) (m: Matrix) =
-      m * Matrix.CreateScale(1.0f, 1.0f, squishFactor)
-
-    let inline applyScale (scale: float32) (m: Matrix) =
-      m * Matrix.CreateScale(scale)
-
-    let inline applyTilt(tilt: float32) = Matrix.CreateRotationX(tilt)
-
-    let inline translateTo (pos: Vector3) (m: Matrix) =
-      m * Matrix.CreateTranslation(pos)
-
-    let inline applyAxisScale
-      (baseScale: float32)
-      (scaleAxis: Vector3)
-      (m: Matrix)
-      =
-      let s =
-        Matrix.CreateScale(
-          1.0f + (baseScale - 1.0f) * scaleAxis.X,
-          1.0f + (baseScale - 1.0f) * scaleAxis.Y,
-          1.0f + (baseScale - 1.0f) * scaleAxis.Z
-        )
-
-      m * s
-
-  /// Logic ↔ Render space conversions
-  module LogicRender =
-    open CoordSpace
-
-    /// Converts a Logic position (pixels) and altitude to Unified Render Space (3D Units).
-    /// X = LogicX / PPU.X
-    /// Z = (LogicY / PPU.Y) - altitude (elevated objects sort behind ground objects)
-    /// Y = Altitude + Z_base (visual height includes altitude and depth bias)
-    let inline toRender
-      (logicPos: Vector2)
-      (altitude: float32)
-      (pixelsPerUnit: Vector2)
-      : Vector3 =
-      let x = toRenderX pixelsPerUnit logicPos.X
-      let zBase = toRenderZBase pixelsPerUnit logicPos.Y
-      let y = toVisualHeight zBase altitude
-      let z = toCameraDepth zBase altitude
-      Vector3(x, y, z)
-
-    /// Converts a Tile position (pixels) with explicit depth to Unified Render Space (3D Units).
-    /// Used for terrain tiles where depthY is pre-calculated from tile bottom edge.
-    /// X = LogicX / PPU.X, Z = LogicY / PPU.Y, Y = depthY (no addition)
-    let inline tileToRender
-      (logicPos: Vector2)
-      (depthY: float32)
-      (pixelsPerUnit: Vector2)
-      : Vector3 =
-      let x = toRenderX pixelsPerUnit logicPos.X
-      let z = toRenderZBase pixelsPerUnit logicPos.Y
-      Vector3(x, depthY, z)
-
-  /// Particle space conversions
-  module ParticleSpace =
-    open CoordSpace
-
-    /// Converts a 3D particle world position to Unified Render Space.
-    /// Particles simulate in 3D where: X/Z = horizontal plane (logic space), Y = altitude.
-    /// The altitude must be scaled by the isometric correction factor (Y / PPU.Y * 2.0)
-    /// to match the visual proportions of the 2:1 isometric projection.
-    let inline toRender
-      (particlePos: Vector3)
-      (pixelsPerUnit: Vector2)
-      : Vector3 =
-      let logicPos = Vector2(particlePos.X, particlePos.Z)
-      let altitude = correctParticleAltitude pixelsPerUnit particlePos.Y
-      LogicRender.toRender logicPos altitude pixelsPerUnit
-
-  /// Screen ↔ Logic space conversions (picking, UI)
-  module ScreenLogic =
-    /// Converts Screen coordinates to Logic coordinates.
-    /// Used for Picking / Mouse interaction.
-    let inline toLogic
-      (screenPos: Vector2)
-      (viewport: Viewport)
-      (zoom: float32)
-      (cameraPosition: Vector2)
-      : Vector2 =
-      let screenCenter =
-        Vector2(
-          float32 viewport.X + float32 viewport.Width / 2.0f,
-          float32 viewport.Y + float32 viewport.Height / 2.0f
-        )
-
-      let deltaPixels = screenPos - screenCenter
-      let logicDelta = deltaPixels / zoom
-      cameraPosition + logicDelta
-
-    /// Converts Logic coordinates to Screen coordinates.
-    /// Inverse of toLogic.
-    let inline toScreen
-      (logicPos: Vector2)
-      (viewport: Viewport)
-      (zoom: float32)
-      (cameraPosition: Vector2)
-      : Vector2 =
-      let screenCenter =
-        Vector2(
-          float32 viewport.X + float32 viewport.Width / 2.0f,
-          float32 viewport.Y + float32 viewport.Height / 2.0f
-        )
-
-      let logicDelta = logicPos - cameraPosition
-      let deltaPixels = logicDelta * zoom
-      screenCenter + deltaPixels
-
   /// Camera and projection matrix builders
   module Camera =
-    open CoordSpace
-
-    /// Calculates the View Matrix for the camera.
-    /// Logic Position is the center of the camera in pixels.
-    let getViewMatrix (logicPos: Vector2) (pixelsPerUnit: Vector2) : Matrix =
-      let target =
-        Vector3(
-          toRenderX pixelsPerUnit logicPos.X,
-          0.0f,
-          toRenderZBase pixelsPerUnit logicPos.Y
-        )
-
-      let cameraPos = target + Vector3.Up * 100.0f
-      Matrix.CreateLookAt(cameraPos, target, Vector3.Forward)
-
-    /// Calculates the Orthographic Projection Matrix.
-    let getProjectionMatrix
-      (viewport: Viewport)
-      (zoom: float32)
-      (pixelsPerUnit: Vector2)
-      : Matrix =
-      let viewWidth = float32 viewport.Width / (zoom * pixelsPerUnit.X)
-      let viewHeight = float32 viewport.Height / (zoom * pixelsPerUnit.Y)
-      Matrix.CreateOrthographic(viewWidth, viewHeight, 0.1f, 5000.0f)
-
-    /// Calculates the 2D transform matrix for SpriteBatch rendering.
-    /// Used for background terrain and UI.
-    let get2DViewMatrix
-      (cameraPos: Vector2)
-      (zoom: float32)
-      (viewport: Viewport)
-      : Matrix =
-      Matrix.CreateTranslation(-cameraPos.X, -cameraPos.Y, 0.0f)
-      * Matrix.CreateScale(zoom, zoom, 1.0f)
-      * Matrix.CreateTranslation(
-        float32 viewport.Width / 2.0f,
-        float32 viewport.Height / 2.0f,
-        0.0f
-      )
-
     /// Computes camera view bounds in logic space for culling.
     /// Returns struct(left, right, top, bottom).
     let inline getViewBounds
-      (cameraPos: Vector2)
+      (cameraPos: WorldPosition)
       (viewportWidth: float32)
       (viewportHeight: float32)
       (zoom: float32)
@@ -216,70 +35,227 @@ module RenderMath =
 
       struct (cameraPos.X - halfW,
               cameraPos.X + halfW,
-              cameraPos.Y - halfH,
-              cameraPos.Y + halfH)
+              cameraPos.Z - halfH,
+              cameraPos.Z + halfH)
 
-  /// World matrix builders for 3D meshes
-  module WorldMatrix =
-    open IsoPipeline
+    let inline private tryGetPixelsPerUnit
+      (viewport: Viewport)
+      (zoom: float32)
+      (projection: Matrix)
+      : struct (float32 * float32) voption =
+      if zoom <= 0.0f || projection.M11 = 0.0f || projection.M22 = 0.0f then
+        ValueNone
+      else
+        let ppuX = float32 viewport.Width * projection.M11 / (2.0f * zoom)
+        let ppuZ = float32 viewport.Height * projection.M22 / (2.0f * zoom)
 
-    /// Transforms models from top-down orientation to isometric view.
-    /// This rotates meshes modeled standing upright to display correctly
-    /// in the 2:1 isometric projection.
-    let IsometricCorrectionMatrix = isoCorrection
+        if
+          ppuX <= 0.0f || ppuZ <= 0.0f || Single.IsNaN ppuX || Single.IsNaN ppuZ
+        then
+          ValueNone
+        else
+          ValueSome(struct (ppuX, ppuZ))
 
-    /// Calculates the Squish Factor used for isometric correction.
-    /// defined as PPU.X / PPU.Y
-    let inline getSquishFactor(pixelsPerUnit: Vector2) : float32 =
-      pixelsPerUnit.X / pixelsPerUnit.Y
+    let inline private tryIntersectPlaneY
+      (viewport: Viewport)
+      (view: Matrix)
+      (projection: Matrix)
+      (screenPos: Vector2)
+      (planeYRender: float32)
+      : Vector3 voption =
+      let nearSource = Vector3(screenPos.X, screenPos.Y, 0f)
+      let farSource = Vector3(screenPos.X, screenPos.Y, 1f)
 
-    /// Calculates the World Matrix for a 3D entity (Mesh).
-    /// Includes PiOver4 offset for isometric camera alignment.
-    let createMesh
+      let nearPoint =
+        viewport.Unproject(nearSource, projection, view, Matrix.Identity)
+
+      let farPoint =
+        viewport.Unproject(farSource, projection, view, Matrix.Identity)
+
+      let dir = Vector3.Normalize(farPoint - nearPoint)
+      let ray = Ray(nearPoint, dir)
+      let plane = Plane(Vector3.Up, -planeYRender)
+      let dist = ray.Intersects plane
+
+      if dist.HasValue then
+        let p = ray.Position + ray.Direction * dist.Value
+
+        if Single.IsNaN p.X || Single.IsNaN p.Y || Single.IsNaN p.Z then
+          ValueNone
+        else
+          ValueSome p
+      else
+        ValueNone
+
+    let tryGetViewBoundsFromMatrices
+      (cameraPos: WorldPosition)
+      (viewport: Viewport)
+      (zoom: float32)
+      (view: Matrix)
+      (projection: Matrix)
+      (visibleHeightRange: float32)
+      : struct (float32 * float32 * float32 * float32) voption =
+      tryGetPixelsPerUnit viewport zoom projection
+      |> ValueOption.bind(fun struct (ppuX, ppuZ) ->
+        let cx = float32 viewport.X + float32 viewport.Width / 2.0f
+        let cy = float32 viewport.Y + float32 viewport.Height / 2.0f
+        let centerScreen = Vector2(cx, cy)
+
+        let planeYCenter = cameraPos.Y / ppuZ
+
+        tryIntersectPlaneY viewport view projection centerScreen planeYCenter
+        |> ValueOption.bind(fun centerHit ->
+          let centerOffsetX = centerHit.X - (cameraPos.X / ppuX)
+          let centerOffsetZ = centerHit.Z - (cameraPos.Z / ppuZ)
+
+          let x0 = float32 viewport.X
+          let y0 = float32 viewport.Y
+          let x1 = x0 + float32 viewport.Width
+          let y1 = y0 + float32 viewport.Height
+
+          let corners = [|
+            Vector2(x0, y0)
+            Vector2(x1, y0)
+            Vector2(x0, y1)
+            Vector2(x1, y1)
+          |]
+
+          let minY = cameraPos.Y - visibleHeightRange
+          let maxY = cameraPos.Y + visibleHeightRange
+
+          let planeYs =
+            if visibleHeightRange > 0.0f then
+              [| minY / ppuZ; maxY / ppuZ |]
+            else
+              [| cameraPos.Y / ppuZ |]
+
+          let mutable minX = Single.PositiveInfinity
+          let mutable maxX = Single.NegativeInfinity
+          let mutable minZ = Single.PositiveInfinity
+          let mutable maxZ = Single.NegativeInfinity
+
+          let mutable ok = true
+          let mutable i = 0
+
+          while ok && i < corners.Length do
+            let corner = corners.[i]
+            let mutable j = 0
+
+            while ok && j < planeYs.Length do
+              let planeY = planeYs.[j]
+
+              match
+                tryIntersectPlaneY viewport view projection corner planeY
+              with
+              | ValueSome hit ->
+                let lx = (hit.X - centerOffsetX) * ppuX
+                let lz = (hit.Z - centerOffsetZ) * ppuZ
+
+                if Single.IsNaN lx || Single.IsNaN lz then
+                  ok <- false
+                else
+                  if lx < minX then
+                    minX <- lx
+
+                  if lx > maxX then
+                    maxX <- lx
+
+                  if lz < minZ then
+                    minZ <- lz
+
+                  if lz > maxZ then
+                    maxZ <- lz
+              | ValueNone -> ok <- false
+
+              j <- j + 1
+
+            i <- i + 1
+
+          if ok && minX <= maxX && minZ <= maxZ then
+            ValueSome(struct (minX, maxX, minZ, maxZ))
+          else
+            ValueNone))
+
+    /// Computes 3D cell bounds for block map culling.
+    /// Converts view bounds to grid cell indices with margin for large models.
+    /// Y bounds are based on camera elevation with visible height range.
+    /// Returns struct(minX, maxX, minY, maxY, minZ, maxZ).
+    let inline getViewCellBounds3D
+      (viewBounds: struct (float32 * float32 * float32 * float32))
+      (cameraY: float32)
+      (cellSize: float32)
+      (visibleHeightRange: float32)
+      : struct (int * int * int * int * int * int) =
+      let struct (viewLeft, viewRight, viewTop, viewBottom) = viewBounds
+      let margin = cellSize * 2.0f // Margin for large models
+
+      let minCellX = int((viewLeft - margin) / cellSize)
+      let maxCellX = int((viewRight + margin) / cellSize) + 1
+      let minCellZ = int((viewTop - margin) / cellSize)
+      let maxCellZ = int((viewBottom + margin) / cellSize) + 1
+
+      // Y culling based on camera elevation
+      // In isometric, we see from above - cull blocks too far above/below camera focus
+      let minCellY = int((cameraY - visibleHeightRange) / cellSize) |> max 0
+      let maxCellY = int((cameraY + visibleHeightRange) / cellSize) + 1
+
+      struct (minCellX, maxCellX, minCellY, maxCellY, minCellZ, maxCellZ)
+
+    /// Checks if a cell is within the 3D cell bounds.
+    let inline isInCellBounds
+      (cellX: int)
+      (cellY: int)
+      (cellZ: int)
+      (bounds: struct (int * int * int * int * int * int))
+      : bool =
+      let struct (minX, maxX, minY, maxY, minZ, maxZ) = bounds
+
+      cellX >= minX
+      && cellX <= maxX
+      && cellY >= minY
+      && cellY <= maxY
+      && cellZ >= minZ
+      && cellZ <= maxZ
+
+  module WorldMatrix3D =
+    let inline createMesh
       (renderPos: Vector3)
       (facing: float32)
       (scale: float32)
-      (squishFactor: float32)
       : Matrix =
-      alignToCamera facing
-      |> applyIsoCorrection
-      |> applySquish squishFactor
-      |> applyScale scale
-      |> translateTo renderPos
+      Matrix.CreateRotationY(facing)
+      * Matrix.CreateScale(scale)
+      * Matrix.CreateTranslation(renderPos)
 
-    /// Calculates the World Matrix for a projectile with tilt (for descending/ascending).
-    /// Tilt rotates around X axis before applying facing.
-    /// Includes PiOver4 offset for isometric camera alignment.
-    let createProjectile
+    let inline createProjectile
       (renderPos: Vector3)
       (facing: float32)
       (tilt: float32)
       (scale: float32)
-      (squishFactor: float32)
       : Matrix =
-      applyTilt tilt
-      |> fun m -> m * alignToCamera facing
-      |> applyIsoCorrection
-      |> applySquish squishFactor
-      |> applyScale scale
-      |> translateTo renderPos
+      Matrix.CreateRotationX(tilt)
+      * Matrix.CreateRotationY(facing)
+      * Matrix.CreateScale(scale)
+      * Matrix.CreateTranslation(renderPos)
 
-    /// Calculates World Matrix for a mesh particle with non-uniform scaling.
-    /// Used for tumbling debris, projectile trails, etc.
-    let createMeshParticle
+    let inline createMeshParticle
       (renderPos: Vector3)
       (rotation: Quaternion)
       (baseScale: float32)
       (scaleAxis: Vector3)
       (pivot: Vector3)
-      (squishFactor: float32)
       : Matrix =
+      let s =
+        Matrix.CreateScale(
+          1.0f + (baseScale - 1.0f) * scaleAxis.X,
+          1.0f + (baseScale - 1.0f) * scaleAxis.Y,
+          1.0f + (baseScale - 1.0f) * scaleAxis.Z
+        )
+
       Matrix.CreateFromQuaternion(rotation)
-      |> applyAxisScale baseScale scaleAxis
-      |> applyIsoCorrection
-      |> applySquish squishFactor
-      |> translateTo pivot
-      |> translateTo renderPos
+      * s
+      * Matrix.CreateTranslation(pivot)
+      * Matrix.CreateTranslation(renderPos)
 
   /// Skeletal animation transforms
   module Rig =
@@ -302,55 +278,47 @@ module RenderMath =
       let inverseView = Matrix.Invert(view)
       struct (inverseView.Right, inverseView.Up)
 
-  /// Tile grid coordinate conversions
-  module TileGrid =
-    /// Converts tile grid coordinates to logic position based on map orientation.
-    /// Handles orthogonal, isometric, and staggered map layouts.
-    let toLogic
-      (orientation: Pomo.Core.Domain.Map.Orientation)
-      (staggerAxis: Pomo.Core.Domain.Map.StaggerAxis voption)
-      (staggerIndex: Pomo.Core.Domain.Map.StaggerIndex voption)
-      (mapWidth: int)
-      (x: int)
-      (y: int)
-      (tileW: float32)
-      (tileH: float32)
-      : struct (float32 * float32) =
-      match orientation, staggerAxis, staggerIndex with
-      | Pomo.Core.Domain.Map.Staggered,
-        ValueSome Pomo.Core.Domain.Map.X,
-        ValueSome index ->
-        let xStep = tileW / 2.0f
-        let yStep = tileH
-        let px = float32 x * xStep
+  /// 3D BlockMap coordinate conversions (True 3D, no isometric squish)
+  /// Uses uniform scale: all dimensions divided by same PPU value
+  module BlockMap3D =
 
-        let isStaggeredCol =
-          match index with
-          | Pomo.Core.Domain.Map.Odd -> x % 2 = 1
-          | Pomo.Core.Domain.Map.Even -> x % 2 = 0
+    /// Calculates render offset to center a BlockMap at origin.
+    /// Returns render-space center offset vector.
+    let inline calcCenterOffset
+      (width: int)
+      (depth: int)
+      (ppu: float32)
+      : Vector3 =
+      let scaleFactor = BlockMap.CellSize / ppu
 
-        let yOffset = if isStaggeredCol then tileH / 2.0f else 0.0f
-        struct (px, float32 y * yStep + yOffset)
+      Vector3(
+        -float32 width * scaleFactor * 0.5f,
+        0f,
+        -float32 depth * scaleFactor * 0.5f
+      )
 
-      | Pomo.Core.Domain.Map.Staggered,
-        ValueSome Pomo.Core.Domain.Map.Y,
-        ValueSome index ->
-        let xStep = tileW
-        let yStep = tileH / 2.0f
-        let py = float32 y * yStep
+    /// Converts WorldPosition to render-space position.
+    /// WorldPosition is in units of (cell * CellSize).
+    /// Uses uniform scale (PPU.X only) for true 3D rendering.
+    let inline toRender
+      (pos: WorldPosition)
+      (ppu: float32)
+      (centerOffset: Vector3)
+      : Vector3 =
+      Vector3(pos.X / ppu, pos.Y / ppu, pos.Z / ppu) + centerOffset
 
-        let isStaggeredRow =
-          match index with
-          | Pomo.Core.Domain.Map.Odd -> y % 2 = 1
-          | Pomo.Core.Domain.Map.Even -> y % 2 = 0
-
-        let xOffset = if isStaggeredRow then tileW / 2.0f else 0.0f
-        struct (float32 x * xStep + xOffset, py)
-
-      | Pomo.Core.Domain.Map.Isometric, _, _ ->
-        let originX = float32 mapWidth * tileW / 2.0f
-        let px = originX + (float32 x - float32 y) * tileW / 2.0f
-        let py = (float32 x + float32 y) * tileH / 2.0f
-        struct (px, py)
-
-      | _ -> struct (float32 x * tileW, float32 y * tileH)
+    /// Converts cell indices to render-space position (centered).
+    /// Used by BlockEmitter for block positioning.
+    let inline cellToRender
+      (cellX: int)
+      (cellY: int)
+      (cellZ: int)
+      (ppu: float32)
+      (centerOffset: Vector3)
+      : Vector3 =
+      let scaleFactor = BlockMap.CellSize / ppu
+      let halfCell = scaleFactor * 0.5f
+      let x = float32 cellX * scaleFactor + halfCell
+      let y = float32 cellY * scaleFactor + halfCell
+      let z = float32 cellZ * scaleFactor + halfCell
+      Vector3(x, y, z) + centerOffset

@@ -53,12 +53,19 @@ module Animation =
     Rig: HashMap<string, RigNode>
     AnimationBindings: HashMap<string, string[]>
     FacingOffset: float32
+    PickBoundsOverride: BoundingBox voption
   }
 
   module Serialization =
     open JDeck
     open JDeck.Decode
     open System.Text.Json
+
+    let inline private vec3FromMap(map: Map<string, float>) : Vector3 =
+      let x = map |> Map.tryFind "X" |> Option.defaultValue 0.0 |> float32
+      let y = map |> Map.tryFind "Y" |> Option.defaultValue 0.0 |> float32
+      let z = map |> Map.tryFind "Z" |> Option.defaultValue 0.0 |> float32
+      Vector3(x, y, z)
 
     module RigNode =
       let decoder: Decoder<RigNode> =
@@ -75,20 +82,12 @@ module Animation =
 
           let offsetVector =
             match offset with
-            | ValueSome map ->
-              let x = map |> Map.tryFind "X" |> Option.defaultValue 0.0
-              let y = map |> Map.tryFind "Y" |> Option.defaultValue 0.0
-              let z = map |> Map.tryFind "Z" |> Option.defaultValue 0.0
-              Vector3(float32 x, float32 y, float32 z)
+            | ValueSome map -> vec3FromMap map
             | ValueNone -> Vector3.Zero
 
           let pivotVector =
             match pivot with
-            | ValueSome map ->
-              let x = map |> Map.tryFind "X" |> Option.defaultValue 0.0
-              let y = map |> Map.tryFind "Y" |> Option.defaultValue 0.0
-              let z = map |> Map.tryFind "Z" |> Option.defaultValue 0.0
-              Vector3(float32 x, float32 y, float32 z)
+            | ValueSome map -> vec3FromMap map
             | ValueNone -> Vector3.Zero
 
           return {
@@ -123,6 +122,20 @@ module Animation =
         }
 
     module ModelConfig =
+      module PickBounds =
+        let decoder: Decoder<BoundingBox> =
+          fun json -> decode {
+            let! minMap =
+              Required.Property.get ("Min", Required.map Required.float) json
+
+            and! maxMap =
+              Required.Property.get ("Max", Required.map Required.float) json
+
+            let minV = vec3FromMap minMap
+            let maxV = vec3FromMap maxMap
+            return BoundingBox(minV, maxV)
+          }
+
       let decoder: Decoder<ModelConfig> =
         fun json -> decode {
           let! rig = Required.Property.get ("Rig", Rig.decoder) json
@@ -135,6 +148,9 @@ module Animation =
           and! facingOffsetDeg =
             VOptional.Property.get ("FacingOffsetDeg", Required.float) json
 
+          and! pickBoundsOverride =
+            VOptional.Property.get ("PickBounds", PickBounds.decoder) json
+
           return {
             Rig = rig
             AnimationBindings =
@@ -145,6 +161,7 @@ module Animation =
               match facingOffsetDeg with
               | ValueSome d -> float32(Math.PI * d / 180.0)
               | ValueNone -> 0.0f
+            PickBoundsOverride = pickBoundsOverride
           }
         }
 

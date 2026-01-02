@@ -133,3 +133,24 @@ module Map =
     BackgroundColor: Color voption
     Properties: HashMap<string, string>
   }
+
+  /// Empty map definition for BlockMap-only scenarios
+  let empty: MapDefinition = {
+    Key = "BlockMapPlaytest"
+    Version = "1.0"
+    TiledVersion = "0.0"
+    Orientation = Isometric
+    RenderOrder = RightDown
+    Width = 0
+    Height = 0
+    TileWidth = 64
+    TileHeight = 64
+    Infinite = false
+    StaggerAxis = ValueNone
+    StaggerIndex = ValueNone
+    Tilesets = IndexList.empty
+    Layers = IndexList.empty
+    ObjectGroups = IndexList.empty
+    BackgroundColor = ValueNone
+    Properties = HashMap.empty
+  }

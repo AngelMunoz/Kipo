@@ -65,7 +65,12 @@ module Notification =
         let newLife = notification.Life - dt
 
         if newLife > 0.0f then
-          let newPosition = notification.Position + notification.Velocity * dt
+          // Apply 2D velocity to X/Z plane (Y is height, unchanged)
+          let newPosition = {
+            notification.Position with
+                X = notification.Position.X + notification.Velocity.X * dt
+                Z = notification.Position.Z + notification.Velocity.Y * dt
+          }
 
           updatedNotifications.Add {
             notification with

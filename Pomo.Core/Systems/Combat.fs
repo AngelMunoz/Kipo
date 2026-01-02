@@ -17,6 +17,7 @@ open Pomo.Core.Domain.Skill
 open Pomo.Core.Systems
 open Pomo.Core.Systems.Systems
 open Pomo.Core.Systems.DamageCalculator
+open Pomo.Core.Domain.Core
 
 module Combat =
   open System.Reactive.Disposables
@@ -27,7 +28,7 @@ module Combat =
     Cooldowns: HashMap<Guid<EntityId>, HashMap<int<SkillId>, TimeSpan>>
     Resources: HashMap<Guid<EntityId>, Entity.Resource>
     DerivedStats: HashMap<Guid<EntityId>, Entity.DerivedStats>
-    Positions: IReadOnlyDictionary<Guid<EntityId>, Vector2>
+    Positions: IReadOnlyDictionary<Guid<EntityId>, WorldPosition>
   }
 
   type WorldContext = {
@@ -48,6 +49,7 @@ module Combat =
     let inline getPosition (ctx: EntityContext) (entityId: Guid<EntityId>) =
       ctx.Positions
       |> Dictionary.tryFindV entityId
+      |> ValueOption.map WorldPosition.toVector2
       |> ValueOption.defaultValue Vector2.Zero
 
     let resolveCircle
@@ -257,7 +259,11 @@ module Combat =
       (activeSkill: ActiveSkill)
       =
       let result = applySkillDamage ctx casterId targetId activeSkill
-      let targetPos = Targeting.getPosition ctx.EntityContext targetId
+
+      let targetPos =
+        ctx.EntityContext.Positions
+        |> Dictionary.tryFindV targetId
+        |> ValueOption.defaultValue WorldPosition.zero
 
       if result.IsEvaded then
         ctx.EventBus.Publish(
@@ -367,6 +373,7 @@ module Combat =
     let spawnEffect
       (ctx: WorldContext)
       (vfxId: string)
+      (owner: Guid<EntityId> voption)
       (pos: Vector2)
       (rotation: Quaternion)
       (area: SkillArea)
@@ -384,7 +391,7 @@ module Combat =
           Rotation = ref rotation
           Scale = ref Vector3.One
           IsAlive = ref true
-          Owner = ValueNone
+          Owner = owner
           Overrides = {
             EffectOverrides.empty with
                 Rotation = ValueSome rotation
@@ -464,7 +471,9 @@ module Combat =
           )
 
           let targetPos =
-            Targeting.getPosition ctx.EntityContext intent.TargetEntity
+            ctx.EntityContext.Positions
+            |> Dictionary.tryFindV intent.TargetEntity
+            |> ValueOption.defaultValue WorldPosition.zero
 
           ctx.EventBus.Publish(
             GameEvent.Notification(
@@ -572,17 +581,28 @@ module Combat =
       let targetCenter =
         match target with
         | SystemCommunications.TargetEntity targetId ->
-          ctx.EntityContext.Positions.TryFindV targetId
+          ctx.EntityContext.Positions
+          |> Dictionary.tryFindV targetId
+          |> ValueOption.map WorldPosition.toVector2
         | SystemCommunications.TargetPosition pos -> ValueSome pos
         // Default the center to the caster
         // allow the area to decide its own center based on the direction
         | SystemCommunications.TargetDirection _
         | SystemCommunications.TargetSelf ->
-          ctx.EntityContext.Positions.TryFindV casterId
+          ctx.EntityContext.Positions
+          |> Dictionary.tryFindV casterId
+          |> ValueOption.map WorldPosition.toVector2
 
       match targetCenter with
       | ValueNone -> () // No center to apply AoE
       | ValueSome center ->
+        let effectOwner =
+          match target with
+          | SystemCommunications.TargetEntity targetId -> ValueSome targetId
+          | SystemCommunications.TargetDirection _
+          | SystemCommunications.TargetSelf -> ValueSome casterId
+          | SystemCommunications.TargetPosition _ -> ValueNone
+
         // Spawn Visuals
         match activeSkill.ImpactVisuals.VfxId with
         | ValueSome vfxId ->
@@ -631,7 +651,13 @@ module Combat =
 
           let rotation = yaw * pitch
 
-          Visuals.spawnEffect ctx vfxId center rotation activeSkill.Area
+          Visuals.spawnEffect
+            ctx
+            vfxId
+            effectOwner
+            center
+            rotation
+            activeSkill.Area
         | ValueNone -> ()
 
         let targets =
@@ -817,7 +843,10 @@ module Combat =
           let result =
             Execution.applySkillDamage ctx impact.CasterId targetId skill
 
-          let targetPos = Targeting.getPosition ctx.EntityContext targetId
+          let targetPos =
+            ctx.EntityContext.Positions
+            |> Dictionary.tryFindV targetId
+            |> ValueOption.defaultValue WorldPosition.zero
 
           if result.IsEvaded then
             ctx.EventBus.Publish(
@@ -1004,8 +1033,11 @@ module Combat =
               // Compensate for altitude (3D Y) - in 2:1 isometric, altitude
               // visually raises the coin on screen. To match that position with
               // a grounded projectile, we subtract half the altitude from logic Y.
-              let spawnPos2D =
-                Vector2(spawnPos3D.X, spawnPos3D.Z - spawnPos3D.Y * 2.0f)
+              let spawnPos = {
+                WorldPosition.X = spawnPos3D.X
+                Y = spawnPos3D.Y
+                Z = spawnPos3D.Z
+              }
 
               // Determine specific target for this projectile
               let target =
@@ -1040,7 +1072,7 @@ module Combat =
               ctx.StateWrite.CreateProjectile(
                 projectileId,
                 liveProjectile,
-                ValueSome spawnPos2D
+                ValueSome spawnPos
               )
 
           | _ ->

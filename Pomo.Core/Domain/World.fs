@@ -11,7 +11,6 @@ open Pomo.Core.Domain.Units
 open Pomo.Core.Domain.Units
 open Pomo.Core.Domain.Item
 open Pomo.Core.Domain.AI
-open Pomo.Core.Domain.Map
 open Pomo.Core.Domain.Animation
 open Pomo.Core.Domain.Particles
 
@@ -26,7 +25,7 @@ module World =
   [<Struct>]
   type Scenario = {
     Id: Guid<ScenarioId>
-    Map: MapDefinition
+    BlockMap: BlockMap.BlockMapDefinition voption
   }
 
   [<Struct>]
@@ -49,7 +48,7 @@ module World =
   type WorldText = {
     Text: string
     Type: SystemCommunications.NotificationType
-    Position: Vector2
+    Position: WorldPosition
     Velocity: Vector2
     Life: float32
     MaxLife: float32
@@ -66,7 +65,7 @@ module World =
     ActiveActionSets: cmap<Guid<EntityId>, int>
     // entity components
     EntityExists: HashSet<Guid<EntityId>>
-    Positions: Dictionary<Guid<EntityId>, Vector2>
+    Positions: Dictionary<Guid<EntityId>, WorldPosition>
     Velocities: Dictionary<Guid<EntityId>, Vector2>
     MovementStates: cmap<Guid<EntityId>, MovementState>
     Resources: cmap<Guid<EntityId>, Entity.Resource>
@@ -90,7 +89,7 @@ module World =
     SpawningEntities:
       cmap<
         Guid<EntityId>,
-        struct (SystemCommunications.SpawnType * Vector2 * TimeSpan)
+        struct (SystemCommunications.SpawnType * WorldPosition * TimeSpan)
        >
     // Scenario State
     Scenarios: cmap<Guid<ScenarioId>, Scenario>
@@ -125,7 +124,7 @@ module World =
     abstract ActiveActionSets: amap<Guid<EntityId>, int>
     // entity components
     abstract EntityExists: IReadOnlySet<Guid<EntityId>>
-    abstract Positions: IReadOnlyDictionary<Guid<EntityId>, Vector2>
+    abstract Positions: IReadOnlyDictionary<Guid<EntityId>, WorldPosition>
     abstract Velocities: IReadOnlyDictionary<Guid<EntityId>, Vector2>
     abstract MovementStates: amap<Guid<EntityId>, MovementState>
     abstract Resources: amap<Guid<EntityId>, Entity.Resource>
@@ -163,7 +162,7 @@ module World =
     abstract SpawningEntities:
       amap<
         Guid<EntityId>,
-        struct (SystemCommunications.SpawnType * Vector2 * TimeSpan)
+        struct (SystemCommunications.SpawnType * WorldPosition * TimeSpan)
        >
 
     abstract Scenarios: amap<Guid<ScenarioId>, Scenario>

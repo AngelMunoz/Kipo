@@ -17,7 +17,8 @@ open Pomo.Core.Domain.Units
 open Pomo.Core.Domain.Particles
 open Pomo.Core.Graphics
 open Pomo.Core.Rendering
-open Pomo.Core.AssetPreloader
+open Pomo.Core.Domain.Core
+open Pomo.Core.Domain.Core.Constants
 
 module RenderOrchestrator =
 
@@ -30,11 +31,10 @@ module RenderOrchestrator =
     NodeTransformsPool: Dictionary<string, Matrix>
     ModelCache: ConcurrentDictionary<string, Lazy<LoadedModel>>
     TextureCache: ConcurrentDictionary<string, Lazy<Texture2D>>
-    TileTextureCache: Dictionary<int, Texture2D>
     GetLoadedModel: string -> LoadedModel voption
     GetTexture: string -> Texture2D voption
-    GetTileTexture: int -> Texture2D voption
-    LayerRenderIndices: IReadOnlyDictionary<int, int[]>
+    GetBlockModel: string -> LoadedModel voption
+    MapSource: MapSource
     FallbackTexture: Texture2D
     HudFont: SpriteFont
     HudPalette: UI.HUDColorPalette
@@ -57,12 +57,16 @@ module RenderOrchestrator =
       (view: inref<Matrix>)
       (projection: inref<Matrix>)
       (commands: MeshCommand[])
+      (count: int voption)
       =
       device.DepthStencilState <- DepthStencilState.Default
       device.BlendState <- BlendState.Opaque
       device.RasterizerState <- RasterizerState.CullNone
 
-      for cmd in commands do
+      let len = defaultValueArg count commands.Length
+
+      for i = 0 to len - 1 do
+        let cmd = commands.[i]
         let loadedModel = cmd.LoadedModel
         let model = loadedModel.Model
         let world = cmd.WorldMatrix
@@ -109,78 +113,18 @@ module RenderOrchestrator =
 
           batch.End()
 
-    let inline renderTerrainBackground
-      (batch: SpriteBatch)
-      (camera: inref<Camera.Camera>)
-      (map: Map.MapDefinition)
-      (commands: TerrainCommand[])
-      =
-      // 2D SpriteBatch rendering for background - no depth buffer, no fighting
-      let transform =
-        RenderMath.Camera.get2DViewMatrix
-          camera.Position
-          camera.Zoom
-          camera.Viewport
-
-      batch.Begin(
-        SpriteSortMode.Deferred,
-        BlendState.AlphaBlend,
-        SamplerState.PointClamp,
-        DepthStencilState.None,
-        RasterizerState.CullNone,
-        transformMatrix = transform
-      )
-
-      for cmd in commands do
-        // Convert 3D position back to pixel position for SpriteBatch
-        let drawX = cmd.Position.X * float32 map.TileWidth
-        let drawY = cmd.Position.Z * float32 map.TileHeight
-
-        let destRect =
-          Rectangle(
-            int drawX,
-            int drawY,
-            int(cmd.Size.X * float32 map.TileWidth),
-            int(cmd.Size.Y * float32 map.TileHeight)
-          )
-
-        batch.Draw(cmd.Texture, destRect, Color.White)
-
-      batch.End()
-
-    let inline renderTerrainForeground
-      (batch: QuadBatch)
-      (view: inref<Matrix>)
-      (projection: inref<Matrix>)
-      (commands: TerrainCommand[])
-      =
-      batch.Begin(&view, &projection)
-
-      for cmd in commands do
-        batch.Draw(cmd.Texture, cmd.Position, cmd.Size)
-
-      batch.End()
-
     let inline renderText
       (batch: SpriteBatch)
       (font: SpriteFont)
-      (camera: inref<Camera.Camera>)
       (commands: TextCommand[])
       =
       if commands.Length > 0 then
-        let transform =
-          RenderMath.Camera.get2DViewMatrix
-            camera.Position
-            camera.Zoom
-            camera.Viewport
-
         batch.Begin(
           SpriteSortMode.Deferred,
           BlendState.AlphaBlend,
           SamplerState.PointClamp,
           DepthStencilState.None,
-          RasterizerState.CullNone,
-          transformMatrix = transform
+          RasterizerState.CullNone
         )
 
         for cmd in commands do
@@ -201,10 +145,69 @@ module RenderOrchestrator =
 
         batch.End()
 
+    /// Render line primitives (grid, cursor wireframe)
+    let inline renderLines
+      (device: GraphicsDevice)
+      (effect: BasicEffect)
+      (view: inref<Matrix>)
+      (projection: inref<Matrix>)
+      (vertices: VertexPositionColor[])
+      (vertexCount: int)
+      =
+      if vertexCount > 0 then
+        effect.World <- Matrix.Identity
+        effect.View <- view
+        effect.Projection <- projection
+
+        for pass in effect.CurrentTechnique.Passes do
+          pass.Apply()
+
+          device.DrawUserPrimitives(
+            PrimitiveType.LineList,
+            vertices,
+            0,
+            vertexCount / 2
+          )
+
+    /// Render a ghost mesh with transparency
+    let inline renderGhost
+      (device: GraphicsDevice)
+      (view: inref<Matrix>)
+      (projection: inref<Matrix>)
+      (cmd: MeshCommand)
+      =
+      device.DepthStencilState <- DepthStencilState.DepthRead
+      device.BlendState <- BlendState.AlphaBlend
+      device.RasterizerState <- RasterizerState.CullNone
+
+      for mesh in cmd.LoadedModel.Model.Meshes do
+        for eff in mesh.Effects do
+          match eff with
+          | :? BasicEffect as be ->
+            be.World <- cmd.WorldMatrix
+            be.View <- view
+            be.Projection <- projection
+            be.Alpha <- 0.6f
+
+            if cmd.LoadedModel.HasNormals then
+              LightEmitter.applyDefaultLighting &be
+            else
+              be.LightingEnabled <- false
+              be.TextureEnabled <- true
+          | _ -> ()
+
+        mesh.Draw()
+
+        // Reset alpha
+        for eff in mesh.Effects do
+          match eff with
+          | :? BasicEffect as be -> be.Alpha <- 1.0f
+          | _ -> ()
+
   let inline private prepareContexts
     (res: RenderResources)
     (stores: StoreServices)
-    (map: Pomo.Core.Domain.Map.MapDefinition)
+    (mapSource: MapSource)
     (snapshot: Pomo.Core.Projections.MovementSnapshot)
     (poses:
       System.Collections.Generic.IReadOnlyDictionary<
@@ -213,19 +216,15 @@ module RenderOrchestrator =
        >)
     (projectiles:
       HashMap<Guid<EntityId>, Pomo.Core.Domain.Projectile.LiveProjectile>)
-    (layerRenderIndices:
-      System.Collections.Generic.IReadOnlyDictionary<int, int[]>)
     =
-    let ppu = Vector2(float32 map.TileWidth, float32 map.TileHeight)
-    let renderCore = RenderCore.create ppu
-    let squish = RenderMath.WorldMatrix.getSquishFactor ppu
+    let ppu = MapSource.getPixelsPerUnit mapSource
+    let renderCore = RenderCore.createFromMapSource mapSource
 
     let entityData = {
       ModelStore = stores.ModelStore
       GetLoadedModelByAsset = res.GetLoadedModel
       EntityPoses = poses
       LiveProjectiles = projectiles
-      SquishFactor = squish
       ModelScale = Core.Constants.Entity.ModelScale
     }
 
@@ -233,22 +232,15 @@ module RenderOrchestrator =
       GetTexture = res.GetTexture
       GetLoadedModelByAsset = res.GetLoadedModel
       EntityPositions = snapshot.Positions
-      SquishFactor = squish
       ModelScale = Core.Constants.Entity.ModelScale
       FallbackTexture = res.FallbackTexture
     }
 
-    let terrainData = {
-      GetTileTexture = res.GetTileTexture
-      LayerRenderIndices = layerRenderIndices
-    }
-
-    struct (renderCore, entityData, particleData, terrainData)
+    struct (renderCore, entityData, particleData)
 
   let private renderFrame
     (res: RenderResources)
     (env: PomoEnvironment)
-    (mapKey: string)
     (playerId: Guid<EntityId>)
     =
     let (Core core) = env.CoreServices
@@ -256,7 +248,6 @@ module RenderOrchestrator =
     let (Gameplay gameplay) = env.GameplayServices
     let world = core.World
     let projections = gameplay.Projections
-    let map = stores.MapStore.find mapKey
     let visualEffects = world.VisualEffects.ToArray()
 
     let scenarioIdOpt =
@@ -266,15 +257,14 @@ module RenderOrchestrator =
     | Some scenarioId ->
       let snapshot = projections.ComputeMovementSnapshot scenarioId
 
-      let struct (renderCore, entityData, particleData, terrainData) =
+      let struct (renderCore, entityData, particleData) =
         prepareContexts
           res
           stores
-          map
+          res.MapSource
           snapshot
           world.Poses
           (world.LiveProjectiles |> AMap.force)
-          res.LayerRenderIndices
 
       let meshCommandsEntities =
         EntityEmitter.emitAll
@@ -298,30 +288,59 @@ module RenderOrchestrator =
         let view = camera.View
         let projection = camera.Projection
 
-        let viewBounds =
+        let viewBoundsFallback =
           RenderMath.Camera.getViewBounds
             camera.Position
             (float32 camera.Viewport.Width)
             (float32 camera.Viewport.Height)
             camera.Zoom
 
-        // Collect terrain commands via TerrainEmitter
-        let struct (terrainBG, terrainFG) =
-          TerrainEmitter.emitAll renderCore terrainData map viewBounds
+        let viewBounds2D =
+          RenderMath.Camera.tryGetViewBoundsFromMatrices
+            camera.Position
+            camera.Viewport
+            camera.Zoom
+            view
+            projection
+            0.0f
+          |> ValueOption.defaultValue viewBoundsFallback
+
+        // Collect block mesh commands conditionally based on MapSource
+        let meshCommandsBlocks =
+          match res.MapSource |> MapSource.tryGetBlockMap with
+          | ValueSome blockMap ->
+            let ppu = renderCore.PixelsPerUnit
+            let visibleHeightRange = float32 blockMap.Height * BlockMap.CellSize
+
+            let viewBounds3D =
+              RenderMath.Camera.tryGetViewBoundsFromMatrices
+                camera.Position
+                camera.Viewport
+                camera.Zoom
+                view
+                projection
+                visibleHeightRange
+              |> ValueOption.defaultValue viewBounds2D
+
+            BlockEmitter.emitToArray
+              res.GetBlockModel
+              blockMap
+              viewBounds3D
+              camera.Position.Y
+              visibleHeightRange
+              ppu
+          | ValueNone -> Array.empty
 
         // Render passes in correct order
-        // 1. Background terrain (no depth to avoid tile fighting)
-        res.GraphicsDevice.DepthStencilState <- DepthStencilState.None
+        // 1. Blocks first (they form the ground/structures)
+        res.GraphicsDevice.DepthStencilState <- DepthStencilState.Default
 
-        RenderPasses.renderTerrainBackground
-          res.SpriteBatch
-          &camera
-          map
-          terrainBG
-
-        // Clear depth buffer after background terrain
-        // This ensures entities always render on top of background
-        res.GraphicsDevice.Clear(ClearOptions.DepthBuffer, Color.Black, 1.0f, 0)
+        RenderPasses.renderMeshes
+          res.GraphicsDevice
+          &view
+          &projection
+          meshCommandsBlocks
+          ValueNone
 
         // 2. Entities and mesh particles (with depth testing)
         res.GraphicsDevice.DepthStencilState <- DepthStencilState.Default
@@ -331,12 +350,14 @@ module RenderOrchestrator =
           &view
           &projection
           meshCommandsEntities
+          ValueNone
 
         RenderPasses.renderMeshes
           res.GraphicsDevice
           &view
           &projection
           meshCommandsParticles
+          ValueNone
 
         // 3. Billboard particles
         RenderPasses.renderBillboards
@@ -346,22 +367,19 @@ module RenderOrchestrator =
           &projection
           billboardCommandsParticles
 
-        // 4. Foreground terrain/decorations (with depth testing for occlusion)
-        res.GraphicsDevice.DepthStencilState <- DepthStencilState.Default
-
-        RenderPasses.renderTerrainForeground
-          res.QuadBatch
-          &view
-          &projection
-          terrainFG
-
-        // 5. World text (notifications, damage numbers - rendered in 2D)
-        let textCommands = TextEmitter.emit world.Notifications viewBounds
+        // 4. World text (notifications, damage numbers - rendered in 2D)
+        let textCommands =
+          TextEmitter.emit
+            renderCore
+            camera.Viewport
+            view
+            projection
+            world.Notifications
+            viewBounds2D
 
         RenderPasses.renderText
           res.SpriteBatch
           res.HudFont
-          &camera
           (textCommands res.HudPalette)
 
     | None ->
@@ -373,7 +391,7 @@ module RenderOrchestrator =
     (
       game: Game,
       env: PomoEnvironment,
-      mapKey: string,
+      mapSource: MapSource,
       playerId: Guid<EntityId>,
       drawOrder: int
     ) : DrawableGameComponent =
@@ -386,7 +404,6 @@ module RenderOrchestrator =
           base.Initialize()
           let fallback = new Texture2D(game.GraphicsDevice, 1, 1)
           fallback.SetData [| Color.White |]
-          let map = stores.MapStore.find mapKey
 
           // Load assets via domain emitters (each owns their loading logic)
           let entityModelCache =
@@ -408,20 +425,6 @@ module RenderOrchestrator =
 
           for kvp in particleTextureCache do
             textureCache[kvp.Key] <- Lazy<Texture2D>(fun () -> kvp.Value)
-
-          // Use TerrainEmitter to load tile textures and pre-compute render indices
-          let tileCache = TerrainEmitter.loadTileTextures game.Content map
-          let layerIndices = TerrainEmitter.computeLayerRenderIndices map
-
-          let struct (totalAttempted, totalLoaded, totalFailed) =
-            AssetPreloader.preloadAssets
-              game.Content
-              modelCache
-              textureCache
-              mapKey
-              map
-              stores.ModelStore
-              stores.ParticleStore
 
 
           // Main-thread load queue and pending sets
@@ -485,6 +488,9 @@ module RenderOrchestrator =
 
               ValueNone
 
+          // Create block model loader using BlockEmitter's lazy loader
+          let getBlockModel = BlockEmitter.createLazyModelLoader game.Content
+
           res <-
             ValueSome {
               GraphicsDevice = game.GraphicsDevice
@@ -495,11 +501,10 @@ module RenderOrchestrator =
               NodeTransformsPool = Dictionary()
               ModelCache = modelCache
               TextureCache = textureCache
-              TileTextureCache = tileCache
               GetLoadedModel = getLoadedModel
               GetTexture = getTexture
-              GetTileTexture = fun gid -> tileCache |> Dictionary.tryFindV gid
-              LayerRenderIndices = layerIndices
+              GetBlockModel = getBlockModel
+              MapSource = mapSource
               FallbackTexture = fallback
               HudFont = TextEmitter.loadFont game.Content
               HudPalette =
@@ -524,6 +529,6 @@ module RenderOrchestrator =
           res
           |> ValueOption.iter(fun r ->
             let originalViewport = r.GraphicsDevice.Viewport
-            renderFrame r env mapKey playerId
+            renderFrame r env playerId
             r.GraphicsDevice.Viewport <- originalViewport)
     }

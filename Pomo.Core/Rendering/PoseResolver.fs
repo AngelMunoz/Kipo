@@ -7,6 +7,7 @@ open FSharp.UMX
 open FSharp.Data.Adaptive
 open Pomo.Core
 open Pomo.Core.Domain.Units
+open Pomo.Core.Domain.Core
 open Pomo.Core.Domain.Projectile
 open Pomo.Core.Domain.Animation
 open Pomo.Core.Graphics
@@ -141,7 +142,7 @@ module PoseResolver =
     (nodeTransformsPool: Dictionary<string, Matrix>)
     (nodesBuffer: ResizeArray<ResolvedRigNode>)
     (entityId: Guid<EntityId>)
-    (logicPos: Vector2)
+    (logicPos: WorldPosition)
     : ResolvedEntity voption =
 
     match snapshot.ModelConfigIds.TryGetValue entityId with
@@ -155,29 +156,26 @@ module PoseResolver =
         let entityPose = getEntityPose data.EntityPoses entityId
         let isProjectile = data.LiveProjectiles |> HashMap.containsKey entityId
 
+        // For descending projectiles, get the altitude for tilt calculation
+        // Note: logicPos.Y already contains the altitude from the projectile system
         let altitude =
           computeAltitude data.LiveProjectiles entityId core.PixelsPerUnit.Y
 
-        let renderPos =
-          RenderMath.LogicRender.toRender logicPos altitude core.PixelsPerUnit
+        // Use RenderCore's ToRenderPos which routes to 2D or 3D path correctly
+        let renderPos = core.ToRenderPos logicPos
 
         let entityBaseMatrix =
           if isProjectile then
             let struct (tilt, projFacing) =
               getProjectileTiltAndFacing altitude facing
 
-            RenderMath.WorldMatrix.createProjectile
+            RenderMath.WorldMatrix3D.createProjectile
               renderPos
               projFacing
               tilt
               data.ModelScale
-              data.SquishFactor
           else
-            RenderMath.WorldMatrix.createMesh
-              renderPos
-              facing
-              data.ModelScale
-              data.SquishFactor
+            RenderMath.WorldMatrix3D.createMesh renderPos facing data.ModelScale
 
         nodeTransformsPool.Clear()
         nodesBuffer.Clear()

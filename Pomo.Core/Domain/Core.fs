@@ -32,6 +32,9 @@ module Units =
   [<Measure>]
   type ScenarioId
 
+  [<Measure>]
+  type BlockTypeId
+
 
 module Render =
   [<RequireQualifiedAccess>]
@@ -68,17 +71,26 @@ module Core =
 
 
   module Constants =
+    module BlockMap =
+      [<Literal>]
+      let CellSize = 64.0f
+
+      [<Literal>]
+      let KayKitBlockModelScale = 0.5f
+
     let DefaultPixelsPerUnit = Vector2(64.0f, 32.0f)
+    /// Pixels per unit for BlockMap 3D rendering (1:1 aspect ratio)
+    let BlockMap3DPixelsPerUnit = Vector2(BlockMap.CellSize, BlockMap.CellSize)
 
     module Entity =
       let Size = Vector2(16.0f, 16.0f)
-      let ModelScale = 0.25f
+      let ModelScale = 0.5f
 
       [<Literal>]
       let CollisionRadius = 8.0f
 
       [<Literal>]
-      let CollisionDistance = 32.0f
+      let CollisionDistance = 16.0f
 
       [<Literal>]
       let SkillActivationRangeBuffer = 5.0f
@@ -89,18 +101,14 @@ module Core =
     module UI =
       let TargetingIndicatorSize = Vector2(20.0f, 20.0f)
 
-    module Collision =
-      [<Literal>]
-      let GridCellSize = 64.0f
-
     module Navigation =
-      [<Literal>]
-      let GridCellSize = 8.0f
-
       let EntitySize = Vector2(4.0f, 4.0f)
 
     module Spawning =
       let DefaultDuration = TimeSpan.FromSeconds 1.0
+
+      [<Literal>]
+      let BorderPadding = 8.0f
 
     module AI =
       [<Literal>]
@@ -123,6 +131,22 @@ module Core =
       let TransientCommandDuration = TimeSpan.FromSeconds 2.0
 
 
+  [<Struct>]
+  type WorldPosition = { X: float32; Y: float32; Z: float32 }
+
+  module WorldPosition =
+    let zero = { X = 0.0f; Y = 0.0f; Z = 0.0f }
+    let inline fromVector2(v: Vector2) = { X = v.X; Y = 0f; Z = v.Y }
+    let inline toVector2(p: WorldPosition) = Vector2(p.X, p.Z)
+
+    let inline fromVector3(v: Vector3) = { X = v.X; Y = v.Y; Z = v.Z }
+    let inline toVector3(p: WorldPosition) = Vector3(p.X, p.Y, p.Z)
+
+    let inline distance (a: WorldPosition) (b: WorldPosition) =
+      let dx = a.X - b.X
+      let dy = a.Y - b.Y
+      let dz = a.Z - b.Z
+      sqrt(dx * dx + dy * dy + dz * dz)
 
   [<Struct>]
   type Element =

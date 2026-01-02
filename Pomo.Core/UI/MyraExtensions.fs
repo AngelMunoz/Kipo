@@ -9,6 +9,7 @@ open Myra.Graphics2D.UI
 open FSharp.UMX
 open FSharp.Data.Adaptive
 open Pomo.Core.Domain.World
+open Pomo.Core.Domain.Core
 
 
 module WidgetSubs =
@@ -197,8 +198,8 @@ module W =
   let inline mapPositions<'T
     when 'T :> Widget
     and 'T: (member set_Positions:
-      IReadOnlyDictionary<Guid<EntityId>, Vector2> -> unit)>
-    (positions: IReadOnlyDictionary<Guid<EntityId>, Vector2>)
+      IReadOnlyDictionary<Guid<EntityId>, WorldPosition> -> unit)>
+    (positions: IReadOnlyDictionary<Guid<EntityId>, WorldPosition>)
     (w: 'T)
     =
     w.set_Positions(positions)
@@ -390,16 +391,6 @@ module W =
     (w: 'T)
     =
     let sub = aval.AddWeakCallback(fun v -> w.set_IsInCombat(v))
-    WidgetSubs.get(w).Add(sub)
-    w
-
-  let inline bindMap<'T
-    when 'T :> Widget
-    and 'T: (member set_Map: Pomo.Core.Domain.Map.MapDefinition option -> unit)>
-    (aval: aval<Pomo.Core.Domain.Map.MapDefinition option>)
-    (w: 'T)
-    =
-    let sub = aval.AddWeakCallback(fun v -> w.set_Map(v))
     WidgetSubs.get(w).Add(sub)
     w
 
@@ -595,9 +586,37 @@ module HStack =
     WidgetSubs.get(w).Add(sub)
     w
 
+  let inline bindChildren<'W when 'W :> HorizontalStackPanel>
+    (childrenAVal: aval<Widget list>)
+    (w: 'W)
+    =
+    let sub =
+      childrenAVal.AddWeakCallback(fun children ->
+        w.Widgets.Clear()
+
+        for child in children do
+          w.Widgets.Add(child))
+
+    WidgetSubs.get(w).Add(sub)
+    w
+
 module VStack =
   let inline create() = VerticalStackPanel()
   let inline spaced(spacing: int) = VerticalStackPanel(Spacing = spacing)
+
+  let inline bindChildren<'W when 'W :> VerticalStackPanel>
+    (childrenAVal: aval<Widget list>)
+    (w: 'W)
+    =
+    let sub =
+      childrenAVal.AddWeakCallback(fun children ->
+        w.Widgets.Clear()
+
+        for child in children do
+          w.Widgets.Add(child))
+
+    WidgetSubs.get(w).Add(sub)
+    w
 
 
 module Grid =

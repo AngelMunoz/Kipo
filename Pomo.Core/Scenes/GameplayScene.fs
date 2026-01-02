@@ -14,12 +14,14 @@ open Pomo.Core.EventBus
 open Pomo.Core.Domain
 open Pomo.Core.Domain.Events
 open Pomo.Core.Domain.Units
+open Pomo.Core.Domain.Core
 open Pomo.Core.Domain.Map
 open Pomo.Core.Domain.Scenes
 open Pomo.Core.Domain.UI
 open Pomo.Core.Stores
 open Pomo.Core.Environment
 open Pomo.Core.Algorithms
+open Pomo.Core.Domain.Core.Constants
 
 // System Imports
 open Pomo.Core.Systems
@@ -84,6 +86,11 @@ module GameplayScene =
         projections
       )
 
+    let getPickBounds =
+      Pomo.Core.Graphics.ModelMetrics.createPickBoundsResolver
+        monoGame.Content
+        stores.ModelStore
+
     // 3. Create Listeners
     let effectApplication =
       EffectApplication.create(worldView, stateWriteService, eventBus)
@@ -96,6 +103,7 @@ module GameplayScene =
         targetingService,
         projections,
         cameraService,
+        getPickBounds,
         playerId
       )
 
@@ -178,6 +186,7 @@ module GameplayScene =
         cameraService
         cursorService
         targetingService
+        getPickBounds
         projections
         worldView
         playerId
@@ -211,8 +220,8 @@ module GameplayScene =
       let navGrid =
         Algorithms.Pathfinding.Grid.generate
           mapDef
-          Domain.Core.Constants.Navigation.GridCellSize
-          Domain.Core.Constants.Navigation.EntitySize
+          BlockMap.CellSize
+          Navigation.EntitySize
 
       let candidates = MapSpawning.extractSpawnCandidates mapDef navGrid random
 
@@ -223,7 +232,7 @@ module GameplayScene =
         EntityId = spawnPlayerId
         ScenarioId = scenarioId
         Type = SystemCommunications.SpawnType.Player 0
-        Position = playerPos
+        Position = WorldPosition.fromVector2 playerPos
       }
 
       eventBus.Publish(GameEvent.Spawn(SpawningEvent.SpawnEntity playerIntent))
@@ -261,14 +270,20 @@ module GameplayScene =
 
       // Create Scenario
       let scenarioId = Guid.NewGuid() |> UMX.tag<ScenarioId>
-      let scenario: World.Scenario = { Id = scenarioId; Map = mapDef }
+
+      let scenario: World.Scenario = {
+        Id = scenarioId
+        Map = ValueSome mapDef
+        BlockMap = ValueNone
+      }
+
       mutableWorld.Scenarios[scenarioId] <- scenario
 
       let renderOrchestrator =
         RenderOrchestrator.create(
           game,
           pomoEnv,
-          newMapKey,
+          Rendering.TileMap mapDef,
           playerId,
           Render.Layer.TerrainBase
         )
@@ -297,7 +312,8 @@ module GameplayScene =
         hudService.TogglePanelVisible HUDPanelId.EquipmentPanel
       | GuiAction.StartNewGame
       | GuiAction.OpenSettings
-      | GuiAction.ExitGame -> () // Not applicable in Gameplay
+      | GuiAction.OpenMapEditor
+      | GuiAction.ExitGame -> ()
 
     // 6. Setup Listeners (Subs)
     let subs = new CompositeDisposable()

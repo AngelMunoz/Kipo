@@ -17,33 +17,39 @@
     <Compile Include="Domain/Skill.fs" />
     <Compile Include="Domain/Particles.fs" />
     <Compile Include="Domain/Item.fs" />
-    <Compile Include="Domain/Map.fs" />
     <Compile Include="Domain/AssetManifest.fs" />
     <Compile Include="Domain/Spatial.fs" />
-    <Compile Include="Domain/Navigation.fs" />
+    <Compile Include="Domain/BlockMap.fs" />
     <Compile Include="Domain/AI.fs" />
     <Compile Include="Domain/Animation.fs" />
     <Compile Include="Domain/Scenes.fs" />
     <Compile Include="Domain/Events.fs" />
     <Compile Include="Domain/World.fs" />
     <Compile Include="Algorithms/Physics.fs" />
-    <Compile Include="Algorithms/Pathfinding.fs" />
+    <Compile Include="Algorithms/Pathfinding3D.fs" />
+    <Compile Include="Algorithms/BlockMap.fs" />
+    <Compile Include="Algorithms/BlockCollision.fs" />
     <Compile Include="EventBus.fs" />
     <Compile Include="Serialization.fs" />
     <Compile Include="Stores.fs" />
     <Compile Include="MapSpawning.fs" />
+    <Compile Include="BlockMapSpawning.fs" />
     <Compile Include="Projections.fs" />
     <Compile Include="Graphics/RenderMath.fs" />
+    <Compile Include="Graphics/Camera.fs" />
     <Compile Include="Graphics/RenderCommands.fs" />
     <Compile Include="Graphics/Picking.fs" />
+    <Compile Include="Graphics/ModelMetrics.fs" />
     <Compile Include="Graphics/CommandQueue.fs" />
     <Compile Include="Graphics/QuadBatch.fs" />
     <Compile Include="Graphics/BillboardBatch.fs" />
+    <Compile Include="Rendering/MapSource.fs" />
     <Compile Include="Rendering/EmitterContext.fs" />
     <Compile Include="Rendering/PoseResolver.fs" />
     <Compile Include="Rendering/EntityEmitter.fs" />
     <Compile Include="Rendering/ParticleEmitter.fs" />
-    <Compile Include="Rendering/TerrainEmitter.fs" />
+    <Compile Include="Rendering/BlockEmitter.fs" />
+    <Compile Include="Rendering/EditorEmitter.fs" />
     <Compile Include="Rendering/TextEmitter.fs" />
     <Compile Include="Rendering/UIEmitter.fs" />
     <Compile Include="Rendering/LightEmitter.fs" />
@@ -59,6 +65,7 @@
     <Compile Include="Systems/ResourceManager.fs" />
     <Compile Include="Systems/Combat.fs" />
     <Compile Include="Systems/MovementLogic.fs" />
+    <Compile Include="Systems/MovementLogic3D.fs" />
     <Compile Include="Systems/InputMapping.fs" />
     <Compile Include="Systems/PlayerMovement.fs" />
     <Compile Include="Systems/Notification.fs" />
@@ -68,13 +75,12 @@
     <Compile Include="Systems/AbilityActivation.fs" />
     <Compile Include="Systems/RawInput.fs" />
     <Compile Include="Systems/ActionHandler.fs" />
-    <Compile Include="Systems/Navigation.fs" />
+    <Compile Include="Systems/Navigation3D.fs" />
     <Compile Include="Systems/Movement.fs" />
     <Compile Include="Systems/UnitMovement.fs" />
     <Compile Include="Systems/Collision.fs" />
-    <Compile Include="Systems/MapLoader.fs" />
-    <Compile Include="Systems/CameraSystem.fs" />
-    <Compile Include="AssetPreloader.fs" />
+    <Compile Include="Systems/BlockMapLoader.fs" />
+    <Compile Include="Systems/BlockMapCameraSystem.fs" />
     <Compile Include="Systems/RenderOrchestratorV2.fs" />
     <Compile Include="Systems/State.fs" />
     <Compile Include="Systems/Inventory.fs" />
@@ -85,7 +91,6 @@
     <Compile Include="Systems/AISystem.fs" />
     <Compile Include="Systems/AnimationSystem.fs" />
     <Compile Include="Systems/MotionStateAnimation.fs" />
-    <Compile Include="Systems/WorldMapService.fs" />
     <Compile Include="Systems/HUDService.fs" />
     <Compile Include="Systems/HUDComponents.fs" />
     <Compile Include="Systems/UIControllerSystem.fs" />
@@ -93,8 +98,15 @@
     <Compile Include="Systems/UISystem.fs" />
     <Compile Include="Systems/CursorSystem.fs" />
     <Compile Include="Systems/HoverFeedbackSystem.fs" />
+    <Compile Include="Editor/Domain.fs" />
+    <Compile Include="Editor/State.fs" />
+    <Compile Include="Editor/Camera.fs" />
+    <Compile Include="Editor/Input.fs" />
+    <Compile Include="Editor/EditorRenderer.fs" />
+    <Compile Include="Editor/UI.fs" />
+    <Compile Include="Editor/Scene.fs" />
     <Compile Include="Scenes.fs" />
-    <Compile Include="Scenes/GameplayScene.fs" />
+    <Compile Include="Scenes/BlockMapScene.fs" />
     <Compile Include="CompositionRoot.fs" />
     <Compile Include="PomoGame.fs" />
   </ItemGroup>
@@ -106,15 +118,6 @@
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
     <Content Include="Content/Skills.json">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </Content>
-    <Content Include="Content/Maps/Pomo.world">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </Content>
-    <Content Include="Content/Maps/Proto.xml">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </Content>
-    <Content Include="Content/Maps/Lobby.xml">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
     <Content Include="Content/Models.json">
@@ -142,6 +145,9 @@
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
     <Content Include="Content/HUDConfig.json">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+    <Content Include="Content/CustomMaps/**/*.json">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
   </ItemGroup>

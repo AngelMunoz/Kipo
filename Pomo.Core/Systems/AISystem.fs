@@ -21,6 +21,7 @@ open Pomo.Core.Environment
 open Pomo.Core.Graphics
 open Pomo.Core.Domain.Spatial
 open Systems
+open Pomo.Core.Domain.Core.Constants
 
 /// Shared context and result types for AI system
 
@@ -29,7 +30,7 @@ module AIContext =
   /// Snapshot of world state for AI decision making
   [<Struct>]
   type WorldSnapshot = {
-    Positions: IReadOnlyDictionary<Guid<EntityId>, Vector2>
+    Positions: IReadOnlyDictionary<Guid<EntityId>, WorldPosition>
     Velocities: IReadOnlyDictionary<Guid<EntityId>, Vector2>
     Factions: HashMap<Guid<EntityId>, Faction HashSet>
     SpatialGrid: IReadOnlyDictionary<GridCell, Guid<EntityId>[]>
@@ -238,7 +239,9 @@ module Perception =
 
     for entityId in nearbyEntities do
       match world.Positions |> Dictionary.tryFindV entityId with
-      | ValueSome pos ->
+      | ValueSome worldPos ->
+        let pos = WorldPosition.toVector2 worldPos
+
         match world.Factions |> HashMap.tryFindV entityId with
         | ValueSome targetFactions ->
           let isHostile = isHostileFaction ctx.Entity.Factions targetFactions
@@ -319,7 +322,7 @@ module Perception =
   let gatherCues (ctx: PerceptionContext) (world: WorldSnapshot) =
     let cells =
       Spatial.getCellsInRadius
-        Constants.Collision.GridCellSize
+        BlockMap.CellSize
         ctx.Entity.Position
         ctx.Archetype.perceptionConfig.visualRange
 
@@ -1072,7 +1075,7 @@ module AISystemLogic =
           // Prefer real-time position over stale memory position
           let pos =
             match world.Positions |> Dictionary.tryFindV id with
-            | ValueSome p -> p
+            | ValueSome p -> WorldPosition.toVector2 p
             | ValueNone -> entry.lastKnownPosition
 
           targetResult <- ValueSome struct (id, pos)
@@ -1192,21 +1195,33 @@ module private Culling =
     while i < cameras.Length && not result do
       let struct (_, cam) = cameras.[i]
 
-      let struct (left, right, top, bottom) =
+      let boundsFallback =
         RenderMath.Camera.getViewBounds
           cam.Position
           (float32 cam.Viewport.Width)
           (float32 cam.Viewport.Height)
           cam.Zoom
 
+      let struct (left, right, top, bottom) =
+        RenderMath.Camera.tryGetViewBoundsFromMatrices
+          cam.Position
+          cam.Viewport
+          cam.Zoom
+          cam.View
+          cam.Projection
+          0.0f
+        |> ValueOption.defaultValue boundsFallback
+
+      let centerX = (left + right) / 2.0f
+      let centerZ = (top + bottom) / 2.0f
       let halfW = (right - left) / 2.0f * Constants.AI.ActiveZoneMargin
       let halfH = (bottom - top) / 2.0f * Constants.AI.ActiveZoneMargin
 
       if
-        pos.X >= cam.Position.X - halfW
-        && pos.X <= cam.Position.X + halfW
-        && pos.Y >= cam.Position.Y - halfH
-        && pos.Y <= cam.Position.Y + halfH
+        pos.X >= centerX - halfW
+        && pos.X <= centerX + halfW
+        && pos.Y >= centerZ - halfH
+        && pos.Y <= centerZ + halfH
       then
         result <- true
 
@@ -1336,7 +1351,9 @@ type AISystem(game: Game, env: PomoEnvironment) =
               w
 
           let posOpt =
-            world.Positions |> Dictionary.tryFindV controller.controlledEntityId
+            world.Positions
+            |> Dictionary.tryFindV controller.controlledEntityId
+            |> ValueOption.map WorldPosition.toVector2
 
           let facOpt =
             getFactions() |> HashMap.tryFindV controller.controlledEntityId

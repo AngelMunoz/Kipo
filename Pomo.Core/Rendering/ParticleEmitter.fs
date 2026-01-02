@@ -11,6 +11,7 @@ open FSharp.UMX
 open FSharp.Data.Adaptive
 open Pomo.Core
 open Pomo.Core.Domain.Units
+open Pomo.Core.Domain.Core
 open Pomo.Core.Domain.Particles
 open Pomo.Core.Graphics
 open Pomo.Core.Stores
@@ -104,14 +105,14 @@ module ParticleEmitter =
 
   let inline private computeEffectPosition
     (owner: Guid<EntityId> voption)
-    (positions: IReadOnlyDictionary<Guid<EntityId>, Vector2>)
+    (positions: IReadOnlyDictionary<Guid<EntityId>, WorldPosition>)
     (fallbackPos: Vector3)
     =
     match owner with
     | ValueSome ownerId ->
       positions
       |> Dictionary.tryFindV ownerId
-      |> ValueOption.map(fun p -> Vector3(p.X, 0.0f, p.Y))
+      |> ValueOption.map(fun p -> WorldPosition.toVector3 p)
       |> ValueOption.defaultValue fallbackPos
     | ValueNone -> fallbackPos
 
@@ -132,7 +133,7 @@ module ParticleEmitter =
     (config: EmitterConfig)
     (effectPos: Vector3)
     (effectRotation: Quaternion)
-    (pixelsPerUnit: Vector2)
+    (core: RenderCore)
     (modelScale: float32)
     (particle: Particle)
     : BillboardCommand =
@@ -143,7 +144,7 @@ module ParticleEmitter =
         effectPos
         effectRotation
 
-    let renderPos = RenderMath.ParticleSpace.toRender worldPos pixelsPerUnit
+    let renderPos = core.ToRenderParticlePos worldPos
 
     {
       Texture = texture
@@ -158,9 +159,8 @@ module ParticleEmitter =
     (config: EmitterConfig)
     (effectPos: Vector3)
     (effectRotation: Quaternion)
-    (pixelsPerUnit: Vector2)
+    (core: RenderCore)
     (modelScale: float32)
-    (squishFactor: float32)
     (particle: MeshParticle)
     : MeshCommand =
     let worldPos =
@@ -170,16 +170,15 @@ module ParticleEmitter =
         effectPos
         effectRotation
 
-    let renderPos = RenderMath.ParticleSpace.toRender worldPos pixelsPerUnit
+    let renderPos = core.ToRenderParticlePos worldPos
 
     let worldMatrix =
-      RenderMath.WorldMatrix.createMeshParticle
+      RenderMath.WorldMatrix3D.createMeshParticle
         renderPos
         particle.Rotation
         (particle.Scale * modelScale)
         config.ScaleAxis
         config.ScalePivot
-        squishFactor
 
     {
       LoadedModel = loadedModel
@@ -238,7 +237,7 @@ module ParticleEmitter =
                   emitter.Config
                   effectPos
                   effectRotation
-                  core.PixelsPerUnit
+                  core
                   data.ModelScale
                   particle
 
@@ -274,9 +273,8 @@ module ParticleEmitter =
                 meshEmitter.Config
                 effectPos
                 effectRotation
-                core.PixelsPerUnit
+                core
                 data.ModelScale
-                data.SquishFactor
                 particle
 
             idx <- idx + 1)

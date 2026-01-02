@@ -117,6 +117,50 @@ module Array =
         | ValueNone -> ()
     |]
 
+module Decode =
+  open JDeck
+  open System.Text.Json
+
+  module Required =
+
+    let inline float32(element: JsonElement) =
+      try
+        match element.ValueKind with
+        | kind when kind = JsonValueKind.Number -> Ok(element.GetSingle())
+        | kind ->
+          DecodeError.ofError(
+            element.Clone(),
+            $"Expected '{JsonValueKind.Number}' but got `{kind}`"
+          )
+          |> Error
+      with ex ->
+        DecodeError.ofError(element.Clone(), "")
+        |> DecodeError.withException ex
+        |> Error
+
+  module VOptional =
+
+    let inline float32(element: JsonElement) =
+      try
+        match element.ValueKind with
+        | kind when kind = JsonValueKind.Number -> Ok(element.GetSingle())
+        | kind ->
+          DecodeError.ofError(
+            element.Clone(),
+            $"Expected '{JsonValueKind.Number}' but got `{kind}`"
+          )
+          |> Error
+      with ex ->
+        DecodeError.ofError(element.Clone(), "")
+        |> DecodeError.withException ex
+        |> Error
+
+
+module Encode =
+  open System.Text.Json.Nodes
+
+  let inline float32(v: float32) = JsonValue.Create v :> JsonNode
+
 [<AutoOpen>]
 module DictionaryExtensions =
 

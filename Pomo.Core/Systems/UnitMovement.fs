@@ -30,13 +30,6 @@ module UnitMovement =
     let lastVelocities =
       System.Collections.Generic.Dictionary<Guid<EntityId>, Vector2>()
 
-    let mutable sub: IDisposable = null
-
-    let collisionEvents =
-      System.Collections.Concurrent.ConcurrentQueue<
-        SystemCommunications.CollisionEvents
-       >()
-
     // Local state for path following
     let mutable currentPaths =
       System.Collections.Generic.Dictionary<Guid<EntityId>, Vector2 list>()
@@ -52,55 +45,11 @@ module UnitMovement =
 
     override val Kind = Movement with get
 
-    override this.Initialize() =
-      base.Initialize()
-
-      sub <-
-        core.EventBus.Observable
-        |> Observable.choose(fun e ->
-          match e with
-          | GameEvent.Collision(collision) -> Some collision
-          | _ -> None)
-        |> Observable.subscribe(fun e -> collisionEvents.Enqueue(e))
-
-
-    override this.Dispose(disposing) =
-      if disposing then
-        sub.Dispose()
-
-      base.Dispose(disposing)
-
     override this.Update(gameTime) =
       let scenarios = core.World.Scenarios |> AMap.force
       let movementStates = movementStates |> AMap.force
       let derivedStats = derivedStats |> AMap.force
       let entityScenarios = core.World.EntityScenario |> AMap.force
-
-      let frameCollisions =
-        System.Collections.Generic.Dictionary<Guid<EntityId>, Vector2>()
-
-      let mutable collisionEvent =
-        Unchecked.defaultof<SystemCommunications.CollisionEvents>
-
-      while collisionEvents.TryDequeue(&collisionEvent) do
-        match collisionEvent with
-        | SystemCommunications.CollisionEvents.MapObjectCollision(eId, _, mtv) when
-          eId <> playerId
-          ->
-          match entityScenarios.TryFindV eId with
-          | ValueSome scenarioId ->
-            let snapshot =
-              gameplay.Projections.ComputeMovementSnapshot(scenarioId)
-
-            match snapshot.Positions |> Dictionary.tryFindV eId with
-            | ValueSome currentPos ->
-
-              match frameCollisions.TryGetValue eId with
-              | true, existing -> frameCollisions[eId] <- existing + mtv
-              | false, _ -> frameCollisions[eId] <- mtv
-            | ValueNone -> ()
-          | ValueNone -> ()
-        | _ -> ()
 
       // 2. Process Movement
       for (scenarioId, _) in scenarios do
@@ -115,17 +64,20 @@ module UnitMovement =
                 | ValueSome stats -> float32 stats.MS
                 | ValueNone -> 100.0f
 
-              let mtv =
-                match frameCollisions.TryGetValue entityId with
-                | true, m -> m
-                | false, _ -> Vector2.Zero
+              let mtv = Vector2.Zero
+
+              let currentPos2d = WorldPosition.toVector2 currentPos
 
               match state with
               | MovingAlongPath path ->
                 currentPaths[entityId] <- path
 
                 match
-                  MovementLogic.handleMovingAlongPath currentPos path speed mtv
+                  MovementLogic.handleMovingAlongPath
+                    currentPos2d
+                    path
+                    speed
+                    mtv
                 with
                 | MovementLogic.Arrived ->
                   MovementLogic.notifyArrived entityId stateWrite core.EventBus
@@ -152,7 +104,7 @@ module UnitMovement =
 
               | MovingTo target ->
                 match
-                  MovementLogic.handleMovingTo currentPos target speed mtv
+                  MovementLogic.handleMovingTo currentPos2d target speed mtv
                 with
                 | MovementLogic.Arrived ->
                   MovementLogic.notifyArrived entityId stateWrite core.EventBus

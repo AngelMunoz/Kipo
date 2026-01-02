@@ -8,15 +8,15 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <Compile Include="RenderMathTests.fs" />
     <Compile Include="CommandQueueTests.fs" />
-    <Compile Include="EmitterTests.fs" />
     <Compile Include="DamageCalculatorTests.fs" />
     <Compile Include="ProjectionsTests.fs" />
+    <Compile Include="BlockMapTests.fs" />
+    <Compile Include="RenderMath3DTests.fs" />
   </ItemGroup>
 
   <ItemGroup>
-    <PackageReference Include="MonoGame.Framework.DesktopGL" Version="3.8.*"/>
+    <PackageReference Include="MonoGame.Framework.DesktopGL" Version="3.8.*" PrivateAssets="All" />
     <PackageReference Include="MSTest" Version="4.0.1" />
     <PackageReference Include="FsCheck" Version="3.3.2" />
   </ItemGroup>

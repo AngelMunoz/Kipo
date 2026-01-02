@@ -35,8 +35,7 @@ module Navigation =
       | false, _ ->
         let mapDef = mapStore.find mapKey
 
-        let grid =
-          Grid.generate mapDef Constants.Navigation.GridCellSize entitySize
+        let grid = Grid.generate mapDef Constants.BlockMap.CellSize entitySize
 
         gridCache[mapKey] <- grid
         grid
@@ -48,7 +47,7 @@ module Navigation =
 
       snapshot.Positions
       |> Dictionary.tryFindV entityId
-      |> ValueOption.map(fun pos -> struct (ctx, pos))
+      |> ValueOption.map(fun pos -> struct (ctx, WorldPosition.toVector2 pos))
 
     let inline publishPath entityId path =
       if not(List.isEmpty path) then

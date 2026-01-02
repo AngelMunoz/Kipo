@@ -34,7 +34,7 @@ module Environment =
     abstract member TargetingMode: Targeting voption aval with get
 
   type IPhysicsWriteService =
-    abstract UpdatePosition: Guid<EntityId> * Vector2 -> unit
+    abstract UpdatePosition: Guid<EntityId> * WorldPosition -> unit
     abstract UpdateVelocity: Guid<EntityId> * Vector2 -> unit
     abstract UpdateRotation: Guid<EntityId> * float32 -> unit
 
@@ -43,7 +43,7 @@ module Environment =
     abstract ApplyEntitySpawnBundle: EntitySpawnBundle -> unit
 
     abstract CreateProjectile:
-      Guid<EntityId> * LiveProjectile * Vector2 voption -> unit
+      Guid<EntityId> * LiveProjectile * WorldPosition voption -> unit
 
   type IMovementWriteService =
     abstract UpdateMovementState: Guid<EntityId> * Events.MovementState -> unit
@@ -133,7 +133,6 @@ module Environment =
   type StoreServices =
     abstract SkillStore: SkillStore
     abstract ItemStore: ItemStore
-    abstract MapStore: MapStore
     abstract AIArchetypeStore: AIArchetypeStore
     abstract AIFamilyStore: AIFamilyStore
     abstract AIEntityStore: AIEntityStore

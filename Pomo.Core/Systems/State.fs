@@ -17,6 +17,7 @@ open Pomo.Core.Domain.RawInput
 open Pomo.Core.Domain.Skill
 open Pomo.Core.Domain.Item
 open Pomo.Core.Domain.AI
+open Pomo.Core.Domain.Core
 
 module StateUpdate =
   let COMBAT_DURATION = TimeSpan.FromSeconds(5.0)
@@ -125,7 +126,7 @@ module StateUpdate =
 
     let inline updatePosition
       (world: MutableWorld)
-      struct (entity: Guid<EntityId>, position: Vector2)
+      struct (entity: Guid<EntityId>, position: WorldPosition)
       =
       if world.EntityExists.Contains entity then
         world.Positions[entity] <- position
@@ -154,7 +155,7 @@ module StateUpdate =
     let createProjectile
       (world: MutableWorld)
       struct (entityId: Guid<EntityId>, projectile: Projectile.LiveProjectile,
-              startPos: Vector2 voption)
+              startPos: WorldPosition voption)
       =
       // Determine starting position:
       // 1. If explicitly provided (e.g., chain projectile), use that
@@ -165,7 +166,8 @@ module StateUpdate =
         | ValueSome pos -> ValueSome pos
         | ValueNone ->
           match projectile.Target with
-          | Projectile.PositionTarget targetPos -> ValueSome targetPos
+          | Projectile.PositionTarget targetPos ->
+            ValueSome(WorldPosition.fromVector2 targetPos)
           | Projectile.EntityTarget _ ->
             match world.Positions.TryGetValue projectile.Caster with
             | true, pos -> ValueSome pos
@@ -410,7 +412,7 @@ module StateWrite =
 
   [<Struct>]
   type NonAdaptiveCommand =
-    | UpdatePosition of posEntityId: Guid<EntityId> * position: Vector2
+    | UpdatePosition of posEntityId: Guid<EntityId> * position: WorldPosition
     | UpdateVelocity of velEntityId: Guid<EntityId> * velocity: Vector2
     | UpdateRotation of rotEntityId: Guid<EntityId> * rotation: float32
 
@@ -489,7 +491,7 @@ module StateWrite =
     | CreateProjectile of
       projEntityId: Guid<EntityId> *
       proj: Projectile.LiveProjectile *
-      pos: Vector2 voption
+      pos: WorldPosition voption
     | ApplyEntitySpawnBundle of bundle: EntitySpawnBundle
     | UpdateActiveOrbital of
       orbEntityId: Guid<EntityId> *

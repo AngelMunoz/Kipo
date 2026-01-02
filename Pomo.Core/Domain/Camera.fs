@@ -5,12 +5,13 @@ open Microsoft.Xna.Framework
 open Microsoft.Xna.Framework.Graphics
 open FSharp.UMX
 open Pomo.Core.Domain.Units
+open Pomo.Core.Domain.Core
 
 module Camera =
 
   [<Struct>]
   type Camera = {
-    Position: Vector2
+    Position: WorldPosition
     Zoom: float32
     Viewport: Viewport
     View: Matrix
@@ -20,5 +21,8 @@ module Camera =
   type CameraService =
     abstract member GetCamera: Guid<EntityId> -> Camera voption
     abstract member GetAllCameras: unit -> struct (Guid<EntityId> * Camera)[]
-    abstract member ScreenToWorld: Vector2 * Guid<EntityId> -> Vector2 voption
+
+    abstract member ScreenToWorld:
+      Vector2 * Guid<EntityId> -> WorldPosition voption
+
     abstract member CreatePickRay: Vector2 * Guid<EntityId> -> Ray voption

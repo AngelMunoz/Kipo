@@ -38,9 +38,10 @@ let createFakeItemStore
 let emptyItemStore: ItemStore = createFakeItemStore []
 
 /// Creates a dummy PhysicsCache that returns empty snapshots
-let dummyPhysicsCache: Projections.PhysicsCache.IService =
-  { new Projections.PhysicsCache.IService with
+let dummyPhysicsCache: Projections.PhysicsCache.PhysicsCacheService =
+  { new Projections.PhysicsCache.PhysicsCacheService with
       member _.GetMovementSnapshot _ = Projections.MovementSnapshot.Empty
+      member _.GetMovement3DSnapshot _ = Projections.Movement3DSnapshot.Empty
       member _.RefreshAllCaches() = ()
   }
 

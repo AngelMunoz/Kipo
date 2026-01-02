@@ -15,7 +15,6 @@ open Pomo.Core.Domain.Projectile
 open Pomo.Core.Domain.RawInput
 open Pomo.Core.Domain.Skill
 open Pomo.Core.Domain.Item
-open Pomo.Core.Domain.Map
 open Pomo.Core.Domain.AI
 open Pomo.Core.Domain.Core
 
@@ -51,7 +50,7 @@ module SystemCommunications =
     EntityId: Guid<EntityId>
     ScenarioId: Guid<ScenarioId>
     Type: SpawnType
-    Position: Vector2
+    Position: WorldPosition
   }
 
   [<Struct>]
@@ -82,7 +81,7 @@ module SystemCommunications =
   [<Struct>]
   type ShowNotification = {
     Message: string
-    Position: Vector2
+    Position: WorldPosition
     Type: NotificationType
   }
 
@@ -132,13 +131,6 @@ module SystemCommunications =
   type AttackIntent = {
     Attacker: Guid<EntityId>
     Target: Guid<EntityId>
-  }
-
-  [<Struct>]
-  type PortalTravel = {
-    EntityId: Guid<EntityId>
-    TargetMap: string
-    TargetSpawn: string
   }
 
   [<Struct>]
@@ -217,8 +209,6 @@ module SystemCommunications =
   [<Struct>]
   type CollisionEvents =
     | EntityCollision of entity: struct (Guid<EntityId> * Guid<EntityId>)
-    | MapObjectCollision of
-      object: struct (Guid<EntityId> * MapObject * Vector2)
 
   [<Struct>]
   type SceneTransition = { Scene: Pomo.Core.Domain.Scenes.Scene }
@@ -270,7 +260,6 @@ type IntentEvent =
   | EffectResource of effectRes: SystemCommunications.EffectResourceIntent
   | MovementTarget of movement: SystemCommunications.SetMovementTarget
   | TargetSelection of target: SystemCommunications.TargetSelected
-  | Portal of portal: SystemCommunications.PortalTravel
   | SlotActivated of slot: SystemCommunications.SlotActivated
 
 // --- Item Intent Events ---

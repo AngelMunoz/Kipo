@@ -14,6 +14,7 @@ open Pomo.Core.Domain.Events
 open Pomo.Core.Domain.Units
 open Pomo.Core.Domain.World
 open Pomo.Core.Systems.Systems
+open Pomo.Core.Domain.Core
 
 module ResourceManager =
   open System.Reactive.Disposables
@@ -69,7 +70,7 @@ module ResourceManager =
 
     let position =
       world.Positions.TryFindV event.Target
-      |> ValueOption.defaultValue Vector2.Zero
+      |> ValueOption.defaultValue WorldPosition.zero
 
     match resources.TryFindV event.Target with
     | ValueSome currentResources ->

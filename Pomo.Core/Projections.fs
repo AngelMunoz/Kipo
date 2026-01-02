@@ -16,6 +16,8 @@ open Pomo.Core.Domain.Item
 open Pomo.Core.Domain.Spatial
 open Pomo.Core.Domain.Projectile
 open Pomo.Core.Domain.Skill
+open Pomo.Core.Algorithms
+open Pomo.Core.Domain.Core.Constants
 
 module Projections =
   let private liveEntities(world: World) =
@@ -53,9 +55,9 @@ module Projections =
       HP = baseStats.Charm * 10
       DP = baseStats.Charm + int(float baseStats.Charm * 1.25)
       HV = baseStats.Charm * 2
-      MS = 100
-      HPRegen = 20
-      MPRegen = 20
+      MS = 200
+      HPRegen = 50
+      MPRegen = 50
       ElementAttributes = HashMap.empty
       ElementResistances = HashMap.empty
     }
@@ -296,7 +298,7 @@ module Projections =
 
   [<Struct>]
   type MovementSnapshot = {
-    Positions: IReadOnlyDictionary<Guid<EntityId>, Vector2>
+    Positions: IReadOnlyDictionary<Guid<EntityId>, WorldPosition>
     SpatialGrid: IReadOnlyDictionary<GridCell, Guid<EntityId>[]>
     Rotations: IReadOnlyDictionary<Guid<EntityId>, float32>
     ModelConfigIds: IReadOnlyDictionary<Guid<EntityId>, string>
@@ -307,6 +309,22 @@ module Projections =
       SpatialGrid = Dictionary() :> IReadOnlyDictionary<_, _>
       Rotations = Dictionary() :> IReadOnlyDictionary<_, _>
       ModelConfigIds = Dictionary() :> IReadOnlyDictionary<_, _>
+    }
+
+  /// 3D movement snapshot for BlockMap-based scenarios
+  [<Struct>]
+  type Movement3DSnapshot = {
+    Positions: IReadOnlyDictionary<Guid<EntityId>, WorldPosition>
+    SpatialGrid3D: IReadOnlyDictionary<GridCell3D, Guid<EntityId>[]>
+    Rotations: IReadOnlyDictionary<Guid<EntityId>, float32>
+    ModelConfigIds: IReadOnlyDictionary<Guid<EntityId>, string>
+  } with
+
+    static member Empty = {
+      Positions = Dictionary()
+      SpatialGrid3D = Dictionary()
+      Rotations = Dictionary()
+      ModelConfigIds = Dictionary()
     }
 
 
@@ -344,21 +362,28 @@ module Projections =
 
     abstract ComputeMovementSnapshot: Guid<ScenarioId> -> MovementSnapshot
 
+    abstract ComputeMovement3DSnapshot: Guid<ScenarioId> -> Movement3DSnapshot
+
     abstract GetNearbyEntitiesSnapshot:
       MovementSnapshot * HashSet<Guid<EntityId>> * Vector2 * float32 ->
         IndexList<struct (Guid<EntityId> * Vector2)>
 
+    abstract GetNearbyEntities3DSnapshot:
+      Movement3DSnapshot * HashSet<Guid<EntityId>> * WorldPosition * float32 ->
+        IndexList<struct (Guid<EntityId> * WorldPosition)>
+
 
   module PhysicsCache =
 
-    type IService =
+    type PhysicsCacheService =
       abstract GetMovementSnapshot: Guid<ScenarioId> -> MovementSnapshot
+      abstract GetMovement3DSnapshot: Guid<ScenarioId> -> Movement3DSnapshot
       abstract RefreshAllCaches: unit -> unit
 
     let private calculateSnapshot
       (time: TimeSpan)
       (velocities: IReadOnlyDictionary<Guid<EntityId>, Vector2>)
-      (positions: IReadOnlyDictionary<Guid<EntityId>, Vector2>)
+      (positions: IReadOnlyDictionary<Guid<EntityId>, WorldPosition>)
       (rotations: IReadOnlyDictionary<Guid<EntityId>, float32>)
       (modelConfigIds: HashMap<Guid<EntityId>, string>)
       (entityScenarios: HashMap<Guid<EntityId>, Guid<ScenarioId>>)
@@ -366,7 +391,7 @@ module Projections =
       =
       let dt = float32 time.TotalSeconds
 
-      let positionsBuilder = Dictionary<Guid<EntityId>, Vector2>()
+      let positionsBuilder = Dictionary<Guid<EntityId>, WorldPosition>()
       let rotationsBuilder = Dictionary<Guid<EntityId>, float32>()
       let modelConfigBuilder = Dictionary<Guid<EntityId>, string>()
       let gridBuilder = Dictionary<GridCell, ResizeArray<Guid<EntityId>>>()
@@ -377,7 +402,13 @@ module Projections =
           // Calculate Position
           let currentPos =
             match velocities |> Dictionary.tryFindV id with
-            | ValueSome v -> startPos + (v * dt)
+            | ValueSome v ->
+                // Apply 2D velocity to X/Z plane, preserve Y
+                {
+                  WorldPosition.X = startPos.X + v.X * dt
+                  Y = startPos.Y
+                  Z = startPos.Z + v.Y * dt
+                }
             | ValueNone -> startPos
 
           positionsBuilder[id] <- currentPos
@@ -401,7 +432,9 @@ module Projections =
 
           // Calculate Grid Cell
           let cell =
-            Spatial.getGridCell Core.Constants.Collision.GridCellSize currentPos
+            Spatial.getGridCell
+              BlockMap.CellSize
+              (WorldPosition.toVector2 currentPos)
 
           // Add to Grid (O(1) amortized with ResizeArray)
           match gridBuilder |> Dictionary.tryFindV cell with
@@ -421,14 +454,94 @@ module Projections =
         ModelConfigIds = modelConfigBuilder
       }
 
-    let create(world: World) : IService =
-      let snapshotCache = Dictionary<Guid<ScenarioId>, MovementSnapshot>()
+    let private calculate3DSnapshot
+      (time: TimeSpan)
+      (velocities: IReadOnlyDictionary<Guid<EntityId>, Vector2>)
+      (positions: IReadOnlyDictionary<Guid<EntityId>, WorldPosition>)
+      (rotations: IReadOnlyDictionary<Guid<EntityId>, float32>)
+      (modelConfigIds: HashMap<Guid<EntityId>, string>)
+      (entityScenarios: HashMap<Guid<EntityId>, Guid<ScenarioId>>)
+      (blockMap: BlockMap.BlockMapDefinition voption)
+      (scenarioId: Guid<ScenarioId>)
+      =
+      let dt = float32 time.TotalSeconds
 
-      { new IService with
+      let positionsBuilder = Dictionary<Guid<EntityId>, WorldPosition>()
+      let rotationsBuilder = Dictionary<Guid<EntityId>, float32>()
+      let modelConfigBuilder = Dictionary<Guid<EntityId>, string>()
+      let gridBuilder = Dictionary<GridCell3D, ResizeArray<Guid<EntityId>>>()
+
+      for KeyValue(id, startPos) in positions do
+        match entityScenarios |> HashMap.tryFindV id with
+        | ValueSome sId when sId = scenarioId ->
+          let currentPos =
+            match velocities |> Dictionary.tryFindV id with
+            | ValueSome v ->
+              match blockMap with
+              | ValueSome map ->
+                BlockCollision.applyCollision map startPos v dt 1.0f
+              | ValueNone ->
+                  {
+                    WorldPosition.X = startPos.X + v.X * dt
+                    Y = startPos.Y
+                    Z = startPos.Z + v.Y * dt
+                  }
+            | ValueNone -> startPos
+
+          positionsBuilder[id] <- currentPos
+
+          let rotation =
+            match velocities |> Dictionary.tryFindV id with
+            | ValueSome v when v <> Vector2.Zero ->
+              float32(Math.Atan2(float v.X, float v.Y))
+            | _ ->
+              rotations
+              |> Dictionary.tryFindV id
+              |> ValueOption.defaultValue 0.0f
+
+          rotationsBuilder[id] <- rotation
+
+          match modelConfigIds |> HashMap.tryFindV id with
+          | ValueSome configId -> modelConfigBuilder[id] <- configId
+          | ValueNone -> ()
+
+          let cell: GridCell3D = {
+            X = int(currentPos.X / BlockMap.CellSize)
+            Y = int(currentPos.Y / BlockMap.CellSize)
+            Z = int(currentPos.Z / BlockMap.CellSize)
+          }
+
+          match gridBuilder |> Dictionary.tryFindV cell with
+          | ValueSome list -> list.Add id
+          | ValueNone -> gridBuilder[cell] <- ResizeArray([| id |])
+        | _ -> ()
+
+      let spatialGrid = Dictionary<GridCell3D, Guid<EntityId>[]>()
+
+      for kv in gridBuilder do
+        spatialGrid[kv.Key] <- kv.Value.ToArray()
+
+      {
+        Positions = positionsBuilder
+        SpatialGrid3D = spatialGrid
+        Rotations = rotationsBuilder
+        ModelConfigIds = modelConfigBuilder
+      }
+
+    let create(world: World) : PhysicsCacheService =
+      let snapshotCache = Dictionary<Guid<ScenarioId>, MovementSnapshot>()
+      let snapshot3DCache = Dictionary<Guid<ScenarioId>, Movement3DSnapshot>()
+
+      { new PhysicsCacheService with
           member _.GetMovementSnapshot(scenarioId) =
             match snapshotCache |> Dictionary.tryFindV scenarioId with
             | ValueSome snapshot -> snapshot
             | ValueNone -> MovementSnapshot.Empty
+
+          member _.GetMovement3DSnapshot(scenarioId) =
+            match snapshot3DCache |> Dictionary.tryFindV scenarioId with
+            | ValueSome snapshot -> snapshot
+            | ValueNone -> Movement3DSnapshot.Empty
 
           member _.RefreshAllCaches() =
             let time = world.Time |> AVal.force |> _.Delta
@@ -439,7 +552,7 @@ module Projections =
             let entityScenarios = world.EntityScenario |> AMap.force
             let scenarios = world.Scenarios |> AMap.force
 
-            for (sId, _) in scenarios do
+            for (sId, scenario) in scenarios do
               let snapshot =
                 calculateSnapshot
                   time
@@ -451,6 +564,19 @@ module Projections =
                   sId
 
               snapshotCache[sId] <- snapshot
+
+              let snapshot3D =
+                calculate3DSnapshot
+                  time
+                  velocities
+                  positions
+                  rotations
+                  modelConfigIds
+                  entityScenarios
+                  scenario.BlockMap
+                  sId
+
+              snapshot3DCache[sId] <- snapshot3D
       }
 
   let private entityScenarioContexts(world: World) =
@@ -460,11 +586,16 @@ module Projections =
 
       match scenario with
       | Some s ->
+        let mapKey =
+          match s.BlockMap with
+          | ValueSome b -> b.Key
+          | ValueNone -> "unknown"
+
         return
           Some {
             ScenarioId = scenarioId
             Scenario = s
-            MapKey = s.Map.Key
+            MapKey = mapKey
           }
       | None -> return None
     })
@@ -493,8 +624,11 @@ module Projections =
     })
 
   let create
-    (itemStore: ItemStore, world: World, physicsCache: PhysicsCache.IService)
-    =
+    (
+      itemStore: ItemStore,
+      world: World,
+      physicsCache: PhysicsCache.PhysicsCacheService
+    ) =
     let derivedStats = calculateDerivedStats itemStore world
 
 
@@ -513,14 +647,13 @@ module Projections =
         member _.ComputeMovementSnapshot(scenarioId) =
           physicsCache.GetMovementSnapshot(scenarioId)
 
+        member _.ComputeMovement3DSnapshot(scenarioId) =
+          physicsCache.GetMovement3DSnapshot(scenarioId)
+
         member _.GetNearbyEntitiesSnapshot
           (snapshot, liveEntities, center, radius)
           =
-          let cells =
-            Spatial.getCellsInRadius
-              Constants.Collision.GridCellSize
-              center
-              radius
+          let cells = Spatial.getCellsInRadius BlockMap.CellSize center radius
 
           let potentialTargets =
             cells
@@ -535,7 +668,45 @@ module Projections =
               None
             else
               match snapshot.Positions.TryGetValue entityId with
-              | true, pos when Vector2.Distance(pos, center) <= radius ->
-                Some struct (entityId, pos)
+              | true, pos ->
+                let pos2d = WorldPosition.toVector2 pos
+
+                if Vector2.Distance(pos2d, center) <= radius then
+                  Some struct (entityId, pos2d)
+                else
+                  None
               | _ -> None)
+
+        member _.GetNearbyEntities3DSnapshot
+          (snapshot, liveEntities, center, radius)
+          =
+          let cellSize = BlockMap.CellSize
+          let cellRadius = int(radius / cellSize) + 1
+          let centerCellX = int(center.X / cellSize)
+          let centerCellY = int(center.Y / cellSize)
+          let centerCellZ = int(center.Z / cellSize)
+          let results = ResizeArray<struct (Guid<EntityId> * WorldPosition)>()
+          let mutable cell = Unchecked.defaultof<GridCell3D>
+
+          for dx = -cellRadius to cellRadius do
+            for dy = -cellRadius to cellRadius do
+              for dz = -cellRadius to cellRadius do
+                cell <- {
+                  X = centerCellX + dx
+                  Y = centerCellY + dy
+                  Z = centerCellZ + dz
+                }
+
+                match snapshot.SpatialGrid3D.TryGetValue cell with
+                | true, entityIds ->
+                  for entityId in entityIds do
+                    if liveEntities.Contains entityId then
+                      match snapshot.Positions.TryGetValue entityId with
+                      | true, pos ->
+                        if WorldPosition.distance pos center <= radius then
+                          results.Add struct (entityId, pos)
+                      | _ -> ()
+                | _ -> ()
+
+          IndexList.ofSeq results
     }

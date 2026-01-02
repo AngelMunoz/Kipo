@@ -8,6 +8,7 @@ open Microsoft.Xna.Framework.Graphics
 open FSharp.UMX
 open FSharp.Data.Adaptive
 open Pomo.Core
+open Pomo.Core.Domain.Core
 open Pomo.Core.Domain.Units
 open Pomo.Core.Domain.Map
 open Pomo.Core.Domain.Animation
@@ -34,7 +35,10 @@ let isoPpu = Vector2(32.0f, 16.0f)
 /// Creates a RenderCore with standard settings
 let createRenderCore() : RenderCore = {
   PixelsPerUnit = isoPpu
-  ToRenderPos = fun pos alt -> RenderMath.LogicRender.toRender pos alt isoPpu
+  Space = RenderSpace.Isometric
+  ToRenderPos = fun pos -> RenderMath.LogicRender.toRender pos isoPpu
+  ToRenderParticlePos =
+    fun particlePos -> RenderMath.ParticleSpace.toRender particlePos isoPpu
 }
 
 // ============================================================================
@@ -55,7 +59,10 @@ type EntityEmitterTests() =
     let model = fakeModel()
 
     let getModel(asset: string) =
-      if asset = "TestAsset" then ValueSome model else ValueNone
+      if asset = "TestAsset" then
+        ValueSome { Model = model; HasNormals = false }
+      else
+        ValueNone
 
     let entities = [|
       {
@@ -77,7 +84,10 @@ type EntityEmitterTests() =
     let model = fakeModel()
 
     let getModel(asset: string) =
-      if asset = "Valid" then ValueSome model else ValueNone
+      if asset = "Valid" then
+        ValueSome { Model = model; HasNormals = false }
+      else
+        ValueNone
 
     let entities = [|
       {
@@ -105,9 +115,11 @@ type EntityEmitterTests() =
   [<TestMethod>]
   member _.``emit handles multiple entities``() =
     let model = fakeModel()
-    let getModel _ = ValueSome model
 
-    let entities = [|
+    let getModel _ =
+      ValueSome { Model = model; HasNormals = false }
+
+    let entities: ResolvedEntity[] = [|
       {
         EntityId = %Guid.NewGuid()
         Nodes = [|
@@ -236,6 +248,7 @@ type PoseResolverTests() =
                   ]
                 AnimationBindings = HashMap.empty
                 FacingOffset = 0.0f
+                PickBoundsOverride = ValueNone
               }
             else
               ValueNone
@@ -245,8 +258,13 @@ type PoseResolverTests() =
 
     {
       ModelStore = modelStore
-      GetModelByAsset = fun _ -> ValueSome(fakeModel())
-      EntityPoses = Dictionary.empty()
+      GetLoadedModelByAsset =
+        fun _ ->
+          ValueSome {
+            Model = fakeModel()
+            HasNormals = false
+          }
+      EntityPoses = readOnlyDict []
       LiveProjectiles = HashMap.empty
       SquishFactor = 2.0f
       ModelScale = 1.0f
@@ -258,7 +276,10 @@ type PoseResolverTests() =
     : MovementSnapshot =
     {
       Positions =
-        entities |> List.map(fun (id, pos, _) -> id, pos) |> Dictionary.ofSeq
+        entities
+        |> List.map(fun (id, pos, _) ->
+          id, ({ X = pos.X; Y = 0.0f; Z = pos.Y }: WorldPosition))
+        |> Dictionary.ofSeq
       SpatialGrid = Dictionary.empty()
       Rotations = Dictionary.empty()
       ModelConfigIds =
@@ -325,6 +346,7 @@ type PoseResolverTests() =
                   ]
                 AnimationBindings = HashMap.empty
                 FacingOffset = 0.0f
+                PickBoundsOverride = ValueNone
               }
             else
               ValueNone
@@ -336,8 +358,13 @@ type PoseResolverTests() =
 
     let data = {
       ModelStore = modelStore
-      GetModelByAsset = fun _ -> ValueSome(fakeModel())
-      EntityPoses = Dictionary.empty()
+      GetLoadedModelByAsset =
+        fun _ ->
+          ValueSome {
+            Model = fakeModel()
+            HasNormals = false
+          }
+      EntityPoses = readOnlyDict []
       LiveProjectiles = HashMap.empty
       SquishFactor = 2.0f
       ModelScale = 1.0f
