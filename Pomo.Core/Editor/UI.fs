@@ -53,6 +53,22 @@ module EditorUI =
           | ValueNone -> "Block: None")
       )
 
+    let effectInfo =
+      Label.create "Effect: None"
+      |> W.bindText(
+        (state.BlockMap, state.SelectedBlockType)
+        ||> AVal.map2(fun map selectedId ->
+          match selectedId with
+          | ValueSome id ->
+            match map.Palette.TryGetValue(id) with
+            | true, bt ->
+              match bt.Effect with
+              | ValueSome e -> $"Effect: {e.Name}"
+              | ValueNone -> "Effect: None"
+            | _ -> "Effect: Unknown"
+          | ValueNone -> "Effect: None")
+      )
+
     let brushInfo =
       Label.create "Brush: Place"
       |> W.bindText(state.BrushMode |> AVal.map(fun m -> $"Brush: %A{m}"))
@@ -70,6 +86,40 @@ module EditorUI =
         label.Text <- if enabled then "Collision: On" else "Collision: Off")
 
     WidgetSubs.get(collisionBtn).Add(collisionSub)
+
+    let effectNoneBtn =
+      Btn.create "Effect: None"
+      |> W.size 120 30
+      |> Btn.onClick(fun () ->
+        transact(fun () ->
+          match state.SelectedBlockType.Value with
+          | ValueSome archetypeId ->
+            let map = state.BlockMap.Value
+
+            Pomo.Core.Algorithms.BlockMap.setArchetypeEffect
+              map
+              archetypeId
+              ValueNone
+
+            state.BlockMap.Value <- { map with Version = map.Version + 1 }
+          | ValueNone -> ()))
+
+    let effectLavaBtn =
+      Btn.create "Effect: Lava"
+      |> W.size 120 30
+      |> Btn.onClick(fun () ->
+        transact(fun () ->
+          match state.SelectedBlockType.Value with
+          | ValueSome archetypeId ->
+            let map = state.BlockMap.Value
+
+            Pomo.Core.Algorithms.BlockMap.setArchetypeEffect
+              map
+              archetypeId
+              (ValueSome EditorEffectPresets.lava)
+
+            state.BlockMap.Value <- { map with Version = map.Version + 1 }
+          | ValueNone -> ()))
 
     let layerInfo =
       Label.create "Layer: 0"
@@ -196,6 +246,9 @@ module EditorUI =
       redoBtn
       collisionBtn
       blockInfo
+      effectInfo
+      effectNoneBtn
+      effectLavaBtn
       blockCount
       brushInfo
       layerInfo

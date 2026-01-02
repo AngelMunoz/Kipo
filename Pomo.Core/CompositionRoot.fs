@@ -157,7 +157,9 @@ module CompositionRoot =
           | path :: rest ->
             match Systems.BlockMapLoader.load Systems.BlockMapLoader.Resolvers.runtime path with
             | Ok map -> ValueSome map
-            | Error _ -> loop rest
+            | Error e ->
+                printfn $"Error loading Map: {path} - {e}"
+                loop rest
 
         loop candidatePaths
 

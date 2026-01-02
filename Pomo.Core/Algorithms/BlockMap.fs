@@ -77,6 +77,31 @@ module BlockMap =
           map.Palette.Add(newId, variant)
           ValueSome newId))
 
+  let setArchetypeEffect
+    (map: BlockMapDefinition)
+    (archetypeId: int<BlockTypeId>)
+    (effect: Effect voption)
+    : unit =
+    tryGetArchetype map archetypeId
+    |> ValueOption.iter(fun archetype ->
+      let collisionVariantId =
+        tryFindVariantId map.Palette archetypeId VariantKeyCollisionEnabled
+
+      let updatedArchetype: BlockType = { archetype with Effect = effect }
+      map.Palette[archetypeId] <- updatedArchetype
+
+      collisionVariantId
+      |> ValueOption.iter(fun variantId ->
+        let updatedVariant: BlockType = {
+          updatedArchetype with
+              Id = variantId
+              ArchetypeId = archetypeId
+              VariantKey = ValueSome VariantKeyCollisionEnabled
+              CollisionType = Box
+        }
+
+        map.Palette[variantId] <- updatedVariant))
+
   let inline createEmpty
     (key: string)
     (width: int)
