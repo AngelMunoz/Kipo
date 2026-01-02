@@ -21,6 +21,8 @@ type BlockMapTests() =
 
     let blockType = {
       Id = blockId
+      ArchetypeId = blockId
+      VariantKey = ValueNone
       Name = "Grass Block"
       Model = "Tiles/kaykit_blocks/grass"
       Category = "Terrain"

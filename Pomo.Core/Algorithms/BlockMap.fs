@@ -6,8 +6,76 @@ open Pomo.Core.Domain.BlockMap
 open Pomo.Core.Domain.Skill
 open Pomo.Core.Domain.Spatial
 open Pomo.Core.Domain.Core.Constants
+open FSharp.UMX
+open Pomo.Core.Domain.Units
 
 module BlockMap =
+
+  [<Literal>]
+  let private VariantKeyCollisionEnabled = "Collision=On"
+
+  let inline private tryGetArchetype
+    (map: BlockMapDefinition)
+    (archetypeId: int<BlockTypeId>)
+    : BlockType voption =
+    map.Palette |> Dictionary.tryFindV archetypeId
+
+  let inline private tryFindVariantId
+    (palette: System.Collections.Generic.Dictionary<int<BlockTypeId>, BlockType>)
+    (archetypeId: int<BlockTypeId>)
+    (variantKey: string)
+    : int<BlockTypeId> voption =
+    let mutable found = ValueNone
+    let mutable e = palette.Values.GetEnumerator()
+
+    while e.MoveNext() && found.IsNone do
+      let bt = e.Current
+
+      if bt.ArchetypeId = archetypeId then
+        match bt.VariantKey with
+        | ValueSome k when k = variantKey -> found <- ValueSome bt.Id
+        | _ -> ()
+
+    found
+
+  let inline private nextBlockTypeId
+    (palette: System.Collections.Generic.Dictionary<int<BlockTypeId>, BlockType>)
+    : int<BlockTypeId> =
+    let mutable maxId = 0
+    let mutable e = palette.Keys.GetEnumerator()
+
+    while e.MoveNext() do
+      let k = e.Current |> UMX.untag
+
+      if k > maxId then
+        maxId <- k
+
+    maxId + 1 |> UMX.tag<BlockTypeId>
+
+  let getOrCreateVariantId
+    (map: BlockMapDefinition)
+    (archetypeId: int<BlockTypeId>)
+    (collisionEnabled: bool)
+    : int<BlockTypeId> voption =
+    if not collisionEnabled then
+      ValueSome archetypeId
+    else
+      tryGetArchetype map archetypeId
+      |> ValueOption.bind(fun archetype ->
+        tryFindVariantId map.Palette archetypeId VariantKeyCollisionEnabled
+        |> ValueOption.orElseWith(fun () ->
+          let newId = nextBlockTypeId map.Palette
+
+          let variant: BlockType = {
+            archetype with
+                Id = newId
+                ArchetypeId = archetypeId
+                VariantKey = ValueSome VariantKeyCollisionEnabled
+                CollisionType = Box
+          }
+
+          map.Palette.Add(newId, variant)
+          ValueSome newId))
 
   let inline createEmpty
     (key: string)

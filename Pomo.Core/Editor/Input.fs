@@ -272,22 +272,29 @@ module EditorInput =
       ctx.LastPaintedCell <- cell
 
       match state.SelectedBlockType |> AVal.force with
-      | ValueSome blockTypeId ->
+      | ValueSome archetypeId ->
         match state.BrushMode |> AVal.force with
         | Place ->
-          let rotation =
-            if state.CurrentRotation.Value = Quaternion.Identity then
-              ValueNone
-            else
-              ValueSome state.CurrentRotation.Value
+          let collisionEnabled = state.CollisionEnabled |> AVal.force
 
-          let block: PlacedBlock = {
-            Cell = cell
-            BlockTypeId = blockTypeId
-            Rotation = rotation
-          }
+          match
+            BlockMap.getOrCreateVariantId map archetypeId collisionEnabled
+          with
+          | ValueNone -> ()
+          | ValueSome blockTypeId ->
+            let rotation =
+              if state.CurrentRotation.Value = Quaternion.Identity then
+                ValueNone
+              else
+                ValueSome state.CurrentRotation.Value
 
-          EditorState.applyAction state (PlaceBlock(block, ValueNone))
+            let block: PlacedBlock = {
+              Cell = cell
+              BlockTypeId = blockTypeId
+              Rotation = rotation
+            }
+
+            EditorState.applyAction state (PlaceBlock(block, ValueNone))
         | Erase -> EditorState.applyAction state (RemoveBlock(cell, ValueNone))
         | Select -> ()
       | ValueNone ->

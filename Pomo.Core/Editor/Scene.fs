@@ -53,6 +53,8 @@ module EditorScene =
           id,
           {
             Id = id
+            ArchetypeId = id
+            VariantKey = ValueNone
             Name = name
             Model = model
             Category = cat

@@ -57,6 +57,20 @@ module EditorUI =
       Label.create "Brush: Place"
       |> W.bindText(state.BrushMode |> AVal.map(fun m -> $"Brush: %A{m}"))
 
+    let collisionBtn =
+      Btn.create "Collision: Off"
+      |> W.size 120 30
+      |> Btn.onClick(fun () ->
+        transact(fun () ->
+          state.CollisionEnabled.Value <- not state.CollisionEnabled.Value))
+
+    let collisionSub =
+      state.CollisionEnabled.AddWeakCallback(fun enabled ->
+        let label = collisionBtn.Content :?> Label
+        label.Text <- if enabled then "Collision: On" else "Collision: Off")
+
+    WidgetSubs.get(collisionBtn).Add(collisionSub)
+
     let layerInfo =
       Label.create "Layer: 0"
       |> W.bindText(state.CurrentLayer |> AVal.map(fun l -> $"Layer: {l}"))
@@ -93,26 +107,27 @@ module EditorUI =
       state.BlockMap
       |> AVal.map(fun map -> [
         for bt in map.Palette.Values do
-          let btn =
-            Btn.create bt.Name
-            |> W.size 80 30
-            |> Btn.onClick(fun () ->
-              transact(fun () ->
-                state.SelectedBlockType.Value <- ValueSome bt.Id))
+          if bt.Id = bt.ArchetypeId then
+            let btn =
+              Btn.create bt.Name
+              |> W.size 80 30
+              |> Btn.onClick(fun () ->
+                transact(fun () ->
+                  state.SelectedBlockType.Value <- ValueSome bt.Id))
 
-          // Highlight selected
-          let sub =
-            state.SelectedBlockType.AddWeakCallback(fun selId ->
-              let label = btn.Content :?> Label
+            // Highlight selected
+            let sub =
+              state.SelectedBlockType.AddWeakCallback(fun selId ->
+                let label = btn.Content :?> Label
 
-              if selId = ValueSome bt.Id then
-                label.TextColor <- Color.Yellow
-              else
-                label.TextColor <- Color.White)
+                if selId = ValueSome bt.Id then
+                  label.TextColor <- Color.Yellow
+                else
+                  label.TextColor <- Color.White)
 
-          WidgetSubs.get(btn).Add(sub)
+            WidgetSubs.get(btn).Add(sub)
 
-          btn :> Widget
+            btn :> Widget
       ])
 
     palette |> HStack.bindChildren paletteChildren |> ignore
@@ -179,6 +194,7 @@ module EditorUI =
       helpLabel
       undoBtn
       redoBtn
+      collisionBtn
       blockInfo
       blockCount
       brushInfo

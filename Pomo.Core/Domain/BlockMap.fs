@@ -75,6 +75,8 @@ module BlockMap =
 
   type BlockType = {
     Id: int<BlockTypeId>
+    ArchetypeId: int<BlockTypeId>
+    VariantKey: string voption
     Name: string
     Model: string
     Category: string
@@ -217,6 +219,17 @@ module BlockMap =
     let blockTypeDecoder: Decoder<BlockType> =
       fun json -> decode {
         let! id = Required.Property.get ("Id", Required.int) json
+
+        and! archetypeId =
+          VOptional.Property.get ("ArchetypeId", Required.int) json
+          |> Result.map(fun v ->
+            match v with
+            | ValueSome a -> a * 1<BlockTypeId>
+            | ValueNone -> 1<BlockTypeId>)
+
+        and! variantKey =
+          VOptional.Property.get ("VariantKey", Required.string) json
+
         and! name = Required.Property.get ("Name", Required.string) json
         and! model = Required.Property.get ("Model", Required.string) json
 
@@ -235,6 +248,8 @@ module BlockMap =
 
         return {
           Id = id * 1<BlockTypeId>
+          ArchetypeId = archetypeId
+          VariantKey = variantKey
           Name = name
           Model = model
           Category = category
@@ -247,6 +262,11 @@ module BlockMap =
       fun value ->
         Json.object [
           "Id", Encode.int(value.Id |> UMX.untag)
+          if value.ArchetypeId <> value.Id then
+            "ArchetypeId", Encode.int(value.ArchetypeId |> UMX.untag)
+          match value.VariantKey with
+          | ValueSome key -> "VariantKey", Encode.string key
+          | ValueNone -> ()
           "Name", Encode.string value.Name
           "Model", Encode.string value.Model
           "Category", Encode.string value.Category
