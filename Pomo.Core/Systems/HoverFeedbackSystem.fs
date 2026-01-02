@@ -116,7 +116,7 @@ module HoverFeedback =
     | ValueNone, _ -> Hand
     | _, _ -> Arrow
 
-  let inline determineCursor
+  let inline private determineCursor
     (targetingMode: Targeting voption)
     (hoveredEntity: Guid<EntityId> voption)
     (factions: HashMap<Guid<EntityId>, HashSet<Faction>>)
