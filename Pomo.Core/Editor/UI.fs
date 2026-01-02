@@ -146,41 +146,57 @@ module EditorUI =
       )
 
     let palette =
-      HStack.spaced 4
+      Panel.sized 420 240
       |> W.hAlign HorizontalAlignment.Right
       |> W.vAlign VerticalAlignment.Bottom
-      |> W.padding 20
+      |> W.padding 12
 
     palette.Background <- SolidBrush(Color(0, 0, 0, 150))
 
-    let paletteChildren =
+    let paletteWidget =
       state.BlockMap
-      |> AVal.map(fun map -> [
-        for bt in map.Palette.Values do
-          if bt.Id = bt.ArchetypeId then
-            let btn =
-              Btn.create bt.Name
-              |> W.size 80 30
-              |> Btn.onClick(fun () ->
-                transact(fun () ->
-                  state.SelectedBlockType.Value <- ValueSome bt.Id))
+      |> AVal.map(fun map ->
+        let archetypes =
+          map.Palette.Values
+          |> Seq.filter(fun bt -> bt.Id = bt.ArchetypeId)
+          |> Seq.sortBy(fun bt -> struct (bt.Category, bt.Name))
+          |> Seq.toArray
 
-            // Highlight selected
-            let sub =
-              state.SelectedBlockType.AddWeakCallback(fun selId ->
-                let label = btn.Content :?> Label
+        let columns = 3
+        let rows = (archetypes.Length + columns - 1) / columns
 
-                if selId = ValueSome bt.Id then
-                  label.TextColor <- Color.Yellow
-                else
-                  label.TextColor <- Color.White)
+        let grid = Grid.spaced 4 4 |> Grid.autoColumns columns |> Grid.autoRows rows
 
-            WidgetSubs.get(btn).Add(sub)
+        for i = 0 to archetypes.Length - 1 do
+          let bt = archetypes[i]
 
-            btn :> Widget
-      ])
+          let btn =
+            Btn.create bt.Name
+            |> W.size 120 30
+            |> Btn.onClick(fun () ->
+              transact(fun () ->
+                state.SelectedBlockType.Value <- ValueSome bt.Id))
 
-    palette |> HStack.bindChildren paletteChildren |> ignore
+          let sub =
+            state.SelectedBlockType.AddWeakCallback(fun selId ->
+              let label = btn.Content :?> Label
+
+              if selId = ValueSome bt.Id then
+                label.TextColor <- Color.Yellow
+              else
+                label.TextColor <- Color.White)
+
+          WidgetSubs.get(btn).Add(sub)
+
+          Grid.SetColumn(btn, i % columns)
+          Grid.SetRow(btn, i / columns)
+          grid.Widgets.Add(btn)
+
+        let scroll = ScrollViewer(Content = grid)
+        scroll :> Widget
+      )
+
+    palette |> Panel.bindChildren(paletteWidget |> AVal.map List.singleton) |> ignore
 
     // Help Overlay
     let controls = [

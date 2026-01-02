@@ -111,6 +111,13 @@ type BlockMapTests() =
       "Model": "Tiles/grass",
       "Category": "Terrain",
       "CollisionType": { "Type": "Box" }
+    },
+    "2": {
+      "Id": 2,
+      "Name": "Stone Block",
+      "Model": "Tiles/stone",
+      "Category": "Terrain",
+      "CollisionType": { "Type": "Box" }
     }
   },
   "Blocks": [
@@ -129,8 +136,9 @@ type BlockMapTests() =
     | Ok map ->
       Assert.AreEqual("json_test", map.Key)
       Assert.AreEqual(10, map.Width)
-      Assert.AreEqual(1, map.Palette.Count)
+      Assert.AreEqual(2, map.Palette.Count)
       Assert.AreEqual("Grass Block", map.Palette.[%1].Name)
+      Assert.AreEqual(%2, map.Palette.[%2].ArchetypeId)
       Assert.AreEqual(1, map.Blocks.Count)
 
       let cell = { X = 1; Y = 0; Z = 2 }

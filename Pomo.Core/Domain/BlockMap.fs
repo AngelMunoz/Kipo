@@ -220,28 +220,29 @@ module BlockMap =
       fun json -> decode {
         let! id = Required.Property.get ("Id", Required.int) json
 
-        and! archetypeId =
+        let! archetypeIdRaw =
           VOptional.Property.get ("ArchetypeId", Required.int) json
-          |> Result.map(fun v ->
-            match v with
-            | ValueSome a -> a * 1<BlockTypeId>
-            | ValueNone -> 1<BlockTypeId>)
 
-        and! variantKey =
+        let archetypeId =
+          archetypeIdRaw
+          |> ValueOption.defaultValue id
+          |> fun a -> a * 1<BlockTypeId>
+
+        let! variantKey =
           VOptional.Property.get ("VariantKey", Required.string) json
 
-        and! name = Required.Property.get ("Name", Required.string) json
-        and! model = Required.Property.get ("Model", Required.string) json
+        let! name = Required.Property.get ("Name", Required.string) json
+        let! model = Required.Property.get ("Model", Required.string) json
 
-        and! category =
+        let! category =
           VOptional.Property.get ("Category", Required.string) json
           |> Result.map(ValueOption.defaultValue "Terrain")
 
-        and! collisionType =
+        let! collisionType =
           VOptional.Property.get ("CollisionType", collisionTypeDecoder) json
           |> Result.map(ValueOption.defaultValue Box)
 
-        and! effect =
+        let! effect =
           VOptional.Property.get
             ("Effect", Skill.Serialization.Effect.decoder)
             json

@@ -102,6 +102,22 @@ module BlockMap =
 
         map.Palette[variantId] <- updatedVariant))
 
+  let normalizeLoadedMap(map: BlockMapDefinition) : BlockMapDefinition =
+    let mutable e = map.Palette.GetEnumerator()
+
+    while e.MoveNext() do
+      let kv = e.Current
+      let key = kv.Key
+      let bt = kv.Value
+
+      match bt.VariantKey with
+      | ValueSome _ -> ()
+      | ValueNone ->
+        if bt.ArchetypeId <> bt.Id then
+          map.Palette[key] <- { bt with ArchetypeId = bt.Id }
+
+    map
+
   let inline createEmpty
     (key: string)
     (width: int)
