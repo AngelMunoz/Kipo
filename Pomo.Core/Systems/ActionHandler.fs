@@ -27,65 +27,222 @@ module ActionHandler =
   open System.Collections.Generic
   open System
 
-  let private findHoveredEntity
+  [<Struct>]
+  type private ClickContext = {
+    MouseWorld: WorldPosition
+    Positions: IReadOnlyDictionary<Guid<EntityId>, WorldPosition>
+    Rotations: IReadOnlyDictionary<Guid<EntityId>, float32>
+    ModelConfigIds: IReadOnlyDictionary<Guid<EntityId>, string>
+  }
+
+  let inline private tryGetMouseState
     (world: World)
-    (positions: IReadOnlyDictionary<Guid<EntityId>, WorldPosition>)
-    (rotations: IReadOnlyDictionary<Guid<EntityId>, float32>)
-    (cameraService: CameraService)
-    (playerId: Guid<EntityId>)
+    (entityId: Guid<EntityId>)
     =
-    let mouseStateOpt =
-      world.RawInputStates
-      |> AMap.tryFind playerId
-      |> AVal.force
-      |> Option.map _.Mouse
+    world.RawInputStates
+    |> AMap.tryFind entityId
+    |> AVal.map(Option.map _.Mouse)
+    |> AVal.force
+    |> Option.defaultWith(fun () -> Mouse.GetState())
 
-    match mouseStateOpt with
-    | Some ms ->
-      let rawPos = Vector2(float32 ms.Position.X, float32 ms.Position.Y)
+  let inline private tryGetMouseWorld
+    (cameraService: CameraService)
+    (entityId: Guid<EntityId>)
+    (mouseState: MouseState)
+    : WorldPosition voption =
+    let rawMousePos =
+      Vector2(float32 mouseState.Position.X, float32 mouseState.Position.Y)
 
-      match cameraService.CreatePickRay(rawPos, playerId) with
-      | ValueSome ray ->
-        let entityScenarios = world.EntityScenario |> AMap.force
-        let scenarios = world.Scenarios |> AMap.force
+    cameraService.ScreenToWorld(rawMousePos, entityId)
 
+  let inline private buildClickContext
+    (projections: Projections.ProjectionService)
+    (scenarioId: Guid<ScenarioId>)
+    (scenario: Scenario)
+    (mouseWorld: WorldPosition)
+    : ClickContext =
+
+    if scenario.BlockMap.IsSome then
+      let snap = projections.ComputeMovement3DSnapshot scenarioId
+
+      {
+        MouseWorld = mouseWorld
+        Positions = snap.Positions
+        Rotations = snap.Rotations
+        ModelConfigIds = snap.ModelConfigIds
+      }
+    else
+      let snap = projections.ComputeMovementSnapshot scenarioId
+
+      {
+        MouseWorld = mouseWorld
+        Positions = snap.Positions
+        Rotations = snap.Rotations
+        ModelConfigIds = snap.ModelConfigIds
+      }
+
+  let inline private tryPickClickedEntity
+    (cameraService: CameraService)
+    (getPickBounds: string -> BoundingBox voption)
+    (entityId: Guid<EntityId>)
+    (scenario: Scenario)
+    (rawMousePos: Vector2)
+    (ctx: ClickContext)
+    : Guid<EntityId> voption =
+    cameraService.CreatePickRay(rawMousePos, entityId)
+    |> ValueOption.bind(fun ray ->
+      match scenario.BlockMap, scenario.Map with
+      | ValueSome blockMap, _ ->
+        EntityPicker.pickEntityBlockMap3D
+          ray
+          getPickBounds
+          Constants.BlockMap3DPixelsPerUnit.X
+          blockMap
+          Constants.Entity.ModelScale
+          ctx.Positions
+          ctx.Rotations
+          ctx.ModelConfigIds
+          entityId
+      | ValueNone, ValueSome map ->
+        let pixelsPerUnit =
+          Vector2(float32 map.TileWidth, float32 map.TileHeight)
+
+        let squishFactor = pixelsPerUnit.X / pixelsPerUnit.Y
+        let modelScale = Constants.Entity.ModelScale
+
+        EntityPicker.pickEntity
+          ray
+          pixelsPerUnit
+          modelScale
+          squishFactor
+          ctx.Positions
+          ctx.Rotations
+          entityId
+      | _ -> ValueNone)
+
+  let inline private publishMovement
+    (eventBus: EventBus)
+    (entityId: Guid<EntityId>)
+    (mouseWorld: WorldPosition)
+    =
+    eventBus.Publish(
+      GameEvent.Intent(
+        IntentEvent.MovementTarget {
+          EntityId = entityId
+          Target = WorldPosition.toVector2 mouseWorld
+        }
+      )
+    )
+
+  let inline private publishAttack
+    (eventBus: EventBus)
+    (entityId: Guid<EntityId>)
+    (targetId: Guid<EntityId>)
+    =
+    eventBus.Publish(
+      GameEvent.Intent(
+        IntentEvent.Attack {
+          Attacker = entityId
+          Target = targetId
+        }
+      )
+    )
+
+  let inline private publishTargetSelectionEntity
+    (eventBus: EventBus)
+    (entityId: Guid<EntityId>)
+    (targetId: Guid<EntityId>)
+    =
+    eventBus.Publish(
+      GameEvent.Intent(
+        IntentEvent.TargetSelection {
+          Selector = entityId
+          Selection = SelectedEntity targetId
+        }
+      )
+    )
+
+  let inline private publishTargetSelectionPosition
+    (eventBus: EventBus)
+    (entityId: Guid<EntityId>)
+    (mouseWorld: WorldPosition)
+    =
+    eventBus.Publish(
+      GameEvent.Intent(
+        IntentEvent.TargetSelection {
+          Selector = entityId
+          Selection = SelectedPosition(WorldPosition.toVector2 mouseWorld)
+        }
+      )
+    )
+
+  let inline private handlePrimaryClick
+    (world: World)
+    (eventBus: EventBus)
+    (targetingService: TargetingService)
+    (projections: Projections.ProjectionService)
+    (cameraService: CameraService)
+    (getPickBounds: string -> BoundingBox voption)
+    (entityId: Guid<EntityId>)
+    =
+    let mouseState = tryGetMouseState world entityId
+
+    let rawMousePos =
+      Vector2(float32 mouseState.Position.X, float32 mouseState.Position.Y)
+
+    tryGetMouseWorld cameraService entityId mouseState
+    |> ValueOption.iter(fun mouseWorld ->
+      let targetingMode = targetingService.TargetingMode |> AVal.force
+
+      let entityScenarios = projections.EntityScenarios |> AMap.force
+      let scenarios = world.Scenarios |> AMap.force
+
+      let scenarioCtx =
         entityScenarios
-        |> HashMap.tryFindV playerId
+        |> HashMap.tryFindV entityId
         |> ValueOption.bind(fun scenarioId ->
           scenarios
           |> HashMap.tryFindV scenarioId
-          |> ValueOption.bind(fun scenario ->
-            match scenario.BlockMap, scenario.Map with
-            | ValueSome blockMap, _ ->
-              EntityPicker.pickEntityBlockMap3D
-                ray
-                Constants.BlockMap3DPixelsPerUnit.X
-                blockMap
-                Constants.Entity.ModelScale
-                positions
-                rotations
-                playerId
-            | ValueNone, ValueSome map ->
-              let pixelsPerUnit =
-                Vector2(float32 map.TileWidth, float32 map.TileHeight)
+          |> ValueOption.map(fun scenario ->
+            struct (scenarioId,
+                    scenario,
+                    buildClickContext
+                      projections
+                      scenarioId
+                      scenario
+                      mouseWorld)))
 
-              let squishFactor = pixelsPerUnit.X / pixelsPerUnit.Y
-              let modelScale = Constants.Entity.ModelScale
+      let picked =
+        scenarioCtx
+        |> ValueOption.bind(fun struct (_scenarioId, scenario, ctx) ->
+          tryPickClickedEntity
+            cameraService
+            getPickBounds
+            entityId
+            scenario
+            rawMousePos
+            ctx)
 
-              EntityPicker.pickEntity
-                ray
-                pixelsPerUnit
-                modelScale
-                squishFactor
-                positions
-                rotations
-                playerId
-            | _ -> ValueNone))
-        |> ValueOption.map Some
-        |> ValueOption.defaultValue None
+      let mouseWorld =
+        scenarioCtx
+        |> ValueOption.map(fun struct (_scenarioId, _scenario, ctx) ->
+          ctx.MouseWorld)
+        |> ValueOption.defaultValue mouseWorld
 
-      | ValueNone -> None
-    | None -> None
+      match targetingMode with
+      | ValueNone ->
+        match picked with
+        | ValueSome targetId -> publishAttack eventBus entityId targetId
+        | ValueNone -> publishMovement eventBus entityId mouseWorld
+      | ValueSome Self -> ()
+      | ValueSome TargetEntity ->
+        picked
+        |> ValueOption.iter(fun targetId ->
+          publishTargetSelectionEntity eventBus entityId targetId)
+      | ValueSome TargetPosition ->
+        publishTargetSelectionPosition eventBus entityId mouseWorld
+      | ValueSome TargetDirection ->
+        publishTargetSelectionPosition eventBus entityId mouseWorld)
 
 
   let private handleActionSetChange
@@ -96,8 +253,6 @@ module ActionHandler =
     | ValueSome(Pressed, value) -> publishChange value
     | _ -> ()
 
-  open Pomo.Core.Environment.Patterns
-
   let create
     (
       world: World,
@@ -106,6 +261,7 @@ module ActionHandler =
       targetingService: TargetingService,
       projections: Projections.ProjectionService,
       cameraService: CameraService,
+      getPickBounds: string -> BoundingBox voption,
       entityId: Guid<EntityId>
     ) =
 
@@ -178,132 +334,14 @@ module ActionHandler =
 
               match primaryActionState with
               | ValueSome Pressed ->
-                let mouseState =
-                  world.RawInputStates
-                  |> AMap.tryFind entityId
-                  |> AVal.map(Option.map _.Mouse)
-                  |> AVal.force
-                  |> Option.defaultWith(fun () -> Mouse.GetState())
-
-                let mousePosition =
-                  let rawMousePos =
-                    Vector2(
-                      float32 mouseState.Position.X,
-                      float32 mouseState.Position.Y
-                    )
-
-                  match cameraService.ScreenToWorld(rawMousePos, entityId) with
-                  | ValueSome worldPos -> ValueSome worldPos
-                  | ValueNone -> ValueNone
-
-                match mousePosition with
-                | ValueNone -> ()
-                | ValueSome mousePosition ->
-
-                  let targetingMode =
-                    targetingService.TargetingMode |> AVal.force
-
-                  // Get the entity under the cursor AT THIS MOMENT by forcing the projection.
-                  let entityScenarios =
-                    projections.EntityScenarios |> AMap.force
-
-                  let scenarios = world.Scenarios |> AMap.force
-
-                  let positions, rotations =
-                    match entityScenarios |> HashMap.tryFindV entityId with
-                    | ValueSome scenarioId ->
-                      match scenarios |> HashMap.tryFindV scenarioId with
-                      | ValueSome scenario when scenario.BlockMap.IsSome ->
-                        let snapshot =
-                          projections.ComputeMovement3DSnapshot(scenarioId)
-
-                        snapshot.Positions, snapshot.Rotations
-                      | _ ->
-                        let snapshot =
-                          projections.ComputeMovementSnapshot(scenarioId)
-
-                        snapshot.Positions, snapshot.Rotations
-                    | ValueNone -> Dictionary(), Dictionary()
-
-                  let clickedEntity =
-                    findHoveredEntity
-                      world
-                      positions
-                      rotations
-                      cameraService
-                      entityId
-
-                  match targetingMode with
-                  | ValueNone ->
-                    // NOT targeting: This is a click to move or attack
-                    match clickedEntity with
-                    | Some clickedEntityId ->
-                      // An entity was clicked, publish an attack intent
-                      eventBus.Publish(
-                        GameEvent.Intent(
-                          IntentEvent.Attack {
-                            Attacker = entityId
-                            Target = clickedEntityId
-                          }
-                        )
-                      )
-                    | None ->
-                      // Nothing was clicked, publish a movement command
-                      eventBus.Publish(
-                        GameEvent.Intent(
-                          IntentEvent.MovementTarget {
-                            EntityId = entityId
-                            Target = WorldPosition.toVector2 mousePosition
-                          }
-                        )
-                      )
-
-                  | ValueSome Self ->
-                    // This case should be handled immediately on key press, not click.
-                    ()
-
-                  | ValueSome TargetEntity ->
-                    match clickedEntity with
-                    | Some clickedEntityId ->
-                      // TODO: Validate if it's an ally/enemy
-                      let selection = SelectedEntity clickedEntityId
-
-                      eventBus.Publish(
-                        GameEvent.Intent(
-                          IntentEvent.TargetSelection {
-                            Selector = entityId
-                            Selection = selection
-                          }
-                        )
-                      )
-                    | None ->
-                      // Invalid target, do nothing for now
-                      ()
-
-                  | ValueSome TargetPosition ->
-                    let selection =
-                      SelectedPosition(WorldPosition.toVector2 mousePosition)
-
-                    eventBus.Publish(
-                      GameEvent.Intent(
-                        IntentEvent.TargetSelection {
-                          Selector = entityId
-                          Selection = selection
-                        }
-                      )
-                    )
-                  | ValueSome TargetDirection ->
-                    let selection =
-                      SelectedPosition(WorldPosition.toVector2 mousePosition)
-
-                    eventBus.Publish(
-                      GameEvent.Intent(
-                        IntentEvent.TargetSelection {
-                          Selector = entityId
-                          Selection = selection
-                        }
-                      )
-                    )
+                handlePrimaryClick
+                  world
+                  eventBus
+                  targetingService
+                  projections
+                  cameraService
+                  getPickBounds
+                  entityId
               | ValueSome _
               | ValueNone -> ())
     }

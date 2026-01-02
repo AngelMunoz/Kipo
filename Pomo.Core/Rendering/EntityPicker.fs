@@ -15,11 +15,13 @@ module EntityPicker =
 
   let pickEntityBlockMap3D
     (ray: Ray)
+    (getPickBounds: string -> BoundingBox voption)
     (ppu: float32)
     (blockMap: BlockMapDefinition)
     (modelScale: float32)
     (positions: IReadOnlyDictionary<Guid<EntityId>, WorldPosition>)
     (rotations: IReadOnlyDictionary<Guid<EntityId>, float32>)
+    (modelConfigIds: IReadOnlyDictionary<Guid<EntityId>, string>)
     (excludeEntityId: Guid<EntityId>)
     : Guid<EntityId> voption =
 
@@ -33,17 +35,23 @@ module EntityPicker =
       if entityId <> excludeEntityId then
         let renderPos = RenderMath.BlockMap3D.toRender logicPos ppu centerOffset
 
-        let hitBoxCenterY =
-          (Picking.EntityHitBox.Min.Y + Picking.EntityHitBox.Max.Y) * 0.5f
+        let localHitBox =
+          match modelConfigIds.TryGetValue entityId with
+          | true, configId ->
+            match getPickBounds configId with
+            | ValueSome b -> b
+            | ValueNone -> Picking.EntityHitBox
+          | false, _ -> Picking.EntityHitBox
 
-        let hitBoxExtents = Picking.EntityHitBox.Max - Picking.EntityHitBox.Min
+        let maxAbsX = max (abs localHitBox.Min.X) (abs localHitBox.Max.X)
+        let maxAbsY = max (abs localHitBox.Min.Y) (abs localHitBox.Max.Y)
+        let maxAbsZ = max (abs localHitBox.Min.Z) (abs localHitBox.Max.Z)
 
-        let broadPhaseRadius = hitBoxExtents.Length() * 0.5f * modelScale
+        let localRadius =
+          Vector3(maxAbsX, maxAbsY, maxAbsZ).Length()
 
-        let sphereCenter =
-          renderPos + Vector3(0.0f, hitBoxCenterY * modelScale, 0.0f)
-
-        let broadPhaseSphere = BoundingSphere(sphereCenter, broadPhaseRadius)
+        let broadPhaseSphere =
+          BoundingSphere(renderPos, localRadius * modelScale)
 
         if ray.Intersects(broadPhaseSphere).HasValue then
           let facing =
@@ -55,7 +63,7 @@ module EntityPicker =
             RenderMath.WorldMatrix3D.createMesh renderPos facing modelScale
 
           let worldBox =
-            Picking.transformBoundingBox Picking.EntityHitBox worldMatrix
+            Picking.transformBoundingBox localHitBox worldMatrix
 
           match Picking.rayIntersects ray worldBox with
           | ValueSome distance when distance < nearestDistance ->

@@ -248,6 +248,7 @@ type PoseResolverTests() =
                   ]
                 AnimationBindings = HashMap.empty
                 FacingOffset = 0.0f
+                PickBoundsOverride = ValueNone
               }
             else
               ValueNone
@@ -345,6 +346,7 @@ type PoseResolverTests() =
                   ]
                 AnimationBindings = HashMap.empty
                 FacingOffset = 0.0f
+                PickBoundsOverride = ValueNone
               }
             else
               ValueNone

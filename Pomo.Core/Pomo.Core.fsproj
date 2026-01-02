@@ -42,6 +42,7 @@
     <Compile Include="Graphics/Camera.fs" />
     <Compile Include="Graphics/RenderCommands.fs" />
     <Compile Include="Graphics/Picking.fs" />
+    <Compile Include="Graphics/ModelMetrics.fs" />
     <Compile Include="Graphics/CommandQueue.fs" />
     <Compile Include="Graphics/QuadBatch.fs" />
     <Compile Include="Graphics/BillboardBatch.fs" />

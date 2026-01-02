@@ -101,6 +101,11 @@ module BlockMapScene =
         projections
       )
 
+    let getPickBounds =
+      Pomo.Core.Graphics.ModelMetrics.createPickBoundsResolver
+        monoGame.Content
+        stores.ModelStore
+
     // 3. Create Listeners
     let effectApplication =
       EffectApplication.create(worldView, stateWriteService, eventBus)
@@ -113,6 +118,7 @@ module BlockMapScene =
         targetingService,
         projections,
         cameraService,
+        getPickBounds,
         playerId
       )
 
@@ -336,6 +342,7 @@ module BlockMapScene =
         cameraService
         cursorService
         targetingService
+        getPickBounds
         projections
         worldView
         playerId

@@ -18,8 +18,80 @@ open Pomo.Core.Rendering
 module HoverFeedback =
   open Pomo.Core.Environment
   open Pomo.Core.Graphics
+  open Pomo.Core.Domain.BlockMap
+  open Pomo.Core.Domain.Map
 
-  let inline private determineCursorForEntity
+  let inline private tryPickEntityOnBlockMap3D
+    ([<InlineIfLambda>] getPickBounds: string -> BoundingBox voption)
+    (projections: ProjectionService)
+    (scenarioId: Guid<ScenarioId>)
+    (ray: Ray)
+    (blockMap: BlockMapDefinition)
+    (playerId: Guid<EntityId>)
+    : Guid<EntityId> voption =
+    let snapshot = projections.ComputeMovement3DSnapshot scenarioId
+
+    EntityPicker.pickEntityBlockMap3D
+      ray
+      getPickBounds
+      Constants.BlockMap3DPixelsPerUnit.X
+      blockMap
+      Constants.Entity.ModelScale
+      snapshot.Positions
+      snapshot.Rotations
+      snapshot.ModelConfigIds
+      playerId
+
+  let inline private tryPickEntityOnTileMap
+    (projections: ProjectionService)
+    (scenarioId: Guid<ScenarioId>)
+    (ray: Ray)
+    (map: MapDefinition)
+    (playerId: Guid<EntityId>)
+    : Guid<EntityId> voption =
+    let pixelsPerUnit = Vector2(float32 map.TileWidth, float32 map.TileHeight)
+
+    let squishFactor = pixelsPerUnit.X / pixelsPerUnit.Y
+
+    let snapshot = projections.ComputeMovementSnapshot scenarioId
+
+    EntityPicker.pickEntity
+      ray
+      pixelsPerUnit
+      Constants.Entity.ModelScale
+      squishFactor
+      snapshot.Positions
+      snapshot.Rotations
+      playerId
+
+  let inline private tryPickHoveredEntity
+    (cameraService: CameraService)
+    (getPickBounds: string -> BoundingBox voption)
+    (projections: ProjectionService)
+    (scenarios: HashMap<Guid<ScenarioId>, Scenario>)
+    (scenarioId: Guid<ScenarioId>)
+    (screenPos: Vector2)
+    (playerId: Guid<EntityId>)
+    : Guid<EntityId> voption =
+    cameraService.CreatePickRay(screenPos, playerId)
+    |> ValueOption.bind(fun ray ->
+      scenarios
+      |> HashMap.tryFindV scenarioId
+      |> ValueOption.bind(fun scenario ->
+        match scenario.BlockMap, scenario.Map with
+        | ValueSome blockMap, _ ->
+          tryPickEntityOnBlockMap3D
+            getPickBounds
+            projections
+            scenarioId
+            ray
+            blockMap
+            playerId
+        | ValueNone, ValueSome map ->
+          tryPickEntityOnTileMap projections scenarioId ray map playerId
+        | _ -> ValueNone))
+
+  let private determineCursorForEntity
     (hoveredEntityId: Guid<EntityId>)
     (factions: HashMap<Guid<EntityId>, HashSet<Faction>>)
     (playerId: Guid<EntityId>)
@@ -67,6 +139,7 @@ module HoverFeedback =
     (cameraService: CameraService)
     (cursorService: CursorService)
     (targetingService: TargetingService)
+    (getPickBounds: string -> BoundingBox voption)
     (projections: ProjectionService)
     (world: World)
     (playerId: Guid<EntityId>)
@@ -88,56 +161,21 @@ module HoverFeedback =
               let scenarios = world.Scenarios |> AMap.force
               let factions = world.Factions |> AMap.force
 
-              match entityScenarios |> HashMap.tryFindV playerId with
-              | ValueNone -> cursorService.SetCursor Arrow
-              | ValueSome scenarioId ->
-                let modelScale = Constants.Entity.ModelScale
+              let hoveredEntity =
+                entityScenarios
+                |> HashMap.tryFindV playerId
+                |> ValueOption.bind(fun scenarioId ->
+                  tryPickHoveredEntity
+                    cameraService
+                    getPickBounds
+                    projections
+                    scenarios
+                    scenarioId
+                    screenPos
+                    playerId)
 
-                let hoveredEntity =
-                  match cameraService.CreatePickRay(screenPos, playerId) with
-                  | ValueNone -> ValueNone
-                  | ValueSome ray ->
-                    match scenarios |> HashMap.tryFindV scenarioId with
-                    | ValueSome scenario when scenario.BlockMap.IsSome ->
-                      let snapshot =
-                        projections.ComputeMovement3DSnapshot scenarioId
+              let targetingMode = targetingService.TargetingMode |> AVal.force
 
-                      let blockMap = scenario.BlockMap |> ValueOption.get
-
-                      EntityPicker.pickEntityBlockMap3D
-                        ray
-                        Constants.BlockMap3DPixelsPerUnit.X
-                        blockMap
-                        modelScale
-                        snapshot.Positions
-                        snapshot.Rotations
-                        playerId
-                    | ValueSome scenario ->
-                      match scenario.Map with
-                      | ValueSome map ->
-                        let pixelsPerUnit =
-                          Vector2(float32 map.TileWidth, float32 map.TileHeight)
-
-                        let squishFactor = pixelsPerUnit.X / pixelsPerUnit.Y
-
-                        let snapshot =
-                          projections.ComputeMovementSnapshot scenarioId
-
-                        EntityPicker.pickEntity
-                          ray
-                          pixelsPerUnit
-                          modelScale
-                          squishFactor
-                          snapshot.Positions
-                          snapshot.Rotations
-                          playerId
-                      | ValueNone -> ValueNone
-                    | ValueNone -> ValueNone
-
-                let targetingMode = targetingService.TargetingMode |> AVal.force
-
-                let cursor =
-                  determineCursor targetingMode hoveredEntity factions playerId
-
-                cursorService.SetCursor cursor
+              determineCursor targetingMode hoveredEntity factions playerId
+              |> cursorService.SetCursor
     }
