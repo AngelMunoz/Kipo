@@ -172,23 +172,15 @@ module RenderOrchestrator =
     let inline renderText
       (batch: SpriteBatch)
       (font: SpriteFont)
-      (camera: inref<Camera.Camera>)
       (commands: TextCommand[])
       =
       if commands.Length > 0 then
-        let transform =
-          RenderMath.Camera.get2DViewMatrix
-            camera.Position
-            camera.Zoom
-            camera.Viewport
-
         batch.Begin(
           SpriteSortMode.Deferred,
           BlendState.AlphaBlend,
           SamplerState.PointClamp,
           DepthStencilState.None,
-          RasterizerState.CullNone,
-          transformMatrix = transform
+          RasterizerState.CullNone
         )
 
         for cmd in commands do
@@ -475,12 +467,18 @@ module RenderOrchestrator =
           terrainFG
 
         // 5. World text (notifications, damage numbers - rendered in 2D)
-        let textCommands = TextEmitter.emit world.Notifications viewBounds2D
+        let textCommands =
+          TextEmitter.emit
+            renderCore
+            camera.Viewport
+            view
+            projection
+            world.Notifications
+            viewBounds2D
 
         RenderPasses.renderText
           res.SpriteBatch
           res.HudFont
-          &camera
           (textCommands res.HudPalette)
 
     | None ->
