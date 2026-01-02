@@ -155,7 +155,7 @@ module CompositionRoot =
           match paths with
           | [] -> ValueNone
           | path :: rest ->
-            match Systems.BlockMapLoader.load path with
+            match Systems.BlockMapLoader.load Systems.BlockMapLoader.Resolvers.runtime path with
             | Ok map -> ValueSome map
             | Error _ -> loop rest
 

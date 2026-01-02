@@ -30,7 +30,7 @@ module EditorScene =
     let tryLoadOrEmpty(key: string) =
       let path = $"Content/CustomMaps/{key}.json"
 
-      match BlockMapLoader.load path with
+      match BlockMapLoader.load BlockMapLoader.Resolvers.editor path with
       | Ok map -> map
       | Error _ -> BlockMap.createEmpty key 16 8 16
 
@@ -86,7 +86,7 @@ module EditorScene =
       let currentMap = state.BlockMap |> AVal.force
 
       let path = $"Content/CustomMaps/{currentMap.Key}.json"
-      BlockMapLoader.save path currentMap |> ignore
+      BlockMapLoader.save BlockMapLoader.Resolvers.editor path currentMap |> ignore
 
       sceneTransitionSubject.OnNext(BlockMapPlaytest currentMap)
 
