@@ -267,7 +267,6 @@ module GameplayUI =
     let miniMap =
       HUDComponents.createMiniMap
         config
-        currentScenario
         playerId
         core.World.Positions
         core.World.Factions

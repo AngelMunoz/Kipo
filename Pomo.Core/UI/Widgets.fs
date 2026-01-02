@@ -11,7 +11,6 @@ open Pomo.Core
 open Pomo.Core.Domain.World
 open Pomo.Core.Domain.Core
 open Pomo.Core.UI.HUDAnimation
-open Pomo.Core.Domain.Map
 open Pomo.Core.Domain.Units
 open Pomo.Core.Domain.Entity
 
@@ -401,7 +400,6 @@ type MiniMap() =
   inherit Widget()
 
   // Properties
-  member val Map: MapDefinition option = None with get, set
   member val PlayerId: Guid<EntityId> = Guid.Empty |> UMX.tag with get, set
 
   member val Positions: IReadOnlyDictionary<Guid<EntityId>, WorldPosition> =
@@ -424,8 +422,7 @@ type MiniMap() =
     let bounds = this.ActualBounds
     context.FillRectangle(bounds, Color(0, 0, 0, 180))
 
-    match this.Map with
-    | Some _ ->
+    if this.Positions.Count > 0 then
       let playerPos =
         match this.Positions |> Dictionary.tryFindV this.PlayerId with
         | ValueSome pos -> WorldPosition.toVector2 pos
@@ -480,7 +477,7 @@ type MiniMap() =
               ),
               color
             )
-    | None -> ()
+
 
 
 module MiniMap =

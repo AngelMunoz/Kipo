@@ -31,7 +31,7 @@
     "Area": "Point",
     "Delivery": {
       "Type": "Projectile",
-      "Speed": 200.0,
+      "Speed": 400.0,
       "CollisionMode": "IgnoreTerrain",
       "Visuals": { "Vfx": "FireballProjectile" }
     },
@@ -58,7 +58,7 @@
     "Area": "Point",
     "Delivery": {
       "Type": "Projectile",
-      "Speed": 250.0,
+      "Speed": 450.0,
       "CollisionMode": "IgnoreTerrain",
       "Visuals": { "Vfx": "HellfireProjectile" }
     },
@@ -199,7 +199,7 @@
     },
     "Delivery": {
       "Type": "Projectile",
-      "Speed": 250.0,
+      "Speed": 450.0,
       "CollisionMode": "IgnoreTerrain",
       "Kind": {
         "Type": "Descending",
@@ -230,7 +230,7 @@
     "Area": "Point",
     "Delivery": {
       "Type": "Projectile",
-      "Speed": 180.0,
+      "Speed": 480.0,
       "CollisionMode": "IgnoreTerrain",
       "Kind": {
         "Type": "Chained",
@@ -303,7 +303,7 @@
     "Range": [16, 20],
     "Area": {
       "Type": "Line",
-      "Width": 32.0,
+      "Width": 64.0,
       "Length": 192.0,
       "MaxTargets": 6
     },
@@ -332,7 +332,7 @@
     },
     "Delivery": {
       "Type": "Projectile",
-      "Speed": 200.0,
+      "Speed": 500.0,
       "CollisionMode": "IgnoreTerrain",
       "Visuals": {
         "Model": "IceShard",
@@ -361,13 +361,13 @@
     "Range": [16, 16],
     "Area": {
       "Type": "Line",
-      "Width": 16.0,
+      "Width": 128.0,
       "Length": 160.0,
-      "MaxTargets": 4
+      "MaxTargets": 6
     },
     "Delivery": {
       "Type": "Projectile",
-      "Speed": 300.0,
+      "Speed": 600.0,
       "CollisionMode": "IgnoreTerrain",
       "Visuals": { "Model": "PiercingBeam", "Vfx": "PiercingBoltProjectile" }
     },
@@ -394,7 +394,7 @@
     },
     "Delivery": {
       "Type": "Projectile",
-      "Speed": 250.0,
+      "Speed": 520.0,
       "CollisionMode": "BlockedByTerrain",
       "Visuals": {
         "Model": "BladeShard",
@@ -420,7 +420,7 @@
     "Area": "Point",
     "Delivery": {
       "Type": "Projectile",
-      "Speed": 280.0,
+      "Speed": 520.0,
       "CollisionMode": "IgnoreTerrain",
       "Visuals": { "Vfx": "LightBoltProjectile" }
     },
@@ -446,7 +446,7 @@
     "Area": "Point",
     "Delivery": {
       "Type": "Projectile",
-      "Speed": 220.0,
+      "Speed": 500.0,
       "CollisionMode": "IgnoreTerrain",
       "Visuals": { "Vfx": "ShadowStrikeProjectile" }
     },
@@ -470,7 +470,7 @@
     "Targeting": "Self",
     "Area": {
       "Type": "Circle",
-      "Radius": 64.0,
+      "Radius": 128.0,
       "MaxTargets": 8
     },
     "Delivery": { "Type": "Instant" },
@@ -493,7 +493,7 @@
     "Area": "Point",
     "Delivery": {
       "Type": "Projectile",
-      "Speed": 350.0,
+      "Speed": 400.0,
       "CollisionMode": "BlockedByTerrain",
       "Visuals": {
         "Model": "ArrowPurple",
@@ -582,7 +582,7 @@
     "Area": "Point",
     "Delivery": {
       "Type": "Projectile",
-      "Speed": 400.0,
+      "Speed": 500.0,
       "CollisionMode": "IgnoreTerrain",
       "Visuals": { "Model": "ThunderBolt", "Vfx": "ThunderSpearProjectile" }
     },
@@ -777,7 +777,7 @@
     },
     "Delivery": {
       "Type": "Projectile",
-      "Speed": 400.0,
+      "Speed": 650.0,
       "CollisionMode": "IgnoreTerrain",
       "Visuals": { "Model": "LightSphere", "Vfx": "SeraphicProjectile" }
     },
@@ -790,8 +790,8 @@
         "CenterOffset": { "X": 0, "Y": 0, "Z": 0 },
         "RotationAxis": { "X": 0, "Y": 0, "Z": 0 },
         "PathScale": [1.0, 1.0],
-        "StartSpeed": 2.0,
-        "EndSpeed": 40.0,
+        "StartSpeed": 0.5,
+        "EndSpeed": 20.0,
         "Duration": 2.0,
         "Visual": { "Vfx": "OrbitalGlow" }
       }

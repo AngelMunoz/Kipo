@@ -84,7 +84,7 @@ module Core =
 
     module Entity =
       let Size = Vector2(16.0f, 16.0f)
-      let ModelScale = 0.25f
+      let ModelScale = 0.5f
 
       [<Literal>]
       let CollisionRadius = 8.0f

@@ -5,9 +5,8741 @@
   "Width": 32,
   "Height": 10,
   "Depth": 32,
-  "Palette": {},
-  "Blocks": [],
-  "SpawnCell": { "X": 16, "Y": 1, "Z": 16 },
+  "Palette": {
+    "1": {
+      "Id": 1,
+      "Name": "Stone",
+      "Model": "Tiles/kaykit_blocks/stone",
+      "Category": "Basic",
+      "CollisionType": {
+        "Type": "Box"
+      }
+    },
+    "2": {
+      "Id": 2,
+      "Name": "Dirt",
+      "Model": "Tiles/kaykit_blocks/dirt",
+      "Category": "Basic",
+      "CollisionType": {
+        "Type": "Box"
+      }
+    },
+    "3": {
+      "Id": 3,
+      "Name": "Grass",
+      "Model": "Tiles/kaykit_blocks/grass",
+      "Category": "Basic",
+      "CollisionType": {
+        "Type": "Box"
+      }
+    },
+    "4": {
+      "Id": 4,
+      "Name": "Water",
+      "Model": "Tiles/kaykit_blocks/water",
+      "Category": "Basic",
+      "CollisionType": {
+        "Type": "Box"
+      }
+    },
+    "5": {
+      "Id": 5,
+      "Name": "Wood",
+      "Model": "Tiles/kaykit_blocks/wood",
+      "Category": "Basic",
+      "CollisionType": {
+        "Type": "Box"
+      }
+    },
+    "6": {
+      "Id": 6,
+      "Name": "Dark Stone",
+      "Model": "Tiles/kaykit_blocks/stone_dark",
+      "Category": "Basic",
+      "CollisionType": {
+        "Type": "Box"
+      }
+    }
+  },
+  "Blocks": [
+    {
+      "Cell": {
+        "X": 31,
+        "Y": 0,
+        "Z": 31
+      },
+      "BlockTypeId": 1
+    },
+    {
+      "Cell": {
+        "X": 31,
+        "Y": 0,
+        "Z": 29
+      },
+      "BlockTypeId": 1
+    },
+    {
+      "Cell": {
+        "X": 31,
+        "Y": 0,
+        "Z": 28
+      },
+      "BlockTypeId": 1
+    },
+    {
+      "Cell": {
+        "X": 31,
+        "Y": 0,
+        "Z": 27
+      },
+      "BlockTypeId": 1
+    },
+    {
+      "Cell": {
+        "X": 31,
+        "Y": 0,
+        "Z": 26
+      },
+      "BlockTypeId": 1
+    },
+    {
+      "Cell": {
+        "X": 31,
+        "Y": 0,
+        "Z": 25
+      },
+      "BlockTypeId": 1
+    },
+    {
+      "Cell": {
+        "X": 31,
+        "Y": 0,
+        "Z": 24
+      },
+      "BlockTypeId": 1
+    },
+    {
+      "Cell": {
+        "X": 31,
+        "Y": 0,
+        "Z": 23
+      },
+      "BlockTypeId": 1
+    },
+    {
+      "Cell": {
+        "X": 30,
+        "Y": 0,
+        "Z": 27
+      },
+      "BlockTypeId": 1
+    },
+    {
+      "Cell": {
+        "X": 31,
+        "Y": 0,
+        "Z": 30
+      },
+      "BlockTypeId": 1
+    },
+    {
+      "Cell": {
+        "X": 30,
+        "Y": 0,
+        "Z": 30
+      },
+      "BlockTypeId": 1
+    },
+    {
+      "Cell": {
+        "X": 30,
+        "Y": 0,
+        "Z": 31
+      },
+      "BlockTypeId": 1
+    },
+    {
+      "Cell": {
+        "X": 29,
+        "Y": 0,
+        "Z": 31
+      },
+      "BlockTypeId": 1
+    },
+    {
+      "Cell": {
+        "X": 28,
+        "Y": 0,
+        "Z": 31
+      },
+      "BlockTypeId": 1
+    },
+    {
+      "Cell": {
+        "X": 27,
+        "Y": 0,
+        "Z": 31
+      },
+      "BlockTypeId": 1
+    },
+    {
+      "Cell": {
+        "X": 26,
+        "Y": 0,
+        "Z": 31
+      },
+      "BlockTypeId": 1
+    },
+    {
+      "Cell": {
+        "X": 25,
+        "Y": 0,
+        "Z": 31
+      },
+      "BlockTypeId": 1
+    },
+    {
+      "Cell": {
+        "X": 24,
+        "Y": 0,
+        "Z": 31
+      },
+      "BlockTypeId": 1
+    },
+    {
+      "Cell": {
+        "X": 23,
+        "Y": 0,
+        "Z": 30
+      },
+      "BlockTypeId": 1
+    },
+    {
+      "Cell": {
+        "X": 22,
+        "Y": 0,
+        "Z": 30
+      },
+      "BlockTypeId": 1
+    },
+    {
+      "Cell": {
+        "X": 21,
+        "Y": 0,
+        "Z": 30
+      },
+      "BlockTypeId": 1
+    },
+    {
+      "Cell": {
+        "X": 19,
+        "Y": 0,
+        "Z": 30
+      },
+      "BlockTypeId": 1
+    },
+    {
+      "Cell": {
+        "X": 18,
+        "Y": 0,
+        "Z": 29
+      },
+      "BlockTypeId": 1
+    },
+    {
+      "Cell": {
+        "X": 17,
+        "Y": 0,
+        "Z": 29
+      },
+      "BlockTypeId": 1
+    },
+    {
+      "Cell": {
+        "X": 15,
+        "Y": 0,
+        "Z": 29
+      },
+      "BlockTypeId": 1
+    },
+    {
+      "Cell": {
+        "X": 14,
+        "Y": 0,
+        "Z": 29
+      },
+      "BlockTypeId": 1
+    },
+    {
+      "Cell": {
+        "X": 13,
+        "Y": 0,
+        "Z": 29
+      },
+      "BlockTypeId": 1
+    },
+    {
+      "Cell": {
+        "X": 12,
+        "Y": 0,
+        "Z": 29
+      },
+      "BlockTypeId": 1
+    },
+    {
+      "Cell": {
+        "X": 11,
+        "Y": 0,
+        "Z": 29
+      },
+      "BlockTypeId": 1
+    },
+    {
+      "Cell": {
+        "X": 10,
+        "Y": 0,
+        "Z": 29
+      },
+      "BlockTypeId": 1
+    },
+    {
+      "Cell": {
+        "X": 9,
+        "Y": 0,
+        "Z": 29
+      },
+      "BlockTypeId": 1
+    },
+    {
+      "Cell": {
+        "X": 8,
+        "Y": 0,
+        "Z": 28
+      },
+      "BlockTypeId": 1
+    },
+    {
+      "Cell": {
+        "X": 7,
+        "Y": 0,
+        "Z": 28
+      },
+      "BlockTypeId": 1
+    },
+    {
+      "Cell": {
+        "X": 6,
+        "Y": 0,
+        "Z": 28
+      },
+      "BlockTypeId": 2
+    },
+    {
+      "Cell": {
+        "X": 5,
+        "Y": 0,
+        "Z": 28
+      },
+      "BlockTypeId": 1
+    },
+    {
+      "Cell": {
+        "X": 4,
+        "Y": 0,
+        "Z": 28
+      },
+      "BlockTypeId": 1
+    },
+    {
+      "Cell": {
+        "X": 3,
+        "Y": 0,
+        "Z": 29
+      },
+      "BlockTypeId": 1
+    },
+    {
+      "Cell": {
+        "X": 2,
+        "Y": 0,
+        "Z": 29
+      },
+      "BlockTypeId": 1
+    },
+    {
+      "Cell": {
+        "X": 2,
+        "Y": 0,
+        "Z": 28
+      },
+      "BlockTypeId": 1
+    },
+    {
+      "Cell": {
+        "X": 2,
+        "Y": 0,
+        "Z": 27
+      },
+      "BlockTypeId": 1
+    },
+    {
+      "Cell": {
+        "X": 2,
+        "Y": 0,
+        "Z": 26
+      },
+      "BlockTypeId": 1
+    },
+    {
+      "Cell": {
+        "X": 2,
+        "Y": 0,
+        "Z": 25
+      },
+      "BlockTypeId": 1
+    },
+    {
+      "Cell": {
+        "X": 3,
+        "Y": 0,
+        "Z": 24
+      },
+      "BlockTypeId": 1
+    },
+    {
+      "Cell": {
+        "X": 3,
+        "Y": 0,
+        "Z": 23
+      },
+      "BlockTypeId": 2
+    },
+    {
+      "Cell": {
+        "X": 3,
+        "Y": 0,
+        "Z": 22
+      },
+      "BlockTypeId": 1
+    },
+    {
+      "Cell": {
+        "X": 3,
+        "Y": 0,
+        "Z": 21
+      },
+      "BlockTypeId": 1
+    },
+    {
+      "Cell": {
+        "X": 2,
+        "Y": 0,
+        "Z": 20
+      },
+      "BlockTypeId": 1
+    },
+    {
+      "Cell": {
+        "X": 2,
+        "Y": 0,
+        "Z": 19
+      },
+      "BlockTypeId": 1
+    },
+    {
+      "Cell": {
+        "X": 2,
+        "Y": 0,
+        "Z": 18
+      },
+      "BlockTypeId": 1
+    },
+    {
+      "Cell": {
+        "X": 2,
+        "Y": 0,
+        "Z": 17
+      },
+      "BlockTypeId": 1
+    },
+    {
+      "Cell": {
+        "X": 2,
+        "Y": 0,
+        "Z": 15
+      },
+      "BlockTypeId": 1
+    },
+    {
+      "Cell": {
+        "X": 1,
+        "Y": 0,
+        "Z": 14
+      },
+      "BlockTypeId": 1
+    },
+    {
+      "Cell": {
+        "X": 1,
+        "Y": 0,
+        "Z": 13
+      },
+      "BlockTypeId": 1
+    },
+    {
+      "Cell": {
+        "X": 1,
+        "Y": 0,
+        "Z": 12
+      },
+      "BlockTypeId": 1
+    },
+    {
+      "Cell": {
+        "X": 1,
+        "Y": 0,
+        "Z": 11
+      },
+      "BlockTypeId": 1
+    },
+    {
+      "Cell": {
+        "X": 0,
+        "Y": 0,
+        "Z": 10
+      },
+      "BlockTypeId": 1
+    },
+    {
+      "Cell": {
+        "X": 0,
+        "Y": 0,
+        "Z": 9
+      },
+      "BlockTypeId": 1
+    },
+    {
+      "Cell": {
+        "X": 0,
+        "Y": 0,
+        "Z": 8
+      },
+      "BlockTypeId": 1
+    },
+    {
+      "Cell": {
+        "X": 0,
+        "Y": 0,
+        "Z": 7
+      },
+      "BlockTypeId": 1
+    },
+    {
+      "Cell": {
+        "X": 0,
+        "Y": 0,
+        "Z": 6
+      },
+      "BlockTypeId": 1
+    },
+    {
+      "Cell": {
+        "X": 0,
+        "Y": 0,
+        "Z": 5
+      },
+      "BlockTypeId": 1
+    },
+    {
+      "Cell": {
+        "X": 0,
+        "Y": 0,
+        "Z": 4
+      },
+      "BlockTypeId": 1
+    },
+    {
+      "Cell": {
+        "X": 0,
+        "Y": 0,
+        "Z": 3
+      },
+      "BlockTypeId": 1
+    },
+    {
+      "Cell": {
+        "X": 0,
+        "Y": 0,
+        "Z": 2
+      },
+      "BlockTypeId": 1
+    },
+    {
+      "Cell": {
+        "X": 0,
+        "Y": 0,
+        "Z": 1
+      },
+      "BlockTypeId": 1
+    },
+    {
+      "Cell": {
+        "X": 1,
+        "Y": 0,
+        "Z": 1
+      },
+      "BlockTypeId": 1
+    },
+    {
+      "Cell": {
+        "X": 1,
+        "Y": 0,
+        "Z": 0
+      },
+      "BlockTypeId": 1
+    },
+    {
+      "Cell": {
+        "X": 2,
+        "Y": 0,
+        "Z": 0
+      },
+      "BlockTypeId": 1
+    },
+    {
+      "Cell": {
+        "X": 2,
+        "Y": 0,
+        "Z": 1
+      },
+      "BlockTypeId": 1
+    },
+    {
+      "Cell": {
+        "X": 3,
+        "Y": 0,
+        "Z": 2
+      },
+      "BlockTypeId": 1
+    },
+    {
+      "Cell": {
+        "X": 3,
+        "Y": 0,
+        "Z": 3
+      },
+      "BlockTypeId": 1
+    },
+    {
+      "Cell": {
+        "X": 3,
+        "Y": 0,
+        "Z": 4
+      },
+      "BlockTypeId": 1
+    },
+    {
+      "Cell": {
+        "X": 3,
+        "Y": 0,
+        "Z": 5
+      },
+      "BlockTypeId": 1
+    },
+    {
+      "Cell": {
+        "X": 2,
+        "Y": 0,
+        "Z": 6
+      },
+      "BlockTypeId": 1
+    },
+    {
+      "Cell": {
+        "X": 2,
+        "Y": 0,
+        "Z": 7
+      },
+      "BlockTypeId": 2
+    },
+    {
+      "Cell": {
+        "X": 1,
+        "Y": 0,
+        "Z": 8
+      },
+      "BlockTypeId": 1
+    },
+    {
+      "Cell": {
+        "X": 1,
+        "Y": 0,
+        "Z": 9
+      },
+      "BlockTypeId": 1
+    },
+    {
+      "Cell": {
+        "X": 0,
+        "Y": 0,
+        "Z": 11
+      },
+      "BlockTypeId": 1
+    },
+    {
+      "Cell": {
+        "X": 0,
+        "Y": 0,
+        "Z": 12
+      },
+      "BlockTypeId": 6
+    },
+    {
+      "Cell": {
+        "X": 0,
+        "Y": 0,
+        "Z": 13
+      },
+      "BlockTypeId": 1
+    },
+    {
+      "Cell": {
+        "X": 0,
+        "Y": 0,
+        "Z": 15
+      },
+      "BlockTypeId": 1
+    },
+    {
+      "Cell": {
+        "X": 0,
+        "Y": 0,
+        "Z": 16
+      },
+      "BlockTypeId": 1
+    },
+    {
+      "Cell": {
+        "X": 0,
+        "Y": 0,
+        "Z": 17
+      },
+      "BlockTypeId": 1
+    },
+    {
+      "Cell": {
+        "X": 0,
+        "Y": 0,
+        "Z": 18
+      },
+      "BlockTypeId": 2
+    },
+    {
+      "Cell": {
+        "X": 0,
+        "Y": 0,
+        "Z": 19
+      },
+      "BlockTypeId": 1
+    },
+    {
+      "Cell": {
+        "X": 0,
+        "Y": 0,
+        "Z": 20
+      },
+      "BlockTypeId": 2
+    },
+    {
+      "Cell": {
+        "X": 1,
+        "Y": 0,
+        "Z": 21
+      },
+      "BlockTypeId": 1
+    },
+    {
+      "Cell": {
+        "X": 1,
+        "Y": 0,
+        "Z": 23
+      },
+      "BlockTypeId": 1
+    },
+    {
+      "Cell": {
+        "X": 1,
+        "Y": 0,
+        "Z": 24
+      },
+      "BlockTypeId": 1
+    },
+    {
+      "Cell": {
+        "X": 3,
+        "Y": 0,
+        "Z": 28
+      },
+      "BlockTypeId": 1
+    },
+    {
+      "Cell": {
+        "X": 3,
+        "Y": 0,
+        "Z": 30
+      },
+      "BlockTypeId": 1
+    },
+    {
+      "Cell": {
+        "X": 4,
+        "Y": 0,
+        "Z": 30
+      },
+      "BlockTypeId": 1
+    },
+    {
+      "Cell": {
+        "X": 4,
+        "Y": 0,
+        "Z": 31
+      },
+      "BlockTypeId": 1
+    },
+    {
+      "Cell": {
+        "X": 5,
+        "Y": 0,
+        "Z": 31
+      },
+      "BlockTypeId": 1
+    },
+    {
+      "Cell": {
+        "X": 4,
+        "Y": 0,
+        "Z": 29
+      },
+      "BlockTypeId": 1
+    },
+    {
+      "Cell": {
+        "X": 3,
+        "Y": 0,
+        "Z": 27
+      },
+      "BlockTypeId": 1
+    },
+    {
+      "Cell": {
+        "X": 3,
+        "Y": 0,
+        "Z": 25
+      },
+      "BlockTypeId": 1
+    },
+    {
+      "Cell": {
+        "X": 4,
+        "Y": 0,
+        "Z": 22
+      },
+      "BlockTypeId": 1
+    },
+    {
+      "Cell": {
+        "X": 4,
+        "Y": 0,
+        "Z": 21
+      },
+      "BlockTypeId": 1
+    },
+    {
+      "Cell": {
+        "X": 4,
+        "Y": 0,
+        "Z": 20
+      },
+      "BlockTypeId": 1
+    },
+    {
+      "Cell": {
+        "X": 4,
+        "Y": 0,
+        "Z": 19
+      },
+      "BlockTypeId": 1
+    },
+    {
+      "Cell": {
+        "X": 5,
+        "Y": 0,
+        "Z": 18
+      },
+      "BlockTypeId": 2
+    },
+    {
+      "Cell": {
+        "X": 4,
+        "Y": 0,
+        "Z": 17
+      },
+      "BlockTypeId": 1
+    },
+    {
+      "Cell": {
+        "X": 4,
+        "Y": 0,
+        "Z": 16
+      },
+      "BlockTypeId": 1
+    },
+    {
+      "Cell": {
+        "X": 4,
+        "Y": 0,
+        "Z": 15
+      },
+      "BlockTypeId": 6
+    },
+    {
+      "Cell": {
+        "X": 4,
+        "Y": 0,
+        "Z": 13
+      },
+      "BlockTypeId": 2
+    },
+    {
+      "Cell": {
+        "X": 3,
+        "Y": 0,
+        "Z": 13
+      },
+      "BlockTypeId": 6
+    },
+    {
+      "Cell": {
+        "X": 3,
+        "Y": 0,
+        "Z": 12
+      },
+      "BlockTypeId": 6
+    },
+    {
+      "Cell": {
+        "X": 3,
+        "Y": 0,
+        "Z": 11
+      },
+      "BlockTypeId": 1
+    },
+    {
+      "Cell": {
+        "X": 3,
+        "Y": 0,
+        "Z": 10
+      },
+      "BlockTypeId": 1
+    },
+    {
+      "Cell": {
+        "X": 3,
+        "Y": 0,
+        "Z": 9
+      },
+      "BlockTypeId": 1
+    },
+    {
+      "Cell": {
+        "X": 3,
+        "Y": 0,
+        "Z": 8
+      },
+      "BlockTypeId": 2
+    },
+    {
+      "Cell": {
+        "X": 3,
+        "Y": 0,
+        "Z": 7
+      },
+      "BlockTypeId": 2
+    },
+    {
+      "Cell": {
+        "X": 3,
+        "Y": 0,
+        "Z": 6
+      },
+      "BlockTypeId": 1
+    },
+    {
+      "Cell": {
+        "X": 2,
+        "Y": 0,
+        "Z": 5
+      },
+      "BlockTypeId": 1
+    },
+    {
+      "Cell": {
+        "X": 2,
+        "Y": 0,
+        "Z": 4
+      },
+      "BlockTypeId": 1
+    },
+    {
+      "Cell": {
+        "X": 2,
+        "Y": 0,
+        "Z": 3
+      },
+      "BlockTypeId": 1
+    },
+    {
+      "Cell": {
+        "X": 0,
+        "Y": 0,
+        "Z": 0
+      },
+      "BlockTypeId": 1
+    },
+    {
+      "Cell": {
+        "X": 1,
+        "Y": 0,
+        "Z": 15
+      },
+      "BlockTypeId": 1
+    },
+    {
+      "Cell": {
+        "X": 2,
+        "Y": 0,
+        "Z": 21
+      },
+      "BlockTypeId": 1
+    },
+    {
+      "Cell": {
+        "X": 2,
+        "Y": 0,
+        "Z": 22
+      },
+      "BlockTypeId": 1
+    },
+    {
+      "Cell": {
+        "X": 2,
+        "Y": 0,
+        "Z": 23
+      },
+      "BlockTypeId": 2
+    },
+    {
+      "Cell": {
+        "X": 2,
+        "Y": 0,
+        "Z": 24
+      },
+      "BlockTypeId": 1
+    },
+    {
+      "Cell": {
+        "X": 1,
+        "Y": 0,
+        "Z": 25
+      },
+      "BlockTypeId": 1
+    },
+    {
+      "Cell": {
+        "X": 1,
+        "Y": 0,
+        "Z": 26
+      },
+      "BlockTypeId": 1
+    },
+    {
+      "Cell": {
+        "X": 0,
+        "Y": 0,
+        "Z": 27
+      },
+      "BlockTypeId": 1
+    },
+    {
+      "Cell": {
+        "X": 0,
+        "Y": 0,
+        "Z": 26
+      },
+      "BlockTypeId": 1
+    },
+    {
+      "Cell": {
+        "X": 1,
+        "Y": 0,
+        "Z": 27
+      },
+      "BlockTypeId": 1
+    },
+    {
+      "Cell": {
+        "X": 0,
+        "Y": 0,
+        "Z": 22
+      },
+      "BlockTypeId": 2
+    },
+    {
+      "Cell": {
+        "X": 0,
+        "Y": 0,
+        "Z": 21
+      },
+      "BlockTypeId": 2
+    },
+    {
+      "Cell": {
+        "X": 0,
+        "Y": 0,
+        "Z": 23
+      },
+      "BlockTypeId": 1
+    },
+    {
+      "Cell": {
+        "X": 2,
+        "Y": 0,
+        "Z": 16
+      },
+      "BlockTypeId": 1
+    },
+    {
+      "Cell": {
+        "X": 1,
+        "Y": 0,
+        "Z": 7
+      },
+      "BlockTypeId": 1
+    },
+    {
+      "Cell": {
+        "X": 1,
+        "Y": 0,
+        "Z": 6
+      },
+      "BlockTypeId": 1
+    },
+    {
+      "Cell": {
+        "X": 1,
+        "Y": 0,
+        "Z": 4
+      },
+      "BlockTypeId": 1
+    },
+    {
+      "Cell": {
+        "X": 1,
+        "Y": 0,
+        "Z": 3
+      },
+      "BlockTypeId": 1
+    },
+    {
+      "Cell": {
+        "X": 1,
+        "Y": 0,
+        "Z": 2
+      },
+      "BlockTypeId": 1
+    },
+    {
+      "Cell": {
+        "X": 3,
+        "Y": 0,
+        "Z": 0
+      },
+      "BlockTypeId": 1
+    },
+    {
+      "Cell": {
+        "X": 4,
+        "Y": 0,
+        "Z": 1
+      },
+      "BlockTypeId": 1
+    },
+    {
+      "Cell": {
+        "X": 5,
+        "Y": 0,
+        "Z": 1
+      },
+      "BlockTypeId": 1
+    },
+    {
+      "Cell": {
+        "X": 7,
+        "Y": 0,
+        "Z": 1
+      },
+      "BlockTypeId": 1
+    },
+    {
+      "Cell": {
+        "X": 8,
+        "Y": 0,
+        "Z": 1
+      },
+      "BlockTypeId": 1
+    },
+    {
+      "Cell": {
+        "X": 9,
+        "Y": 0,
+        "Z": 1
+      },
+      "BlockTypeId": 1
+    },
+    {
+      "Cell": {
+        "X": 11,
+        "Y": 0,
+        "Z": 1
+      },
+      "BlockTypeId": 2
+    },
+    {
+      "Cell": {
+        "X": 12,
+        "Y": 0,
+        "Z": 1
+      },
+      "BlockTypeId": 2
+    },
+    {
+      "Cell": {
+        "X": 15,
+        "Y": 0,
+        "Z": 1
+      },
+      "BlockTypeId": 2
+    },
+    {
+      "Cell": {
+        "X": 16,
+        "Y": 0,
+        "Z": 1
+      },
+      "BlockTypeId": 1
+    },
+    {
+      "Cell": {
+        "X": 17,
+        "Y": 0,
+        "Z": 1
+      },
+      "BlockTypeId": 1
+    },
+    {
+      "Cell": {
+        "X": 18,
+        "Y": 0,
+        "Z": 1
+      },
+      "BlockTypeId": 1
+    },
+    {
+      "Cell": {
+        "X": 19,
+        "Y": 0,
+        "Z": 1
+      },
+      "BlockTypeId": 1
+    },
+    {
+      "Cell": {
+        "X": 20,
+        "Y": 0,
+        "Z": 1
+      },
+      "BlockTypeId": 1
+    },
+    {
+      "Cell": {
+        "X": 3,
+        "Y": 0,
+        "Z": 1
+      },
+      "BlockTypeId": 1
+    },
+    {
+      "Cell": {
+        "X": 6,
+        "Y": 0,
+        "Z": 0
+      },
+      "BlockTypeId": 1
+    },
+    {
+      "Cell": {
+        "X": 7,
+        "Y": 0,
+        "Z": 0
+      },
+      "BlockTypeId": 1
+    },
+    {
+      "Cell": {
+        "X": 9,
+        "Y": 0,
+        "Z": 0
+      },
+      "BlockTypeId": 1
+    },
+    {
+      "Cell": {
+        "X": 12,
+        "Y": 0,
+        "Z": 0
+      },
+      "BlockTypeId": 1
+    },
+    {
+      "Cell": {
+        "X": 5,
+        "Y": 0,
+        "Z": 0
+      },
+      "BlockTypeId": 1
+    },
+    {
+      "Cell": {
+        "X": 4,
+        "Y": 0,
+        "Z": 0
+      },
+      "BlockTypeId": 1
+    },
+    {
+      "Cell": {
+        "X": 8,
+        "Y": 0,
+        "Z": 0
+      },
+      "BlockTypeId": 1
+    },
+    {
+      "Cell": {
+        "X": 10,
+        "Y": 0,
+        "Z": 0
+      },
+      "BlockTypeId": 1
+    },
+    {
+      "Cell": {
+        "X": 11,
+        "Y": 0,
+        "Z": 0
+      },
+      "BlockTypeId": 1
+    },
+    {
+      "Cell": {
+        "X": 13,
+        "Y": 0,
+        "Z": 0
+      },
+      "BlockTypeId": 1
+    },
+    {
+      "Cell": {
+        "X": 14,
+        "Y": 0,
+        "Z": 0
+      },
+      "BlockTypeId": 1
+    },
+    {
+      "Cell": {
+        "X": 16,
+        "Y": 0,
+        "Z": 0
+      },
+      "BlockTypeId": 1
+    },
+    {
+      "Cell": {
+        "X": 17,
+        "Y": 0,
+        "Z": 0
+      },
+      "BlockTypeId": 1
+    },
+    {
+      "Cell": {
+        "X": 18,
+        "Y": 0,
+        "Z": 0
+      },
+      "BlockTypeId": 1
+    },
+    {
+      "Cell": {
+        "X": 19,
+        "Y": 0,
+        "Z": 0
+      },
+      "BlockTypeId": 1
+    },
+    {
+      "Cell": {
+        "X": 20,
+        "Y": 0,
+        "Z": 0
+      },
+      "BlockTypeId": 1
+    },
+    {
+      "Cell": {
+        "X": 21,
+        "Y": 0,
+        "Z": 0
+      },
+      "BlockTypeId": 1
+    },
+    {
+      "Cell": {
+        "X": 22,
+        "Y": 0,
+        "Z": 0
+      },
+      "BlockTypeId": 1
+    },
+    {
+      "Cell": {
+        "X": 23,
+        "Y": 0,
+        "Z": 0
+      },
+      "BlockTypeId": 1
+    },
+    {
+      "Cell": {
+        "X": 24,
+        "Y": 0,
+        "Z": 0
+      },
+      "BlockTypeId": 1
+    },
+    {
+      "Cell": {
+        "X": 25,
+        "Y": 0,
+        "Z": 0
+      },
+      "BlockTypeId": 1
+    },
+    {
+      "Cell": {
+        "X": 26,
+        "Y": 0,
+        "Z": 0
+      },
+      "BlockTypeId": 1
+    },
+    {
+      "Cell": {
+        "X": 27,
+        "Y": 0,
+        "Z": 1
+      },
+      "BlockTypeId": 1
+    },
+    {
+      "Cell": {
+        "X": 28,
+        "Y": 0,
+        "Z": 1
+      },
+      "BlockTypeId": 1
+    },
+    {
+      "Cell": {
+        "X": 29,
+        "Y": 0,
+        "Z": 2
+      },
+      "BlockTypeId": 1
+    },
+    {
+      "Cell": {
+        "X": 29,
+        "Y": 0,
+        "Z": 3
+      },
+      "BlockTypeId": 1
+    },
+    {
+      "Cell": {
+        "X": 30,
+        "Y": 0,
+        "Z": 3
+      },
+      "BlockTypeId": 1
+    },
+    {
+      "Cell": {
+        "X": 30,
+        "Y": 0,
+        "Z": 4
+      },
+      "BlockTypeId": 1
+    },
+    {
+      "Cell": {
+        "X": 31,
+        "Y": 0,
+        "Z": 4
+      },
+      "BlockTypeId": 1
+    },
+    {
+      "Cell": {
+        "X": 31,
+        "Y": 0,
+        "Z": 5
+      },
+      "BlockTypeId": 1
+    },
+    {
+      "Cell": {
+        "X": 30,
+        "Y": 0,
+        "Z": 5
+      },
+      "BlockTypeId": 1
+    },
+    {
+      "Cell": {
+        "X": 29,
+        "Y": 0,
+        "Z": 5
+      },
+      "BlockTypeId": 1
+    },
+    {
+      "Cell": {
+        "X": 28,
+        "Y": 0,
+        "Z": 5
+      },
+      "BlockTypeId": 1
+    },
+    {
+      "Cell": {
+        "X": 27,
+        "Y": 0,
+        "Z": 4
+      },
+      "BlockTypeId": 1
+    },
+    {
+      "Cell": {
+        "X": 26,
+        "Y": 0,
+        "Z": 4
+      },
+      "BlockTypeId": 1
+    },
+    {
+      "Cell": {
+        "X": 26,
+        "Y": 0,
+        "Z": 3
+      },
+      "BlockTypeId": 1
+    },
+    {
+      "Cell": {
+        "X": 27,
+        "Y": 0,
+        "Z": 2
+      },
+      "BlockTypeId": 1
+    },
+    {
+      "Cell": {
+        "X": 28,
+        "Y": 0,
+        "Z": 2
+      },
+      "BlockTypeId": 1
+    },
+    {
+      "Cell": {
+        "X": 29,
+        "Y": 0,
+        "Z": 4
+      },
+      "BlockTypeId": 1
+    },
+    {
+      "Cell": {
+        "X": 31,
+        "Y": 0,
+        "Z": 6
+      },
+      "BlockTypeId": 1
+    },
+    {
+      "Cell": {
+        "X": 27,
+        "Y": 0,
+        "Z": 0
+      },
+      "BlockTypeId": 1
+    },
+    {
+      "Cell": {
+        "X": 28,
+        "Y": 0,
+        "Z": 3
+      },
+      "BlockTypeId": 1
+    },
+    {
+      "Cell": {
+        "X": 29,
+        "Y": 0,
+        "Z": 6
+      },
+      "BlockTypeId": 1
+    },
+    {
+      "Cell": {
+        "X": 29,
+        "Y": 0,
+        "Z": 8
+      },
+      "BlockTypeId": 1
+    },
+    {
+      "Cell": {
+        "X": 30,
+        "Y": 0,
+        "Z": 9
+      },
+      "BlockTypeId": 1
+    },
+    {
+      "Cell": {
+        "X": 30,
+        "Y": 0,
+        "Z": 10
+      },
+      "BlockTypeId": 1
+    },
+    {
+      "Cell": {
+        "X": 31,
+        "Y": 0,
+        "Z": 12
+      },
+      "BlockTypeId": 1
+    },
+    {
+      "Cell": {
+        "X": 31,
+        "Y": 0,
+        "Z": 22
+      },
+      "BlockTypeId": 1
+    },
+    {
+      "Cell": {
+        "X": 30,
+        "Y": 0,
+        "Z": 22
+      },
+      "BlockTypeId": 1
+    },
+    {
+      "Cell": {
+        "X": 30,
+        "Y": 0,
+        "Z": 23
+      },
+      "BlockTypeId": 1
+    },
+    {
+      "Cell": {
+        "X": 30,
+        "Y": 0,
+        "Z": 21
+      },
+      "BlockTypeId": 1
+    },
+    {
+      "Cell": {
+        "X": 30,
+        "Y": 0,
+        "Z": 19
+      },
+      "BlockTypeId": 1
+    },
+    {
+      "Cell": {
+        "X": 30,
+        "Y": 0,
+        "Z": 17
+      },
+      "BlockTypeId": 1
+    },
+    {
+      "Cell": {
+        "X": 29,
+        "Y": 0,
+        "Z": 15
+      },
+      "BlockTypeId": 1
+    },
+    {
+      "Cell": {
+        "X": 30,
+        "Y": 0,
+        "Z": 13
+      },
+      "BlockTypeId": 1
+    },
+    {
+      "Cell": {
+        "X": 30,
+        "Y": 0,
+        "Z": 11
+      },
+      "BlockTypeId": 1
+    },
+    {
+      "Cell": {
+        "X": 30,
+        "Y": 0,
+        "Z": 8
+      },
+      "BlockTypeId": 1
+    },
+    {
+      "Cell": {
+        "X": 30,
+        "Y": 0,
+        "Z": 7
+      },
+      "BlockTypeId": 1
+    },
+    {
+      "Cell": {
+        "X": 31,
+        "Y": 0,
+        "Z": 8
+      },
+      "BlockTypeId": 1
+    },
+    {
+      "Cell": {
+        "X": 31,
+        "Y": 0,
+        "Z": 9
+      },
+      "BlockTypeId": 1
+    },
+    {
+      "Cell": {
+        "X": 31,
+        "Y": 0,
+        "Z": 10
+      },
+      "BlockTypeId": 1
+    },
+    {
+      "Cell": {
+        "X": 31,
+        "Y": 0,
+        "Z": 15
+      },
+      "BlockTypeId": 1
+    },
+    {
+      "Cell": {
+        "X": 31,
+        "Y": 0,
+        "Z": 19
+      },
+      "BlockTypeId": 1
+    },
+    {
+      "Cell": {
+        "X": 31,
+        "Y": 0,
+        "Z": 20
+      },
+      "BlockTypeId": 1
+    },
+    {
+      "Cell": {
+        "X": 31,
+        "Y": 0,
+        "Z": 13
+      },
+      "BlockTypeId": 1
+    },
+    {
+      "Cell": {
+        "X": 31,
+        "Y": 0,
+        "Z": 14
+      },
+      "BlockTypeId": 1
+    },
+    {
+      "Cell": {
+        "X": 30,
+        "Y": 0,
+        "Z": 18
+      },
+      "BlockTypeId": 1
+    },
+    {
+      "Cell": {
+        "X": 29,
+        "Y": 0,
+        "Z": 19
+      },
+      "BlockTypeId": 1
+    },
+    {
+      "Cell": {
+        "X": 29,
+        "Y": 0,
+        "Z": 20
+      },
+      "BlockTypeId": 1
+    },
+    {
+      "Cell": {
+        "X": 29,
+        "Y": 0,
+        "Z": 18
+      },
+      "BlockTypeId": 1
+    },
+    {
+      "Cell": {
+        "X": 30,
+        "Y": 0,
+        "Z": 16
+      },
+      "BlockTypeId": 1
+    },
+    {
+      "Cell": {
+        "X": 30,
+        "Y": 0,
+        "Z": 15
+      },
+      "BlockTypeId": 1
+    },
+    {
+      "Cell": {
+        "X": 30,
+        "Y": 0,
+        "Z": 14
+      },
+      "BlockTypeId": 1
+    },
+    {
+      "Cell": {
+        "X": 31,
+        "Y": 0,
+        "Z": 16
+      },
+      "BlockTypeId": 1
+    },
+    {
+      "Cell": {
+        "X": 31,
+        "Y": 0,
+        "Z": 17
+      },
+      "BlockTypeId": 1
+    },
+    {
+      "Cell": {
+        "X": 30,
+        "Y": 0,
+        "Z": 20
+      },
+      "BlockTypeId": 1
+    },
+    {
+      "Cell": {
+        "X": 31,
+        "Y": 0,
+        "Z": 18
+      },
+      "BlockTypeId": 1
+    },
+    {
+      "Cell": {
+        "X": 31,
+        "Y": 0,
+        "Z": 21
+      },
+      "BlockTypeId": 1
+    },
+    {
+      "Cell": {
+        "X": 31,
+        "Y": 0,
+        "Z": 7
+      },
+      "BlockTypeId": 1
+    },
+    {
+      "Cell": {
+        "X": 31,
+        "Y": 0,
+        "Z": 11
+      },
+      "BlockTypeId": 1
+    },
+    {
+      "Cell": {
+        "X": 30,
+        "Y": 0,
+        "Z": 6
+      },
+      "BlockTypeId": 1
+    },
+    {
+      "Cell": {
+        "X": 30,
+        "Y": 0,
+        "Z": 12
+      },
+      "BlockTypeId": 1
+    },
+    {
+      "Cell": {
+        "X": 30,
+        "Y": 0,
+        "Z": 26
+      },
+      "BlockTypeId": 1
+    },
+    {
+      "Cell": {
+        "X": 30,
+        "Y": 0,
+        "Z": 28
+      },
+      "BlockTypeId": 1
+    },
+    {
+      "Cell": {
+        "X": 29,
+        "Y": 0,
+        "Z": 29
+      },
+      "BlockTypeId": 1
+    },
+    {
+      "Cell": {
+        "X": 29,
+        "Y": 0,
+        "Z": 30
+      },
+      "BlockTypeId": 1
+    },
+    {
+      "Cell": {
+        "X": 28,
+        "Y": 0,
+        "Z": 30
+      },
+      "BlockTypeId": 1
+    },
+    {
+      "Cell": {
+        "X": 28,
+        "Y": 0,
+        "Z": 28
+      },
+      "BlockTypeId": 1
+    },
+    {
+      "Cell": {
+        "X": 28,
+        "Y": 0,
+        "Z": 26
+      },
+      "BlockTypeId": 2
+    },
+    {
+      "Cell": {
+        "X": 28,
+        "Y": 0,
+        "Z": 24
+      },
+      "BlockTypeId": 2
+    },
+    {
+      "Cell": {
+        "X": 28,
+        "Y": 0,
+        "Z": 22
+      },
+      "BlockTypeId": 1
+    },
+    {
+      "Cell": {
+        "X": 28,
+        "Y": 0,
+        "Z": 21
+      },
+      "BlockTypeId": 1
+    },
+    {
+      "Cell": {
+        "X": 29,
+        "Y": 0,
+        "Z": 21
+      },
+      "BlockTypeId": 1
+    },
+    {
+      "Cell": {
+        "X": 29,
+        "Y": 0,
+        "Z": 22
+      },
+      "BlockTypeId": 1
+    },
+    {
+      "Cell": {
+        "X": 30,
+        "Y": 0,
+        "Z": 24
+      },
+      "BlockTypeId": 2
+    },
+    {
+      "Cell": {
+        "X": 29,
+        "Y": 0,
+        "Z": 25
+      },
+      "BlockTypeId": 2
+    },
+    {
+      "Cell": {
+        "X": 29,
+        "Y": 0,
+        "Z": 26
+      },
+      "BlockTypeId": 1
+    },
+    {
+      "Cell": {
+        "X": 29,
+        "Y": 0,
+        "Z": 27
+      },
+      "BlockTypeId": 1
+    },
+    {
+      "Cell": {
+        "X": 28,
+        "Y": 0,
+        "Z": 27
+      },
+      "BlockTypeId": 1
+    },
+    {
+      "Cell": {
+        "X": 27,
+        "Y": 0,
+        "Z": 27
+      },
+      "BlockTypeId": 1
+    },
+    {
+      "Cell": {
+        "X": 26,
+        "Y": 0,
+        "Z": 26
+      },
+      "BlockTypeId": 1
+    },
+    {
+      "Cell": {
+        "X": 25,
+        "Y": 0,
+        "Z": 26
+      },
+      "BlockTypeId": 6
+    },
+    {
+      "Cell": {
+        "X": 24,
+        "Y": 0,
+        "Z": 26
+      },
+      "BlockTypeId": 6
+    },
+    {
+      "Cell": {
+        "X": 29,
+        "Y": 0,
+        "Z": 28
+      },
+      "BlockTypeId": 1
+    },
+    {
+      "Cell": {
+        "X": 27,
+        "Y": 0,
+        "Z": 30
+      },
+      "BlockTypeId": 1
+    },
+    {
+      "Cell": {
+        "X": 24,
+        "Y": 0,
+        "Z": 30
+      },
+      "BlockTypeId": 1
+    },
+    {
+      "Cell": {
+        "X": 21,
+        "Y": 0,
+        "Z": 29
+      },
+      "BlockTypeId": 1
+    },
+    {
+      "Cell": {
+        "X": 20,
+        "Y": 0,
+        "Z": 28
+      },
+      "BlockTypeId": 1
+    },
+    {
+      "Cell": {
+        "X": 20,
+        "Y": 0,
+        "Z": 27
+      },
+      "BlockTypeId": 2
+    },
+    {
+      "Cell": {
+        "X": 21,
+        "Y": 0,
+        "Z": 26
+      },
+      "BlockTypeId": 2
+    },
+    {
+      "Cell": {
+        "X": 22,
+        "Y": 0,
+        "Z": 26
+      },
+      "BlockTypeId": 2
+    },
+    {
+      "Cell": {
+        "X": 23,
+        "Y": 0,
+        "Z": 26
+      },
+      "BlockTypeId": 1
+    },
+    {
+      "Cell": {
+        "X": 26,
+        "Y": 0,
+        "Z": 27
+      },
+      "BlockTypeId": 1
+    },
+    {
+      "Cell": {
+        "X": 27,
+        "Y": 0,
+        "Z": 28
+      },
+      "BlockTypeId": 1
+    },
+    {
+      "Cell": {
+        "X": 26,
+        "Y": 0,
+        "Z": 29
+      },
+      "BlockTypeId": 1
+    },
+    {
+      "Cell": {
+        "X": 25,
+        "Y": 0,
+        "Z": 29
+      },
+      "BlockTypeId": 1
+    },
+    {
+      "Cell": {
+        "X": 18,
+        "Y": 0,
+        "Z": 30
+      },
+      "BlockTypeId": 1
+    },
+    {
+      "Cell": {
+        "X": 19,
+        "Y": 0,
+        "Z": 29
+      },
+      "BlockTypeId": 1
+    },
+    {
+      "Cell": {
+        "X": 22,
+        "Y": 0,
+        "Z": 29
+      },
+      "BlockTypeId": 1
+    },
+    {
+      "Cell": {
+        "X": 19,
+        "Y": 0,
+        "Z": 31
+      },
+      "BlockTypeId": 1
+    },
+    {
+      "Cell": {
+        "X": 24,
+        "Y": 0,
+        "Z": 28
+      },
+      "BlockTypeId": 1
+    },
+    {
+      "Cell": {
+        "X": 26,
+        "Y": 0,
+        "Z": 28
+      },
+      "BlockTypeId": 1
+    },
+    {
+      "Cell": {
+        "X": 24,
+        "Y": 0,
+        "Z": 29
+      },
+      "BlockTypeId": 1
+    },
+    {
+      "Cell": {
+        "X": 20,
+        "Y": 0,
+        "Z": 30
+      },
+      "BlockTypeId": 1
+    },
+    {
+      "Cell": {
+        "X": 17,
+        "Y": 0,
+        "Z": 30
+      },
+      "BlockTypeId": 1
+    },
+    {
+      "Cell": {
+        "X": 16,
+        "Y": 0,
+        "Z": 30
+      },
+      "BlockTypeId": 1
+    },
+    {
+      "Cell": {
+        "X": 15,
+        "Y": 0,
+        "Z": 30
+      },
+      "BlockTypeId": 1
+    },
+    {
+      "Cell": {
+        "X": 16,
+        "Y": 0,
+        "Z": 29
+      },
+      "BlockTypeId": 1
+    },
+    {
+      "Cell": {
+        "X": 18,
+        "Y": 0,
+        "Z": 31
+      },
+      "BlockTypeId": 1
+    },
+    {
+      "Cell": {
+        "X": 17,
+        "Y": 0,
+        "Z": 31
+      },
+      "BlockTypeId": 1
+    },
+    {
+      "Cell": {
+        "X": 15,
+        "Y": 0,
+        "Z": 31
+      },
+      "BlockTypeId": 1
+    },
+    {
+      "Cell": {
+        "X": 14,
+        "Y": 0,
+        "Z": 31
+      },
+      "BlockTypeId": 1
+    },
+    {
+      "Cell": {
+        "X": 25,
+        "Y": 0,
+        "Z": 30
+      },
+      "BlockTypeId": 1
+    },
+    {
+      "Cell": {
+        "X": 26,
+        "Y": 0,
+        "Z": 30
+      },
+      "BlockTypeId": 1
+    },
+    {
+      "Cell": {
+        "X": 16,
+        "Y": 0,
+        "Z": 31
+      },
+      "BlockTypeId": 1
+    },
+    {
+      "Cell": {
+        "X": 20,
+        "Y": 0,
+        "Z": 31
+      },
+      "BlockTypeId": 1
+    },
+    {
+      "Cell": {
+        "X": 21,
+        "Y": 0,
+        "Z": 31
+      },
+      "BlockTypeId": 1
+    },
+    {
+      "Cell": {
+        "X": 22,
+        "Y": 0,
+        "Z": 31
+      },
+      "BlockTypeId": 1
+    },
+    {
+      "Cell": {
+        "X": 23,
+        "Y": 0,
+        "Z": 31
+      },
+      "BlockTypeId": 1
+    },
+    {
+      "Cell": {
+        "X": 12,
+        "Y": 0,
+        "Z": 30
+      },
+      "BlockTypeId": 1
+    },
+    {
+      "Cell": {
+        "X": 8,
+        "Y": 0,
+        "Z": 30
+      },
+      "BlockTypeId": 1
+    },
+    {
+      "Cell": {
+        "X": 6,
+        "Y": 0,
+        "Z": 30
+      },
+      "BlockTypeId": 1
+    },
+    {
+      "Cell": {
+        "X": 5,
+        "Y": 0,
+        "Z": 30
+      },
+      "BlockTypeId": 1
+    },
+    {
+      "Cell": {
+        "X": 8,
+        "Y": 0,
+        "Z": 31
+      },
+      "BlockTypeId": 1
+    },
+    {
+      "Cell": {
+        "X": 10,
+        "Y": 0,
+        "Z": 31
+      },
+      "BlockTypeId": 1
+    },
+    {
+      "Cell": {
+        "X": 12,
+        "Y": 0,
+        "Z": 31
+      },
+      "BlockTypeId": 1
+    },
+    {
+      "Cell": {
+        "X": 9,
+        "Y": 0,
+        "Z": 31
+      },
+      "BlockTypeId": 1
+    },
+    {
+      "Cell": {
+        "X": 6,
+        "Y": 0,
+        "Z": 31
+      },
+      "BlockTypeId": 1
+    },
+    {
+      "Cell": {
+        "X": 7,
+        "Y": 0,
+        "Z": 30
+      },
+      "BlockTypeId": 1
+    },
+    {
+      "Cell": {
+        "X": 9,
+        "Y": 0,
+        "Z": 30
+      },
+      "BlockTypeId": 1
+    },
+    {
+      "Cell": {
+        "X": 10,
+        "Y": 0,
+        "Z": 30
+      },
+      "BlockTypeId": 1
+    },
+    {
+      "Cell": {
+        "X": 13,
+        "Y": 0,
+        "Z": 30
+      },
+      "BlockTypeId": 1
+    },
+    {
+      "Cell": {
+        "X": 14,
+        "Y": 0,
+        "Z": 30
+      },
+      "BlockTypeId": 1
+    },
+    {
+      "Cell": {
+        "X": 13,
+        "Y": 0,
+        "Z": 31
+      },
+      "BlockTypeId": 1
+    },
+    {
+      "Cell": {
+        "X": 11,
+        "Y": 0,
+        "Z": 31
+      },
+      "BlockTypeId": 1
+    },
+    {
+      "Cell": {
+        "X": 7,
+        "Y": 0,
+        "Z": 31
+      },
+      "BlockTypeId": 1
+    },
+    {
+      "Cell": {
+        "X": 10,
+        "Y": 0,
+        "Z": 28
+      },
+      "BlockTypeId": 1
+    },
+    {
+      "Cell": {
+        "X": 9,
+        "Y": 0,
+        "Z": 28
+      },
+      "BlockTypeId": 1
+    },
+    {
+      "Cell": {
+        "X": 9,
+        "Y": 0,
+        "Z": 27
+      },
+      "BlockTypeId": 1
+    },
+    {
+      "Cell": {
+        "X": 8,
+        "Y": 0,
+        "Z": 26
+      },
+      "BlockTypeId": 1
+    },
+    {
+      "Cell": {
+        "X": 7,
+        "Y": 0,
+        "Z": 26
+      },
+      "BlockTypeId": 2
+    },
+    {
+      "Cell": {
+        "X": 7,
+        "Y": 0,
+        "Z": 25
+      },
+      "BlockTypeId": 2
+    },
+    {
+      "Cell": {
+        "X": 6,
+        "Y": 0,
+        "Z": 25
+      },
+      "BlockTypeId": 2
+    },
+    {
+      "Cell": {
+        "X": 5,
+        "Y": 0,
+        "Z": 25
+      },
+      "BlockTypeId": 1
+    },
+    {
+      "Cell": {
+        "X": 5,
+        "Y": 0,
+        "Z": 24
+      },
+      "BlockTypeId": 1
+    },
+    {
+      "Cell": {
+        "X": 4,
+        "Y": 0,
+        "Z": 25
+      },
+      "BlockTypeId": 1
+    },
+    {
+      "Cell": {
+        "X": 4,
+        "Y": 0,
+        "Z": 26
+      },
+      "BlockTypeId": 1
+    },
+    {
+      "Cell": {
+        "X": 5,
+        "Y": 0,
+        "Z": 26
+      },
+      "BlockTypeId": 2
+    },
+    {
+      "Cell": {
+        "X": 6,
+        "Y": 0,
+        "Z": 27
+      },
+      "BlockTypeId": 2
+    },
+    {
+      "Cell": {
+        "X": 7,
+        "Y": 0,
+        "Z": 29
+      },
+      "BlockTypeId": 1
+    },
+    {
+      "Cell": {
+        "X": 6,
+        "Y": 0,
+        "Z": 29
+      },
+      "BlockTypeId": 1
+    },
+    {
+      "Cell": {
+        "X": 1,
+        "Y": 0,
+        "Z": 28
+      },
+      "BlockTypeId": 1
+    },
+    {
+      "Cell": {
+        "X": 6,
+        "Y": 0,
+        "Z": 24
+      },
+      "BlockTypeId": 2
+    },
+    {
+      "Cell": {
+        "X": 7,
+        "Y": 0,
+        "Z": 24
+      },
+      "BlockTypeId": 2
+    },
+    {
+      "Cell": {
+        "X": 8,
+        "Y": 0,
+        "Z": 24
+      },
+      "BlockTypeId": 2
+    },
+    {
+      "Cell": {
+        "X": 8,
+        "Y": 0,
+        "Z": 25
+      },
+      "BlockTypeId": 2
+    },
+    {
+      "Cell": {
+        "X": 3,
+        "Y": 0,
+        "Z": 20
+      },
+      "BlockTypeId": 1
+    },
+    {
+      "Cell": {
+        "X": 3,
+        "Y": 0,
+        "Z": 19
+      },
+      "BlockTypeId": 1
+    },
+    {
+      "Cell": {
+        "X": 5,
+        "Y": 0,
+        "Z": 21
+      },
+      "BlockTypeId": 2
+    },
+    {
+      "Cell": {
+        "X": 5,
+        "Y": 0,
+        "Z": 22
+      },
+      "BlockTypeId": 2
+    },
+    {
+      "Cell": {
+        "X": 5,
+        "Y": 0,
+        "Z": 23
+      },
+      "BlockTypeId": 1
+    },
+    {
+      "Cell": {
+        "X": 6,
+        "Y": 0,
+        "Z": 22
+      },
+      "BlockTypeId": 2
+    },
+    {
+      "Cell": {
+        "X": 6,
+        "Y": 0,
+        "Z": 21
+      },
+      "BlockTypeId": 1
+    },
+    {
+      "Cell": {
+        "X": 7,
+        "Y": 0,
+        "Z": 27
+      },
+      "BlockTypeId": 2
+    },
+    {
+      "Cell": {
+        "X": 5,
+        "Y": 0,
+        "Z": 29
+      },
+      "BlockTypeId": 1
+    },
+    {
+      "Cell": {
+        "X": 3,
+        "Y": 0,
+        "Z": 26
+      },
+      "BlockTypeId": 1
+    },
+    {
+      "Cell": {
+        "X": 4,
+        "Y": 0,
+        "Z": 27
+      },
+      "BlockTypeId": 1
+    },
+    {
+      "Cell": {
+        "X": 5,
+        "Y": 0,
+        "Z": 27
+      },
+      "BlockTypeId": 1
+    },
+    {
+      "Cell": {
+        "X": 4,
+        "Y": 0,
+        "Z": 24
+      },
+      "BlockTypeId": 1
+    },
+    {
+      "Cell": {
+        "X": 4,
+        "Y": 0,
+        "Z": 23
+      },
+      "BlockTypeId": 1
+    },
+    {
+      "Cell": {
+        "X": 8,
+        "Y": 0,
+        "Z": 27
+      },
+      "BlockTypeId": 1
+    },
+    {
+      "Cell": {
+        "X": 11,
+        "Y": 0,
+        "Z": 30
+      },
+      "BlockTypeId": 1
+    },
+    {
+      "Cell": {
+        "X": 11,
+        "Y": 0,
+        "Z": 27
+      },
+      "BlockTypeId": 2
+    },
+    {
+      "Cell": {
+        "X": 10,
+        "Y": 0,
+        "Z": 25
+      },
+      "BlockTypeId": 2
+    },
+    {
+      "Cell": {
+        "X": 9,
+        "Y": 0,
+        "Z": 24
+      },
+      "BlockTypeId": 2
+    },
+    {
+      "Cell": {
+        "X": 7,
+        "Y": 0,
+        "Z": 22
+      },
+      "BlockTypeId": 1
+    },
+    {
+      "Cell": {
+        "X": 6,
+        "Y": 0,
+        "Z": 20
+      },
+      "BlockTypeId": 2
+    },
+    {
+      "Cell": {
+        "X": 4,
+        "Y": 0,
+        "Z": 14
+      },
+      "BlockTypeId": 6
+    },
+    {
+      "Cell": {
+        "X": 5,
+        "Y": 0,
+        "Z": 16
+      },
+      "BlockTypeId": 2
+    },
+    {
+      "Cell": {
+        "X": 6,
+        "Y": 0,
+        "Z": 19
+      },
+      "BlockTypeId": 6
+    },
+    {
+      "Cell": {
+        "X": 10,
+        "Y": 0,
+        "Z": 27
+      },
+      "BlockTypeId": 2
+    },
+    {
+      "Cell": {
+        "X": 9,
+        "Y": 0,
+        "Z": 26
+      },
+      "BlockTypeId": 2
+    },
+    {
+      "Cell": {
+        "X": 8,
+        "Y": 0,
+        "Z": 23
+      },
+      "BlockTypeId": 2
+    },
+    {
+      "Cell": {
+        "X": 7,
+        "Y": 0,
+        "Z": 20
+      },
+      "BlockTypeId": 3
+    },
+    {
+      "Cell": {
+        "X": 5,
+        "Y": 0,
+        "Z": 17
+      },
+      "BlockTypeId": 6
+    },
+    {
+      "Cell": {
+        "X": 5,
+        "Y": 0,
+        "Z": 14
+      },
+      "BlockTypeId": 6
+    },
+    {
+      "Cell": {
+        "X": 4,
+        "Y": 0,
+        "Z": 11
+      },
+      "BlockTypeId": 2
+    },
+    {
+      "Cell": {
+        "X": 4,
+        "Y": 0,
+        "Z": 10
+      },
+      "BlockTypeId": 1
+    },
+    {
+      "Cell": {
+        "X": 4,
+        "Y": 0,
+        "Z": 9
+      },
+      "BlockTypeId": 2
+    },
+    {
+      "Cell": {
+        "X": 5,
+        "Y": 0,
+        "Z": 9
+      },
+      "BlockTypeId": 6
+    },
+    {
+      "Cell": {
+        "X": 6,
+        "Y": 0,
+        "Z": 9
+      },
+      "BlockTypeId": 6
+    },
+    {
+      "Cell": {
+        "X": 7,
+        "Y": 0,
+        "Z": 8
+      },
+      "BlockTypeId": 6
+    },
+    {
+      "Cell": {
+        "X": 8,
+        "Y": 0,
+        "Z": 7
+      },
+      "BlockTypeId": 2
+    },
+    {
+      "Cell": {
+        "X": 9,
+        "Y": 0,
+        "Z": 6
+      },
+      "BlockTypeId": 2
+    },
+    {
+      "Cell": {
+        "X": 9,
+        "Y": 0,
+        "Z": 5
+      },
+      "BlockTypeId": 2
+    },
+    {
+      "Cell": {
+        "X": 10,
+        "Y": 0,
+        "Z": 4
+      },
+      "BlockTypeId": 2
+    },
+    {
+      "Cell": {
+        "X": 10,
+        "Y": 0,
+        "Z": 3
+      },
+      "BlockTypeId": 1
+    },
+    {
+      "Cell": {
+        "X": 10,
+        "Y": 0,
+        "Z": 2
+      },
+      "BlockTypeId": 2
+    },
+    {
+      "Cell": {
+        "X": 9,
+        "Y": 0,
+        "Z": 2
+      },
+      "BlockTypeId": 1
+    },
+    {
+      "Cell": {
+        "X": 6,
+        "Y": 0,
+        "Z": 2
+      },
+      "BlockTypeId": 1
+    },
+    {
+      "Cell": {
+        "X": 4,
+        "Y": 0,
+        "Z": 3
+      },
+      "BlockTypeId": 1
+    },
+    {
+      "Cell": {
+        "X": 5,
+        "Y": 0,
+        "Z": 3
+      },
+      "BlockTypeId": 2
+    },
+    {
+      "Cell": {
+        "X": 5,
+        "Y": 0,
+        "Z": 4
+      },
+      "BlockTypeId": 2
+    },
+    {
+      "Cell": {
+        "X": 4,
+        "Y": 0,
+        "Z": 4
+      },
+      "BlockTypeId": 1
+    },
+    {
+      "Cell": {
+        "X": 5,
+        "Y": 0,
+        "Z": 2
+      },
+      "BlockTypeId": 1
+    },
+    {
+      "Cell": {
+        "X": 4,
+        "Y": 0,
+        "Z": 5
+      },
+      "BlockTypeId": 1
+    },
+    {
+      "Cell": {
+        "X": 1,
+        "Y": 0,
+        "Z": 5
+      },
+      "BlockTypeId": 1
+    },
+    {
+      "Cell": {
+        "X": 5,
+        "Y": 0,
+        "Z": 5
+      },
+      "BlockTypeId": 2
+    },
+    {
+      "Cell": {
+        "X": 6,
+        "Y": 0,
+        "Z": 4
+      },
+      "BlockTypeId": 2
+    },
+    {
+      "Cell": {
+        "X": 4,
+        "Y": 0,
+        "Z": 7
+      },
+      "BlockTypeId": 2
+    },
+    {
+      "Cell": {
+        "X": 2,
+        "Y": 0,
+        "Z": 9
+      },
+      "BlockTypeId": 1
+    },
+    {
+      "Cell": {
+        "X": 4,
+        "Y": 0,
+        "Z": 6
+      },
+      "BlockTypeId": 2
+    },
+    {
+      "Cell": {
+        "X": 5,
+        "Y": 0,
+        "Z": 6
+      },
+      "BlockTypeId": 2
+    },
+    {
+      "Cell": {
+        "X": 6,
+        "Y": 0,
+        "Z": 5
+      },
+      "BlockTypeId": 1
+    },
+    {
+      "Cell": {
+        "X": 6,
+        "Y": 0,
+        "Z": 6
+      },
+      "BlockTypeId": 2
+    },
+    {
+      "Cell": {
+        "X": 6,
+        "Y": 0,
+        "Z": 7
+      },
+      "BlockTypeId": 2
+    },
+    {
+      "Cell": {
+        "X": 7,
+        "Y": 0,
+        "Z": 4
+      },
+      "BlockTypeId": 1
+    },
+    {
+      "Cell": {
+        "X": 7,
+        "Y": 0,
+        "Z": 3
+      },
+      "BlockTypeId": 1
+    },
+    {
+      "Cell": {
+        "X": 8,
+        "Y": 0,
+        "Z": 2
+      },
+      "BlockTypeId": 2
+    },
+    {
+      "Cell": {
+        "X": 8,
+        "Y": 0,
+        "Z": 3
+      },
+      "BlockTypeId": 1
+    },
+    {
+      "Cell": {
+        "X": 7,
+        "Y": 0,
+        "Z": 2
+      },
+      "BlockTypeId": 1
+    },
+    {
+      "Cell": {
+        "X": 11,
+        "Y": 0,
+        "Z": 3
+      },
+      "BlockTypeId": 2
+    },
+    {
+      "Cell": {
+        "X": 12,
+        "Y": 0,
+        "Z": 4
+      },
+      "BlockTypeId": 2
+    },
+    {
+      "Cell": {
+        "X": 12,
+        "Y": 0,
+        "Z": 5
+      },
+      "BlockTypeId": 2
+    },
+    {
+      "Cell": {
+        "X": 11,
+        "Y": 0,
+        "Z": 5
+      },
+      "BlockTypeId": 2
+    },
+    {
+      "Cell": {
+        "X": 8,
+        "Y": 0,
+        "Z": 4
+      },
+      "BlockTypeId": 1
+    },
+    {
+      "Cell": {
+        "X": 9,
+        "Y": 0,
+        "Z": 4
+      },
+      "BlockTypeId": 2
+    },
+    {
+      "Cell": {
+        "X": 11,
+        "Y": 0,
+        "Z": 4
+      },
+      "BlockTypeId": 2
+    },
+    {
+      "Cell": {
+        "X": 16,
+        "Y": 0,
+        "Z": 4
+      },
+      "BlockTypeId": 1
+    },
+    {
+      "Cell": {
+        "X": 19,
+        "Y": 0,
+        "Z": 4
+      },
+      "BlockTypeId": 1
+    },
+    {
+      "Cell": {
+        "X": 22,
+        "Y": 0,
+        "Z": 4
+      },
+      "BlockTypeId": 2
+    },
+    {
+      "Cell": {
+        "X": 23,
+        "Y": 0,
+        "Z": 4
+      },
+      "BlockTypeId": 2
+    },
+    {
+      "Cell": {
+        "X": 18,
+        "Y": 0,
+        "Z": 4
+      },
+      "BlockTypeId": 1
+    },
+    {
+      "Cell": {
+        "X": 14,
+        "Y": 0,
+        "Z": 3
+      },
+      "BlockTypeId": 2
+    },
+    {
+      "Cell": {
+        "X": 12,
+        "Y": 0,
+        "Z": 3
+      },
+      "BlockTypeId": 2
+    },
+    {
+      "Cell": {
+        "X": 13,
+        "Y": 0,
+        "Z": 3
+      },
+      "BlockTypeId": 2
+    },
+    {
+      "Cell": {
+        "X": 16,
+        "Y": 0,
+        "Z": 3
+      },
+      "BlockTypeId": 2
+    },
+    {
+      "Cell": {
+        "X": 21,
+        "Y": 0,
+        "Z": 3
+      },
+      "BlockTypeId": 1
+    },
+    {
+      "Cell": {
+        "X": 22,
+        "Y": 0,
+        "Z": 3
+      },
+      "BlockTypeId": 1
+    },
+    {
+      "Cell": {
+        "X": 24,
+        "Y": 0,
+        "Z": 3
+      },
+      "BlockTypeId": 1
+    },
+    {
+      "Cell": {
+        "X": 25,
+        "Y": 0,
+        "Z": 3
+      },
+      "BlockTypeId": 1
+    },
+    {
+      "Cell": {
+        "X": 23,
+        "Y": 0,
+        "Z": 2
+      },
+      "BlockTypeId": 1
+    },
+    {
+      "Cell": {
+        "X": 22,
+        "Y": 0,
+        "Z": 2
+      },
+      "BlockTypeId": 1
+    },
+    {
+      "Cell": {
+        "X": 21,
+        "Y": 0,
+        "Z": 2
+      },
+      "BlockTypeId": 1
+    },
+    {
+      "Cell": {
+        "X": 21,
+        "Y": 0,
+        "Z": 1
+      },
+      "BlockTypeId": 1
+    },
+    {
+      "Cell": {
+        "X": 15,
+        "Y": 0,
+        "Z": 0
+      },
+      "BlockTypeId": 1
+    },
+    {
+      "Cell": {
+        "X": 13,
+        "Y": 0,
+        "Z": 1
+      },
+      "BlockTypeId": 2
+    },
+    {
+      "Cell": {
+        "X": 15,
+        "Y": 0,
+        "Z": 2
+      },
+      "BlockTypeId": 2
+    },
+    {
+      "Cell": {
+        "X": 18,
+        "Y": 0,
+        "Z": 2
+      },
+      "BlockTypeId": 2
+    },
+    {
+      "Cell": {
+        "X": 20,
+        "Y": 0,
+        "Z": 2
+      },
+      "BlockTypeId": 1
+    },
+    {
+      "Cell": {
+        "X": 28,
+        "Y": 0,
+        "Z": 4
+      },
+      "BlockTypeId": 1
+    },
+    {
+      "Cell": {
+        "X": 17,
+        "Y": 0,
+        "Z": 4
+      },
+      "BlockTypeId": 1
+    },
+    {
+      "Cell": {
+        "X": 13,
+        "Y": 0,
+        "Z": 4
+      },
+      "BlockTypeId": 2
+    },
+    {
+      "Cell": {
+        "X": 17,
+        "Y": 0,
+        "Z": 3
+      },
+      "BlockTypeId": 1
+    },
+    {
+      "Cell": {
+        "X": 19,
+        "Y": 0,
+        "Z": 3
+      },
+      "BlockTypeId": 1
+    },
+    {
+      "Cell": {
+        "X": 20,
+        "Y": 0,
+        "Z": 3
+      },
+      "BlockTypeId": 1
+    },
+    {
+      "Cell": {
+        "X": 19,
+        "Y": 0,
+        "Z": 2
+      },
+      "BlockTypeId": 1
+    },
+    {
+      "Cell": {
+        "X": 13,
+        "Y": 0,
+        "Z": 2
+      },
+      "BlockTypeId": 2
+    },
+    {
+      "Cell": {
+        "X": 6,
+        "Y": 0,
+        "Z": 1
+      },
+      "BlockTypeId": 1
+    },
+    {
+      "Cell": {
+        "X": 16,
+        "Y": 0,
+        "Z": 2
+      },
+      "BlockTypeId": 2
+    },
+    {
+      "Cell": {
+        "X": 11,
+        "Y": 0,
+        "Z": 2
+      },
+      "BlockTypeId": 1
+    },
+    {
+      "Cell": {
+        "X": 18,
+        "Y": 0,
+        "Z": 3
+      },
+      "BlockTypeId": 1
+    },
+    {
+      "Cell": {
+        "X": 23,
+        "Y": 0,
+        "Z": 3
+      },
+      "BlockTypeId": 1
+    },
+    {
+      "Cell": {
+        "X": 27,
+        "Y": 0,
+        "Z": 3
+      },
+      "BlockTypeId": 1
+    },
+    {
+      "Cell": {
+        "X": 24,
+        "Y": 0,
+        "Z": 1
+      },
+      "BlockTypeId": 1
+    },
+    {
+      "Cell": {
+        "X": 25,
+        "Y": 0,
+        "Z": 1
+      },
+      "BlockTypeId": 1
+    },
+    {
+      "Cell": {
+        "X": 25,
+        "Y": 0,
+        "Z": 2
+      },
+      "BlockTypeId": 1
+    },
+    {
+      "Cell": {
+        "X": 26,
+        "Y": 0,
+        "Z": 2
+      },
+      "BlockTypeId": 1
+    },
+    {
+      "Cell": {
+        "X": 24,
+        "Y": 0,
+        "Z": 4
+      },
+      "BlockTypeId": 1
+    },
+    {
+      "Cell": {
+        "X": 20,
+        "Y": 0,
+        "Z": 4
+      },
+      "BlockTypeId": 1
+    },
+    {
+      "Cell": {
+        "X": 17,
+        "Y": 0,
+        "Z": 2
+      },
+      "BlockTypeId": 2
+    },
+    {
+      "Cell": {
+        "X": 21,
+        "Y": 0,
+        "Z": 4
+      },
+      "BlockTypeId": 1
+    },
+    {
+      "Cell": {
+        "X": 14,
+        "Y": 0,
+        "Z": 2
+      },
+      "BlockTypeId": 2
+    },
+    {
+      "Cell": {
+        "X": 14,
+        "Y": 0,
+        "Z": 1
+      },
+      "BlockTypeId": 1
+    },
+    {
+      "Cell": {
+        "X": 24,
+        "Y": 0,
+        "Z": 2
+      },
+      "BlockTypeId": 1
+    },
+    {
+      "Cell": {
+        "X": 26,
+        "Y": 0,
+        "Z": 1
+      },
+      "BlockTypeId": 1
+    },
+    {
+      "Cell": {
+        "X": 10,
+        "Y": 0,
+        "Z": 1
+      },
+      "BlockTypeId": 1
+    },
+    {
+      "Cell": {
+        "X": 2,
+        "Y": 0,
+        "Z": 2
+      },
+      "BlockTypeId": 1
+    },
+    {
+      "Cell": {
+        "X": 2,
+        "Y": 0,
+        "Z": 8
+      },
+      "BlockTypeId": 2
+    },
+    {
+      "Cell": {
+        "X": 2,
+        "Y": 0,
+        "Z": 10
+      },
+      "BlockTypeId": 1
+    },
+    {
+      "Cell": {
+        "X": 2,
+        "Y": 0,
+        "Z": 11
+      },
+      "BlockTypeId": 1
+    },
+    {
+      "Cell": {
+        "X": 2,
+        "Y": 0,
+        "Z": 12
+      },
+      "BlockTypeId": 6
+    },
+    {
+      "Cell": {
+        "X": 2,
+        "Y": 0,
+        "Z": 13
+      },
+      "BlockTypeId": 1
+    },
+    {
+      "Cell": {
+        "X": 3,
+        "Y": 0,
+        "Z": 14
+      },
+      "BlockTypeId": 1
+    },
+    {
+      "Cell": {
+        "X": 3,
+        "Y": 0,
+        "Z": 15
+      },
+      "BlockTypeId": 1
+    },
+    {
+      "Cell": {
+        "X": 1,
+        "Y": 0,
+        "Z": 20
+      },
+      "BlockTypeId": 1
+    },
+    {
+      "Cell": {
+        "X": 0,
+        "Y": 0,
+        "Z": 14
+      },
+      "BlockTypeId": 2
+    },
+    {
+      "Cell": {
+        "X": 0,
+        "Y": 0,
+        "Z": 25
+      },
+      "BlockTypeId": 1
+    },
+    {
+      "Cell": {
+        "X": 0,
+        "Y": 0,
+        "Z": 24
+      },
+      "BlockTypeId": 1
+    },
+    {
+      "Cell": {
+        "X": 1,
+        "Y": 0,
+        "Z": 19
+      },
+      "BlockTypeId": 1
+    },
+    {
+      "Cell": {
+        "X": 1,
+        "Y": 0,
+        "Z": 18
+      },
+      "BlockTypeId": 1
+    },
+    {
+      "Cell": {
+        "X": 3,
+        "Y": 0,
+        "Z": 16
+      },
+      "BlockTypeId": 1
+    },
+    {
+      "Cell": {
+        "X": 1,
+        "Y": 0,
+        "Z": 17
+      },
+      "BlockTypeId": 1
+    },
+    {
+      "Cell": {
+        "X": 1,
+        "Y": 0,
+        "Z": 16
+      },
+      "BlockTypeId": 1
+    },
+    {
+      "Cell": {
+        "X": 2,
+        "Y": 0,
+        "Z": 14
+      },
+      "BlockTypeId": 1
+    },
+    {
+      "Cell": {
+        "X": 3,
+        "Y": 0,
+        "Z": 18
+      },
+      "BlockTypeId": 1
+    },
+    {
+      "Cell": {
+        "X": 3,
+        "Y": 0,
+        "Z": 17
+      },
+      "BlockTypeId": 1
+    },
+    {
+      "Cell": {
+        "X": 4,
+        "Y": 0,
+        "Z": 18
+      },
+      "BlockTypeId": 1
+    },
+    {
+      "Cell": {
+        "X": 5,
+        "Y": 0,
+        "Z": 20
+      },
+      "BlockTypeId": 1
+    },
+    {
+      "Cell": {
+        "X": 5,
+        "Y": 0,
+        "Z": 19
+      },
+      "BlockTypeId": 2
+    },
+    {
+      "Cell": {
+        "X": 1,
+        "Y": 0,
+        "Z": 10
+      },
+      "BlockTypeId": 1
+    },
+    {
+      "Cell": {
+        "X": 7,
+        "Y": 0,
+        "Z": 5
+      },
+      "BlockTypeId": 2
+    },
+    {
+      "Cell": {
+        "X": 8,
+        "Y": 0,
+        "Z": 6
+      },
+      "BlockTypeId": 1
+    },
+    {
+      "Cell": {
+        "X": 9,
+        "Y": 0,
+        "Z": 7
+      },
+      "BlockTypeId": 6
+    },
+    {
+      "Cell": {
+        "X": 5,
+        "Y": 0,
+        "Z": 8
+      },
+      "BlockTypeId": 2
+    },
+    {
+      "Cell": {
+        "X": 4,
+        "Y": 0,
+        "Z": 2
+      },
+      "BlockTypeId": 1
+    },
+    {
+      "Cell": {
+        "X": 9,
+        "Y": 0,
+        "Z": 3
+      },
+      "BlockTypeId": 1
+    },
+    {
+      "Cell": {
+        "X": 22,
+        "Y": 0,
+        "Z": 1
+      },
+      "BlockTypeId": 1
+    },
+    {
+      "Cell": {
+        "X": 23,
+        "Y": 0,
+        "Z": 1
+      },
+      "BlockTypeId": 1
+    },
+    {
+      "Cell": {
+        "X": 27,
+        "Y": 0,
+        "Z": 5
+      },
+      "BlockTypeId": 1
+    },
+    {
+      "Cell": {
+        "X": 27,
+        "Y": 0,
+        "Z": 6
+      },
+      "BlockTypeId": 1
+    },
+    {
+      "Cell": {
+        "X": 28,
+        "Y": 0,
+        "Z": 7
+      },
+      "BlockTypeId": 1
+    },
+    {
+      "Cell": {
+        "X": 28,
+        "Y": 0,
+        "Z": 8
+      },
+      "BlockTypeId": 2
+    },
+    {
+      "Cell": {
+        "X": 27,
+        "Y": 0,
+        "Z": 7
+      },
+      "BlockTypeId": 2
+    },
+    {
+      "Cell": {
+        "X": 26,
+        "Y": 0,
+        "Z": 6
+      },
+      "BlockTypeId": 2
+    },
+    {
+      "Cell": {
+        "X": 26,
+        "Y": 0,
+        "Z": 5
+      },
+      "BlockTypeId": 1
+    },
+    {
+      "Cell": {
+        "X": 25,
+        "Y": 0,
+        "Z": 5
+      },
+      "BlockTypeId": 1
+    },
+    {
+      "Cell": {
+        "X": 25,
+        "Y": 0,
+        "Z": 4
+      },
+      "BlockTypeId": 1
+    },
+    {
+      "Cell": {
+        "X": 29,
+        "Y": 0,
+        "Z": 7
+      },
+      "BlockTypeId": 1
+    },
+    {
+      "Cell": {
+        "X": 28,
+        "Y": 0,
+        "Z": 6
+      },
+      "BlockTypeId": 1
+    },
+    {
+      "Cell": {
+        "X": 28,
+        "Y": 0,
+        "Z": 10
+      },
+      "BlockTypeId": 2
+    },
+    {
+      "Cell": {
+        "X": 29,
+        "Y": 0,
+        "Z": 10
+      },
+      "BlockTypeId": 2
+    },
+    {
+      "Cell": {
+        "X": 29,
+        "Y": 0,
+        "Z": 12
+      },
+      "BlockTypeId": 2
+    },
+    {
+      "Cell": {
+        "X": 29,
+        "Y": 0,
+        "Z": 13
+      },
+      "BlockTypeId": 1
+    },
+    {
+      "Cell": {
+        "X": 29,
+        "Y": 0,
+        "Z": 14
+      },
+      "BlockTypeId": 1
+    },
+    {
+      "Cell": {
+        "X": 29,
+        "Y": 0,
+        "Z": 16
+      },
+      "BlockTypeId": 1
+    },
+    {
+      "Cell": {
+        "X": 29,
+        "Y": 0,
+        "Z": 17
+      },
+      "BlockTypeId": 1
+    },
+    {
+      "Cell": {
+        "X": 28,
+        "Y": 0,
+        "Z": 19
+      },
+      "BlockTypeId": 2
+    },
+    {
+      "Cell": {
+        "X": 28,
+        "Y": 0,
+        "Z": 20
+      },
+      "BlockTypeId": 2
+    },
+    {
+      "Cell": {
+        "X": 27,
+        "Y": 0,
+        "Z": 23
+      },
+      "BlockTypeId": 2
+    },
+    {
+      "Cell": {
+        "X": 27,
+        "Y": 0,
+        "Z": 24
+      },
+      "BlockTypeId": 2
+    },
+    {
+      "Cell": {
+        "X": 27,
+        "Y": 0,
+        "Z": 25
+      },
+      "BlockTypeId": 1
+    },
+    {
+      "Cell": {
+        "X": 27,
+        "Y": 0,
+        "Z": 26
+      },
+      "BlockTypeId": 1
+    },
+    {
+      "Cell": {
+        "X": 27,
+        "Y": 0,
+        "Z": 29
+      },
+      "BlockTypeId": 1
+    },
+    {
+      "Cell": {
+        "X": 28,
+        "Y": 0,
+        "Z": 29
+      },
+      "BlockTypeId": 1
+    },
+    {
+      "Cell": {
+        "X": 30,
+        "Y": 0,
+        "Z": 29
+      },
+      "BlockTypeId": 1
+    },
+    {
+      "Cell": {
+        "X": 28,
+        "Y": 0,
+        "Z": 25
+      },
+      "BlockTypeId": 2
+    },
+    {
+      "Cell": {
+        "X": 25,
+        "Y": 0,
+        "Z": 28
+      },
+      "BlockTypeId": 1
+    },
+    {
+      "Cell": {
+        "X": 24,
+        "Y": 0,
+        "Z": 27
+      },
+      "BlockTypeId": 1
+    },
+    {
+      "Cell": {
+        "X": 22,
+        "Y": 0,
+        "Z": 28
+      },
+      "BlockTypeId": 2
+    },
+    {
+      "Cell": {
+        "X": 20,
+        "Y": 0,
+        "Z": 29
+      },
+      "BlockTypeId": 1
+    },
+    {
+      "Cell": {
+        "X": 23,
+        "Y": 0,
+        "Z": 29
+      },
+      "BlockTypeId": 1
+    },
+    {
+      "Cell": {
+        "X": 26,
+        "Y": 0,
+        "Z": 22
+      },
+      "BlockTypeId": 6
+    },
+    {
+      "Cell": {
+        "X": 23,
+        "Y": 0,
+        "Z": 24
+      },
+      "BlockTypeId": 2
+    },
+    {
+      "Cell": {
+        "X": 23,
+        "Y": 0,
+        "Z": 25
+      },
+      "BlockTypeId": 2
+    },
+    {
+      "Cell": {
+        "X": 24,
+        "Y": 0,
+        "Z": 24
+      },
+      "BlockTypeId": 2
+    },
+    {
+      "Cell": {
+        "X": 25,
+        "Y": 0,
+        "Z": 24
+      },
+      "BlockTypeId": 6
+    },
+    {
+      "Cell": {
+        "X": 29,
+        "Y": 0,
+        "Z": 23
+      },
+      "BlockTypeId": 1
+    },
+    {
+      "Cell": {
+        "X": 28,
+        "Y": 0,
+        "Z": 23
+      },
+      "BlockTypeId": 2
+    },
+    {
+      "Cell": {
+        "X": 26,
+        "Y": 0,
+        "Z": 25
+      },
+      "BlockTypeId": 1
+    },
+    {
+      "Cell": {
+        "X": 22,
+        "Y": 0,
+        "Z": 27
+      },
+      "BlockTypeId": 2
+    },
+    {
+      "Cell": {
+        "X": 21,
+        "Y": 0,
+        "Z": 28
+      },
+      "BlockTypeId": 1
+    },
+    {
+      "Cell": {
+        "X": 29,
+        "Y": 0,
+        "Z": 24
+      },
+      "BlockTypeId": 2
+    },
+    {
+      "Cell": {
+        "X": 23,
+        "Y": 0,
+        "Z": 27
+      },
+      "BlockTypeId": 2
+    },
+    {
+      "Cell": {
+        "X": 21,
+        "Y": 0,
+        "Z": 27
+      },
+      "BlockTypeId": 2
+    },
+    {
+      "Cell": {
+        "X": 26,
+        "Y": 0,
+        "Z": 24
+      },
+      "BlockTypeId": 1
+    },
+    {
+      "Cell": {
+        "X": 19,
+        "Y": 0,
+        "Z": 27
+      },
+      "BlockTypeId": 2
+    },
+    {
+      "Cell": {
+        "X": 18,
+        "Y": 0,
+        "Z": 27
+      },
+      "BlockTypeId": 2
+    },
+    {
+      "Cell": {
+        "X": 24,
+        "Y": 0,
+        "Z": 25
+      },
+      "BlockTypeId": 6
+    },
+    {
+      "Cell": {
+        "X": 17,
+        "Y": 0,
+        "Z": 28
+      },
+      "BlockTypeId": 2
+    },
+    {
+      "Cell": {
+        "X": 25,
+        "Y": 0,
+        "Z": 27
+      },
+      "BlockTypeId": 1
+    },
+    {
+      "Cell": {
+        "X": 13,
+        "Y": 0,
+        "Z": 28
+      },
+      "BlockTypeId": 2
+    },
+    {
+      "Cell": {
+        "X": 11,
+        "Y": 0,
+        "Z": 28
+      },
+      "BlockTypeId": 2
+    },
+    {
+      "Cell": {
+        "X": 13,
+        "Y": 0,
+        "Z": 27
+      },
+      "BlockTypeId": 2
+    },
+    {
+      "Cell": {
+        "X": 16,
+        "Y": 0,
+        "Z": 25
+      },
+      "BlockTypeId": 6
+    },
+    {
+      "Cell": {
+        "X": 19,
+        "Y": 0,
+        "Z": 24
+      },
+      "BlockTypeId": 1
+    },
+    {
+      "Cell": {
+        "X": 20,
+        "Y": 0,
+        "Z": 23
+      },
+      "BlockTypeId": 3
+    },
+    {
+      "Cell": {
+        "X": 19,
+        "Y": 0,
+        "Z": 23
+      },
+      "BlockTypeId": 1
+    },
+    {
+      "Cell": {
+        "X": 18,
+        "Y": 0,
+        "Z": 24
+      },
+      "BlockTypeId": 2
+    },
+    {
+      "Cell": {
+        "X": 14,
+        "Y": 0,
+        "Z": 25
+      },
+      "BlockTypeId": 6
+    },
+    {
+      "Cell": {
+        "X": 12,
+        "Y": 0,
+        "Z": 26
+      },
+      "BlockTypeId": 2
+    },
+    {
+      "Cell": {
+        "X": 15,
+        "Y": 0,
+        "Z": 25
+      },
+      "BlockTypeId": 1
+    },
+    {
+      "Cell": {
+        "X": 13,
+        "Y": 0,
+        "Z": 26
+      },
+      "BlockTypeId": 1
+    },
+    {
+      "Cell": {
+        "X": 8,
+        "Y": 0,
+        "Z": 29
+      },
+      "BlockTypeId": 1
+    },
+    {
+      "Cell": {
+        "X": 14,
+        "Y": 0,
+        "Z": 24
+      },
+      "BlockTypeId": 6
+    },
+    {
+      "Cell": {
+        "X": 12,
+        "Y": 0,
+        "Z": 27
+      },
+      "BlockTypeId": 2
+    },
+    {
+      "Cell": {
+        "X": 16,
+        "Y": 0,
+        "Z": 26
+      },
+      "BlockTypeId": 6
+    },
+    {
+      "Cell": {
+        "X": 20,
+        "Y": 0,
+        "Z": 24
+      },
+      "BlockTypeId": 6
+    },
+    {
+      "Cell": {
+        "X": 22,
+        "Y": 0,
+        "Z": 23
+      },
+      "BlockTypeId": 3
+    },
+    {
+      "Cell": {
+        "X": 24,
+        "Y": 0,
+        "Z": 23
+      },
+      "BlockTypeId": 1
+    },
+    {
+      "Cell": {
+        "X": 21,
+        "Y": 0,
+        "Z": 24
+      },
+      "BlockTypeId": 6
+    },
+    {
+      "Cell": {
+        "X": 17,
+        "Y": 0,
+        "Z": 26
+      },
+      "BlockTypeId": 6
+    },
+    {
+      "Cell": {
+        "X": 15,
+        "Y": 0,
+        "Z": 27
+      },
+      "BlockTypeId": 2
+    },
+    {
+      "Cell": {
+        "X": 14,
+        "Y": 0,
+        "Z": 27
+      },
+      "BlockTypeId": 2
+    },
+    {
+      "Cell": {
+        "X": 17,
+        "Y": 0,
+        "Z": 25
+      },
+      "BlockTypeId": 6
+    },
+    {
+      "Cell": {
+        "X": 21,
+        "Y": 0,
+        "Z": 23
+      },
+      "BlockTypeId": 3
+    },
+    {
+      "Cell": {
+        "X": 14,
+        "Y": 0,
+        "Z": 26
+      },
+      "BlockTypeId": 1
+    },
+    {
+      "Cell": {
+        "X": 17,
+        "Y": 0,
+        "Z": 24
+      },
+      "BlockTypeId": 3
+    },
+    {
+      "Cell": {
+        "X": 19,
+        "Y": 0,
+        "Z": 22
+      },
+      "BlockTypeId": 3
+    },
+    {
+      "Cell": {
+        "X": 20,
+        "Y": 0,
+        "Z": 22
+      },
+      "BlockTypeId": 3
+    },
+    {
+      "Cell": {
+        "X": 15,
+        "Y": 0,
+        "Z": 26
+      },
+      "BlockTypeId": 6
+    },
+    {
+      "Cell": {
+        "X": 20,
+        "Y": 0,
+        "Z": 25
+      },
+      "BlockTypeId": 2
+    },
+    {
+      "Cell": {
+        "X": 19,
+        "Y": 0,
+        "Z": 25
+      },
+      "BlockTypeId": 6
+    },
+    {
+      "Cell": {
+        "X": 19,
+        "Y": 0,
+        "Z": 26
+      },
+      "BlockTypeId": 2
+    },
+    {
+      "Cell": {
+        "X": 18,
+        "Y": 0,
+        "Z": 26
+      },
+      "BlockTypeId": 2
+    },
+    {
+      "Cell": {
+        "X": 20,
+        "Y": 0,
+        "Z": 26
+      },
+      "BlockTypeId": 2
+    },
+    {
+      "Cell": {
+        "X": 23,
+        "Y": 0,
+        "Z": 28
+      },
+      "BlockTypeId": 2
+    },
+    {
+      "Cell": {
+        "X": 18,
+        "Y": 0,
+        "Z": 28
+      },
+      "BlockTypeId": 2
+    },
+    {
+      "Cell": {
+        "X": 16,
+        "Y": 0,
+        "Z": 28
+      },
+      "BlockTypeId": 2
+    },
+    {
+      "Cell": {
+        "X": 15,
+        "Y": 0,
+        "Z": 28
+      },
+      "BlockTypeId": 2
+    },
+    {
+      "Cell": {
+        "X": 14,
+        "Y": 0,
+        "Z": 28
+      },
+      "BlockTypeId": 2
+    },
+    {
+      "Cell": {
+        "X": 17,
+        "Y": 0,
+        "Z": 27
+      },
+      "BlockTypeId": 2
+    },
+    {
+      "Cell": {
+        "X": 16,
+        "Y": 0,
+        "Z": 27
+      },
+      "BlockTypeId": 2
+    },
+    {
+      "Cell": {
+        "X": 19,
+        "Y": 0,
+        "Z": 28
+      },
+      "BlockTypeId": 2
+    },
+    {
+      "Cell": {
+        "X": 18,
+        "Y": 0,
+        "Z": 25
+      },
+      "BlockTypeId": 6
+    },
+    {
+      "Cell": {
+        "X": 12,
+        "Y": 0,
+        "Z": 28
+      },
+      "BlockTypeId": 2
+    },
+    {
+      "Cell": {
+        "X": 9,
+        "Y": 0,
+        "Z": 25
+      },
+      "BlockTypeId": 2
+    },
+    {
+      "Cell": {
+        "X": 10,
+        "Y": 0,
+        "Z": 26
+      },
+      "BlockTypeId": 2
+    },
+    {
+      "Cell": {
+        "X": 6,
+        "Y": 0,
+        "Z": 26
+      },
+      "BlockTypeId": 2
+    },
+    {
+      "Cell": {
+        "X": 6,
+        "Y": 0,
+        "Z": 23
+      },
+      "BlockTypeId": 2
+    },
+    {
+      "Cell": {
+        "X": 7,
+        "Y": 0,
+        "Z": 23
+      },
+      "BlockTypeId": 2
+    },
+    {
+      "Cell": {
+        "X": 1,
+        "Y": 0,
+        "Z": 22
+      },
+      "BlockTypeId": 2
+    },
+    {
+      "Cell": {
+        "X": 5,
+        "Y": 0,
+        "Z": 7
+      },
+      "BlockTypeId": 2
+    },
+    {
+      "Cell": {
+        "X": 5,
+        "Y": 0,
+        "Z": 10
+      },
+      "BlockTypeId": 6
+    },
+    {
+      "Cell": {
+        "X": 6,
+        "Y": 0,
+        "Z": 8
+      },
+      "BlockTypeId": 6
+    },
+    {
+      "Cell": {
+        "X": 6,
+        "Y": 0,
+        "Z": 3
+      },
+      "BlockTypeId": 2
+    },
+    {
+      "Cell": {
+        "X": 15,
+        "Y": 0,
+        "Z": 3
+      },
+      "BlockTypeId": 2
+    },
+    {
+      "Cell": {
+        "X": 12,
+        "Y": 0,
+        "Z": 2
+      },
+      "BlockTypeId": 2
+    },
+    {
+      "Cell": {
+        "X": 10,
+        "Y": 0,
+        "Z": 6
+      },
+      "BlockTypeId": 2
+    },
+    {
+      "Cell": {
+        "X": 10,
+        "Y": 0,
+        "Z": 7
+      },
+      "BlockTypeId": 6
+    },
+    {
+      "Cell": {
+        "X": 8,
+        "Y": 0,
+        "Z": 8
+      },
+      "BlockTypeId": 6
+    },
+    {
+      "Cell": {
+        "X": 4,
+        "Y": 0,
+        "Z": 8
+      },
+      "BlockTypeId": 2
+    },
+    {
+      "Cell": {
+        "X": 8,
+        "Y": 0,
+        "Z": 5
+      },
+      "BlockTypeId": 2
+    },
+    {
+      "Cell": {
+        "X": 7,
+        "Y": 0,
+        "Z": 6
+      },
+      "BlockTypeId": 2
+    },
+    {
+      "Cell": {
+        "X": 7,
+        "Y": 0,
+        "Z": 7
+      },
+      "BlockTypeId": 2
+    },
+    {
+      "Cell": {
+        "X": 11,
+        "Y": 0,
+        "Z": 7
+      },
+      "BlockTypeId": 2
+    },
+    {
+      "Cell": {
+        "X": 12,
+        "Y": 0,
+        "Z": 7
+      },
+      "BlockTypeId": 6
+    },
+    {
+      "Cell": {
+        "X": 11,
+        "Y": 0,
+        "Z": 6
+      },
+      "BlockTypeId": 2
+    },
+    {
+      "Cell": {
+        "X": 12,
+        "Y": 0,
+        "Z": 6
+      },
+      "BlockTypeId": 2
+    },
+    {
+      "Cell": {
+        "X": 10,
+        "Y": 0,
+        "Z": 5
+      },
+      "BlockTypeId": 2
+    },
+    {
+      "Cell": {
+        "X": 14,
+        "Y": 0,
+        "Z": 4
+      },
+      "BlockTypeId": 2
+    },
+    {
+      "Cell": {
+        "X": 15,
+        "Y": 0,
+        "Z": 4
+      },
+      "BlockTypeId": 2
+    },
+    {
+      "Cell": {
+        "X": 15,
+        "Y": 0,
+        "Z": 5
+      },
+      "BlockTypeId": 6
+    },
+    {
+      "Cell": {
+        "X": 16,
+        "Y": 0,
+        "Z": 5
+      },
+      "BlockTypeId": 2
+    },
+    {
+      "Cell": {
+        "X": 17,
+        "Y": 0,
+        "Z": 5
+      },
+      "BlockTypeId": 6
+    },
+    {
+      "Cell": {
+        "X": 17,
+        "Y": 0,
+        "Z": 6
+      },
+      "BlockTypeId": 6
+    },
+    {
+      "Cell": {
+        "X": 16,
+        "Y": 0,
+        "Z": 6
+      },
+      "BlockTypeId": 2
+    },
+    {
+      "Cell": {
+        "X": 18,
+        "Y": 0,
+        "Z": 5
+      },
+      "BlockTypeId": 2
+    },
+    {
+      "Cell": {
+        "X": 19,
+        "Y": 0,
+        "Z": 5
+      },
+      "BlockTypeId": 6
+    },
+    {
+      "Cell": {
+        "X": 21,
+        "Y": 0,
+        "Z": 6
+      },
+      "BlockTypeId": 6
+    },
+    {
+      "Cell": {
+        "X": 22,
+        "Y": 0,
+        "Z": 6
+      },
+      "BlockTypeId": 6
+    },
+    {
+      "Cell": {
+        "X": 24,
+        "Y": 0,
+        "Z": 6
+      },
+      "BlockTypeId": 2
+    },
+    {
+      "Cell": {
+        "X": 25,
+        "Y": 0,
+        "Z": 7
+      },
+      "BlockTypeId": 2
+    },
+    {
+      "Cell": {
+        "X": 26,
+        "Y": 0,
+        "Z": 8
+      },
+      "BlockTypeId": 2
+    },
+    {
+      "Cell": {
+        "X": 27,
+        "Y": 0,
+        "Z": 8
+      },
+      "BlockTypeId": 2
+    },
+    {
+      "Cell": {
+        "X": 27,
+        "Y": 0,
+        "Z": 9
+      },
+      "BlockTypeId": 3
+    },
+    {
+      "Cell": {
+        "X": 26,
+        "Y": 0,
+        "Z": 7
+      },
+      "BlockTypeId": 2
+    },
+    {
+      "Cell": {
+        "X": 25,
+        "Y": 0,
+        "Z": 6
+      },
+      "BlockTypeId": 2
+    },
+    {
+      "Cell": {
+        "X": 28,
+        "Y": 0,
+        "Z": 9
+      },
+      "BlockTypeId": 2
+    },
+    {
+      "Cell": {
+        "X": 29,
+        "Y": 0,
+        "Z": 9
+      },
+      "BlockTypeId": 2
+    },
+    {
+      "Cell": {
+        "X": 28,
+        "Y": 0,
+        "Z": 11
+      },
+      "BlockTypeId": 2
+    },
+    {
+      "Cell": {
+        "X": 28,
+        "Y": 0,
+        "Z": 12
+      },
+      "BlockTypeId": 2
+    },
+    {
+      "Cell": {
+        "X": 28,
+        "Y": 0,
+        "Z": 13
+      },
+      "BlockTypeId": 2
+    },
+    {
+      "Cell": {
+        "X": 28,
+        "Y": 0,
+        "Z": 14
+      },
+      "BlockTypeId": 2
+    },
+    {
+      "Cell": {
+        "X": 28,
+        "Y": 0,
+        "Z": 15
+      },
+      "BlockTypeId": 2
+    },
+    {
+      "Cell": {
+        "X": 28,
+        "Y": 0,
+        "Z": 16
+      },
+      "BlockTypeId": 2
+    },
+    {
+      "Cell": {
+        "X": 28,
+        "Y": 0,
+        "Z": 18
+      },
+      "BlockTypeId": 2
+    },
+    {
+      "Cell": {
+        "X": 27,
+        "Y": 0,
+        "Z": 21
+      },
+      "BlockTypeId": 2
+    },
+    {
+      "Cell": {
+        "X": 27,
+        "Y": 0,
+        "Z": 22
+      },
+      "BlockTypeId": 2
+    },
+    {
+      "Cell": {
+        "X": 30,
+        "Y": 0,
+        "Z": 25
+      },
+      "BlockTypeId": 2
+    },
+    {
+      "Cell": {
+        "X": 26,
+        "Y": 0,
+        "Z": 23
+      },
+      "BlockTypeId": 6
+    },
+    {
+      "Cell": {
+        "X": 25,
+        "Y": 0,
+        "Z": 23
+      },
+      "BlockTypeId": 6
+    },
+    {
+      "Cell": {
+        "X": 22,
+        "Y": 0,
+        "Z": 25
+      },
+      "BlockTypeId": 2
+    },
+    {
+      "Cell": {
+        "X": 21,
+        "Y": 0,
+        "Z": 25
+      },
+      "BlockTypeId": 2
+    },
+    {
+      "Cell": {
+        "X": 22,
+        "Y": 0,
+        "Z": 24
+      },
+      "BlockTypeId": 6
+    },
+    {
+      "Cell": {
+        "X": 23,
+        "Y": 0,
+        "Z": 23
+      },
+      "BlockTypeId": 6
+    },
+    {
+      "Cell": {
+        "X": 23,
+        "Y": 0,
+        "Z": 22
+      },
+      "BlockTypeId": 3
+    },
+    {
+      "Cell": {
+        "X": 24,
+        "Y": 0,
+        "Z": 21
+      },
+      "BlockTypeId": 3
+    },
+    {
+      "Cell": {
+        "X": 25,
+        "Y": 0,
+        "Z": 20
+      },
+      "BlockTypeId": 3
+    },
+    {
+      "Cell": {
+        "X": 26,
+        "Y": 0,
+        "Z": 20
+      },
+      "BlockTypeId": 2
+    },
+    {
+      "Cell": {
+        "X": 26,
+        "Y": 0,
+        "Z": 19
+      },
+      "BlockTypeId": 2
+    },
+    {
+      "Cell": {
+        "X": 25,
+        "Y": 0,
+        "Z": 21
+      },
+      "BlockTypeId": 6
+    },
+    {
+      "Cell": {
+        "X": 24,
+        "Y": 0,
+        "Z": 22
+      },
+      "BlockTypeId": 2
+    },
+    {
+      "Cell": {
+        "X": 25,
+        "Y": 0,
+        "Z": 22
+      },
+      "BlockTypeId": 6
+    },
+    {
+      "Cell": {
+        "X": 27,
+        "Y": 0,
+        "Z": 18
+      },
+      "BlockTypeId": 2
+    },
+    {
+      "Cell": {
+        "X": 27,
+        "Y": 0,
+        "Z": 17
+      },
+      "BlockTypeId": 2
+    },
+    {
+      "Cell": {
+        "X": 27,
+        "Y": 0,
+        "Z": 16
+      },
+      "BlockTypeId": 2
+    },
+    {
+      "Cell": {
+        "X": 28,
+        "Y": 0,
+        "Z": 17
+      },
+      "BlockTypeId": 2
+    },
+    {
+      "Cell": {
+        "X": 27,
+        "Y": 0,
+        "Z": 15
+      },
+      "BlockTypeId": 2
+    },
+    {
+      "Cell": {
+        "X": 26,
+        "Y": 0,
+        "Z": 15
+      },
+      "BlockTypeId": 3
+    },
+    {
+      "Cell": {
+        "X": 26,
+        "Y": 0,
+        "Z": 16
+      },
+      "BlockTypeId": 3
+    },
+    {
+      "Cell": {
+        "X": 27,
+        "Y": 0,
+        "Z": 19
+      },
+      "BlockTypeId": 2
+    },
+    {
+      "Cell": {
+        "X": 27,
+        "Y": 0,
+        "Z": 20
+      },
+      "BlockTypeId": 2
+    },
+    {
+      "Cell": {
+        "X": 27,
+        "Y": 0,
+        "Z": 14
+      },
+      "BlockTypeId": 2
+    },
+    {
+      "Cell": {
+        "X": 27,
+        "Y": 0,
+        "Z": 13
+      },
+      "BlockTypeId": 2
+    },
+    {
+      "Cell": {
+        "X": 27,
+        "Y": 0,
+        "Z": 12
+      },
+      "BlockTypeId": 2
+    },
+    {
+      "Cell": {
+        "X": 27,
+        "Y": 0,
+        "Z": 11
+      },
+      "BlockTypeId": 2
+    },
+    {
+      "Cell": {
+        "X": 26,
+        "Y": 0,
+        "Z": 10
+      },
+      "BlockTypeId": 3
+    },
+    {
+      "Cell": {
+        "X": 26,
+        "Y": 0,
+        "Z": 9
+      },
+      "BlockTypeId": 3
+    },
+    {
+      "Cell": {
+        "X": 27,
+        "Y": 0,
+        "Z": 10
+      },
+      "BlockTypeId": 2
+    },
+    {
+      "Cell": {
+        "X": 29,
+        "Y": 0,
+        "Z": 11
+      },
+      "BlockTypeId": 2
+    },
+    {
+      "Cell": {
+        "X": 25,
+        "Y": 0,
+        "Z": 8
+      },
+      "BlockTypeId": 6
+    },
+    {
+      "Cell": {
+        "X": 24,
+        "Y": 0,
+        "Z": 5
+      },
+      "BlockTypeId": 2
+    },
+    {
+      "Cell": {
+        "X": 23,
+        "Y": 0,
+        "Z": 5
+      },
+      "BlockTypeId": 2
+    },
+    {
+      "Cell": {
+        "X": 23,
+        "Y": 0,
+        "Z": 6
+      },
+      "BlockTypeId": 2
+    },
+    {
+      "Cell": {
+        "X": 22,
+        "Y": 0,
+        "Z": 7
+      },
+      "BlockTypeId": 3
+    },
+    {
+      "Cell": {
+        "X": 20,
+        "Y": 0,
+        "Z": 6
+      },
+      "BlockTypeId": 6
+    },
+    {
+      "Cell": {
+        "X": 21,
+        "Y": 0,
+        "Z": 5
+      },
+      "BlockTypeId": 2
+    },
+    {
+      "Cell": {
+        "X": 22,
+        "Y": 0,
+        "Z": 5
+      },
+      "BlockTypeId": 2
+    },
+    {
+      "Cell": {
+        "X": 20,
+        "Y": 0,
+        "Z": 5
+      },
+      "BlockTypeId": 2
+    },
+    {
+      "Cell": {
+        "X": 14,
+        "Y": 0,
+        "Z": 6
+      },
+      "BlockTypeId": 2
+    },
+    {
+      "Cell": {
+        "X": 13,
+        "Y": 0,
+        "Z": 6
+      },
+      "BlockTypeId": 2
+    },
+    {
+      "Cell": {
+        "X": 13,
+        "Y": 0,
+        "Z": 7
+      },
+      "BlockTypeId": 6
+    },
+    {
+      "Cell": {
+        "X": 12,
+        "Y": 0,
+        "Z": 8
+      },
+      "BlockTypeId": 6
+    },
+    {
+      "Cell": {
+        "X": 14,
+        "Y": 0,
+        "Z": 7
+      },
+      "BlockTypeId": 6
+    },
+    {
+      "Cell": {
+        "X": 15,
+        "Y": 0,
+        "Z": 6
+      },
+      "BlockTypeId": 6
+    },
+    {
+      "Cell": {
+        "X": 13,
+        "Y": 0,
+        "Z": 5
+      },
+      "BlockTypeId": 6
+    },
+    {
+      "Cell": {
+        "X": 13,
+        "Y": 0,
+        "Z": 8
+      },
+      "BlockTypeId": 2
+    },
+    {
+      "Cell": {
+        "X": 14,
+        "Y": 0,
+        "Z": 5
+      },
+      "BlockTypeId": 6
+    },
+    {
+      "Cell": {
+        "X": 11,
+        "Y": 0,
+        "Z": 8
+      },
+      "BlockTypeId": 2
+    },
+    {
+      "Cell": {
+        "X": 10,
+        "Y": 0,
+        "Z": 9
+      },
+      "BlockTypeId": 6
+    },
+    {
+      "Cell": {
+        "X": 9,
+        "Y": 0,
+        "Z": 10
+      },
+      "BlockTypeId": 6
+    },
+    {
+      "Cell": {
+        "X": 8,
+        "Y": 0,
+        "Z": 10
+      },
+      "BlockTypeId": 6
+    },
+    {
+      "Cell": {
+        "X": 7,
+        "Y": 0,
+        "Z": 11
+      },
+      "BlockTypeId": 6
+    },
+    {
+      "Cell": {
+        "X": 7,
+        "Y": 0,
+        "Z": 12
+      },
+      "BlockTypeId": 6
+    },
+    {
+      "Cell": {
+        "X": 6,
+        "Y": 0,
+        "Z": 12
+      },
+      "BlockTypeId": 6
+    },
+    {
+      "Cell": {
+        "X": 9,
+        "Y": 0,
+        "Z": 9
+      },
+      "BlockTypeId": 6
+    },
+    {
+      "Cell": {
+        "X": 8,
+        "Y": 0,
+        "Z": 9
+      },
+      "BlockTypeId": 6
+    },
+    {
+      "Cell": {
+        "X": 7,
+        "Y": 0,
+        "Z": 10
+      },
+      "BlockTypeId": 6
+    },
+    {
+      "Cell": {
+        "X": 6,
+        "Y": 0,
+        "Z": 11
+      },
+      "BlockTypeId": 6
+    },
+    {
+      "Cell": {
+        "X": 5,
+        "Y": 0,
+        "Z": 11
+      },
+      "BlockTypeId": 6
+    },
+    {
+      "Cell": {
+        "X": 4,
+        "Y": 0,
+        "Z": 12
+      },
+      "BlockTypeId": 6
+    },
+    {
+      "Cell": {
+        "X": 7,
+        "Y": 0,
+        "Z": 9
+      },
+      "BlockTypeId": 6
+    },
+    {
+      "Cell": {
+        "X": 10,
+        "Y": 0,
+        "Z": 8
+      },
+      "BlockTypeId": 6
+    },
+    {
+      "Cell": {
+        "X": 15,
+        "Y": 0,
+        "Z": 7
+      },
+      "BlockTypeId": 6
+    },
+    {
+      "Cell": {
+        "X": 15,
+        "Y": 0,
+        "Z": 8
+      },
+      "BlockTypeId": 3
+    },
+    {
+      "Cell": {
+        "X": 14,
+        "Y": 0,
+        "Z": 8
+      },
+      "BlockTypeId": 3
+    },
+    {
+      "Cell": {
+        "X": 11,
+        "Y": 0,
+        "Z": 9
+      },
+      "BlockTypeId": 6
+    },
+    {
+      "Cell": {
+        "X": 6,
+        "Y": 0,
+        "Z": 17
+      },
+      "BlockTypeId": 6
+    },
+    {
+      "Cell": {
+        "X": 6,
+        "Y": 0,
+        "Z": 16
+      },
+      "BlockTypeId": 6
+    },
+    {
+      "Cell": {
+        "X": 7,
+        "Y": 0,
+        "Z": 16
+      },
+      "BlockTypeId": 6
+    },
+    {
+      "Cell": {
+        "X": 7,
+        "Y": 0,
+        "Z": 17
+      },
+      "BlockTypeId": 6
+    },
+    {
+      "Cell": {
+        "X": 7,
+        "Y": 0,
+        "Z": 18
+      },
+      "BlockTypeId": 6
+    },
+    {
+      "Cell": {
+        "X": 7,
+        "Y": 0,
+        "Z": 19
+      },
+      "BlockTypeId": 6
+    },
+    {
+      "Cell": {
+        "X": 6,
+        "Y": 0,
+        "Z": 18
+      },
+      "BlockTypeId": 6
+    },
+    {
+      "Cell": {
+        "X": 8,
+        "Y": 0,
+        "Z": 18
+      },
+      "BlockTypeId": 6
+    },
+    {
+      "Cell": {
+        "X": 9,
+        "Y": 0,
+        "Z": 20
+      },
+      "BlockTypeId": 3
+    },
+    {
+      "Cell": {
+        "X": 9,
+        "Y": 0,
+        "Z": 21
+      },
+      "BlockTypeId": 2
+    },
+    {
+      "Cell": {
+        "X": 10,
+        "Y": 0,
+        "Z": 22
+      },
+      "BlockTypeId": 6
+    },
+    {
+      "Cell": {
+        "X": 10,
+        "Y": 0,
+        "Z": 23
+      },
+      "BlockTypeId": 6
+    },
+    {
+      "Cell": {
+        "X": 10,
+        "Y": 0,
+        "Z": 21
+      },
+      "BlockTypeId": 6
+    },
+    {
+      "Cell": {
+        "X": 8,
+        "Y": 0,
+        "Z": 19
+      },
+      "BlockTypeId": 3
+    },
+    {
+      "Cell": {
+        "X": 8,
+        "Y": 0,
+        "Z": 21
+      },
+      "BlockTypeId": 2
+    },
+    {
+      "Cell": {
+        "X": 9,
+        "Y": 0,
+        "Z": 23
+      },
+      "BlockTypeId": 2
+    },
+    {
+      "Cell": {
+        "X": 10,
+        "Y": 0,
+        "Z": 24
+      },
+      "BlockTypeId": 6
+    },
+    {
+      "Cell": {
+        "X": 11,
+        "Y": 0,
+        "Z": 25
+      },
+      "BlockTypeId": 2
+    },
+    {
+      "Cell": {
+        "X": 12,
+        "Y": 0,
+        "Z": 25
+      },
+      "BlockTypeId": 6
+    },
+    {
+      "Cell": {
+        "X": 11,
+        "Y": 0,
+        "Z": 24
+      },
+      "BlockTypeId": 2
+    },
+    {
+      "Cell": {
+        "X": 9,
+        "Y": 0,
+        "Z": 22
+      },
+      "BlockTypeId": 2
+    },
+    {
+      "Cell": {
+        "X": 8,
+        "Y": 0,
+        "Z": 20
+      },
+      "BlockTypeId": 3
+    },
+    {
+      "Cell": {
+        "X": 8,
+        "Y": 0,
+        "Z": 22
+      },
+      "BlockTypeId": 2
+    },
+    {
+      "Cell": {
+        "X": 11,
+        "Y": 0,
+        "Z": 26
+      },
+      "BlockTypeId": 2
+    },
+    {
+      "Cell": {
+        "X": 7,
+        "Y": 0,
+        "Z": 21
+      },
+      "BlockTypeId": 2
+    },
+    {
+      "Cell": {
+        "X": 12,
+        "Y": 0,
+        "Z": 22
+      },
+      "BlockTypeId": 6
+    },
+    {
+      "Cell": {
+        "X": 12,
+        "Y": 0,
+        "Z": 23
+      },
+      "BlockTypeId": 6
+    },
+    {
+      "Cell": {
+        "X": 11,
+        "Y": 0,
+        "Z": 23
+      },
+      "BlockTypeId": 6
+    },
+    {
+      "Cell": {
+        "X": 8,
+        "Y": 0,
+        "Z": 17
+      },
+      "BlockTypeId": 3
+    },
+    {
+      "Cell": {
+        "X": 7,
+        "Y": 0,
+        "Z": 15
+      },
+      "BlockTypeId": 3
+    },
+    {
+      "Cell": {
+        "X": 6,
+        "Y": 0,
+        "Z": 14
+      },
+      "BlockTypeId": 3
+    },
+    {
+      "Cell": {
+        "X": 6,
+        "Y": 0,
+        "Z": 15
+      },
+      "BlockTypeId": 6
+    },
+    {
+      "Cell": {
+        "X": 5,
+        "Y": 0,
+        "Z": 12
+      },
+      "BlockTypeId": 6
+    },
+    {
+      "Cell": {
+        "X": 5,
+        "Y": 0,
+        "Z": 13
+      },
+      "BlockTypeId": 3
+    },
+    {
+      "Cell": {
+        "X": 5,
+        "Y": 0,
+        "Z": 15
+      },
+      "BlockTypeId": 6
+    },
+    {
+      "Cell": {
+        "X": 6,
+        "Y": 0,
+        "Z": 13
+      },
+      "BlockTypeId": 3
+    },
+    {
+      "Cell": {
+        "X": 9,
+        "Y": 0,
+        "Z": 8
+      },
+      "BlockTypeId": 6
+    },
+    {
+      "Cell": {
+        "X": 19,
+        "Y": 0,
+        "Z": 6
+      },
+      "BlockTypeId": 6
+    },
+    {
+      "Cell": {
+        "X": 23,
+        "Y": 0,
+        "Z": 7
+      },
+      "BlockTypeId": 6
+    },
+    {
+      "Cell": {
+        "X": 21,
+        "Y": 0,
+        "Z": 7
+      },
+      "BlockTypeId": 6
+    },
+    {
+      "Cell": {
+        "X": 18,
+        "Y": 0,
+        "Z": 7
+      },
+      "BlockTypeId": 6
+    },
+    {
+      "Cell": {
+        "X": 16,
+        "Y": 0,
+        "Z": 7
+      },
+      "BlockTypeId": 6
+    },
+    {
+      "Cell": {
+        "X": 17,
+        "Y": 0,
+        "Z": 7
+      },
+      "BlockTypeId": 6
+    },
+    {
+      "Cell": {
+        "X": 20,
+        "Y": 0,
+        "Z": 7
+      },
+      "BlockTypeId": 6
+    },
+    {
+      "Cell": {
+        "X": 18,
+        "Y": 0,
+        "Z": 8
+      },
+      "BlockTypeId": 3
+    },
+    {
+      "Cell": {
+        "X": 17,
+        "Y": 0,
+        "Z": 8
+      },
+      "BlockTypeId": 3
+    },
+    {
+      "Cell": {
+        "X": 16,
+        "Y": 0,
+        "Z": 8
+      },
+      "BlockTypeId": 3
+    },
+    {
+      "Cell": {
+        "X": 19,
+        "Y": 0,
+        "Z": 7
+      },
+      "BlockTypeId": 6
+    },
+    {
+      "Cell": {
+        "X": 18,
+        "Y": 0,
+        "Z": 6
+      },
+      "BlockTypeId": 6
+    },
+    {
+      "Cell": {
+        "X": 24,
+        "Y": 0,
+        "Z": 7
+      },
+      "BlockTypeId": 6
+    },
+    {
+      "Cell": {
+        "X": 21,
+        "Y": 0,
+        "Z": 8
+      },
+      "BlockTypeId": 3
+    },
+    {
+      "Cell": {
+        "X": 15,
+        "Y": 0,
+        "Z": 9
+      },
+      "BlockTypeId": 3
+    },
+    {
+      "Cell": {
+        "X": 12,
+        "Y": 0,
+        "Z": 10
+      },
+      "BlockTypeId": 6
+    },
+    {
+      "Cell": {
+        "X": 11,
+        "Y": 0,
+        "Z": 10
+      },
+      "BlockTypeId": 6
+    },
+    {
+      "Cell": {
+        "X": 8,
+        "Y": 0,
+        "Z": 11
+      },
+      "BlockTypeId": 6
+    },
+    {
+      "Cell": {
+        "X": 9,
+        "Y": 0,
+        "Z": 11
+      },
+      "BlockTypeId": 6
+    },
+    {
+      "Cell": {
+        "X": 10,
+        "Y": 0,
+        "Z": 11
+      },
+      "BlockTypeId": 3
+    },
+    {
+      "Cell": {
+        "X": 11,
+        "Y": 0,
+        "Z": 11
+      },
+      "BlockTypeId": 3
+    },
+    {
+      "Cell": {
+        "X": 12,
+        "Y": 0,
+        "Z": 11
+      },
+      "BlockTypeId": 3
+    },
+    {
+      "Cell": {
+        "X": 13,
+        "Y": 0,
+        "Z": 10
+      },
+      "BlockTypeId": 3
+    },
+    {
+      "Cell": {
+        "X": 16,
+        "Y": 0,
+        "Z": 10
+      },
+      "BlockTypeId": 3
+    },
+    {
+      "Cell": {
+        "X": 17,
+        "Y": 0,
+        "Z": 10
+      },
+      "BlockTypeId": 3
+    },
+    {
+      "Cell": {
+        "X": 19,
+        "Y": 0,
+        "Z": 10
+      },
+      "BlockTypeId": 3
+    },
+    {
+      "Cell": {
+        "X": 21,
+        "Y": 0,
+        "Z": 10
+      },
+      "BlockTypeId": 3
+    },
+    {
+      "Cell": {
+        "X": 22,
+        "Y": 0,
+        "Z": 10
+      },
+      "BlockTypeId": 3
+    },
+    {
+      "Cell": {
+        "X": 23,
+        "Y": 0,
+        "Z": 10
+      },
+      "BlockTypeId": 3
+    },
+    {
+      "Cell": {
+        "X": 24,
+        "Y": 0,
+        "Z": 10
+      },
+      "BlockTypeId": 3
+    },
+    {
+      "Cell": {
+        "X": 25,
+        "Y": 0,
+        "Z": 10
+      },
+      "BlockTypeId": 3
+    },
+    {
+      "Cell": {
+        "X": 25,
+        "Y": 0,
+        "Z": 9
+      },
+      "BlockTypeId": 6
+    },
+    {
+      "Cell": {
+        "X": 24,
+        "Y": 0,
+        "Z": 8
+      },
+      "BlockTypeId": 6
+    },
+    {
+      "Cell": {
+        "X": 22,
+        "Y": 0,
+        "Z": 8
+      },
+      "BlockTypeId": 3
+    },
+    {
+      "Cell": {
+        "X": 23,
+        "Y": 0,
+        "Z": 9
+      },
+      "BlockTypeId": 3
+    },
+    {
+      "Cell": {
+        "X": 26,
+        "Y": 0,
+        "Z": 11
+      },
+      "BlockTypeId": 6
+    },
+    {
+      "Cell": {
+        "X": 26,
+        "Y": 0,
+        "Z": 12
+      },
+      "BlockTypeId": 6
+    },
+    {
+      "Cell": {
+        "X": 26,
+        "Y": 0,
+        "Z": 13
+      },
+      "BlockTypeId": 3
+    },
+    {
+      "Cell": {
+        "X": 25,
+        "Y": 0,
+        "Z": 12
+      },
+      "BlockTypeId": 3
+    },
+    {
+      "Cell": {
+        "X": 25,
+        "Y": 0,
+        "Z": 11
+      },
+      "BlockTypeId": 3
+    },
+    {
+      "Cell": {
+        "X": 25,
+        "Y": 0,
+        "Z": 14
+      },
+      "BlockTypeId": 3
+    },
+    {
+      "Cell": {
+        "X": 25,
+        "Y": 0,
+        "Z": 15
+      },
+      "BlockTypeId": 3
+    },
+    {
+      "Cell": {
+        "X": 25,
+        "Y": 0,
+        "Z": 17
+      },
+      "BlockTypeId": 3
+    },
+    {
+      "Cell": {
+        "X": 25,
+        "Y": 0,
+        "Z": 18
+      },
+      "BlockTypeId": 3
+    },
+    {
+      "Cell": {
+        "X": 26,
+        "Y": 0,
+        "Z": 21
+      },
+      "BlockTypeId": 6
+    },
+    {
+      "Cell": {
+        "X": 25,
+        "Y": 0,
+        "Z": 25
+      },
+      "BlockTypeId": 6
+    },
+    {
+      "Cell": {
+        "X": 25,
+        "Y": 0,
+        "Z": 19
+      },
+      "BlockTypeId": 3
+    },
+    {
+      "Cell": {
+        "X": 24,
+        "Y": 0,
+        "Z": 19
+      },
+      "BlockTypeId": 6
+    },
+    {
+      "Cell": {
+        "X": 24,
+        "Y": 0,
+        "Z": 20
+      },
+      "BlockTypeId": 6
+    },
+    {
+      "Cell": {
+        "X": 23,
+        "Y": 0,
+        "Z": 21
+      },
+      "BlockTypeId": 6
+    },
+    {
+      "Cell": {
+        "X": 22,
+        "Y": 0,
+        "Z": 22
+      },
+      "BlockTypeId": 3
+    },
+    {
+      "Cell": {
+        "X": 16,
+        "Y": 0,
+        "Z": 23
+      },
+      "BlockTypeId": 3
+    },
+    {
+      "Cell": {
+        "X": 15,
+        "Y": 0,
+        "Z": 23
+      },
+      "BlockTypeId": 6
+    },
+    {
+      "Cell": {
+        "X": 15,
+        "Y": 0,
+        "Z": 24
+      },
+      "BlockTypeId": 6
+    },
+    {
+      "Cell": {
+        "X": 16,
+        "Y": 0,
+        "Z": 24
+      },
+      "BlockTypeId": 6
+    },
+    {
+      "Cell": {
+        "X": 17,
+        "Y": 0,
+        "Z": 23
+      },
+      "BlockTypeId": 3
+    },
+    {
+      "Cell": {
+        "X": 18,
+        "Y": 0,
+        "Z": 22
+      },
+      "BlockTypeId": 3
+    },
+    {
+      "Cell": {
+        "X": 19,
+        "Y": 0,
+        "Z": 21
+      },
+      "BlockTypeId": 3
+    },
+    {
+      "Cell": {
+        "X": 20,
+        "Y": 0,
+        "Z": 21
+      },
+      "BlockTypeId": 3
+    },
+    {
+      "Cell": {
+        "X": 13,
+        "Y": 0,
+        "Z": 25
+      },
+      "BlockTypeId": 6
+    },
+    {
+      "Cell": {
+        "X": 12,
+        "Y": 0,
+        "Z": 24
+      },
+      "BlockTypeId": 6
+    },
+    {
+      "Cell": {
+        "X": 13,
+        "Y": 0,
+        "Z": 23
+      },
+      "BlockTypeId": 6
+    },
+    {
+      "Cell": {
+        "X": 13,
+        "Y": 0,
+        "Z": 22
+      },
+      "BlockTypeId": 3
+    },
+    {
+      "Cell": {
+        "X": 14,
+        "Y": 0,
+        "Z": 21
+      },
+      "BlockTypeId": 3
+    },
+    {
+      "Cell": {
+        "X": 14,
+        "Y": 0,
+        "Z": 22
+      },
+      "BlockTypeId": 3
+    },
+    {
+      "Cell": {
+        "X": 10,
+        "Y": 0,
+        "Z": 20
+      },
+      "BlockTypeId": 3
+    },
+    {
+      "Cell": {
+        "X": 9,
+        "Y": 0,
+        "Z": 19
+      },
+      "BlockTypeId": 3
+    },
+    {
+      "Cell": {
+        "X": 11,
+        "Y": 0,
+        "Z": 21
+      },
+      "BlockTypeId": 3
+    },
+    {
+      "Cell": {
+        "X": 13,
+        "Y": 0,
+        "Z": 24
+      },
+      "BlockTypeId": 6
+    },
+    {
+      "Cell": {
+        "X": 14,
+        "Y": 0,
+        "Z": 23
+      },
+      "BlockTypeId": 6
+    },
+    {
+      "Cell": {
+        "X": 15,
+        "Y": 0,
+        "Z": 21
+      },
+      "BlockTypeId": 3
+    },
+    {
+      "Cell": {
+        "X": 11,
+        "Y": 0,
+        "Z": 22
+      },
+      "BlockTypeId": 3
+    },
+    {
+      "Cell": {
+        "X": 11,
+        "Y": 0,
+        "Z": 20
+      },
+      "BlockTypeId": 3
+    },
+    {
+      "Cell": {
+        "X": 9,
+        "Y": 0,
+        "Z": 18
+      },
+      "BlockTypeId": 3
+    },
+    {
+      "Cell": {
+        "X": 8,
+        "Y": 0,
+        "Z": 12
+      },
+      "BlockTypeId": 6
+    },
+    {
+      "Cell": {
+        "X": 9,
+        "Y": 0,
+        "Z": 12
+      },
+      "BlockTypeId": 3
+    },
+    {
+      "Cell": {
+        "X": 6,
+        "Y": 0,
+        "Z": 10
+      },
+      "BlockTypeId": 6
+    },
+    {
+      "Cell": {
+        "X": 10,
+        "Y": 0,
+        "Z": 10
+      },
+      "BlockTypeId": 6
+    },
+    {
+      "Cell": {
+        "X": 14,
+        "Y": 0,
+        "Z": 10
+      },
+      "BlockTypeId": 3
+    },
+    {
+      "Cell": {
+        "X": 15,
+        "Y": 0,
+        "Z": 10
+      },
+      "BlockTypeId": 3
+    },
+    {
+      "Cell": {
+        "X": 18,
+        "Y": 0,
+        "Z": 9
+      },
+      "BlockTypeId": 6
+    },
+    {
+      "Cell": {
+        "X": 19,
+        "Y": 0,
+        "Z": 9
+      },
+      "BlockTypeId": 3
+    },
+    {
+      "Cell": {
+        "X": 20,
+        "Y": 0,
+        "Z": 9
+      },
+      "BlockTypeId": 3
+    },
+    {
+      "Cell": {
+        "X": 22,
+        "Y": 0,
+        "Z": 9
+      },
+      "BlockTypeId": 3
+    },
+    {
+      "Cell": {
+        "X": 12,
+        "Y": 0,
+        "Z": 9
+      },
+      "BlockTypeId": 6
+    },
+    {
+      "Cell": {
+        "X": 13,
+        "Y": 0,
+        "Z": 9
+      },
+      "BlockTypeId": 6
+    },
+    {
+      "Cell": {
+        "X": 14,
+        "Y": 0,
+        "Z": 9
+      },
+      "BlockTypeId": 6
+    },
+    {
+      "Cell": {
+        "X": 19,
+        "Y": 0,
+        "Z": 8
+      },
+      "BlockTypeId": 6
+    },
+    {
+      "Cell": {
+        "X": 17,
+        "Y": 0,
+        "Z": 9
+      },
+      "BlockTypeId": 3
+    },
+    {
+      "Cell": {
+        "X": 16,
+        "Y": 0,
+        "Z": 9
+      },
+      "BlockTypeId": 3
+    },
+    {
+      "Cell": {
+        "X": 18,
+        "Y": 0,
+        "Z": 10
+      },
+      "BlockTypeId": 3
+    },
+    {
+      "Cell": {
+        "X": 19,
+        "Y": 0,
+        "Z": 11
+      },
+      "BlockTypeId": 3
+    },
+    {
+      "Cell": {
+        "X": 20,
+        "Y": 0,
+        "Z": 11
+      },
+      "BlockTypeId": 3
+    },
+    {
+      "Cell": {
+        "X": 21,
+        "Y": 0,
+        "Z": 11
+      },
+      "BlockTypeId": 3
+    },
+    {
+      "Cell": {
+        "X": 22,
+        "Y": 0,
+        "Z": 11
+      },
+      "BlockTypeId": 3
+    },
+    {
+      "Cell": {
+        "X": 20,
+        "Y": 0,
+        "Z": 8
+      },
+      "BlockTypeId": 3
+    },
+    {
+      "Cell": {
+        "X": 21,
+        "Y": 0,
+        "Z": 9
+      },
+      "BlockTypeId": 3
+    },
+    {
+      "Cell": {
+        "X": 23,
+        "Y": 0,
+        "Z": 8
+      },
+      "BlockTypeId": 3
+    },
+    {
+      "Cell": {
+        "X": 24,
+        "Y": 0,
+        "Z": 9
+      },
+      "BlockTypeId": 3
+    },
+    {
+      "Cell": {
+        "X": 24,
+        "Y": 0,
+        "Z": 11
+      },
+      "BlockTypeId": 3
+    },
+    {
+      "Cell": {
+        "X": 24,
+        "Y": 0,
+        "Z": 12
+      },
+      "BlockTypeId": 3
+    },
+    {
+      "Cell": {
+        "X": 24,
+        "Y": 0,
+        "Z": 13
+      },
+      "BlockTypeId": 3
+    },
+    {
+      "Cell": {
+        "X": 25,
+        "Y": 0,
+        "Z": 13
+      },
+      "BlockTypeId": 3
+    },
+    {
+      "Cell": {
+        "X": 25,
+        "Y": 0,
+        "Z": 16
+      },
+      "BlockTypeId": 3
+    },
+    {
+      "Cell": {
+        "X": 26,
+        "Y": 0,
+        "Z": 14
+      },
+      "BlockTypeId": 3
+    },
+    {
+      "Cell": {
+        "X": 24,
+        "Y": 0,
+        "Z": 17
+      },
+      "BlockTypeId": 3
+    },
+    {
+      "Cell": {
+        "X": 26,
+        "Y": 0,
+        "Z": 18
+      },
+      "BlockTypeId": 3
+    },
+    {
+      "Cell": {
+        "X": 26,
+        "Y": 0,
+        "Z": 17
+      },
+      "BlockTypeId": 3
+    },
+    {
+      "Cell": {
+        "X": 18,
+        "Y": 0,
+        "Z": 23
+      },
+      "BlockTypeId": 3
+    },
+    {
+      "Cell": {
+        "X": 18,
+        "Y": 0,
+        "Z": 21
+      },
+      "BlockTypeId": 3
+    },
+    {
+      "Cell": {
+        "X": 17,
+        "Y": 0,
+        "Z": 21
+      },
+      "BlockTypeId": 3
+    },
+    {
+      "Cell": {
+        "X": 16,
+        "Y": 0,
+        "Z": 22
+      },
+      "BlockTypeId": 3
+    },
+    {
+      "Cell": {
+        "X": 15,
+        "Y": 0,
+        "Z": 22
+      },
+      "BlockTypeId": 3
+    },
+    {
+      "Cell": {
+        "X": 12,
+        "Y": 0,
+        "Z": 20
+      },
+      "BlockTypeId": 3
+    },
+    {
+      "Cell": {
+        "X": 13,
+        "Y": 0,
+        "Z": 21
+      },
+      "BlockTypeId": 3
+    },
+    {
+      "Cell": {
+        "X": 12,
+        "Y": 0,
+        "Z": 21
+      },
+      "BlockTypeId": 3
+    },
+    {
+      "Cell": {
+        "X": 10,
+        "Y": 0,
+        "Z": 19
+      },
+      "BlockTypeId": 3
+    },
+    {
+      "Cell": {
+        "X": 11,
+        "Y": 0,
+        "Z": 19
+      },
+      "BlockTypeId": 3
+    },
+    {
+      "Cell": {
+        "X": 10,
+        "Y": 0,
+        "Z": 18
+      },
+      "BlockTypeId": 3
+    },
+    {
+      "Cell": {
+        "X": 9,
+        "Y": 0,
+        "Z": 17
+      },
+      "BlockTypeId": 3
+    },
+    {
+      "Cell": {
+        "X": 8,
+        "Y": 0,
+        "Z": 16
+      },
+      "BlockTypeId": 3
+    },
+    {
+      "Cell": {
+        "X": 7,
+        "Y": 0,
+        "Z": 14
+      },
+      "BlockTypeId": 3
+    },
+    {
+      "Cell": {
+        "X": 7,
+        "Y": 0,
+        "Z": 13
+      },
+      "BlockTypeId": 3
+    },
+    {
+      "Cell": {
+        "X": 8,
+        "Y": 0,
+        "Z": 13
+      },
+      "BlockTypeId": 3
+    },
+    {
+      "Cell": {
+        "X": 9,
+        "Y": 0,
+        "Z": 13
+      },
+      "BlockTypeId": 3
+    },
+    {
+      "Cell": {
+        "X": 9,
+        "Y": 0,
+        "Z": 14
+      },
+      "BlockTypeId": 3
+    },
+    {
+      "Cell": {
+        "X": 8,
+        "Y": 0,
+        "Z": 14
+      },
+      "BlockTypeId": 3
+    },
+    {
+      "Cell": {
+        "X": 10,
+        "Y": 0,
+        "Z": 13
+      },
+      "BlockTypeId": 3
+    },
+    {
+      "Cell": {
+        "X": 10,
+        "Y": 0,
+        "Z": 14
+      },
+      "BlockTypeId": 3
+    },
+    {
+      "Cell": {
+        "X": 9,
+        "Y": 0,
+        "Z": 15
+      },
+      "BlockTypeId": 3
+    },
+    {
+      "Cell": {
+        "X": 8,
+        "Y": 0,
+        "Z": 15
+      },
+      "BlockTypeId": 3
+    },
+    {
+      "Cell": {
+        "X": 11,
+        "Y": 0,
+        "Z": 13
+      },
+      "BlockTypeId": 3
+    },
+    {
+      "Cell": {
+        "X": 12,
+        "Y": 0,
+        "Z": 12
+      },
+      "BlockTypeId": 3
+    },
+    {
+      "Cell": {
+        "X": 13,
+        "Y": 0,
+        "Z": 11
+      },
+      "BlockTypeId": 3
+    },
+    {
+      "Cell": {
+        "X": 11,
+        "Y": 0,
+        "Z": 12
+      },
+      "BlockTypeId": 3
+    },
+    {
+      "Cell": {
+        "X": 10,
+        "Y": 0,
+        "Z": 12
+      },
+      "BlockTypeId": 3
+    },
+    {
+      "Cell": {
+        "X": 18,
+        "Y": 0,
+        "Z": 11
+      },
+      "BlockTypeId": 3
+    },
+    {
+      "Cell": {
+        "X": 19,
+        "Y": 0,
+        "Z": 12
+      },
+      "BlockTypeId": 3
+    },
+    {
+      "Cell": {
+        "X": 18,
+        "Y": 0,
+        "Z": 12
+      },
+      "BlockTypeId": 3
+    },
+    {
+      "Cell": {
+        "X": 17,
+        "Y": 0,
+        "Z": 12
+      },
+      "BlockTypeId": 3
+    },
+    {
+      "Cell": {
+        "X": 22,
+        "Y": 0,
+        "Z": 12
+      },
+      "BlockTypeId": 3
+    },
+    {
+      "Cell": {
+        "X": 23,
+        "Y": 0,
+        "Z": 12
+      },
+      "BlockTypeId": 3
+    },
+    {
+      "Cell": {
+        "X": 24,
+        "Y": 0,
+        "Z": 18
+      },
+      "BlockTypeId": 3
+    },
+    {
+      "Cell": {
+        "X": 23,
+        "Y": 0,
+        "Z": 18
+      },
+      "BlockTypeId": 3
+    },
+    {
+      "Cell": {
+        "X": 23,
+        "Y": 0,
+        "Z": 17
+      },
+      "BlockTypeId": 3
+    },
+    {
+      "Cell": {
+        "X": 23,
+        "Y": 0,
+        "Z": 16
+      },
+      "BlockTypeId": 3
+    },
+    {
+      "Cell": {
+        "X": 22,
+        "Y": 0,
+        "Z": 19
+      },
+      "BlockTypeId": 3
+    },
+    {
+      "Cell": {
+        "X": 22,
+        "Y": 0,
+        "Z": 20
+      },
+      "BlockTypeId": 3
+    },
+    {
+      "Cell": {
+        "X": 22,
+        "Y": 0,
+        "Z": 21
+      },
+      "BlockTypeId": 3
+    },
+    {
+      "Cell": {
+        "X": 23,
+        "Y": 0,
+        "Z": 19
+      },
+      "BlockTypeId": 3
+    },
+    {
+      "Cell": {
+        "X": 22,
+        "Y": 0,
+        "Z": 18
+      },
+      "BlockTypeId": 3
+    },
+    {
+      "Cell": {
+        "X": 23,
+        "Y": 0,
+        "Z": 20
+      },
+      "BlockTypeId": 3
+    },
+    {
+      "Cell": {
+        "X": 21,
+        "Y": 0,
+        "Z": 22
+      },
+      "BlockTypeId": 3
+    },
+    {
+      "Cell": {
+        "X": 17,
+        "Y": 0,
+        "Z": 22
+      },
+      "BlockTypeId": 3
+    },
+    {
+      "Cell": {
+        "X": 16,
+        "Y": 0,
+        "Z": 21
+      },
+      "BlockTypeId": 3
+    },
+    {
+      "Cell": {
+        "X": 16,
+        "Y": 0,
+        "Z": 20
+      },
+      "BlockTypeId": 3
+    },
+    {
+      "Cell": {
+        "X": 15,
+        "Y": 0,
+        "Z": 20
+      },
+      "BlockTypeId": 3
+    },
+    {
+      "Cell": {
+        "X": 18,
+        "Y": 0,
+        "Z": 20
+      },
+      "BlockTypeId": 3
+    },
+    {
+      "Cell": {
+        "X": 19,
+        "Y": 0,
+        "Z": 20
+      },
+      "BlockTypeId": 3
+    },
+    {
+      "Cell": {
+        "X": 13,
+        "Y": 0,
+        "Z": 20
+      },
+      "BlockTypeId": 3
+    },
+    {
+      "Cell": {
+        "X": 13,
+        "Y": 0,
+        "Z": 19
+      },
+      "BlockTypeId": 3
+    },
+    {
+      "Cell": {
+        "X": 13,
+        "Y": 0,
+        "Z": 18
+      },
+      "BlockTypeId": 3
+    },
+    {
+      "Cell": {
+        "X": 13,
+        "Y": 0,
+        "Z": 17
+      },
+      "BlockTypeId": 3
+    },
+    {
+      "Cell": {
+        "X": 14,
+        "Y": 0,
+        "Z": 17
+      },
+      "BlockTypeId": 3
+    },
+    {
+      "Cell": {
+        "X": 14,
+        "Y": 0,
+        "Z": 16
+      },
+      "BlockTypeId": 3
+    },
+    {
+      "Cell": {
+        "X": 13,
+        "Y": 0,
+        "Z": 16
+      },
+      "BlockTypeId": 3
+    },
+    {
+      "Cell": {
+        "X": 12,
+        "Y": 0,
+        "Z": 15
+      },
+      "BlockTypeId": 3
+    },
+    {
+      "Cell": {
+        "X": 11,
+        "Y": 0,
+        "Z": 15
+      },
+      "BlockTypeId": 3
+    },
+    {
+      "Cell": {
+        "X": 10,
+        "Y": 0,
+        "Z": 15
+      },
+      "BlockTypeId": 3
+    },
+    {
+      "Cell": {
+        "X": 10,
+        "Y": 0,
+        "Z": 16
+      },
+      "BlockTypeId": 3
+    },
+    {
+      "Cell": {
+        "X": 10,
+        "Y": 0,
+        "Z": 17
+      },
+      "BlockTypeId": 3
+    },
+    {
+      "Cell": {
+        "X": 11,
+        "Y": 0,
+        "Z": 18
+      },
+      "BlockTypeId": 3
+    },
+    {
+      "Cell": {
+        "X": 12,
+        "Y": 0,
+        "Z": 18
+      },
+      "BlockTypeId": 3
+    },
+    {
+      "Cell": {
+        "X": 11,
+        "Y": 0,
+        "Z": 17
+      },
+      "BlockTypeId": 3
+    },
+    {
+      "Cell": {
+        "X": 9,
+        "Y": 0,
+        "Z": 16
+      },
+      "BlockTypeId": 3
+    },
+    {
+      "Cell": {
+        "X": 12,
+        "Y": 0,
+        "Z": 14
+      },
+      "BlockTypeId": 3
+    },
+    {
+      "Cell": {
+        "X": 14,
+        "Y": 0,
+        "Z": 14
+      },
+      "BlockTypeId": 3
+    },
+    {
+      "Cell": {
+        "X": 15,
+        "Y": 0,
+        "Z": 14
+      },
+      "BlockTypeId": 3
+    },
+    {
+      "Cell": {
+        "X": 17,
+        "Y": 0,
+        "Z": 13
+      },
+      "BlockTypeId": 3
+    },
+    {
+      "Cell": {
+        "X": 15,
+        "Y": 0,
+        "Z": 13
+      },
+      "BlockTypeId": 3
+    },
+    {
+      "Cell": {
+        "X": 13,
+        "Y": 0,
+        "Z": 14
+      },
+      "BlockTypeId": 3
+    },
+    {
+      "Cell": {
+        "X": 11,
+        "Y": 0,
+        "Z": 14
+      },
+      "BlockTypeId": 3
+    },
+    {
+      "Cell": {
+        "X": 12,
+        "Y": 0,
+        "Z": 13
+      },
+      "BlockTypeId": 3
+    },
+    {
+      "Cell": {
+        "X": 13,
+        "Y": 0,
+        "Z": 13
+      },
+      "BlockTypeId": 3
+    },
+    {
+      "Cell": {
+        "X": 14,
+        "Y": 0,
+        "Z": 13
+      },
+      "BlockTypeId": 3
+    },
+    {
+      "Cell": {
+        "X": 15,
+        "Y": 0,
+        "Z": 12
+      },
+      "BlockTypeId": 3
+    },
+    {
+      "Cell": {
+        "X": 16,
+        "Y": 0,
+        "Z": 12
+      },
+      "BlockTypeId": 3
+    },
+    {
+      "Cell": {
+        "X": 17,
+        "Y": 0,
+        "Z": 11
+      },
+      "BlockTypeId": 3
+    },
+    {
+      "Cell": {
+        "X": 15,
+        "Y": 0,
+        "Z": 11
+      },
+      "BlockTypeId": 3
+    },
+    {
+      "Cell": {
+        "X": 16,
+        "Y": 0,
+        "Z": 11
+      },
+      "BlockTypeId": 3
+    },
+    {
+      "Cell": {
+        "X": 19,
+        "Y": 0,
+        "Z": 13
+      },
+      "BlockTypeId": 3
+    },
+    {
+      "Cell": {
+        "X": 20,
+        "Y": 0,
+        "Z": 15
+      },
+      "BlockTypeId": 3
+    },
+    {
+      "Cell": {
+        "X": 20,
+        "Y": 0,
+        "Z": 16
+      },
+      "BlockTypeId": 3
+    },
+    {
+      "Cell": {
+        "X": 21,
+        "Y": 0,
+        "Z": 17
+      },
+      "BlockTypeId": 3
+    },
+    {
+      "Cell": {
+        "X": 21,
+        "Y": 0,
+        "Z": 18
+      },
+      "BlockTypeId": 3
+    },
+    {
+      "Cell": {
+        "X": 22,
+        "Y": 0,
+        "Z": 17
+      },
+      "BlockTypeId": 3
+    },
+    {
+      "Cell": {
+        "X": 21,
+        "Y": 0,
+        "Z": 16
+      },
+      "BlockTypeId": 3
+    },
+    {
+      "Cell": {
+        "X": 22,
+        "Y": 0,
+        "Z": 15
+      },
+      "BlockTypeId": 3
+    },
+    {
+      "Cell": {
+        "X": 21,
+        "Y": 0,
+        "Z": 14
+      },
+      "BlockTypeId": 3
+    },
+    {
+      "Cell": {
+        "X": 21,
+        "Y": 0,
+        "Z": 13
+      },
+      "BlockTypeId": 3
+    },
+    {
+      "Cell": {
+        "X": 21,
+        "Y": 0,
+        "Z": 12
+      },
+      "BlockTypeId": 3
+    },
+    {
+      "Cell": {
+        "X": 22,
+        "Y": 0,
+        "Z": 13
+      },
+      "BlockTypeId": 3
+    },
+    {
+      "Cell": {
+        "X": 23,
+        "Y": 0,
+        "Z": 14
+      },
+      "BlockTypeId": 3
+    },
+    {
+      "Cell": {
+        "X": 23,
+        "Y": 0,
+        "Z": 15
+      },
+      "BlockTypeId": 3
+    },
+    {
+      "Cell": {
+        "X": 24,
+        "Y": 0,
+        "Z": 16
+      },
+      "BlockTypeId": 3
+    },
+    {
+      "Cell": {
+        "X": 24,
+        "Y": 0,
+        "Z": 15
+      },
+      "BlockTypeId": 3
+    },
+    {
+      "Cell": {
+        "X": 23,
+        "Y": 0,
+        "Z": 13
+      },
+      "BlockTypeId": 3
+    },
+    {
+      "Cell": {
+        "X": 23,
+        "Y": 0,
+        "Z": 11
+      },
+      "BlockTypeId": 3
+    },
+    {
+      "Cell": {
+        "X": 20,
+        "Y": 0,
+        "Z": 10
+      },
+      "BlockTypeId": 3
+    },
+    {
+      "Cell": {
+        "X": 18,
+        "Y": 0,
+        "Z": 13
+      },
+      "BlockTypeId": 3
+    },
+    {
+      "Cell": {
+        "X": 14,
+        "Y": 0,
+        "Z": 12
+      },
+      "BlockTypeId": 3
+    },
+    {
+      "Cell": {
+        "X": 13,
+        "Y": 0,
+        "Z": 12
+      },
+      "BlockTypeId": 3
+    },
+    {
+      "Cell": {
+        "X": 14,
+        "Y": 0,
+        "Z": 11
+      },
+      "BlockTypeId": 3
+    },
+    {
+      "Cell": {
+        "X": 12,
+        "Y": 0,
+        "Z": 17
+      },
+      "BlockTypeId": 3
+    },
+    {
+      "Cell": {
+        "X": 12,
+        "Y": 0,
+        "Z": 16
+      },
+      "BlockTypeId": 3
+    },
+    {
+      "Cell": {
+        "X": 13,
+        "Y": 0,
+        "Z": 15
+      },
+      "BlockTypeId": 3
+    },
+    {
+      "Cell": {
+        "X": 11,
+        "Y": 0,
+        "Z": 16
+      },
+      "BlockTypeId": 3
+    },
+    {
+      "Cell": {
+        "X": 16,
+        "Y": 0,
+        "Z": 14
+      },
+      "BlockTypeId": 3
+    },
+    {
+      "Cell": {
+        "X": 17,
+        "Y": 0,
+        "Z": 14
+      },
+      "BlockTypeId": 3
+    },
+    {
+      "Cell": {
+        "X": 17,
+        "Y": 0,
+        "Z": 15
+      },
+      "BlockTypeId": 3
+    },
+    {
+      "Cell": {
+        "X": 16,
+        "Y": 0,
+        "Z": 15
+      },
+      "BlockTypeId": 3
+    },
+    {
+      "Cell": {
+        "X": 20,
+        "Y": 0,
+        "Z": 13
+      },
+      "BlockTypeId": 3
+    },
+    {
+      "Cell": {
+        "X": 19,
+        "Y": 0,
+        "Z": 14
+      },
+      "BlockTypeId": 3
+    },
+    {
+      "Cell": {
+        "X": 18,
+        "Y": 0,
+        "Z": 15
+      },
+      "BlockTypeId": 3
+    },
+    {
+      "Cell": {
+        "X": 17,
+        "Y": 0,
+        "Z": 16
+      },
+      "BlockTypeId": 3
+    },
+    {
+      "Cell": {
+        "X": 16,
+        "Y": 0,
+        "Z": 16
+      },
+      "BlockTypeId": 3
+    },
+    {
+      "Cell": {
+        "X": 15,
+        "Y": 0,
+        "Z": 17
+      },
+      "BlockTypeId": 3
+    },
+    {
+      "Cell": {
+        "X": 14,
+        "Y": 0,
+        "Z": 18
+      },
+      "BlockTypeId": 3
+    },
+    {
+      "Cell": {
+        "X": 16,
+        "Y": 0,
+        "Z": 13
+      },
+      "BlockTypeId": 3
+    },
+    {
+      "Cell": {
+        "X": 14,
+        "Y": 0,
+        "Z": 15
+      },
+      "BlockTypeId": 3
+    },
+    {
+      "Cell": {
+        "X": 15,
+        "Y": 0,
+        "Z": 16
+      },
+      "BlockTypeId": 3
+    },
+    {
+      "Cell": {
+        "X": 12,
+        "Y": 0,
+        "Z": 19
+      },
+      "BlockTypeId": 3
+    },
+    {
+      "Cell": {
+        "X": 15,
+        "Y": 0,
+        "Z": 15
+      },
+      "BlockTypeId": 3
+    },
+    {
+      "Cell": {
+        "X": 17,
+        "Y": 0,
+        "Z": 17
+      },
+      "BlockTypeId": 3
+    },
+    {
+      "Cell": {
+        "X": 18,
+        "Y": 0,
+        "Z": 18
+      },
+      "BlockTypeId": 3
+    },
+    {
+      "Cell": {
+        "X": 18,
+        "Y": 0,
+        "Z": 16
+      },
+      "BlockTypeId": 3
+    },
+    {
+      "Cell": {
+        "X": 18,
+        "Y": 0,
+        "Z": 17
+      },
+      "BlockTypeId": 3
+    },
+    {
+      "Cell": {
+        "X": 19,
+        "Y": 0,
+        "Z": 16
+      },
+      "BlockTypeId": 3
+    },
+    {
+      "Cell": {
+        "X": 20,
+        "Y": 0,
+        "Z": 12
+      },
+      "BlockTypeId": 3
+    },
+    {
+      "Cell": {
+        "X": 22,
+        "Y": 0,
+        "Z": 14
+      },
+      "BlockTypeId": 3
+    },
+    {
+      "Cell": {
+        "X": 22,
+        "Y": 0,
+        "Z": 16
+      },
+      "BlockTypeId": 3
+    },
+    {
+      "Cell": {
+        "X": 21,
+        "Y": 0,
+        "Z": 15
+      },
+      "BlockTypeId": 3
+    },
+    {
+      "Cell": {
+        "X": 24,
+        "Y": 0,
+        "Z": 14
+      },
+      "BlockTypeId": 3
+    },
+    {
+      "Cell": {
+        "X": 20,
+        "Y": 0,
+        "Z": 14
+      },
+      "BlockTypeId": 3
+    },
+    {
+      "Cell": {
+        "X": 18,
+        "Y": 0,
+        "Z": 14
+      },
+      "BlockTypeId": 3
+    },
+    {
+      "Cell": {
+        "X": 19,
+        "Y": 0,
+        "Z": 15
+      },
+      "BlockTypeId": 3
+    },
+    {
+      "Cell": {
+        "X": 16,
+        "Y": 0,
+        "Z": 17
+      },
+      "BlockTypeId": 3
+    },
+    {
+      "Cell": {
+        "X": 19,
+        "Y": 0,
+        "Z": 18
+      },
+      "BlockTypeId": 3
+    },
+    {
+      "Cell": {
+        "X": 19,
+        "Y": 0,
+        "Z": 19
+      },
+      "BlockTypeId": 3
+    },
+    {
+      "Cell": {
+        "X": 18,
+        "Y": 0,
+        "Z": 19
+      },
+      "BlockTypeId": 3
+    },
+    {
+      "Cell": {
+        "X": 20,
+        "Y": 0,
+        "Z": 20
+      },
+      "BlockTypeId": 3
+    },
+    {
+      "Cell": {
+        "X": 19,
+        "Y": 0,
+        "Z": 17
+      },
+      "BlockTypeId": 3
+    },
+    {
+      "Cell": {
+        "X": 20,
+        "Y": 0,
+        "Z": 17
+      },
+      "BlockTypeId": 3
+    },
+    {
+      "Cell": {
+        "X": 20,
+        "Y": 0,
+        "Z": 19
+      },
+      "BlockTypeId": 3
+    },
+    {
+      "Cell": {
+        "X": 20,
+        "Y": 0,
+        "Z": 18
+      },
+      "BlockTypeId": 3
+    },
+    {
+      "Cell": {
+        "X": 21,
+        "Y": 0,
+        "Z": 20
+      },
+      "BlockTypeId": 3
+    },
+    {
+      "Cell": {
+        "X": 21,
+        "Y": 0,
+        "Z": 19
+      },
+      "BlockTypeId": 3
+    },
+    {
+      "Cell": {
+        "X": 21,
+        "Y": 0,
+        "Z": 21
+      },
+      "BlockTypeId": 3
+    },
+    {
+      "Cell": {
+        "X": 17,
+        "Y": 0,
+        "Z": 19
+      },
+      "BlockTypeId": 3
+    },
+    {
+      "Cell": {
+        "X": 17,
+        "Y": 0,
+        "Z": 18
+      },
+      "BlockTypeId": 3
+    },
+    {
+      "Cell": {
+        "X": 16,
+        "Y": 0,
+        "Z": 18
+      },
+      "BlockTypeId": 3
+    },
+    {
+      "Cell": {
+        "X": 15,
+        "Y": 0,
+        "Z": 18
+      },
+      "BlockTypeId": 3
+    },
+    {
+      "Cell": {
+        "X": 16,
+        "Y": 0,
+        "Z": 19
+      },
+      "BlockTypeId": 3
+    },
+    {
+      "Cell": {
+        "X": 15,
+        "Y": 0,
+        "Z": 19
+      },
+      "BlockTypeId": 3
+    },
+    {
+      "Cell": {
+        "X": 14,
+        "Y": 0,
+        "Z": 20
+      },
+      "BlockTypeId": 3
+    },
+    {
+      "Cell": {
+        "X": 14,
+        "Y": 0,
+        "Z": 19
+      },
+      "BlockTypeId": 3
+    },
+    {
+      "Cell": {
+        "X": 17,
+        "Y": 0,
+        "Z": 20
+      },
+      "BlockTypeId": 3
+    },
+    {
+      "Cell": {
+        "X": 0,
+        "Y": 1,
+        "Z": 12
+      },
+      "BlockTypeId": 5
+    },
+    {
+      "Cell": {
+        "X": 1,
+        "Y": 1,
+        "Z": 12
+      },
+      "BlockTypeId": 5
+    },
+    {
+      "Cell": {
+        "X": 2,
+        "Y": 1,
+        "Z": 12
+      },
+      "BlockTypeId": 5
+    },
+    {
+      "Cell": {
+        "X": 3,
+        "Y": 1,
+        "Z": 12
+      },
+      "BlockTypeId": 5
+    },
+    {
+      "Cell": {
+        "X": 4,
+        "Y": 1,
+        "Z": 12
+      },
+      "BlockTypeId": 5
+    },
+    {
+      "Cell": {
+        "X": 5,
+        "Y": 1,
+        "Z": 12
+      },
+      "BlockTypeId": 5
+    },
+    {
+      "Cell": {
+        "X": 6,
+        "Y": 1,
+        "Z": 12
+      },
+      "BlockTypeId": 5
+    },
+    {
+      "Cell": {
+        "X": 7,
+        "Y": 1,
+        "Z": 12
+      },
+      "BlockTypeId": 5
+    },
+    {
+      "Cell": {
+        "X": 8,
+        "Y": 1,
+        "Z": 12
+      },
+      "BlockTypeId": 5
+    },
+    {
+      "Cell": {
+        "X": 26,
+        "Y": 1,
+        "Z": 12
+      },
+      "BlockTypeId": 5
+    },
+    {
+      "Cell": {
+        "X": 26,
+        "Y": 1,
+        "Z": 11
+      },
+      "BlockTypeId": 5
+    },
+    {
+      "Cell": {
+        "X": 27,
+        "Y": 1,
+        "Z": 11
+      },
+      "BlockTypeId": 5
+    },
+    {
+      "Cell": {
+        "X": 28,
+        "Y": 1,
+        "Z": 11
+      },
+      "BlockTypeId": 5
+    },
+    {
+      "Cell": {
+        "X": 29,
+        "Y": 1,
+        "Z": 11
+      },
+      "BlockTypeId": 5
+    },
+    {
+      "Cell": {
+        "X": 30,
+        "Y": 1,
+        "Z": 11
+      },
+      "BlockTypeId": 5
+    },
+    {
+      "Cell": {
+        "X": 31,
+        "Y": 1,
+        "Z": 11
+      },
+      "BlockTypeId": 5
+    },
+    {
+      "Cell": {
+        "X": 15,
+        "Y": 1,
+        "Z": 31
+      },
+      "BlockTypeId": 5
+    },
+    {
+      "Cell": {
+        "X": 15,
+        "Y": 1,
+        "Z": 30
+      },
+      "BlockTypeId": 5
+    },
+    {
+      "Cell": {
+        "X": 15,
+        "Y": 1,
+        "Z": 29
+      },
+      "BlockTypeId": 5
+    },
+    {
+      "Cell": {
+        "X": 16,
+        "Y": 1,
+        "Z": 29
+      },
+      "BlockTypeId": 5
+    },
+    {
+      "Cell": {
+        "X": 16,
+        "Y": 1,
+        "Z": 28
+      },
+      "BlockTypeId": 5
+    },
+    {
+      "Cell": {
+        "X": 15,
+        "Y": 1,
+        "Z": 28
+      },
+      "BlockTypeId": 5
+    },
+    {
+      "Cell": {
+        "X": 15,
+        "Y": 1,
+        "Z": 27
+      },
+      "BlockTypeId": 5
+    },
+    {
+      "Cell": {
+        "X": 16,
+        "Y": 1,
+        "Z": 27
+      },
+      "BlockTypeId": 5
+    },
+    {
+      "Cell": {
+        "X": 16,
+        "Y": 1,
+        "Z": 26
+      },
+      "BlockTypeId": 5
+    },
+    {
+      "Cell": {
+        "X": 16,
+        "Y": 1,
+        "Z": 6
+      },
+      "BlockTypeId": 5
+    },
+    {
+      "Cell": {
+        "X": 16,
+        "Y": 1,
+        "Z": 5
+      },
+      "BlockTypeId": 5
+    },
+    {
+      "Cell": {
+        "X": 15,
+        "Y": 1,
+        "Z": 5
+      },
+      "BlockTypeId": 5
+    },
+    {
+      "Cell": {
+        "X": 15,
+        "Y": 1,
+        "Z": 4
+      },
+      "BlockTypeId": 5
+    },
+    {
+      "Cell": {
+        "X": 15,
+        "Y": 1,
+        "Z": 3
+      },
+      "BlockTypeId": 5
+    },
+    {
+      "Cell": {
+        "X": 15,
+        "Y": 1,
+        "Z": 2
+      },
+      "BlockTypeId": 5
+    },
+    {
+      "Cell": {
+        "X": 14,
+        "Y": 1,
+        "Z": 2
+      },
+      "BlockTypeId": 5
+    },
+    {
+      "Cell": {
+        "X": 14,
+        "Y": 1,
+        "Z": 1
+      },
+      "BlockTypeId": 5
+    },
+    {
+      "Cell": {
+        "X": 14,
+        "Y": 1,
+        "Z": 0
+      },
+      "BlockTypeId": 5
+    },
+    {
+      "Cell": {
+        "X": 23,
+        "Y": 1,
+        "Z": 1
+      },
+      "BlockTypeId": 6
+    },
+    {
+      "Cell": {
+        "X": 24,
+        "Y": 1,
+        "Z": 1
+      },
+      "BlockTypeId": 6
+    },
+    {
+      "Cell": {
+        "X": 24,
+        "Y": 1,
+        "Z": 2
+      },
+      "BlockTypeId": 6
+    },
+    {
+      "Cell": {
+        "X": 25,
+        "Y": 1,
+        "Z": 2
+      },
+      "BlockTypeId": 6
+    },
+    {
+      "Cell": {
+        "X": 25,
+        "Y": 1,
+        "Z": 3
+      },
+      "BlockTypeId": 6
+    },
+    {
+      "Cell": {
+        "X": 26,
+        "Y": 1,
+        "Z": 4
+      },
+      "BlockTypeId": 6
+    },
+    {
+      "Cell": {
+        "X": 27,
+        "Y": 1,
+        "Z": 5
+      },
+      "BlockTypeId": 6
+    },
+    {
+      "Cell": {
+        "X": 28,
+        "Y": 1,
+        "Z": 5
+      },
+      "BlockTypeId": 6
+    },
+    {
+      "Cell": {
+        "X": 28,
+        "Y": 1,
+        "Z": 6
+      },
+      "BlockTypeId": 6
+    },
+    {
+      "Cell": {
+        "X": 8,
+        "Y": 1,
+        "Z": 6
+      },
+      "BlockTypeId": 6
+    },
+    {
+      "Cell": {
+        "X": 3,
+        "Y": 1,
+        "Z": 5
+      },
+      "BlockTypeId": 6
+    },
+    {
+      "Cell": {
+        "X": 3,
+        "Y": 1,
+        "Z": 8
+      },
+      "BlockTypeId": 6
+    },
+    {
+      "Cell": {
+        "X": 6,
+        "Y": 1,
+        "Z": 25
+      },
+      "BlockTypeId": 6
+    },
+    {
+      "Cell": {
+        "X": 2,
+        "Y": 1,
+        "Z": 21
+      },
+      "BlockTypeId": 6
+    },
+    {
+      "Cell": {
+        "X": 7,
+        "Y": 1,
+        "Z": 24
+      },
+      "BlockTypeId": 6
+    },
+    {
+      "Cell": {
+        "X": 7,
+        "Y": 1,
+        "Z": 25
+      },
+      "BlockTypeId": 6
+    },
+    {
+      "Cell": {
+        "X": 7,
+        "Y": 1,
+        "Z": 26
+      },
+      "BlockTypeId": 6
+    },
+    {
+      "Cell": {
+        "X": 10,
+        "Y": 1,
+        "Z": 29
+      },
+      "BlockTypeId": 6
+    },
+    {
+      "Cell": {
+        "X": 25,
+        "Y": 1,
+        "Z": 21
+      },
+      "BlockTypeId": 6
+    },
+    {
+      "Cell": {
+        "X": 26,
+        "Y": 1,
+        "Z": 21
+      },
+      "BlockTypeId": 6
+    },
+    {
+      "Cell": {
+        "X": 29,
+        "Y": 1,
+        "Z": 20
+      },
+      "BlockTypeId": 6
+    },
+    {
+      "Cell": {
+        "X": 30,
+        "Y": 1,
+        "Z": 16
+      },
+      "BlockTypeId": 6
+    },
+    {
+      "Cell": {
+        "X": 30,
+        "Y": 1,
+        "Z": 15
+      },
+      "BlockTypeId": 6
+    },
+    {
+      "Cell": {
+        "X": 2,
+        "Y": 1,
+        "Z": 16
+      },
+      "BlockTypeId": 6
+    },
+    {
+      "Cell": {
+        "X": 4,
+        "Y": 1,
+        "Z": 17
+      },
+      "BlockTypeId": 6
+    },
+    {
+      "Cell": {
+        "X": 3,
+        "Y": 1,
+        "Z": 17
+      },
+      "BlockTypeId": 6
+    },
+    {
+      "Cell": {
+        "X": 2,
+        "Y": 1,
+        "Z": 18
+      },
+      "BlockTypeId": 6
+    },
+    {
+      "Cell": {
+        "X": 2,
+        "Y": 1,
+        "Z": 17
+      },
+      "BlockTypeId": 6
+    },
+    {
+      "Cell": {
+        "X": 4,
+        "Y": 1,
+        "Z": 19
+      },
+      "BlockTypeId": 6
+    },
+    {
+      "Cell": {
+        "X": 2,
+        "Y": 1,
+        "Z": 19
+      },
+      "BlockTypeId": 6
+    },
+    {
+      "Cell": {
+        "X": 2,
+        "Y": 1,
+        "Z": 20
+      },
+      "BlockTypeId": 6
+    },
+    {
+      "Cell": {
+        "X": 4,
+        "Y": 1,
+        "Z": 18
+      },
+      "BlockTypeId": 6
+    },
+    {
+      "Cell": {
+        "X": 3,
+        "Y": 1,
+        "Z": 20
+      },
+      "BlockTypeId": 6
+    },
+    {
+      "Cell": {
+        "X": 3,
+        "Y": 1,
+        "Z": 19
+      },
+      "BlockTypeId": 6
+    },
+    {
+      "Cell": {
+        "X": 4,
+        "Y": 2,
+        "Z": 19
+      },
+      "BlockTypeId": 6
+    },
+    {
+      "Cell": {
+        "X": 3,
+        "Y": 2,
+        "Z": 20
+      },
+      "BlockTypeId": 6
+    },
+    {
+      "Cell": {
+        "X": 2,
+        "Y": 2,
+        "Z": 20
+      },
+      "BlockTypeId": 6
+    },
+    {
+      "Cell": {
+        "X": 2,
+        "Y": 2,
+        "Z": 19
+      },
+      "BlockTypeId": 6
+    },
+    {
+      "Cell": {
+        "X": 3,
+        "Y": 2,
+        "Z": 17
+      },
+      "BlockTypeId": 6
+    },
+    {
+      "Cell": {
+        "X": 3,
+        "Y": 2,
+        "Z": 18
+      },
+      "BlockTypeId": 6
+    },
+    {
+      "Cell": {
+        "X": 4,
+        "Y": 2,
+        "Z": 17
+      },
+      "BlockTypeId": 6
+    },
+    {
+      "Cell": {
+        "X": 3,
+        "Y": 2,
+        "Z": 19
+      },
+      "BlockTypeId": 6
+    },
+    {
+      "Cell": {
+        "X": 3,
+        "Y": 3,
+        "Z": 19
+      },
+      "BlockTypeId": 6
+    },
+    {
+      "Cell": {
+        "X": 3,
+        "Y": 3,
+        "Z": 18
+      },
+      "BlockTypeId": 6
+    },
+    {
+      "Cell": {
+        "X": 4,
+        "Y": 3,
+        "Z": 17
+      },
+      "BlockTypeId": 6
+    },
+    {
+      "Cell": {
+        "X": 3,
+        "Y": 3,
+        "Z": 20
+      },
+      "BlockTypeId": 6
+    }
+  ],
+  "SpawnCell": {
+    "X": 16,
+    "Y": 1,
+    "Z": 16
+  },
   "Settings": {
     "EngagementRules": "PvE",
     "MaxEnemyEntities": 20,
@@ -17,15 +8749,41 @@
     {
       "Id": 1,
       "Name": "GateA_Spawn",
-      "Position": { "X": 512.0, "Y": 32.0, "Z": 512.0 },
-      "Shape": { "Type": "Box", "Size": { "X": 32.0, "Y": 32.0, "Z": 32.0 } },
-      "Data": { "Type": "Spawn", "IsPlayerSpawn": true, "MaxSpawns": 1 }
+      "Position": {
+        "X": 512,
+        "Y": 32,
+        "Z": 512
+      },
+      "Shape": {
+        "Type": "Box",
+        "Size": {
+          "X": 32,
+          "Y": 32,
+          "Z": 32
+        }
+      },
+      "Data": {
+        "Type": "Spawn",
+        "IsPlayerSpawn": true,
+        "MaxSpawns": 1
+      }
     },
     {
       "Id": 2,
       "Name": "Magic Casters Spawn",
-      "Position": { "X": 640.0, "Y": 32.0, "Z": 512.0 },
-      "Shape": { "Type": "Box", "Size": { "X": 96.0, "Y": 32.0, "Z": 96.0 } },
+      "Position": {
+        "X": 640,
+        "Y": 32,
+        "Z": 512
+      },
+      "Shape": {
+        "Type": "Box",
+        "Size": {
+          "X": 96,
+          "Y": 32,
+          "Z": 96
+        }
+      },
       "Data": {
         "Type": "Spawn",
         "IsPlayerSpawn": false,
@@ -36,8 +8794,19 @@
     {
       "Id": 3,
       "Name": "Fire Mages Spawn",
-      "Position": { "X": 384.0, "Y": 32.0, "Z": 384.0 },
-      "Shape": { "Type": "Box", "Size": { "X": 96.0, "Y": 32.0, "Z": 96.0 } },
+      "Position": {
+        "X": 384,
+        "Y": 32,
+        "Z": 384
+      },
+      "Shape": {
+        "Type": "Box",
+        "Size": {
+          "X": 96,
+          "Y": 32,
+          "Z": 96
+        }
+      },
       "Data": {
         "Type": "Spawn",
         "IsPlayerSpawn": false,
@@ -48,8 +8817,19 @@
     {
       "Id": 4,
       "Name": "Melee Fighters Spawn",
-      "Position": { "X": 448.0, "Y": 32.0, "Z": 640.0 },
-      "Shape": { "Type": "Box", "Size": { "X": 96.0, "Y": 32.0, "Z": 96.0 } },
+      "Position": {
+        "X": 448,
+        "Y": 32,
+        "Z": 640
+      },
+      "Shape": {
+        "Type": "Box",
+        "Size": {
+          "X": 96,
+          "Y": 32,
+          "Z": 96
+        }
+      },
       "Data": {
         "Type": "Spawn",
         "IsPlayerSpawn": false,
@@ -60,8 +8840,19 @@
     {
       "Id": 5,
       "Name": "Ranged Attackers Spawn",
-      "Position": { "X": 704.0, "Y": 32.0, "Z": 448.0 },
-      "Shape": { "Type": "Box", "Size": { "X": 96.0, "Y": 32.0, "Z": 96.0 } },
+      "Position": {
+        "X": 704,
+        "Y": 32,
+        "Z": 448
+      },
+      "Shape": {
+        "Type": "Box",
+        "Size": {
+          "X": 96,
+          "Y": 32,
+          "Z": 96
+        }
+      },
       "Data": {
         "Type": "Spawn",
         "IsPlayerSpawn": false,
@@ -72,8 +8863,19 @@
     {
       "Id": 6,
       "Name": "Support Units Spawn",
-      "Position": { "X": 512.0, "Y": 32.0, "Z": 704.0 },
-      "Shape": { "Type": "Box", "Size": { "X": 96.0, "Y": 32.0, "Z": 96.0 } },
+      "Position": {
+        "X": 512,
+        "Y": 32,
+        "Z": 704
+      },
+      "Shape": {
+        "Type": "Box",
+        "Size": {
+          "X": 96,
+          "Y": 32,
+          "Z": 96
+        }
+      },
       "Data": {
         "Type": "Spawn",
         "IsPlayerSpawn": false,
@@ -84,8 +8886,19 @@
     {
       "Id": 7,
       "Name": "Defense Towers Spawn",
-      "Position": { "X": 320.0, "Y": 32.0, "Z": 704.0 },
-      "Shape": { "Type": "Box", "Size": { "X": 96.0, "Y": 32.0, "Z": 96.0 } },
+      "Position": {
+        "X": 320,
+        "Y": 32,
+        "Z": 704
+      },
+      "Shape": {
+        "Type": "Box",
+        "Size": {
+          "X": 96,
+          "Y": 32,
+          "Z": 96
+        }
+      },
       "Data": {
         "Type": "Spawn",
         "IsPlayerSpawn": false,

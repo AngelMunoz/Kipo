@@ -55,9 +55,9 @@ module Projections =
       HP = baseStats.Charm * 10
       DP = baseStats.Charm + int(float baseStats.Charm * 1.25)
       HV = baseStats.Charm * 2
-      MS = 100
-      HPRegen = 20
-      MPRegen = 20
+      MS = 200
+      HPRegen = 50
+      MPRegen = 50
       ElementAttributes = HashMap.empty
       ElementResistances = HashMap.empty
     }

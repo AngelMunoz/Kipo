@@ -394,16 +394,6 @@ module W =
     WidgetSubs.get(w).Add(sub)
     w
 
-  let inline bindMap<'T
-    when 'T :> Widget
-    and 'T: (member set_Map: Pomo.Core.Domain.Map.MapDefinition option -> unit)>
-    (aval: aval<Pomo.Core.Domain.Map.MapDefinition option>)
-    (w: 'T)
-    =
-    let sub = aval.AddWeakCallback(fun v -> w.set_Map(v))
-    WidgetSubs.get(w).Add(sub)
-    w
-
   let inline playerId<'T
     when 'T :> Widget and 'T: (member set_PlayerId: Guid<EntityId> -> unit)>
     (value: Guid<EntityId>)

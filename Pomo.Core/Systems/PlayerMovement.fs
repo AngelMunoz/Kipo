@@ -22,29 +22,33 @@ module PlayerMovement =
     let PlayerVelocity
       (world: World)
       (playerId: Guid<EntityId>)
-      (speed: float32)
+      (speed: aval<float32>)
       =
-      world.GameActionStates
-      |> AMap.tryFind playerId
-      |> AVal.map(Option.defaultValue HashMap.empty)
-      |> AVal.map(
-        HashMap.fold
-          (fun acc action _ ->
-            let mutable move = Vector2.Zero
+      let actions =
+        world.GameActionStates
+        |> AMap.tryFind playerId
+        |> AVal.map(Option.defaultValue HashMap.empty)
 
-            match action with
-            | MoveUp -> move <- move - Vector2.UnitY
-            | MoveDown -> move <- move + Vector2.UnitY
-            | MoveLeft -> move <- move - Vector2.UnitX
-            | MoveRight -> move <- move + Vector2.UnitX
-            | _ -> ()
+      AVal.map2
+        (fun actions speed ->
+          let moveDir =
+            actions
+            |> HashMap.fold
+              (fun acc action _ ->
+                match action with
+                | MoveUp -> acc - Vector2.UnitY
+                | MoveDown -> acc + Vector2.UnitY
+                | MoveLeft -> acc - Vector2.UnitX
+                | MoveRight -> acc + Vector2.UnitX
+                | _ -> acc)
+              Vector2.Zero
 
-            if move.LengthSquared() > 0.0f then
-              acc + Vector2.Normalize move * speed
-            else
-              Vector2.Zero)
-          Vector2.Zero
-      )
+          if moveDir.LengthSquared() > 0.0f then
+            Vector2.Normalize moveDir * speed
+          else
+            Vector2.Zero)
+        actions
+        speed
 
   open Pomo.Core.Environment
   open Pomo.Core.Environment.Patterns
@@ -58,11 +62,6 @@ module PlayerMovement =
     let (Gameplay gameplay) = env.GameplayServices
     let stateWrite = core.StateWrite
 
-    let speed = 100.0f
-
-    // Use the projection
-    let velocity = Projections.PlayerVelocity core.World playerId speed
-
     let playerCombatStatuses =
       gameplay.Projections.CombatStatuses
       |> AMap.tryFind playerId
@@ -72,7 +71,10 @@ module PlayerMovement =
     let movementSpeed =
       gameplay.Projections.DerivedStats
       |> AMap.tryFind playerId
-      |> AVal.map(Option.map _.MS >> Option.defaultValue 100)
+      |> AVal.map(fun statsOpt ->
+        statsOpt |> Option.map(_.MS >> float32) |> Option.defaultValue 100.0f)
+
+    let velocity = Projections.PlayerVelocity core.World playerId movementSpeed
 
     let movementState = core.World.MovementStates |> AMap.tryFind playerId
 
@@ -130,12 +132,6 @@ module PlayerMovement =
         | SystemCommunications.CollisionEvents.MapObjectCollision(eId, _, mtv) when
           eId = playerId
           ->
-          let currentPos =
-            snapshot.Positions
-            |> Dictionary.tryFindV playerId
-            |> ValueOption.map WorldPosition.toVector2
-            |> ValueOption.defaultValue Vector2.Zero
-
           accumulatedMtv <- accumulatedMtv + mtv
         | _ -> ()
 
@@ -171,7 +167,7 @@ module PlayerMovement =
             MovementLogic.handleMovingTo
               position
               destination
-              (float32 movementSpeed)
+              movementSpeed
               accumulatedMtv
           with
           | MovementLogic.Arrived ->
@@ -190,7 +186,7 @@ module PlayerMovement =
             MovementLogic.handleMovingAlongPath
               position
               path
-              (float32 movementSpeed)
+              movementSpeed
               accumulatedMtv
           with
           | MovementLogic.Arrived ->

@@ -1154,16 +1154,12 @@ module HUDComponents =
 
   let createMiniMap
     (config: HUDConfig aval)
-    (scenario: Scenario option aval)
     (playerId: Guid<EntityId>)
     (positions: IReadOnlyDictionary<Guid<EntityId>, WorldPosition>)
     (factions: amap<Guid<EntityId>, FSharp.Data.Adaptive.HashSet<Faction>>)
     (camera: Pomo.Core.Domain.Camera.Camera option aval)
     =
-    let mapDef =
-      scenario |> AVal.map(Option.bind(fun s -> s.Map |> ValueOption.toOption))
 
-    let factMap = factions |> AMap.toAVal
 
     // Compute view bounds from camera for frustum culling
     let viewBounds =
@@ -1181,9 +1177,10 @@ module HUDComponents =
           ValueSome bounds
         | None -> ValueNone)
 
+    let factMap = factions |> AMap.toAVal
+
     MiniMap.create()
     |> W.size 150 150
-    |> W.bindMap mapDef
     |> W.playerId playerId
     |> W.mapPositions positions
     |> W.bindMapFactions factMap
