@@ -1,0 +1,76 @@
+name: Preview Release
+
+on:
+  pull_request:
+    branches:
+      - main
+    types: [closed]
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    if: github.event.pull_request.merged == true
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Build DesktopGL
+        run: dotnet publish Pomo.DesktopGL/Pomo.DesktopGL.fsproj -c Release -o publish/DesktopGL
+
+      - name: Build WindowsDX
+        run: dotnet publish Pomo.WindowsDX/Pomo.WindowsDX.fsproj -c Release -o publish/WindowsDX
+
+      - name: Zip Artifacts
+        shell: pwsh
+        run: |
+          Compress-Archive -Path publish/DesktopGL/* -DestinationPath publish/Pomo-DesktopGL.zip
+          Compress-Archive -Path publish/WindowsDX/* -DestinationPath publish/Pomo-WindowsDX.zip
+
+      - name: Generate Timestamp
+        id: timestamp
+        shell: pwsh
+        run: |
+          $timestamp = Get-Date -Format "dd-MM-yyyy-HH-mm-ss"
+          echo "value=$timestamp" >> $env:GITHUB_OUTPUT
+
+      - name: Create Preview Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: preview-${{ steps.timestamp.outputs.value }}
+          name: "Preview Release - ${{ steps.timestamp.outputs.value }}"
+          prerelease: true
+          make_latest: true
+          body: |
+            ## Preview Release
+
+            This is an automated preview release generated from the merged PR.
+
+            ### What's New in this Build
+            **PR:** [${{ github.event.pull_request.title }}](${{ github.event.pull_request.html_url }})
+
+            #### Description
+            ${{ github.event.pull_request.body || 'No description provided.' }}
+
+            ---
+
+            > [!IMPORTANT]
+            > These builds are **NOT self-contained**.
+            > You **MUST** have the **.NET 10 Runtime** installed to run these binaries.
+
+            ### Assets
+            - `Pomo-DesktopGL.zip`: Cross-platform Desktop version.
+            - `Pomo-WindowsDX.zip`: Windows-specific DirectX version.
+          files: |
+            publish/Pomo-DesktopGL.zip
+            publish/Pomo-WindowsDX.zip
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

@@ -6,9 +6,9 @@
   <Folder Name="/Platforms/">
     <Project Path="Pomo.DesktopGL/Pomo.DesktopGL.fsproj" />
     <Project Path="Pomo.WindowsDX/Pomo.WindowsDX.fsproj" />
-    <Project Path="Pomo.Android/Pomo.Android.fsproj">
+    <!-- <Project Path="Pomo.Android/Pomo.Android.fsproj">
       <Deploy />
-    </Project>
+    </Project> -->
     <!-- <Project Path="Pomo.iOS/Pomo.iOS.fsproj">
       <Deploy />
     </Project> -->
