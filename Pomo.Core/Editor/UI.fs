@@ -73,19 +73,21 @@ module EditorUI =
       Label.create "Brush: Place"
       |> W.bindText(state.BrushMode |> AVal.map(fun m -> $"Brush: %A{m}"))
 
+    let collisionLabel =
+      Label.create ""
+      |> W.bindText(
+        state.CollisionEnabled
+        |> AVal.map(fun enabled ->
+          if enabled then "Collision: On" else "Collision: Off")
+      )
+
     let collisionBtn =
-      Btn.create "Collision: Off"
+      Btn.empty()
+      |> Btn.content collisionLabel
       |> W.size 120 30
       |> Btn.onClick(fun () ->
         transact(fun () ->
           state.CollisionEnabled.Value <- not state.CollisionEnabled.Value))
-
-    let collisionSub =
-      state.CollisionEnabled.AddWeakCallback(fun enabled ->
-        let label = collisionBtn.Content :?> Label
-        label.Text <- if enabled then "Collision: On" else "Collision: Off")
-
-    WidgetSubs.get(collisionBtn).Add(collisionSub)
 
     let effectNoneBtn =
       Btn.create "Effect: None"
@@ -165,7 +167,8 @@ module EditorUI =
         let columns = 3
         let rows = (archetypes.Length + columns - 1) / columns
 
-        let grid = Grid.spaced 4 4 |> Grid.autoColumns columns |> Grid.autoRows rows
+        let grid =
+          Grid.spaced 4 4 |> Grid.autoColumns columns |> Grid.autoRows rows
 
         for i = 0 to archetypes.Length - 1 do
           let bt = archetypes[i]
@@ -193,10 +196,11 @@ module EditorUI =
           grid.Widgets.Add(btn)
 
         let scroll = ScrollViewer(Content = grid)
-        scroll :> Widget
-      )
+        scroll :> Widget)
 
-    palette |> Panel.bindChildren(paletteWidget |> AVal.map List.singleton) |> ignore
+    palette
+    |> Panel.bindChildren(paletteWidget |> AVal.map List.singleton)
+    |> ignore
 
     // Help Overlay
     let controls = [

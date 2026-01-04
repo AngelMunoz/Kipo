@@ -35,7 +35,7 @@ module EditorInput =
     =
     curr.IsKeyDown key && prev.IsKeyUp key
 
-  let private cameraSpeed = 5.0f
+  let private cameraSpeed = 0.5f
   let private rotationSpeed = 0.01f
 
   /// Handle camera movement based on mode
@@ -51,18 +51,18 @@ module EditorInput =
 
     match cam.Mode with
     | Isometric ->
-      // Arrow keys pan XZ
+      // Arrow keys pan relative to screen
       if keyboard.IsKeyDown Keys.Left then
-        EditorCamera.panXZ cam -moveAmount 0f
+        EditorCamera.panRelative cam -moveAmount 0f
 
       if keyboard.IsKeyDown Keys.Right then
-        EditorCamera.panXZ cam moveAmount 0f
+        EditorCamera.panRelative cam moveAmount 0f
 
       if keyboard.IsKeyDown Keys.Up then
-        EditorCamera.panXZ cam 0f -moveAmount
+        EditorCamera.panRelative cam 0f -moveAmount
 
       if keyboard.IsKeyDown Keys.Down then
-        EditorCamera.panXZ cam 0f moveAmount
+        EditorCamera.panRelative cam 0f moveAmount
 
       // Scroll zooms
       let scrollDelta =

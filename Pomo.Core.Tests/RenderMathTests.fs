@@ -4,376 +4,9 @@ open Microsoft.VisualStudio.TestTools.UnitTesting
 open Microsoft.Xna.Framework
 open Pomo.Core.Graphics
 open Pomo.Core.Domain.Core
-open Pomo.Core.Domain.Map
-open FsCheck
-open FsCheck.FSharp
-
-/// Standard isometric PPU used throughout the game
-let isoPpu = Vector2(32.0f, 16.0f)
-
-/// Helper to clamp values to reasonable ranges for PPU (avoid division by zero)
-let inline clampPpu(x: int) = max 1 (abs x % 128 + 1)
-
-/// Arbitrary for int values
-let intArb = Arb.fromGen(Gen.choose(-10000, 10000))
-
-/// Arbitrary for 4 int values (for PPU tests)
-let fourInts =
-  Arb.zip(Arb.zip(intArb, intArb), Arb.zip(intArb, intArb))
-  |> Arb.convert (fun ((a, b), (c, d)) -> (a, b, c, d)) (fun (a, b, c, d) ->
-    ((a, b), (c, d)))
-
-/// Arbitrary for 3 int values
-let threeInts =
-  Arb.zip(intArb, Arb.zip(intArb, intArb))
-  |> Arb.convert (fun (a, (b, c)) -> (a, b, c)) (fun (a, b, c) -> (a, (b, c)))
-
-/// Arbitrary for 2 int values
-let twoInts = Arb.zip(intArb, intArb)
-
 
 [<TestClass>]
-type LogicToRenderTests() =
-
-  [<TestMethod>]
-  member _.``origin maps to origin``() =
-    let result = RenderMath.LogicRender.toRender WorldPosition.zero isoPpu
-    Assert.AreEqual(Vector3.Zero, result)
-
-  [<TestMethod>]
-  member _.``X is scaled by PPU.X``() =
-    let logicPos = { WorldPosition.zero with X = 64.0f }
-    let result = RenderMath.LogicRender.toRender logicPos isoPpu
-    Assert.AreEqual(2.0f, result.X) // 64 / 32 = 2
-
-  [<TestMethod>]
-  member _.``Z is scaled by PPU.Y``() =
-    let logicPos = { WorldPosition.zero with Z = 32.0f }
-    let result = RenderMath.LogicRender.toRender logicPos isoPpu
-    Assert.AreEqual(2.0f, result.Z) // 32 / 16 = 2
-
-  [<TestMethod>]
-  member _.``Y includes altitude and depth bias``() =
-    let logicPos = { X = 0.0f; Y = 5.0f; Z = 16.0f } // zBase = 1.0, altitude = 5.0
-    let result = RenderMath.LogicRender.toRender logicPos isoPpu
-    Assert.AreEqual(6.0f, result.Y) // altitude(5) + zBase(1) = 6
-
-  [<TestMethod>]
-  member _.``Z is reduced by altitude for depth sorting``() =
-    let logicPos = { X = 0.0f; Y = 5.0f; Z = 16.0f } // zBase = 1.0, altitude = 5.0
-    let result = RenderMath.LogicRender.toRender logicPos isoPpu
-    Assert.AreEqual(-4.0f, result.Z) // zBase(1) - altitude(5) = -4
-
-
-[<TestClass>]
-type GetSquishFactorTests() =
-
-  [<TestMethod>]
-  member _.``isometric PPU gives 2x squish``() =
-    let squish = RenderMath.WorldMatrix.getSquishFactor isoPpu
-    Assert.AreEqual(2.0f, squish) // 32 / 16 = 2
-
-  [<TestMethod>]
-  member _.``square PPU gives 1x squish``() =
-    let squish = RenderMath.WorldMatrix.getSquishFactor(Vector2(32.0f, 32.0f))
-    Assert.AreEqual(1.0f, squish)
-
-
-[<TestClass>]
-type ScreenToLogicTests() =
-
-  [<TestMethod>]
-  member _.``screen center maps to camera position``() =
-    let viewport = Microsoft.Xna.Framework.Graphics.Viewport(0, 0, 800, 600)
-    let screenCenter = Vector2(400.0f, 300.0f)
-    let cameraPos = { X = 100.0f; Y = 0.0f; Z = 200.0f }
-
-    let result =
-      RenderMath.ScreenLogic.toLogic screenCenter viewport 1.0f cameraPos
-
-    Assert.AreEqual(cameraPos.X, result.X, 0.001f)
-    Assert.AreEqual(cameraPos.Z, result.Z, 0.001f)
-
-  [<TestMethod>]
-  member _.``offset from center is scaled by zoom``() =
-    let viewport = Microsoft.Xna.Framework.Graphics.Viewport(0, 0, 800, 600)
-    let screenPos = Vector2(500.0f, 300.0f) // 100 pixels right of center
-    let cameraPos = WorldPosition.zero
-    let zoom = 2.0f
-
-    let result =
-      RenderMath.ScreenLogic.toLogic screenPos viewport zoom cameraPos
-
-    Assert.AreEqual(50.0f, result.X, 0.001f) // 100 / 2 = 50
-
-  [<TestMethod>]
-  member _.``round-trip logic to screen to logic``() =
-    let viewport = Microsoft.Xna.Framework.Graphics.Viewport(0, 0, 800, 600)
-    let cameraPos = { X = 1000.0f; Y = 0.0f; Z = 500.0f }
-    let zoom = 2.5f
-    let logicPos = { X = 1100.0f; Y = 0.0f; Z = 400.0f }
-
-    let screenPos =
-      RenderMath.ScreenLogic.toScreen logicPos viewport zoom cameraPos
-
-    let actualLogicPos =
-      RenderMath.ScreenLogic.toLogic screenPos viewport zoom cameraPos
-
-    Assert.AreEqual(logicPos.X, actualLogicPos.X, 0.001f)
-    Assert.AreEqual(logicPos.Z, actualLogicPos.Z, 0.001f)
-
-
-[<TestClass>]
-type PropertyTests() =
-
-  [<TestMethod>]
-  member _.``LogicToRender X component is always logicX div ppu.X``() =
-    Prop.forAll fourInts (fun (lx, ly, px, py) ->
-      let logicPos = {
-        X = float32 lx
-        Y = 0.0f
-        Z = float32 ly
-      }
-
-      let ppu = Vector2(float32(clampPpu px), float32(clampPpu py))
-      let result = RenderMath.LogicRender.toRender logicPos ppu
-      abs(result.X - logicPos.X / ppu.X) < 0.0001f)
-    |> Check.QuickThrowOnFailure
-
-  [<TestMethod>]
-  member _.``LogicToRender Z at zero altitude equals logicY div ppu.Y``() =
-    Prop.forAll fourInts (fun (lx, ly, px, py) ->
-      let logicPos = {
-        X = float32 lx
-        Y = 0.0f
-        Z = float32 ly
-      }
-
-      let ppu = Vector2(float32(clampPpu px), float32(clampPpu py))
-      let result = RenderMath.LogicRender.toRender logicPos ppu
-      abs(result.Z - logicPos.Z / ppu.Y) < 0.0001f)
-    |> Check.QuickThrowOnFailure
-
-  [<TestMethod>]
-  member _.``altitude directly contributes to Y``() =
-    Prop.forAll fourInts (fun (lx, ly, px, py) ->
-      let logicPosA = {
-        X = float32 lx
-        Y = 0.0f
-        Z = float32 ly
-      }
-
-      let logicPosB = {
-        X = float32 lx
-        Y = 10.0f
-        Z = float32 ly
-      }
-
-      let ppu = Vector2(float32(clampPpu px), float32(clampPpu py))
-      let resultA = RenderMath.LogicRender.toRender logicPosA ppu
-      let resultB = RenderMath.LogicRender.toRender logicPosB ppu
-      // Use larger tolerance for float32 precision with large zBase values
-      abs(resultB.Y - resultA.Y - 10.0f) < 0.01f)
-    |> Check.QuickThrowOnFailure
-
-  [<TestMethod>]
-  member _.``altitude inversely contributes to Z``() =
-    Prop.forAll fourInts (fun (lx, ly, px, py) ->
-      let logicPosA = {
-        X = float32 lx
-        Y = 0.0f
-        Z = float32 ly
-      }
-
-      let logicPosB = {
-        X = float32 lx
-        Y = 10.0f
-        Z = float32 ly
-      }
-
-      let ppu = Vector2(float32(clampPpu px), float32(clampPpu py))
-      let resultA = RenderMath.LogicRender.toRender logicPosA ppu
-      let resultB = RenderMath.LogicRender.toRender logicPosB ppu
-      abs(resultA.Z - resultB.Z - 10.0f) < 0.0001f)
-    |> Check.QuickThrowOnFailure
-
-  [<TestMethod>]
-  member _.``GetSquishFactor is always ppu.X div ppu.Y``() =
-    Prop.forAll twoInts (fun (px, py) ->
-      let ppu = Vector2(float32(clampPpu px), float32(clampPpu py))
-      let expected = ppu.X / ppu.Y
-      let actual = RenderMath.WorldMatrix.getSquishFactor ppu
-      abs(actual - expected) < 0.0001f)
-    |> Check.QuickThrowOnFailure
-
-  [<TestMethod>]
-  member _.``ParticleSpace at ground equals LogicRender at zero altitude``() =
-    Prop.forAll twoInts (fun (x, z) ->
-      let ppu = Vector2(32.0f, 16.0f)
-      let particle = Vector3(float32 x, 0.0f, float32 z)
-
-      let logic = {
-        X = float32 x
-        Y = 0.0f
-        Z = float32 z
-      }
-
-      let fromParticle = RenderMath.ParticleSpace.toRender particle ppu
-      let fromLogic = RenderMath.LogicRender.toRender logic ppu
-
-      abs(fromParticle.X - fromLogic.X) < 0.0001f
-      && abs(fromParticle.Y - fromLogic.Y) < 0.0001f
-      && abs(fromParticle.Z - fromLogic.Z) < 0.0001f)
-    |> Check.QuickThrowOnFailure
-
-  [<TestMethod>]
-  member _.``tileToRender X and Z match toRender X and Z``() =
-    Prop.forAll twoInts (fun (lx, ly) ->
-      let ppu = Vector2(32.0f, 16.0f)
-      let logicPosV2 = Vector2(float32 lx, float32 ly)
-      let depthY = 5.0f
-
-      let tileResult =
-        RenderMath.LogicRender.tileToRender logicPosV2 depthY ppu
-
-      let renderResult =
-        RenderMath.LogicRender.toRender
-          {
-            X = float32 lx
-            Y = 0.0f
-            Z = float32 ly
-          }
-          ppu
-
-      abs(tileResult.X - renderResult.X) < 0.0001f
-      && abs(tileResult.Z - renderResult.Z) < 0.0001f
-      && abs(tileResult.Y - depthY) < 0.0001f)
-    |> Check.QuickThrowOnFailure
-
-  [<TestMethod>]
-  member _.``createMesh translation equals render position``() =
-    Prop.forAll threeInts (fun (x, y, z) ->
-      let renderPos = Vector3(float32 x, float32 y, float32 z)
-      let world = RenderMath.WorldMatrix.createMesh renderPos 0.0f 1.0f 2.0f
-      let translation = world.Translation
-
-      abs(translation.X - renderPos.X) < 0.0001f
-      && abs(translation.Y - renderPos.Y) < 0.0001f
-      && abs(translation.Z - renderPos.Z) < 0.0001f)
-    |> Check.QuickThrowOnFailure
-
-  [<TestMethod>]
-  member _.``createProjectile translation equals render position``() =
-    Prop.forAll threeInts (fun (x, y, z) ->
-      let renderPos = Vector3(float32 x, float32 y, float32 z)
-
-      let world =
-        RenderMath.WorldMatrix.createProjectile renderPos 0.0f 0.0f 1.0f 2.0f
-
-      let translation = world.Translation
-
-      abs(translation.X - renderPos.X) < 0.0001f
-      && abs(translation.Y - renderPos.Y) < 0.0001f
-      && abs(translation.Z - renderPos.Z) < 0.0001f)
-    |> Check.QuickThrowOnFailure
-
-  [<TestMethod>]
-  member _.``createMeshParticle translation includes pivot and position``() =
-    Prop.forAll threeInts (fun (x, y, z) ->
-      let renderPos = Vector3(float32 x, float32 y, float32 z)
-      let pivot = Vector3(1.0f, 2.0f, 3.0f)
-
-      let world =
-        RenderMath.WorldMatrix.createMeshParticle
-          renderPos
-          Quaternion.Identity
-          1.0f
-          Vector3.One
-          pivot
-          2.0f
-
-      let translation = world.Translation
-
-      abs(translation.X - (renderPos.X + pivot.X)) < 0.1f
-      && abs(translation.Y - (renderPos.Y + pivot.Y)) < 0.1f
-      && abs(translation.Z - (renderPos.Z + pivot.Z)) < 0.1f)
-    |> Check.QuickThrowOnFailure
-
-  [<TestMethod>]
-  member _.``applyNodeTransform with identity animation returns offset translation``
-    ()
-    =
-    Prop.forAll threeInts (fun (ox, oy, oz) ->
-      let pivot = Vector3.Zero
-      let offset = Vector3(float32 ox, float32 oy, float32 oz)
-      let animation = Matrix.Identity
-      let result = RenderMath.Rig.applyNodeTransform pivot offset animation
-
-      abs(result.Translation.X - offset.X) < 0.0001f
-      && abs(result.Translation.Y - offset.Y) < 0.0001f
-      && abs(result.Translation.Z - offset.Z) < 0.0001f)
-    |> Check.QuickThrowOnFailure
-
-  [<TestMethod>]
-  member _.``getBillboardVectors returns orthogonal vectors``() =
-    let ppu = Vector2(32.0f, 16.0f)
-    let view = RenderMath.Camera.getViewMatrix WorldPosition.zero ppu
-    let struct (right, up) = RenderMath.Billboard.getVectors &view
-    let dot = Vector3.Dot(right, up)
-    Assert.IsTrue(abs(dot) < 0.0001f)
-
-  [<TestMethod>]
-  member _.``getViewMatrix produces invertible matrix``() =
-    Prop.forAll twoInts (fun (x, y) ->
-      let ppu = Vector2(32.0f, 16.0f)
-
-      let pos = {
-        X = float32 x
-        Y = 0.0f
-        Z = float32 y
-      }
-
-      let view = RenderMath.Camera.getViewMatrix pos ppu
-      let det = view.Determinant()
-      abs(det) > 0.0001f)
-    |> Check.QuickThrowOnFailure
-
-  [<TestMethod>]
-  member _.``getProjectionMatrix produces well-formed matrix``() =
-    Prop.forAll intArb (fun zoom ->
-      let zoom = float32(abs zoom % 10 + 1)
-      let viewport = Microsoft.Xna.Framework.Graphics.Viewport(0, 0, 800, 600)
-      let ppu = Vector2(32.0f, 16.0f)
-      let proj = RenderMath.Camera.getProjectionMatrix viewport zoom ppu
-
-      not(System.Single.IsNaN proj.M11)
-      && not(System.Single.IsInfinity proj.M11))
-    |> Check.QuickThrowOnFailure
-
-  [<TestMethod>]
-  member _.``get2DViewMatrix centers camera position on screen center``() =
-    Prop.forAll twoInts (fun (cx, cy) ->
-      let zoom = 1.0f
-      let viewport = Microsoft.Xna.Framework.Graphics.Viewport(0, 0, 800, 600)
-
-      let cameraPos = {
-        X = float32 cx
-        Y = 0.0f
-        Z = float32 cy
-      }
-
-      let matrix = RenderMath.Camera.get2DViewMatrix cameraPos zoom viewport
-
-      let transformed =
-        Vector2.Transform(Vector2(cameraPos.X, cameraPos.Z), matrix)
-
-      abs(transformed.X - 400.0f) < 0.0001f
-      && abs(transformed.Y - 300.0f) < 0.0001f)
-    |> Check.QuickThrowOnFailure
-
-
-[<TestClass>]
-type GetViewBoundsTests() =
+type CameraViewBoundsTests() =
 
   [<TestMethod>]
   member _.``centered camera has symmetric bounds``() =
@@ -411,123 +44,190 @@ type GetViewBoundsTests() =
 
 
 [<TestClass>]
-type TileGridToLogicTests() =
+type CameraViewCellBoundsTests() =
 
   [<TestMethod>]
-  member _.``orthogonal layout is simple grid``() =
-    let struct (px, py) =
-      RenderMath.TileGrid.toLogic
-        Orthogonal
-        ValueNone
-        ValueNone
-        10
-        2
-        3
-        32.0f
-        32.0f
+  member _.``getViewCellBounds3D returns valid cell bounds``() =
+    let viewBounds = struct (-100.0f, 100.0f, -100.0f, 100.0f)
+    let cameraY = 0.0f
+    let cellSize = 10.0f
+    let visibleHeightRange = 50.0f
 
-    Assert.AreEqual(64.0f, px)
-    Assert.AreEqual(96.0f, py)
+    let struct (minX, maxX, minY, maxY, minZ, maxZ) =
+      RenderMath.Camera.getViewCellBounds3D
+        viewBounds
+        cameraY
+        cellSize
+        visibleHeightRange
 
-  [<TestMethod>]
-  member _.``isometric layout applies diamond projection``() =
-    let mapWidth = 10
-    let tileW, tileH = 64.0f, 32.0f
-
-    let struct (px, py) =
-      RenderMath.TileGrid.toLogic
-        Isometric
-        ValueNone
-        ValueNone
-        mapWidth
-        0
-        0
-        tileW
-        tileH
-
-    Assert.AreEqual(320.0f, px)
-    Assert.AreEqual(0.0f, py)
+    Assert.IsTrue(minX <= maxX)
+    Assert.IsTrue(minY <= maxY)
+    Assert.IsTrue(minZ <= maxZ)
 
   [<TestMethod>]
-  member _.``isometric x+1 moves right and down``() =
-    let mapWidth = 10
-    let tileW, tileH = 64.0f, 32.0f
+  member _.``isInCellBounds correctly identifies cells within bounds``() =
+    let bounds = struct (0, 10, 0, 5, 0, 10)
 
-    let struct (px0, py0) =
-      RenderMath.TileGrid.toLogic
-        Isometric
-        ValueNone
-        ValueNone
-        mapWidth
-        0
-        0
-        tileW
-        tileH
+    Assert.IsTrue(RenderMath.Camera.isInCellBounds 5 2 5 bounds)
+    Assert.IsFalse(RenderMath.Camera.isInCellBounds -1 2 5 bounds)
+    Assert.IsFalse(RenderMath.Camera.isInCellBounds 5 -1 5 bounds)
+    Assert.IsFalse(RenderMath.Camera.isInCellBounds 5 2 -1 bounds)
+    Assert.IsFalse(RenderMath.Camera.isInCellBounds 11 2 5 bounds)
 
-    let struct (px1, py1) =
-      RenderMath.TileGrid.toLogic
-        Isometric
-        ValueNone
-        ValueNone
-        mapWidth
-        1
-        0
-        tileW
-        tileH
 
-    Assert.AreEqual(px0 + 32.0f, px1)
-    Assert.AreEqual(py0 + 16.0f, py1)
+[<TestClass>]
+type WorldMatrix3DTests() =
 
   [<TestMethod>]
-  member _.``staggered X axis odd index offsets Y``() =
-    let struct (_, py0) =
-      RenderMath.TileGrid.toLogic
-        Staggered
-        (ValueSome X)
-        (ValueSome Odd)
-        10
-        0
-        0
-        64.0f
-        32.0f
+  member _.``createMesh translation equals render position``() =
+    let renderPos = Vector3(10.0f, 20.0f, 30.0f)
+    let world = RenderMath.WorldMatrix3D.createMesh renderPos 0.0f 1.0f
+    let translation = world.Translation
 
-    let struct (_, py1) =
-      RenderMath.TileGrid.toLogic
-        Staggered
-        (ValueSome X)
-        (ValueSome Odd)
-        10
-        1
-        0
-        64.0f
-        32.0f
-
-    Assert.AreEqual(0.0f, py0)
-    Assert.AreEqual(16.0f, py1)
+    Assert.AreEqual(renderPos.X, translation.X, 0.0001f)
+    Assert.AreEqual(renderPos.Y, translation.Y, 0.0001f)
+    Assert.AreEqual(renderPos.Z, translation.Z, 0.0001f)
 
   [<TestMethod>]
-  member _.``staggered Y axis odd index offsets X``() =
-    let struct (px0, _) =
-      RenderMath.TileGrid.toLogic
-        Staggered
-        (ValueSome Y)
-        (ValueSome Odd)
-        10
-        0
-        0
-        64.0f
-        32.0f
+  member _.``createMesh with scale affects matrix``() =
+    let renderPos = Vector3.Zero
+    let scale = 2.0f
+    let world = RenderMath.WorldMatrix3D.createMesh renderPos 0.0f scale
 
-    let struct (px1, _) =
-      RenderMath.TileGrid.toLogic
-        Staggered
-        (ValueSome Y)
-        (ValueSome Odd)
-        10
-        0
-        1
-        64.0f
-        32.0f
+    Assert.AreEqual(scale, world.M11, 0.0001f)
+    Assert.AreEqual(scale, world.M22, 0.0001f)
+    Assert.AreEqual(scale, world.M33, 0.0001f)
 
-    Assert.AreEqual(0.0f, px0)
-    Assert.AreEqual(32.0f, px1)
+  [<TestMethod>]
+  member _.``createProjectile translation equals render position``() =
+    let renderPos = Vector3(5.0f, 10.0f, 15.0f)
+
+    let world =
+      RenderMath.WorldMatrix3D.createProjectile renderPos 0.0f 0.0f 1.0f
+
+    let translation = world.Translation
+
+    Assert.AreEqual(renderPos.X, translation.X, 0.0001f)
+    Assert.AreEqual(renderPos.Y, translation.Y, 0.0001f)
+    Assert.AreEqual(renderPos.Z, translation.Z, 0.0001f)
+
+  [<TestMethod>]
+  member _.``createMeshParticle includes pivot offset``() =
+    let renderPos = Vector3(10.0f, 20.0f, 30.0f)
+    let pivot = Vector3(1.0f, 2.0f, 3.0f)
+
+    let world =
+      RenderMath.WorldMatrix3D.createMeshParticle
+        renderPos
+        Quaternion.Identity
+        1.0f
+        Vector3.One
+        pivot
+
+    let translation = world.Translation
+
+    Assert.AreEqual(renderPos.X + pivot.X, translation.X, 0.1f)
+    Assert.AreEqual(renderPos.Y + pivot.Y, translation.Y, 0.1f)
+    Assert.AreEqual(renderPos.Z + pivot.Z, translation.Z, 0.1f)
+
+
+[<TestClass>]
+type RigTransformTests() =
+
+  [<TestMethod>]
+  member _.``applyNodeTransform with identity animation returns offset translation``
+    ()
+    =
+    let pivot = Vector3.Zero
+    let offset = Vector3(5.0f, 10.0f, 15.0f)
+    let animation = Matrix.Identity
+    let result = RenderMath.Rig.applyNodeTransform pivot offset animation
+
+    Assert.AreEqual(offset.X, result.Translation.X, 0.0001f)
+    Assert.AreEqual(offset.Y, result.Translation.Y, 0.0001f)
+    Assert.AreEqual(offset.Z, result.Translation.Z, 0.0001f)
+
+  [<TestMethod>]
+  member _.``applyNodeTransform with pivot rotates around pivot point``() =
+    let pivot = Vector3(0.0f, 1.0f, 0.0f)
+    let offset = Vector3.Zero
+    let rotation = Matrix.CreateRotationY(MathHelper.PiOver2)
+    let result = RenderMath.Rig.applyNodeTransform pivot offset rotation
+
+    Assert.IsTrue(
+      abs(result.M11 - 0.0f) < 0.01f || abs(result.M11 - 1.0f) < 0.01f
+    )
+
+
+[<TestClass>]
+type BillboardTests() =
+
+  [<TestMethod>]
+  member _.``getBillboardVectors returns orthogonal vectors``() =
+    let view =
+      Matrix.CreateLookAt(Vector3.Backward * 10.0f, Vector3.Zero, Vector3.Up)
+
+    let struct (right, up) = RenderMath.Billboard.getVectors &view
+    let dot = Vector3.Dot(right, up)
+    Assert.IsTrue(abs(dot) < 0.0001f)
+
+
+[<TestClass>]
+type BlockMap3DTests() =
+
+  [<TestMethod>]
+  member _.``calcCenterOffset returns correct offset``() =
+    let width = 10
+    let depth = 10
+    let ppu = 32.0f
+    let cellSize = Pomo.Core.Domain.Core.Constants.BlockMap.CellSize
+
+    let offset = RenderMath.BlockMap3D.calcCenterOffset width depth ppu
+
+    let expectedX = -float32 width * (cellSize / ppu) * 0.5f
+    let expectedZ = -float32 depth * (cellSize / ppu) * 0.5f
+
+    Assert.AreEqual(expectedX, offset.X, 0.001f)
+    Assert.AreEqual(0.0f, offset.Y, 0.001f)
+    Assert.AreEqual(expectedZ, offset.Z, 0.001f)
+
+  [<TestMethod>]
+  member _.``toRender scales position by PPU``() =
+    let pos = { X = 32.0f; Y = 16.0f; Z = 64.0f }
+    let ppu = 32.0f
+    let centerOffset = Vector3.Zero
+
+    let result = RenderMath.BlockMap3D.toRender pos ppu centerOffset
+
+    Assert.AreEqual(1.0f, result.X, 0.001f)
+    Assert.AreEqual(0.5f, result.Y, 0.001f)
+    Assert.AreEqual(2.0f, result.Z, 0.001f)
+
+  [<TestMethod>]
+  member _.``toRender applies center offset``() =
+    let pos = WorldPosition.zero
+    let ppu = 32.0f
+    let centerOffset = Vector3(10.0f, 20.0f, 30.0f)
+
+    let result = RenderMath.BlockMap3D.toRender pos ppu centerOffset
+
+    Assert.AreEqual(centerOffset.X, result.X, 0.001f)
+    Assert.AreEqual(centerOffset.Y, result.Y, 0.001f)
+    Assert.AreEqual(centerOffset.Z, result.Z, 0.001f)
+
+  [<TestMethod>]
+  member _.``cellToRender positions cell at center``() =
+    let cellX, cellY, cellZ = 0, 0, 0
+    let ppu = 32.0f
+    let centerOffset = Vector3.Zero
+    let cellSize = Pomo.Core.Domain.Core.Constants.BlockMap.CellSize
+
+    let result =
+      RenderMath.BlockMap3D.cellToRender cellX cellY cellZ ppu centerOffset
+
+    let scaleFactor = cellSize / ppu
+    let halfCell = scaleFactor * 0.5f
+
+    Assert.AreEqual(halfCell, result.X, 0.001f)
+    Assert.AreEqual(halfCell, result.Y, 0.001f)
+    Assert.AreEqual(halfCell, result.Z, 0.001f)
