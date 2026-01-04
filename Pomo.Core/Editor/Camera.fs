@@ -21,6 +21,9 @@ module EditorCamera =
   let inline panXZ (cam: MutableCamera) (deltaX: float32) (deltaZ: float32) =
     cam.Params <- Camera.Transform.panXZ cam.Params deltaX deltaZ
 
+  let inline panRelative (cam: MutableCamera) (deltaX: float32) (deltaZ: float32) =
+    cam.Params <- Camera.Transform.panRelative cam.Params deltaX deltaZ
+
   let moveFreeFly
     (cam: MutableCamera)
     (deltaX: float32)

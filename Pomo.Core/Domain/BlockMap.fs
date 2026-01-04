@@ -75,6 +75,8 @@ module BlockMap =
 
   type BlockType = {
     Id: int<BlockTypeId>
+    ArchetypeId: int<BlockTypeId>
+    VariantKey: string voption
     Name: string
     Model: string
     Category: string
@@ -217,24 +219,38 @@ module BlockMap =
     let blockTypeDecoder: Decoder<BlockType> =
       fun json -> decode {
         let! id = Required.Property.get ("Id", Required.int) json
-        and! name = Required.Property.get ("Name", Required.string) json
-        and! model = Required.Property.get ("Model", Required.string) json
 
-        and! category =
+        let! archetypeIdRaw =
+          VOptional.Property.get ("ArchetypeId", Required.int) json
+
+        let archetypeId =
+          archetypeIdRaw
+          |> ValueOption.defaultValue id
+          |> fun a -> a * 1<BlockTypeId>
+
+        let! variantKey =
+          VOptional.Property.get ("VariantKey", Required.string) json
+
+        let! name = Required.Property.get ("Name", Required.string) json
+        let! model = Required.Property.get ("Model", Required.string) json
+
+        let! category =
           VOptional.Property.get ("Category", Required.string) json
           |> Result.map(ValueOption.defaultValue "Terrain")
 
-        and! collisionType =
+        let! collisionType =
           VOptional.Property.get ("CollisionType", collisionTypeDecoder) json
           |> Result.map(ValueOption.defaultValue Box)
 
-        and! effect =
+        let! effect =
           VOptional.Property.get
             ("Effect", Skill.Serialization.Effect.decoder)
             json
 
         return {
           Id = id * 1<BlockTypeId>
+          ArchetypeId = archetypeId
+          VariantKey = variantKey
           Name = name
           Model = model
           Category = category
@@ -247,6 +263,11 @@ module BlockMap =
       fun value ->
         Json.object [
           "Id", Encode.int(value.Id |> UMX.untag)
+          if value.ArchetypeId <> value.Id then
+            "ArchetypeId", Encode.int(value.ArchetypeId |> UMX.untag)
+          match value.VariantKey with
+          | ValueSome key -> "VariantKey", Encode.string key
+          | ValueNone -> ()
           "Name", Encode.string value.Name
           "Model", Encode.string value.Model
           "Category", Encode.string value.Category

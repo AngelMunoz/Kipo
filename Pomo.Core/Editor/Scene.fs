@@ -32,7 +32,9 @@ module EditorScene =
 
       match BlockMapLoader.load BlockMapLoader.Resolvers.editor path with
       | Ok map -> map
-      | Error _ -> BlockMap.createEmpty key 16 8 16
+      | Error e ->
+        printfn $"Error loading Map: {path} - {e}"
+        BlockMap.createEmpty key 16 8 16
 
     let blockMap =
       match mapKey with
@@ -53,6 +55,8 @@ module EditorScene =
           id,
           {
             Id = id
+            ArchetypeId = id
+            VariantKey = ValueNone
             Name = name
             Model = model
             Category = cat

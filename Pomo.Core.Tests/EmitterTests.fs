@@ -10,7 +10,6 @@ open FSharp.Data.Adaptive
 open Pomo.Core
 open Pomo.Core.Domain.Core
 open Pomo.Core.Domain.Units
-open Pomo.Core.Domain.Map
 open Pomo.Core.Domain.Animation
 open Pomo.Core.Domain.Projectile
 open Pomo.Core.Domain.Spatial
@@ -19,31 +18,23 @@ open Pomo.Core.Rendering
 open Pomo.Core.Stores
 open Pomo.Core.Projections
 
-// ============================================================================
-// Fake Implementations (no mocks)
-// ============================================================================
-
 /// Creates a fake Model for testing (MonoGame Model requires GraphicsDevice, so we use null)
 let fakeModel() : Model = Unchecked.defaultof<Model>
 
 /// Creates a fake Texture2D for testing
 let fakeTexture() : Texture2D = Unchecked.defaultof<Texture2D>
 
-/// Standard isometric PPU
-let isoPpu = Vector2(32.0f, 16.0f)
+/// Standard PPU
+let stdPpu = Vector2(32.0f, 32.0f)
 
-/// Creates a RenderCore with standard settings
+/// Creates a RenderCore for testing with True3D space
 let createRenderCore() : RenderCore = {
-  PixelsPerUnit = isoPpu
-  Space = RenderSpace.Isometric
-  ToRenderPos = fun pos -> RenderMath.LogicRender.toRender pos isoPpu
-  ToRenderParticlePos =
-    fun particlePos -> RenderMath.ParticleSpace.toRender particlePos isoPpu
+  PixelsPerUnit = stdPpu
+  Space = True3D
+  ToRenderPos = fun pos -> Vector3(pos.X / 32.0f, pos.Y / 32.0f, pos.Z / 32.0f)
+  ToRenderParticlePos = fun particlePos -> particlePos / 32.0f
 }
 
-// ============================================================================
-// EntityEmitter Tests
-// ============================================================================
 
 [<TestClass>]
 type EntityEmitterTests() =
@@ -152,77 +143,6 @@ type EntityEmitterTests() =
     let result = EntityEmitter.emit getModel entities
     Assert.AreEqual(3, result.Length)
 
-// ============================================================================
-// TerrainEmitter Tests
-// ============================================================================
-
-[<TestClass>]
-type TerrainEmitterTests() =
-
-  /// Creates a fake MapLayer with optional tiles
-  let createLayer
-    (width: int)
-    (height: int)
-    (tileIds: (int * int * int) list)
-    : MapLayer =
-    let tiles = Array2D.create width height ValueNone
-
-    for (x, y, id) in tileIds do
-      tiles.[x, y] <- ValueSome { TileId = %id; X = x; Y = y }
-
-    {
-      Id = %1
-      Name = "TestLayer"
-      Width = width
-      Height = height
-      Visible = true
-      Opacity = 1.0f
-      Properties = HashMap.empty
-      Tiles = tiles
-    }
-
-  [<TestMethod>]
-  member _.``emitLayer returns empty for invisible layer``() =
-    let core = createRenderCore()
-
-    let data: TerrainRenderData = {
-      GetTileTexture = fun _ -> ValueSome(fakeTexture())
-      LayerRenderIndices = readOnlyDict []
-    }
-
-    let map: MapDefinition = {
-      Key = "test"
-      Version = "1.0"
-      TiledVersion = "1.0"
-      Width = 10
-      Height = 10
-      TileWidth = 32
-      TileHeight = 32
-      Orientation = Orthogonal
-      RenderOrder = RightDown
-      Infinite = false
-      StaggerAxis = ValueNone
-      StaggerIndex = ValueNone
-      Tilesets = IndexList.empty
-      Layers = IndexList.empty
-      ObjectGroups = IndexList.empty
-      BackgroundColor = ValueNone
-      Properties = HashMap.empty
-    }
-
-    let layer = {
-      createLayer 10 10 [ (0, 0, 1) ] with
-          Visible = false
-    }
-
-    let viewBounds = struct (-1000.0f, 1000.0f, -1000.0f, 1000.0f)
-
-    let result = TerrainEmitter.emitLayer core data map layer viewBounds
-    Assert.AreEqual(0, result.Length)
-
-// ============================================================================
-// PoseResolver Tests
-// ============================================================================
 
 [<TestClass>]
 type PoseResolverTests() =
@@ -266,7 +186,6 @@ type PoseResolverTests() =
           }
       EntityPoses = readOnlyDict []
       LiveProjectiles = HashMap.empty
-      SquishFactor = 2.0f
       ModelScale = 1.0f
     }
 
@@ -366,7 +285,6 @@ type PoseResolverTests() =
           }
       EntityPoses = readOnlyDict []
       LiveProjectiles = HashMap.empty
-      SquishFactor = 2.0f
       ModelScale = 1.0f
     }
 

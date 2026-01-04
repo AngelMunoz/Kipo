@@ -53,9 +53,75 @@ module EditorUI =
           | ValueNone -> "Block: None")
       )
 
+    let effectInfo =
+      Label.create "Effect: None"
+      |> W.bindText(
+        (state.BlockMap, state.SelectedBlockType)
+        ||> AVal.map2(fun map selectedId ->
+          match selectedId with
+          | ValueSome id ->
+            match map.Palette.TryGetValue(id) with
+            | true, bt ->
+              match bt.Effect with
+              | ValueSome e -> $"Effect: {e.Name}"
+              | ValueNone -> "Effect: None"
+            | _ -> "Effect: Unknown"
+          | ValueNone -> "Effect: None")
+      )
+
     let brushInfo =
       Label.create "Brush: Place"
       |> W.bindText(state.BrushMode |> AVal.map(fun m -> $"Brush: %A{m}"))
+
+    let collisionLabel =
+      Label.create ""
+      |> W.bindText(
+        state.CollisionEnabled
+        |> AVal.map(fun enabled ->
+          if enabled then "Collision: On" else "Collision: Off")
+      )
+
+    let collisionBtn =
+      Btn.empty()
+      |> Btn.content collisionLabel
+      |> W.size 120 30
+      |> Btn.onClick(fun () ->
+        transact(fun () ->
+          state.CollisionEnabled.Value <- not state.CollisionEnabled.Value))
+
+    let effectNoneBtn =
+      Btn.create "Effect: None"
+      |> W.size 120 30
+      |> Btn.onClick(fun () ->
+        transact(fun () ->
+          match state.SelectedBlockType.Value with
+          | ValueSome archetypeId ->
+            let map = state.BlockMap.Value
+
+            Pomo.Core.Algorithms.BlockMap.setArchetypeEffect
+              map
+              archetypeId
+              ValueNone
+
+            state.BlockMap.Value <- { map with Version = map.Version + 1 }
+          | ValueNone -> ()))
+
+    let effectLavaBtn =
+      Btn.create "Effect: Lava"
+      |> W.size 120 30
+      |> Btn.onClick(fun () ->
+        transact(fun () ->
+          match state.SelectedBlockType.Value with
+          | ValueSome archetypeId ->
+            let map = state.BlockMap.Value
+
+            Pomo.Core.Algorithms.BlockMap.setArchetypeEffect
+              map
+              archetypeId
+              (ValueSome EditorEffectPresets.lava)
+
+            state.BlockMap.Value <- { map with Version = map.Version + 1 }
+          | ValueNone -> ()))
 
     let layerInfo =
       Label.create "Layer: 0"
@@ -82,25 +148,38 @@ module EditorUI =
       )
 
     let palette =
-      HStack.spaced 4
+      Panel.sized 420 240
       |> W.hAlign HorizontalAlignment.Right
       |> W.vAlign VerticalAlignment.Bottom
-      |> W.padding 20
+      |> W.padding 12
 
     palette.Background <- SolidBrush(Color(0, 0, 0, 150))
 
-    let paletteChildren =
+    let paletteWidget =
       state.BlockMap
-      |> AVal.map(fun map -> [
-        for bt in map.Palette.Values do
+      |> AVal.map(fun map ->
+        let archetypes =
+          map.Palette.Values
+          |> Seq.filter(fun bt -> bt.Id = bt.ArchetypeId)
+          |> Seq.sortBy(fun bt -> struct (bt.Category, bt.Name))
+          |> Seq.toArray
+
+        let columns = 3
+        let rows = (archetypes.Length + columns - 1) / columns
+
+        let grid =
+          Grid.spaced 4 4 |> Grid.autoColumns columns |> Grid.autoRows rows
+
+        for i = 0 to archetypes.Length - 1 do
+          let bt = archetypes[i]
+
           let btn =
             Btn.create bt.Name
-            |> W.size 80 30
+            |> W.size 120 30
             |> Btn.onClick(fun () ->
               transact(fun () ->
                 state.SelectedBlockType.Value <- ValueSome bt.Id))
 
-          // Highlight selected
           let sub =
             state.SelectedBlockType.AddWeakCallback(fun selId ->
               let label = btn.Content :?> Label
@@ -112,10 +191,16 @@ module EditorUI =
 
           WidgetSubs.get(btn).Add(sub)
 
-          btn :> Widget
-      ])
+          Grid.SetColumn(btn, i % columns)
+          Grid.SetRow(btn, i / columns)
+          grid.Widgets.Add(btn)
 
-    palette |> HStack.bindChildren paletteChildren |> ignore
+        let scroll = ScrollViewer(Content = grid)
+        scroll :> Widget)
+
+    palette
+    |> Panel.bindChildren(paletteWidget |> AVal.map List.singleton)
+    |> ignore
 
     // Help Overlay
     let controls = [
@@ -179,7 +264,11 @@ module EditorUI =
       helpLabel
       undoBtn
       redoBtn
+      collisionBtn
       blockInfo
+      effectInfo
+      effectNoneBtn
+      effectLavaBtn
       blockCount
       brushInfo
       layerInfo

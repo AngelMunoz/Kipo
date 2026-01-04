@@ -59,7 +59,7 @@ module BlockMapLoader =
             Serialization.blockMapDefinitionDecoder
           )
         with
-        | Ok map -> Ok map
+        | Ok map -> Ok(Pomo.Core.Algorithms.BlockMap.normalizeLoadedMap map)
         | Error err -> Error $"Failed to decode block map: {err.message}"
       else
         Error $"Block map file not found: {resolvedPath}"

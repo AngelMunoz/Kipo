@@ -532,10 +532,25 @@ module Label =
 
 module Panel =
   open Myra.Graphics2D.Brushes
+  open System.Collections.ObjectModel
+
   let inline create() = Panel()
 
   let inline sized (width: int) (height: int) =
     Panel(Width = Nullable width, Height = Nullable height)
+
+  let inline bindChild<'T when 'T :> Panel> (childAVal: aval<Widget>) (w: 'T) =
+    let sub =
+      childAVal.AddWeakCallback(fun child ->
+        let index = w.Widgets.IndexOf(child)
+
+        if index = -1 then
+          w.Widgets.Add(child)
+        else
+          w.Widgets[index] <- child)
+
+    WidgetSubs.get(w).Add(sub)
+    w
 
   let inline bindChildren<'W when 'W :> Panel>
     (childrenAVal: aval<Widget list>)
@@ -652,6 +667,12 @@ module Grid =
 
 module Btn =
   let inline create(text: string) = Button(Content = Label(Text = text))
+
+  let inline empty() = Button()
+
+  let inline content (widget: Widget) (btn: Button) =
+    btn.Content <- widget
+    btn
 
   let inline onClick (handler: unit -> unit) (btn: Button) =
     let sub = btn.Click.Subscribe(fun _ -> handler())

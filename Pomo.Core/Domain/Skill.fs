@@ -521,8 +521,16 @@ module Skill =
         fun json -> decode {
           let! formulaStr = Required.string json
 
+          let trimmed = formulaStr.Trim()
+
+          let normalized =
+            if trimmed.Length > 0 && trimmed[0] = '-' then
+              "0" + trimmed
+            else
+              trimmed
+
           try
-            return FormulaParser.parse formulaStr
+            return FormulaParser.parse normalized
           with ex ->
             return!
               DecodeError.ofError(json.Clone(), "Failed to parse formula")
@@ -877,7 +885,12 @@ module Skill =
 
       let rec private formulaEncoder(expr: Formula.MathExpr) : string =
         match expr with
-        | Formula.Const c -> string c
+        | Formula.Const c when c < 0.0 ->
+          let absC = -c
+          let absStr = absC.ToString(System.Globalization.CultureInfo.InvariantCulture)
+          $"(0 - {absStr})"
+        | Formula.Const c ->
+          c.ToString(System.Globalization.CultureInfo.InvariantCulture)
         | Formula.Var v ->
           match v with
           | Formula.VarId.AP -> "AP"

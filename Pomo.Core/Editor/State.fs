@@ -16,6 +16,7 @@ type EditorState = {
   SelectedBlockType: cval<int<BlockTypeId> voption>
   BrushMode: cval<BrushMode>
   CurrentRotation: cval<Quaternion>
+  CollisionEnabled: cval<bool>
   CameraMode: cval<CameraMode>
   ShowHelp: cval<bool>
   UndoStack: Stack<EditorAction>
@@ -31,6 +32,7 @@ module EditorState =
     SelectedBlockType = cval ValueNone
     BrushMode = cval Place
     CurrentRotation = cval Quaternion.Identity
+    CollisionEnabled = cval false
     CameraMode = cval Isometric
     ShowHelp = cval false
     UndoStack = Stack()
