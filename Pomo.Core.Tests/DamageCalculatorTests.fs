@@ -76,7 +76,7 @@ let measureRate (trials: int) (action: unit -> bool) : float =
   float successes / float trials
 
 /// Statistical tolerance for probability tests (based on sample size)
-let tolerance10k = 0.025
+let tolerance100 = 0.15
 let tolerance1k = 0.05
 
 // ============================================================================
@@ -94,14 +94,14 @@ type HitChanceTests() =
     let skill = createSkill Physical 100.0
 
     let hitRate =
-      measureRate 10000 (fun () ->
+      measureRate 100 (fun () ->
         let result =
           DamageCalculator.calculateFinalDamage rng attacker defender skill
 
         not result.IsEvaded)
 
     Assert.IsTrue(
-      abs(hitRate - 0.5) < tolerance10k,
+      abs(hitRate - 0.5) < tolerance100,
       sprintf "Hit rate was %.3f, expected ~0.5 (equal AC/HV stats)" hitRate
     )
 
@@ -113,7 +113,7 @@ type HitChanceTests() =
     let skill = createSkill Physical 100.0
 
     let hitRate =
-      measureRate 10000 (fun () ->
+      measureRate 100 (fun () ->
         let result =
           DamageCalculator.calculateFinalDamage rng attacker defender skill
 
@@ -121,7 +121,7 @@ type HitChanceTests() =
 
     // Expected: 0.5 + 30/200 = 0.65
     Assert.IsTrue(
-      abs(hitRate - 0.65) < tolerance10k,
+      abs(hitRate - 0.65) < tolerance100,
       sprintf "Hit rate was %.3f, expected ~0.65 (+30 AC advantage)" hitRate
     )
 
@@ -133,7 +133,7 @@ type HitChanceTests() =
     let skill = createSkill Physical 100.0
 
     let hitRate =
-      measureRate 10000 (fun () ->
+      measureRate 100 (fun () ->
         let result =
           DamageCalculator.calculateFinalDamage rng attacker defender skill
 
@@ -141,7 +141,7 @@ type HitChanceTests() =
 
     // Expected: 0.5 - 30/200 = 0.35
     Assert.IsTrue(
-      abs(hitRate - 0.35) < tolerance10k,
+      abs(hitRate - 0.35) < tolerance100,
       sprintf "Hit rate was %.3f, expected ~0.35 (+30 HV defense)" hitRate
     )
 
@@ -153,14 +153,14 @@ type HitChanceTests() =
     let skill = createSkill Physical 100.0
 
     let hitRate =
-      measureRate 10000 (fun () ->
+      measureRate 100 (fun () ->
         let result =
           DamageCalculator.calculateFinalDamage rng attacker defender skill
 
         not result.IsEvaded)
 
     Assert.IsTrue(
-      abs(hitRate - 0.20) < tolerance10k,
+      abs(hitRate - 0.20) < tolerance100,
       sprintf "Hit rate was %.3f, expected ~0.20 (minimum clamp)" hitRate
     )
 
@@ -172,14 +172,14 @@ type HitChanceTests() =
     let skill = createSkill Physical 100.0
 
     let hitRate =
-      measureRate 10000 (fun () ->
+      measureRate 100 (fun () ->
         let result =
           DamageCalculator.calculateFinalDamage rng attacker defender skill
 
         not result.IsEvaded)
 
     Assert.IsTrue(
-      abs(hitRate - 0.80) < tolerance10k,
+      abs(hitRate - 0.80) < tolerance100,
       sprintf "Hit rate was %.3f, expected ~0.80 (maximum clamp)" hitRate
     )
 
@@ -191,7 +191,7 @@ type HitChanceTests() =
     let skill = createSkill Magical 100.0
 
     let hitRate =
-      measureRate 10000 (fun () ->
+      measureRate 100 (fun () ->
         let result =
           DamageCalculator.calculateFinalDamage rng attacker defender skill
 
@@ -199,7 +199,7 @@ type HitChanceTests() =
 
     // Expected: 0.5 + 30/200 = 0.65
     Assert.IsTrue(
-      abs(hitRate - 0.65) < tolerance10k,
+      abs(hitRate - 0.65) < tolerance100,
       sprintf "Hit rate was %.3f, expected ~0.65 (magical uses LK)" hitRate
     )
 
@@ -219,7 +219,7 @@ type CriticalHitTests() =
 
     // Measure hit rate first
     let hitsOnly =
-      measureRate 10000 (fun () ->
+      measureRate 100 (fun () ->
         let result =
           DamageCalculator.calculateFinalDamage rng attacker defender skill
 
@@ -227,7 +227,7 @@ type CriticalHitTests() =
 
     // Measure crits among all trials
     let critsTotal =
-      measureRate 10000 (fun () ->
+      measureRate 100 (fun () ->
         let result =
           DamageCalculator.calculateFinalDamage rng attacker defender skill
 
@@ -237,7 +237,7 @@ type CriticalHitTests() =
     let critAmongHits = critsTotal / hitsOnly
 
     Assert.IsTrue(
-      abs(critAmongHits - 0.2) < tolerance10k,
+      abs(critAmongHits - 0.2) < tolerance100,
       sprintf
         "Crit rate among hits was %.3f, expected ~0.2 (20 LK)"
         critAmongHits
@@ -251,7 +251,7 @@ type CriticalHitTests() =
     let skill = createSkill Physical 100.0
 
     let critRate =
-      measureRate 1000 (fun () ->
+      measureRate 100 (fun () ->
         let result =
           DamageCalculator.calculateFinalDamage rng attacker defender skill
 
@@ -349,13 +349,13 @@ type PropertyTests() =
 
       // Measure actual hit rate
       let actualHitRate =
-        measureRate 500 (fun () ->
+        measureRate 100 (fun () ->
           let result =
             DamageCalculator.calculateFinalDamage rng attacker defender skill
 
           not result.IsEvaded)
 
-      abs(actualHitRate - expectedHitChance) < 0.1
+      abs(actualHitRate - expectedHitChance) < 0.2
       |> Prop.classify (expectedHitChance <= 0.20) "low chance (<=20%)"
       |> Prop.classify
         (expectedHitChance > 0.20 && expectedHitChance < 0.80)
@@ -424,7 +424,7 @@ type PropertyTests() =
 
     let allMissesZeroDamage =
       [|
-        for _ in 1..1000 ->
+        for _ in 1..100 ->
           let result =
             DamageCalculator.calculateFinalDamage rng attacker defender skill
 

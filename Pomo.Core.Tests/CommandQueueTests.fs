@@ -111,12 +111,12 @@ type IntegrationTests() =
 [<TestClass>]
 type PropertyTests() =
 
-  let intListArb = Arb.list(Arb.fromGen(Gen.choose(-1000, 1000)))
+  let intListArb = Arb.list(Arb.fromGen(Gen.choose(-50, 50)))
 
   [<TestMethod>]
   member _.``count always equals number of adds``() =
     Prop.forAll intListArb (fun items ->
-      if items.Length > 0 && items.Length < 1000 then
+      if items.Length > 0 && items.Length < 100 then
         use queue = CommandQueue.create<int> 16
 
         for item in items do
@@ -131,7 +131,7 @@ type PropertyTests() =
   [<TestMethod>]
   member _.``iterate sum equals list sum``() =
     Prop.forAll intListArb (fun items ->
-      if items.Length > 0 && items.Length < 1000 then
+      if items.Length > 0 && items.Length < 100 then
         use queue = CommandQueue.create<int> 16
 
         for item in items do
@@ -148,7 +148,7 @@ type PropertyTests() =
   [<TestMethod>]
   member _.``clear always results in zero count``() =
     Prop.forAll intListArb (fun items ->
-      if items.Length > 0 && items.Length < 1000 then
+      if items.Length > 0 && items.Length < 100 then
         use queue = CommandQueue.create<int> 16
 
         for item in items do

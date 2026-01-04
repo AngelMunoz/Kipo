@@ -40,6 +40,26 @@
       "Category": "Basic",
       "CollisionType": {
         "Type": "Box"
+      },
+      "Effect": {
+        "Name": "Lava",
+        "Kind": "DamageOverTime",
+        "DamageSource": "Magical",
+        "Stacking": {
+          "Type": "RefreshDuration"
+        },
+        "Duration": {
+          "Type": "Loop",
+          "Interval": 1,
+          "Duration": 5
+        },
+        "Modifiers": [
+          {
+            "Type": "ResourceChange",
+            "Resource": "HP",
+            "Amount": "(0 - 10)"
+          }
+        ]
       }
     },
     "5": {
@@ -55,6 +75,79 @@
       "Id": 6,
       "Name": "Dark Stone",
       "Model": "Tiles/kaykit_blocks/stone_dark",
+      "Category": "Basic",
+      "CollisionType": {
+        "Type": "Box"
+      },
+      "Effect": {
+        "Name": "Lava",
+        "Kind": "DamageOverTime",
+        "DamageSource": "Magical",
+        "Stacking": {
+          "Type": "RefreshDuration"
+        },
+        "Duration": {
+          "Type": "Loop",
+          "Interval": 1,
+          "Duration": 5
+        },
+        "Modifiers": [
+          {
+            "Type": "ResourceChange",
+            "Resource": "HP",
+            "Amount": "(0 - 10)"
+          }
+        ]
+      }
+    },
+    "7": {
+      "Id": 7,
+      "ArchetypeId": 1,
+      "VariantKey": "Collision=On",
+      "Name": "Stone",
+      "Model": "Tiles/kaykit_blocks/stone",
+      "Category": "Basic",
+      "CollisionType": {
+        "Type": "Box"
+      }
+    },
+    "8": {
+      "Id": 8,
+      "ArchetypeId": 6,
+      "VariantKey": "Collision=On",
+      "Name": "Dark Stone",
+      "Model": "Tiles/kaykit_blocks/stone_dark",
+      "Category": "Basic",
+      "CollisionType": {
+        "Type": "Box"
+      },
+      "Effect": {
+        "Name": "Lava",
+        "Kind": "DamageOverTime",
+        "DamageSource": "Magical",
+        "Stacking": {
+          "Type": "RefreshDuration"
+        },
+        "Duration": {
+          "Type": "Loop",
+          "Interval": 1,
+          "Duration": 5
+        },
+        "Modifiers": [
+          {
+            "Type": "ResourceChange",
+            "Resource": "HP",
+            "Amount": "(0 - 10)"
+          }
+        ]
+      }
+    },
+    "9": {
+      "Id": 9,
+      "ArchetypeId": 2,
+      "VariantKey": "Collision=On",
+      "Name": "Dirt",
+      "Model": "Tiles/kaykit_blocks/dirt",
       "Category": "Basic",
       "CollisionType": {
         "Type": "Box"
@@ -1604,7 +1697,7 @@
         "Y": 0,
         "Z": 0
       },
-      "BlockTypeId": 1
+      "BlockTypeId": 2
     },
     {
       "Cell": {
@@ -7132,7 +7225,7 @@
         "Y": 0,
         "Z": 19
       },
-      "BlockTypeId": 3
+      "BlockTypeId": 4
     },
     {
       "Cell": {
@@ -7140,7 +7233,7 @@
         "Y": 0,
         "Z": 20
       },
-      "BlockTypeId": 3
+      "BlockTypeId": 4
     },
     {
       "Cell": {
@@ -7156,7 +7249,7 @@
         "Y": 0,
         "Z": 19
       },
-      "BlockTypeId": 3
+      "BlockTypeId": 4
     },
     {
       "Cell": {
@@ -7172,7 +7265,7 @@
         "Y": 0,
         "Z": 20
       },
-      "BlockTypeId": 3
+      "BlockTypeId": 4
     },
     {
       "Cell": {
@@ -8004,7 +8097,7 @@
         "Y": 0,
         "Z": 20
       },
-      "BlockTypeId": 3
+      "BlockTypeId": 4
     },
     {
       "Cell": {
@@ -8012,7 +8105,7 @@
         "Y": 0,
         "Z": 19
       },
-      "BlockTypeId": 3
+      "BlockTypeId": 4
     },
     {
       "Cell": {
@@ -8733,6 +8826,294 @@
         "Z": 20
       },
       "BlockTypeId": 6
+    },
+    {
+      "Cell": {
+        "X": 19,
+        "Y": 1,
+        "Z": 20
+      },
+      "BlockTypeId": 7
+    },
+    {
+      "Cell": {
+        "X": 18,
+        "Y": 1,
+        "Z": 20
+      },
+      "BlockTypeId": 7
+    },
+    {
+      "Cell": {
+        "X": 17,
+        "Y": 1,
+        "Z": 20
+      },
+      "BlockTypeId": 7
+    },
+    {
+      "Cell": {
+        "X": 25,
+        "Y": 1,
+        "Z": 15
+      },
+      "BlockTypeId": 1
+    },
+    {
+      "Cell": {
+        "X": 25,
+        "Y": 1,
+        "Z": 16
+      },
+      "BlockTypeId": 1
+    },
+    {
+      "Cell": {
+        "X": 25,
+        "Y": 1,
+        "Z": 17
+      },
+      "BlockTypeId": 1
+    },
+    {
+      "Cell": {
+        "X": 19,
+        "Y": 1,
+        "Z": 19
+      },
+      "BlockTypeId": 7
+    },
+    {
+      "Cell": {
+        "X": 19,
+        "Y": 1,
+        "Z": 18
+      },
+      "BlockTypeId": 7
+    },
+    {
+      "Cell": {
+        "X": 25,
+        "Y": 1,
+        "Z": 14
+      },
+      "BlockTypeId": 1
+    },
+    {
+      "Cell": {
+        "X": 24,
+        "Y": 1,
+        "Z": 14
+      },
+      "BlockTypeId": 1
+    },
+    {
+      "Cell": {
+        "X": 23,
+        "Y": 1,
+        "Z": 14
+      },
+      "BlockTypeId": 1
+    },
+    {
+      "Cell": {
+        "X": 14,
+        "Y": 1,
+        "Z": 22
+      },
+      "BlockTypeId": 8
+    },
+    {
+      "Cell": {
+        "X": 9,
+        "Y": 1,
+        "Z": 17
+      },
+      "BlockTypeId": 8
+    },
+    {
+      "Cell": {
+        "X": 10,
+        "Y": 1,
+        "Z": 18
+      },
+      "BlockTypeId": 8
+    },
+    {
+      "Cell": {
+        "X": 11,
+        "Y": 1,
+        "Z": 19
+      },
+      "BlockTypeId": 8
+    },
+    {
+      "Cell": {
+        "X": 18,
+        "Y": 1,
+        "Z": 14
+      },
+      "BlockTypeId": 9
+    },
+    {
+      "Cell": {
+        "X": 31,
+        "Y": 0,
+        "Z": 2
+      },
+      "BlockTypeId": 2
+    },
+    {
+      "Cell": {
+        "X": 31,
+        "Y": 0,
+        "Z": 1
+      },
+      "BlockTypeId": 2
+    },
+    {
+      "Cell": {
+        "X": 31,
+        "Y": 0,
+        "Z": 3
+      },
+      "BlockTypeId": 2
+    },
+    {
+      "Cell": {
+        "X": 31,
+        "Y": 0,
+        "Z": 0
+      },
+      "BlockTypeId": 2
+    },
+    {
+      "Cell": {
+        "X": 29,
+        "Y": 0,
+        "Z": 1
+      },
+      "BlockTypeId": 2
+    },
+    {
+      "Cell": {
+        "X": 30,
+        "Y": 0,
+        "Z": 1
+      },
+      "BlockTypeId": 2
+    },
+    {
+      "Cell": {
+        "X": 30,
+        "Y": 0,
+        "Z": 2
+      },
+      "BlockTypeId": 2
+    },
+    {
+      "Cell": {
+        "X": 29,
+        "Y": 0,
+        "Z": 0
+      },
+      "BlockTypeId": 2
+    },
+    {
+      "Cell": {
+        "X": 28,
+        "Y": 0,
+        "Z": 0
+      },
+      "BlockTypeId": 2
+    },
+    {
+      "Cell": {
+        "X": 30,
+        "Y": 0,
+        "Z": 0
+      },
+      "BlockTypeId": 2
+    },
+    {
+      "Cell": {
+        "X": 0,
+        "Y": 0,
+        "Z": 28
+      },
+      "BlockTypeId": 2
+    },
+    {
+      "Cell": {
+        "X": 0,
+        "Y": 0,
+        "Z": 29
+      },
+      "BlockTypeId": 2
+    },
+    {
+      "Cell": {
+        "X": 1,
+        "Y": 0,
+        "Z": 29
+      },
+      "BlockTypeId": 2
+    },
+    {
+      "Cell": {
+        "X": 1,
+        "Y": 0,
+        "Z": 30
+      },
+      "BlockTypeId": 2
+    },
+    {
+      "Cell": {
+        "X": 1,
+        "Y": 0,
+        "Z": 31
+      },
+      "BlockTypeId": 2
+    },
+    {
+      "Cell": {
+        "X": 0,
+        "Y": 0,
+        "Z": 31
+      },
+      "BlockTypeId": 2
+    },
+    {
+      "Cell": {
+        "X": 0,
+        "Y": 0,
+        "Z": 30
+      },
+      "BlockTypeId": 2
+    },
+    {
+      "Cell": {
+        "X": 2,
+        "Y": 0,
+        "Z": 31
+      },
+      "BlockTypeId": 2
+    },
+    {
+      "Cell": {
+        "X": 2,
+        "Y": 0,
+        "Z": 30
+      },
+      "BlockTypeId": 2
+    },
+    {
+      "Cell": {
+        "X": 3,
+        "Y": 0,
+        "Z": 31
+      },
+      "BlockTypeId": 2
     }
   ],
   "SpawnCell": {

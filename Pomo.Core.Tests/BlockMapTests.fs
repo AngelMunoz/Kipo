@@ -1,5 +1,6 @@
 namespace Pomo.Core.Tests
 
+open System
 open Microsoft.VisualStudio.TestTools.UnitTesting
 open Microsoft.Xna.Framework
 open FSharp.UMX
@@ -7,6 +8,30 @@ open Pomo.Core.Domain
 open Pomo.Core.Domain.Units
 open Pomo.Core.Domain.BlockMap
 open Pomo.Core.Domain.Spatial
+open Pomo.Core.Domain.Skill
+open Pomo.Core.Algorithms
+
+module BlockMapTestHelpers =
+  let createArchetype (id: int) (name: string) : BlockType = {
+    Id = %id
+    ArchetypeId = %id
+    VariantKey = ValueNone
+    Name = name
+    Model = $"Tiles/{name.ToLowerInvariant()}"
+    Category = "Terrain"
+    CollisionType = NoCollision
+    Effect = ValueNone
+  }
+
+  let createTestEffect(name: string) : Effect = {
+    Name = name
+    Kind = Buff
+    DamageSource = Physical
+    Stacking = NoStack
+    Duration = Duration.Instant
+    Visuals = Pomo.Core.Domain.Core.VisualManifest.empty
+    Modifiers = [||]
+  }
 
 [<TestClass>]
 type BlockMapTests() =
@@ -21,6 +46,8 @@ type BlockMapTests() =
 
     let blockType = {
       Id = blockId
+      ArchetypeId = blockId
+      VariantKey = ValueNone
       Name = "Grass Block"
       Model = "Tiles/kaykit_blocks/grass"
       Category = "Terrain"
@@ -109,6 +136,13 @@ type BlockMapTests() =
       "Model": "Tiles/grass",
       "Category": "Terrain",
       "CollisionType": { "Type": "Box" }
+    },
+    "2": {
+      "Id": 2,
+      "Name": "Stone Block",
+      "Model": "Tiles/stone",
+      "Category": "Terrain",
+      "CollisionType": { "Type": "Box" }
     }
   },
   "Blocks": [
@@ -127,8 +161,9 @@ type BlockMapTests() =
     | Ok map ->
       Assert.AreEqual("json_test", map.Key)
       Assert.AreEqual(10, map.Width)
-      Assert.AreEqual(1, map.Palette.Count)
+      Assert.AreEqual(2, map.Palette.Count)
       Assert.AreEqual("Grass Block", map.Palette.[%1].Name)
+      Assert.AreEqual(%2, map.Palette.[%2].ArchetypeId)
       Assert.AreEqual(1, map.Blocks.Count)
 
       let cell = { X = 1; Y = 0; Z = 2 }
@@ -143,3 +178,167 @@ type BlockMapTests() =
       | ValueNone -> Assert.Fail("Rotation should be present")
 
     | Error err -> Assert.Fail($"Deserialization failed: {err.message}")
+
+[<TestClass>]
+type ArchetypeVariantTests() =
+
+  [<TestMethod>]
+  member _.``getOrCreateVariantId returns archetype id when collision disabled``
+    ()
+    =
+    let map = BlockMap.createEmpty "test" 10 5 10
+    let archetype = BlockMapTestHelpers.createArchetype 1 "Grass"
+    map.Palette.Add(archetype.Id, archetype)
+
+    let result = BlockMap.getOrCreateVariantId map archetype.Id false
+
+    Assert.AreEqual(ValueSome archetype.Id, result)
+    Assert.AreEqual(1, map.Palette.Count)
+
+  [<TestMethod>]
+  member _.``getOrCreateVariantId creates variant when collision enabled``() =
+    let map = BlockMap.createEmpty "test" 10 5 10
+    let archetype = BlockMapTestHelpers.createArchetype 1 "Grass"
+    map.Palette.Add(archetype.Id, archetype)
+
+    let result = BlockMap.getOrCreateVariantId map archetype.Id true
+
+    match result with
+    | ValueSome variantId ->
+      Assert.AreNotEqual(archetype.Id, variantId)
+      Assert.AreEqual(2, map.Palette.Count)
+
+      let variant = map.Palette.[variantId]
+      Assert.AreEqual(archetype.Id, variant.ArchetypeId)
+      Assert.AreEqual(ValueSome "Collision=On", variant.VariantKey)
+      Assert.AreEqual(Box, variant.CollisionType)
+    | ValueNone -> Assert.Fail("Expected variant to be created")
+
+  [<TestMethod>]
+  member _.``getOrCreateVariantId is idempotent``() =
+    let map = BlockMap.createEmpty "test" 10 5 10
+    let archetype = BlockMapTestHelpers.createArchetype 1 "Grass"
+    map.Palette.Add(archetype.Id, archetype)
+
+    let result1 = BlockMap.getOrCreateVariantId map archetype.Id true
+    let result2 = BlockMap.getOrCreateVariantId map archetype.Id true
+
+    Assert.AreEqual(result1, result2)
+    Assert.AreEqual(2, map.Palette.Count)
+
+  [<TestMethod>]
+  member _.``getOrCreateVariantId returns none for missing archetype``() =
+    let map = BlockMap.createEmpty "test" 10 5 10
+    let missingId: int<BlockTypeId> = %99
+
+    let result = BlockMap.getOrCreateVariantId map missingId true
+
+    Assert.AreEqual(ValueNone, result)
+
+  [<TestMethod>]
+  member _.``setArchetypeEffect updates archetype effect``() =
+    let map = BlockMap.createEmpty "test" 10 5 10
+    let archetype = BlockMapTestHelpers.createArchetype 1 "Lava"
+    map.Palette.Add(archetype.Id, archetype)
+
+    let effect = BlockMapTestHelpers.createTestEffect "Burn"
+    BlockMap.setArchetypeEffect map archetype.Id (ValueSome effect)
+
+    let updated = map.Palette.[archetype.Id]
+    Assert.IsTrue(updated.Effect.IsSome)
+    Assert.AreEqual("Burn", updated.Effect.Value.Name)
+
+  [<TestMethod>]
+  member _.``setArchetypeEffect propagates to collision variant``() =
+    let map = BlockMap.createEmpty "test" 10 5 10
+    let archetype = BlockMapTestHelpers.createArchetype 1 "Lava"
+    map.Palette.Add(archetype.Id, archetype)
+
+    let variantId = BlockMap.getOrCreateVariantId map archetype.Id true
+    let effect = BlockMapTestHelpers.createTestEffect "Burn"
+    BlockMap.setArchetypeEffect map archetype.Id (ValueSome effect)
+
+    match variantId with
+    | ValueSome vid ->
+      let variant = map.Palette.[vid]
+      Assert.IsTrue(variant.Effect.IsSome)
+      Assert.AreEqual("Burn", variant.Effect.Value.Name)
+      Assert.AreEqual(Box, variant.CollisionType)
+    | ValueNone -> Assert.Fail("Variant should exist")
+
+  [<TestMethod>]
+  member _.``setArchetypeEffect can clear effect``() =
+    let map = BlockMap.createEmpty "test" 10 5 10
+    let archetype = BlockMapTestHelpers.createArchetype 1 "Lava"
+    map.Palette.Add(archetype.Id, archetype)
+
+    let effect = BlockMapTestHelpers.createTestEffect "Burn"
+    BlockMap.setArchetypeEffect map archetype.Id (ValueSome effect)
+    BlockMap.setArchetypeEffect map archetype.Id ValueNone
+
+    let updated = map.Palette.[archetype.Id]
+    Assert.AreEqual(ValueNone, updated.Effect)
+
+  [<TestMethod>]
+  member _.``normalizeLoadedMap fixes inconsistent archetype ids``() =
+    let map = BlockMap.createEmpty "test" 10 5 10
+
+    let inconsistentBlock: BlockType = {
+      Id = %5
+      ArchetypeId = %1
+      VariantKey = ValueNone
+      Name = "Broken"
+      Model = "Tiles/broken"
+      Category = "Terrain"
+      CollisionType = NoCollision
+      Effect = ValueNone
+    }
+
+    map.Palette.Add(inconsistentBlock.Id, inconsistentBlock)
+
+    let normalized = BlockMap.normalizeLoadedMap map
+    let fixedBlock = normalized.Palette.[%5]
+
+    Assert.AreEqual(%5, fixedBlock.ArchetypeId)
+
+  [<TestMethod>]
+  member _.``normalizeLoadedMap preserves valid variants``() =
+    let map = BlockMap.createEmpty "test" 10 5 10
+    let archetype = BlockMapTestHelpers.createArchetype 1 "Grass"
+    map.Palette.Add(archetype.Id, archetype)
+
+    let variantId = BlockMap.getOrCreateVariantId map archetype.Id true
+
+    let normalized = BlockMap.normalizeLoadedMap map
+
+    match variantId with
+    | ValueSome vid ->
+      let variant = normalized.Palette.[vid]
+      Assert.AreEqual(archetype.Id, variant.ArchetypeId)
+      Assert.AreEqual(ValueSome "Collision=On", variant.VariantKey)
+    | ValueNone -> Assert.Fail("Variant should exist")
+
+  [<TestMethod>]
+  member _.``normalizeLoadedMap is idempotent``() =
+    let map = BlockMap.createEmpty "test" 10 5 10
+
+    let inconsistentBlock: BlockType = {
+      Id = %5
+      ArchetypeId = %1
+      VariantKey = ValueNone
+      Name = "Broken"
+      Model = "Tiles/broken"
+      Category = "Terrain"
+      CollisionType = NoCollision
+      Effect = ValueNone
+    }
+
+    map.Palette.Add(inconsistentBlock.Id, inconsistentBlock)
+
+    let normalized1 = BlockMap.normalizeLoadedMap map
+    let normalized2 = BlockMap.normalizeLoadedMap normalized1
+
+    let block1 = normalized1.Palette.[%5]
+    let block2 = normalized2.Palette.[%5]
+
+    Assert.AreEqual(block1.ArchetypeId, block2.ArchetypeId)

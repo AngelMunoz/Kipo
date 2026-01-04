@@ -40,6 +40,19 @@ module Camera =
             Position = p.Position + Vector3(dx, 0f, dz)
       }
 
+    /// Pans the camera on the XZ plane relative to its current Yaw.
+    /// dx: Right/Left on screen, dz: Forward/Backward (Up/Down) on screen.
+    let panRelative (p: CameraParams) (dx: float32) (dz: float32) : CameraParams =
+      let rotation = Matrix.CreateRotationY(p.Yaw)
+      let right = Vector3.Transform(Vector3.Right, rotation)
+      let forward = Vector3.Transform(Vector3.Forward, rotation)
+
+      let moveDir = right * dx + forward * dz
+      {
+        p with
+            Position = p.Position + moveDir
+      }
+
     let moveFreeFly (p: CameraParams) (delta: Vector3) : CameraParams =
       let rotation = Matrix.CreateFromYawPitchRoll(p.Yaw, p.Pitch, 0f)
       let forward = Vector3.Transform(Vector3.Forward, rotation)
