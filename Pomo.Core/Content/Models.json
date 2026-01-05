@@ -165,39 +165,167 @@
   },
   "Barbarian": {
     "Rig": {
-      "Root": { "Model": "3d_models/lay_kit_adventurers/Characters/barbarian" }
+      "Root": {
+        "Model": "3d_models/lay_kit_adventurers/Characters/barbarian_body"
+      },
+      "Head": {
+        "Model": "3d_models/lay_kit_adventurers/Characters/barbarian_head",
+        "Parent": "Root"
+      },
+      "Hat": {
+        "Model": "3d_models/lay_kit_adventurers/Characters/barbarian_bear_hat",
+        "Parent": "Head"
+      },
+      "Arm_L": {
+        "Model": "3d_models/lay_kit_adventurers/Characters/barbarian_left_arm",
+        "Parent": "Root",
+        "Pivot": { "X": 0.0, "Y": 1.5, "Z": 0.0 }
+      },
+      "Arm_R": {
+        "Model": "3d_models/lay_kit_adventurers/Characters/barbarian_right_arm",
+        "Parent": "Root",
+        "Pivot": { "X": 0.0, "Y": 1.5, "Z": 0.0 }
+      },
+      "Leg_L": {
+        "Model": "3d_models/lay_kit_adventurers/Characters/barbarian_left_leg",
+        "Parent": "Root"
+      },
+      "Leg_R": {
+        "Model": "3d_models/lay_kit_adventurers/Characters/barbarian_right_leg",
+        "Parent": "Root"
+      }
     },
     "AnimationBindings": {
-      "Run": ["Run_Bounce"]
+      "Run": ["Arm_Swing", "Run_Bounce"]
     }
   },
   "Knight": {
     "Rig": {
-      "Root": { "Model": "3d_models/lay_kit_adventurers/Characters/knight" }
+      "Root": {
+        "Model": "3d_models/lay_kit_adventurers/Characters/knight_body"
+      },
+      "Head": {
+        "Model": "3d_models/lay_kit_adventurers/Characters/knight_head",
+        "Parent": "Root"
+      },
+      "Helmet": {
+        "Model": "3d_models/lay_kit_adventurers/Characters/knight_helmet",
+        "Parent": "Head"
+      },
+      "Visor": {
+        "Model": "3d_models/lay_kit_adventurers/Characters/knight_helmet_visor",
+        "Parent": "Helmet"
+      },
+      "Cape": {
+        "Model": "3d_models/lay_kit_adventurers/Characters/knight_cape",
+        "Parent": "Root"
+      },
+      "Arm_L": {
+        "Model": "3d_models/lay_kit_adventurers/Characters/knight_left_arm",
+        "Parent": "Root",
+        "Pivot": { "X": 0.0, "Y": 1.5, "Z": 0.0 }
+      },
+      "Arm_R": {
+        "Model": "3d_models/lay_kit_adventurers/Characters/knight_right_arm",
+        "Parent": "Root",
+        "Pivot": { "X": 0.0, "Y": 1.5, "Z": 0.0 }
+      },
+      "Leg_L": {
+        "Model": "3d_models/lay_kit_adventurers/Characters/knight_left_leg",
+        "Parent": "Root"
+      },
+      "Leg_R": {
+        "Model": "3d_models/lay_kit_adventurers/Characters/knight_right_leg",
+        "Parent": "Root"
+      }
     },
     "AnimationBindings": {
-      "Run": ["Run_Bounce"]
+      "Run": ["Arm_Swing", "Run_Bounce"]
     }
   },
   "Mage": {
     "Rig": {
-      "Root": { "Model": "3d_models/lay_kit_adventurers/Characters/mage" }
+      "Root": { "Model": "3d_models/lay_kit_adventurers/Characters/mage_body" },
+      "Head": {
+        "Model": "3d_models/lay_kit_adventurers/Characters/mage_head",
+        "Parent": "Root"
+      },
+      "Hat": {
+        "Model": "3d_models/lay_kit_adventurers/Characters/mage_hat",
+        "Parent": "Head"
+      },
+      "Cape": {
+        "Model": "3d_models/lay_kit_adventurers/Characters/mage_cape",
+        "Parent": "Root"
+      },
+      "Arm_L": {
+        "Model": "3d_models/lay_kit_adventurers/Characters/mage_left_arm",
+        "Parent": "Root",
+        "Pivot": { "X": 0.0, "Y": 1.5, "Z": 0.0 }
+      },
+      "Arm_R": {
+        "Model": "3d_models/lay_kit_adventurers/Characters/mage_right_arm",
+        "Parent": "Root",
+        "Pivot": { "X": 0.0, "Y": 1.5, "Z": 0.0 }
+      },
+      "Leg_L": {
+        "Model": "3d_models/lay_kit_adventurers/Characters/mage_left_leg",
+        "Parent": "Root"
+      },
+      "Leg_R": {
+        "Model": "3d_models/lay_kit_adventurers/Characters/mage_right_leg",
+        "Parent": "Root"
+      }
     },
     "AnimationBindings": {
-      "Run": ["Run_Bounce"]
+      "Run": ["Arm_Swing", "Run_Bounce"]
     }
   },
   "Ranger": {
     "Rig": {
-      "Root": { "Model": "3d_models/lay_kit_adventurers/Characters/ranger" }
+      "Root": {
+        "Model": "3d_models/lay_kit_adventurers/Characters/ranger_body"
+      },
+      "Head": {
+        "Model": "3d_models/lay_kit_adventurers/Characters/ranger_head",
+        "Parent": "Root"
+      },
+      "Cape": {
+        "Model": "3d_models/lay_kit_adventurers/Characters/ranger_cape",
+        "Parent": "Root"
+      },
+      "Quiver": {
+        "Model": "3d_models/lay_kit_adventurers/Characters/ranger_quiver",
+        "Parent": "Root"
+      },
+      "Arm_L": {
+        "Model": "3d_models/lay_kit_adventurers/Characters/ranger_left_arm",
+        "Parent": "Root",
+        "Pivot": { "X": 0.0, "Y": 1.5, "Z": 0.0 }
+      },
+      "Arm_R": {
+        "Model": "3d_models/lay_kit_adventurers/Characters/ranger_right_arm",
+        "Parent": "Root",
+        "Pivot": { "X": 0.0, "Y": 1.5, "Z": 0.0 }
+      },
+      "Leg_L": {
+        "Model": "3d_models/lay_kit_adventurers/Characters/ranger_left_leg",
+        "Parent": "Root"
+      },
+      "Leg_R": {
+        "Model": "3d_models/lay_kit_adventurers/Characters/ranger_right_leg",
+        "Parent": "Root"
+      }
     },
     "AnimationBindings": {
-      "Run": ["Run_Bounce"]
+      "Run": ["Arm_Swing", "Run_Bounce"]
     }
   },
   "SkeletonMage": {
     "Rig": {
-      "Root": { "Model": "3d_models/kay_kit_characters/Skeletons/skeleton_mage_body" },
+      "Root": {
+        "Model": "3d_models/kay_kit_characters/Skeletons/skeleton_mage_body"
+      },
       "Head": {
         "Model": "3d_models/kay_kit_characters/Skeletons/skeleton_mage_skull",
         "Parent": "Root"
@@ -235,7 +363,9 @@
   },
   "SkeletonArcher": {
     "Rig": {
-      "Root": { "Model": "3d_models/kay_kit_characters/Skeletons/skeleton_archer_body" },
+      "Root": {
+        "Model": "3d_models/kay_kit_characters/Skeletons/skeleton_archer_body"
+      },
       "Head": {
         "Model": "3d_models/kay_kit_characters/Skeletons/skeleton_archer_skull",
         "Parent": "Root"
@@ -273,20 +403,78 @@
   },
   "Rogue": {
     "Rig": {
-      "Root": { "Model": "3d_models/lay_kit_adventurers/Characters/rogue" }
+      "Root": {
+        "Model": "3d_models/lay_kit_adventurers/Characters/rogue_body"
+      },
+      "Head": {
+        "Model": "3d_models/lay_kit_adventurers/Characters/rogue_head",
+        "Parent": "Root"
+      },
+      "Cape": {
+        "Model": "3d_models/lay_kit_adventurers/Characters/rogue_cape",
+        "Parent": "Root"
+      },
+      "Arm_L": {
+        "Model": "3d_models/lay_kit_adventurers/Characters/rogue_left_arm",
+        "Parent": "Root",
+        "Pivot": { "X": 0.0, "Y": 1.5, "Z": 0.0 }
+      },
+      "Arm_R": {
+        "Model": "3d_models/lay_kit_adventurers/Characters/rogue_right_arm",
+        "Parent": "Root",
+        "Pivot": { "X": 0.0, "Y": 1.5, "Z": 0.0 }
+      },
+      "Leg_L": {
+        "Model": "3d_models/lay_kit_adventurers/Characters/rogue_left_leg",
+        "Parent": "Root"
+      },
+      "Leg_R": {
+        "Model": "3d_models/lay_kit_adventurers/Characters/rogue_right_leg",
+        "Parent": "Root"
+      }
     },
     "AnimationBindings": {
-      "Run": ["Run_Bounce"]
+      "Run": ["Arm_Swing", "Run_Bounce"]
     }
   },
   "RogueHooded": {
     "Rig": {
       "Root": {
-        "Model": "3d_models/lay_kit_adventurers/Characters/rogue_hooded"
+        "Model": "3d_models/lay_kit_adventurers/Characters/rogue_body"
+      },
+      "Head": {
+        "Model": "3d_models/lay_kit_adventurers/Characters/rogue_hooded_head",
+        "Parent": "Root"
+      },
+      "Mask": {
+        "Model": "3d_models/lay_kit_adventurers/Characters/rogue_hooded_mask",
+        "Parent": "Head"
+      },
+      "Cape": {
+        "Model": "3d_models/lay_kit_adventurers/Characters/rogue_cape",
+        "Parent": "Root"
+      },
+      "Arm_L": {
+        "Model": "3d_models/lay_kit_adventurers/Characters/rogue_left_arm",
+        "Parent": "Root",
+        "Pivot": { "X": 0.0, "Y": 1.5, "Z": 0.0 }
+      },
+      "Arm_R": {
+        "Model": "3d_models/lay_kit_adventurers/Characters/rogue_right_arm",
+        "Parent": "Root",
+        "Pivot": { "X": 0.0, "Y": 1.5, "Z": 0.0 }
+      },
+      "Leg_L": {
+        "Model": "3d_models/lay_kit_adventurers/Characters/rogue_left_leg",
+        "Parent": "Root"
+      },
+      "Leg_R": {
+        "Model": "3d_models/lay_kit_adventurers/Characters/rogue_right_leg",
+        "Parent": "Root"
       }
     },
     "AnimationBindings": {
-      "Run": ["Run_Bounce"]
+      "Run": ["Arm_Swing", "Run_Bounce"]
     }
   }
 }
