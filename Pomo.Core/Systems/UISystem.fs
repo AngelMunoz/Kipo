@@ -285,8 +285,6 @@ module GameplayUI =
         core.World.ItemInstances
         stores.ItemStore
 
-    let loadingOverlay = HUDComponents.createLoadingOverlay config
-
     let layout = config |> AVal.map _.Layout
 
     let hudChildren =
@@ -318,9 +316,6 @@ module GameplayUI =
 
         if l.EquipmentPanel.Visible then
           applyLayout l.EquipmentPanel equipmentPanel
-
-        if overlayVisible then
-          loadingOverlay
       ])
 
     panel |> Panel.bindChildren hudChildren |> ignore

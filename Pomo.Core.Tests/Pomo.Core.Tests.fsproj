@@ -13,6 +13,7 @@
     <Compile Include="RenderMathTests.fs" />
     <Compile Include="EmitterTests.fs" />
     <Compile Include="BlockMapTests.fs" />
+    <Compile Include="Spatial3DTests.fs" />
     <Compile Include="RenderMath3DTests.fs" />
   </ItemGroup>
 

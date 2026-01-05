@@ -67,12 +67,11 @@ module MapSpawning =
   /// Returns ValueNone if resolution fails at any step
   let tryResolveEntityFromGroup
     (random: Random)
-    (groupStore: MapEntityGroupStore option)
+    (groupStore: MapEntityGroupStore voption)
     (entityStore: AIEntityStore)
     (groupName: string)
     : ResolvedEntityInfo voption =
     groupStore
-    |> Option.toValueOption
     |> ValueOption.bind(fun (store: MapEntityGroupStore) ->
       store.tryFind groupName)
     |> ValueOption.bind(fun group ->
@@ -87,17 +86,17 @@ module MapSpawning =
         })))
 
   /// Load map entity group store for a map (returns None if not found)
-  let tryLoadMapEntityGroupStore(mapKey: string) : MapEntityGroupStore option =
+  let tryLoadMapEntityGroupStore(mapKey: string) =
     try
       let deserializer = Serialization.create()
 
-      Some(
+      ValueSome(
         Stores.MapEntityGroup.create
           (JsonFileLoader.readMapEntityGroups deserializer)
           mapKey
       )
     with _ ->
-      None
+      ValueNone
 
   /// Apply family stat scaling to base stats
   let applyFamilyScaling
@@ -210,7 +209,7 @@ module MapSpawning =
   /// Build spawn zones from candidates, filtering out zones that fail to resolve
   let buildSpawnZones
     (random: Random)
-    (mapEntityGroupStore: MapEntityGroupStore option)
+    (mapEntityGroupStore: MapEntityGroupStore voption)
     (entityStore: AIEntityStore)
     (candidates: SpawnCandidate[])
     : SpawnZoneInfo[] =
@@ -245,7 +244,7 @@ module MapSpawning =
   [<Struct>]
   type SpawnContext = {
     Random: Random
-    MapEntityGroupStore: MapEntityGroupStore option
+    MapEntityGroupStore: MapEntityGroupStore voption
     EntityStore: AIEntityStore
     ScenarioId: Guid<ScenarioId>
     MaxEnemies: int

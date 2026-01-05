@@ -382,7 +382,7 @@ module Projections =
 
     let private calculateSnapshot
       (time: TimeSpan)
-      (velocities: IReadOnlyDictionary<Guid<EntityId>, Vector2>)
+      (velocities: IReadOnlyDictionary<Guid<EntityId>, Vector3>)
       (positions: IReadOnlyDictionary<Guid<EntityId>, WorldPosition>)
       (rotations: IReadOnlyDictionary<Guid<EntityId>, float32>)
       (modelConfigIds: HashMap<Guid<EntityId>, string>)
@@ -403,11 +403,11 @@ module Projections =
           let currentPos =
             match velocities |> Dictionary.tryFindV id with
             | ValueSome v ->
-                // Apply 2D velocity to X/Z plane, preserve Y
+                // Apply 3D velocity to position
                 {
                   WorldPosition.X = startPos.X + v.X * dt
-                  Y = startPos.Y
-                  Z = startPos.Z + v.Y * dt
+                  Y = startPos.Y + v.Y * dt
+                  Z = startPos.Z + v.Z * dt
                 }
             | ValueNone -> startPos
 
@@ -416,8 +416,8 @@ module Projections =
           // Calculate Rotation (Derived from Velocity if moving, else keep existing)
           let rotation =
             match velocities |> Dictionary.tryFindV id with
-            | ValueSome v when v <> Vector2.Zero ->
-              float32(Math.Atan2(float v.X, float v.Y))
+            | ValueSome v when v <> Vector3.Zero ->
+              float32(Math.Atan2(float v.X, float v.Z))
             | _ ->
               rotations
               |> Dictionary.tryFindV id
@@ -456,7 +456,7 @@ module Projections =
 
     let private calculate3DSnapshot
       (time: TimeSpan)
-      (velocities: IReadOnlyDictionary<Guid<EntityId>, Vector2>)
+      (velocities: IReadOnlyDictionary<Guid<EntityId>, Vector3>)
       (positions: IReadOnlyDictionary<Guid<EntityId>, WorldPosition>)
       (rotations: IReadOnlyDictionary<Guid<EntityId>, float32>)
       (modelConfigIds: HashMap<Guid<EntityId>, string>)
@@ -476,24 +476,19 @@ module Projections =
         | ValueSome sId when sId = scenarioId ->
           let currentPos =
             match velocities |> Dictionary.tryFindV id with
-            | ValueSome v ->
-              match blockMap with
-              | ValueSome map ->
-                BlockCollision.applyCollision map startPos v dt 1.0f
-              | ValueNone ->
-                  {
-                    WorldPosition.X = startPos.X + v.X * dt
-                    Y = startPos.Y
-                    Z = startPos.Z + v.Y * dt
-                  }
-            | ValueNone -> startPos
+            | ValueSome v when v <> Vector3.Zero -> {
+                WorldPosition.X = startPos.X + v.X * dt
+                Y = startPos.Y + v.Y * dt
+                Z = startPos.Z + v.Z * dt
+              }
+            | _ -> startPos
 
           positionsBuilder[id] <- currentPos
 
           let rotation =
             match velocities |> Dictionary.tryFindV id with
-            | ValueSome v when v <> Vector2.Zero ->
-              float32(Math.Atan2(float v.X, float v.Y))
+            | ValueSome v when v <> Vector3.Zero ->
+              float32(Math.Atan2(float v.X, float v.Z))
             | _ ->
               rotations
               |> Dictionary.tryFindV id

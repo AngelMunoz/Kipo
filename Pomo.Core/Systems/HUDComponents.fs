@@ -1199,3 +1199,16 @@ module HUDComponents =
     |> W.vAlign VerticalAlignment.Stretch
     |> W.bindBackground(config |> AVal.map _.Theme.TooltipBackground)
     |> W.childrenP [ label ]
+
+  let globalOverlay (config: HUDConfig aval) (show: bool aval) =
+    Panel.create()
+    |> W.hAlign HorizontalAlignment.Stretch
+    |> W.vAlign VerticalAlignment.Stretch
+    |> W.bindBackground(config |> AVal.map _.Theme.TooltipBackground)
+    |> Panel.bindChildren(
+      show
+      |> AVal.map(fun show -> [
+        if show then
+          createLoadingOverlay config :> Widget
+      ])
+    )

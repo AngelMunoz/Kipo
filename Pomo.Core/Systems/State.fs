@@ -133,7 +133,7 @@ module StateUpdate =
 
     let inline updateVelocity
       (world: MutableWorld)
-      struct (entity: Guid<EntityId>, velocity: Vector2)
+      struct (entity: Guid<EntityId>, velocity: Vector3)
       =
       if world.EntityExists.Contains entity then
         world.Velocities[entity] <- velocity
@@ -179,7 +179,7 @@ module StateUpdate =
         | Some scenarioId ->
           world.EntityExists.Add(entityId) |> ignore
           world.Positions[entityId] <- pos
-          world.Velocities[entityId] <- Vector2.Zero
+          world.Velocities[entityId] <- Vector3.Zero
           world.LiveProjectiles[entityId] <- projectile
           // Use projectile's model if specified, otherwise default to "Projectile"
           let modelConfig =
@@ -413,7 +413,7 @@ module StateWrite =
   [<Struct>]
   type NonAdaptiveCommand =
     | UpdatePosition of posEntityId: Guid<EntityId> * position: WorldPosition
-    | UpdateVelocity of velEntityId: Guid<EntityId> * velocity: Vector2
+    | UpdateVelocity of velEntityId: Guid<EntityId> * velocity: Vector3
     | UpdateRotation of rotEntityId: Guid<EntityId> * rotation: float32
 
   let inline applyNonAdaptiveCommand

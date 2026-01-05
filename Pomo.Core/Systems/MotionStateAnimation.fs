@@ -33,7 +33,7 @@ module AnimationStateLogic =
   /// Determines what animation action to take based on movement state.
   /// Returns: Some true = start run animation, Some false = stop animation, None = no change
   let determineAnimationAction
-    (currentVelocity: Vector2)
+    (currentVelocity: Vector3)
     (currentActiveAnimations: AnimationState[])
     (runClipIds: string[] voption)
     : (bool * AnimationState[] voption) voption =
@@ -42,7 +42,8 @@ module AnimationStateLogic =
     | ValueNone -> ValueNone
     | ValueSome clips when clips.Length = 0 -> ValueNone
     | ValueSome clips ->
-      let speed = currentVelocity.Length()
+      // Use XZ speed for ground movement animation
+      let speed = Vector2(currentVelocity.X, currentVelocity.Z).Length()
       let isMoving = speed > RUN_THRESHOLD
       let isRunAnimActive = hasAnyOfClips clips currentActiveAnimations
 
@@ -83,7 +84,7 @@ type MotionStateAnimationSystem(game: Game, env: PomoEnvironment) =
         let velocity =
           velocities
           |> Dictionary.tryFindV entityId
-          |> ValueOption.defaultValue Vector2.Zero
+          |> ValueOption.defaultValue Vector3.Zero
 
         let currentAnims =
           activeAnimations

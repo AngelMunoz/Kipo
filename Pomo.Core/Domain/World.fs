@@ -66,7 +66,7 @@ module World =
     // entity components
     EntityExists: HashSet<Guid<EntityId>>
     Positions: Dictionary<Guid<EntityId>, WorldPosition>
-    Velocities: Dictionary<Guid<EntityId>, Vector2>
+    Velocities: Dictionary<Guid<EntityId>, Vector3>
     MovementStates: cmap<Guid<EntityId>, MovementState>
     Resources: cmap<Guid<EntityId>, Entity.Resource>
     Factions: cmap<Guid<EntityId>, FSharp.Data.Adaptive.HashSet<Entity.Faction>>
@@ -125,7 +125,7 @@ module World =
     // entity components
     abstract EntityExists: IReadOnlySet<Guid<EntityId>>
     abstract Positions: IReadOnlyDictionary<Guid<EntityId>, WorldPosition>
-    abstract Velocities: IReadOnlyDictionary<Guid<EntityId>, Vector2>
+    abstract Velocities: IReadOnlyDictionary<Guid<EntityId>, Vector3>
     abstract MovementStates: amap<Guid<EntityId>, MovementState>
     abstract Resources: amap<Guid<EntityId>, Entity.Resource>
 

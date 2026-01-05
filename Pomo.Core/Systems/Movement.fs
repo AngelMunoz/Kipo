@@ -8,6 +8,10 @@ open FSharp.Data.Adaptive
 
 open Pomo.Core
 open Pomo.Core.Domain.Events
+open Pomo.Core.Domain.Core
+open Pomo.Core.Domain.Core.Constants
+open Pomo.Core.Domain.BlockMap
+open Pomo.Core.Algorithms
 open Pomo.Core.Systems.Systems
 
 
@@ -15,6 +19,38 @@ module Movement =
 
   open Pomo.Core.Environment
   open Pomo.Core.Environment.Patterns
+  open Pomo.Core.Domain
+
+  let calculateFinalPosition
+    (world: World.World)
+    (blockMap: BlockMapDefinition)
+    (id: Guid<Units.EntityId>)
+    (proposedPos: WorldPosition)
+    (dt: float32)
+    : WorldPosition =
+    // Get the committed position to calculate proper collision
+    let startPos =
+      world.Positions
+      |> Dictionary.tryFindV id
+      |> ValueOption.defaultValue proposedPos
+
+    let velocity =
+      world.Velocities
+      |> Dictionary.tryFindV id
+      |> ValueOption.defaultValue Vector3.Zero
+
+    if velocity <> Vector3.Zero then
+      // Extract XZ for block collision (ground movement)
+      let velocity2D = Vector2(velocity.X, velocity.Z)
+
+      BlockCollision.applyCollision
+        blockMap
+        startPos
+        velocity2D
+        dt
+        BlockMap.CellSize
+    else
+      proposedPos
 
   type MovementSystem(game: Game, env: PomoEnvironment) =
     inherit GameSystem(game)
@@ -27,12 +63,33 @@ module Movement =
 
     override this.Update _ =
       let scenarios = core.World.Scenarios |> AMap.force
+      let liveProjectiles = core.World.LiveProjectiles |> AMap.force
 
-      for scenarioId, _ in scenarios do
-        let snapshot = gameplay.Projections.ComputeMovementSnapshot(scenarioId)
+      for scenarioId, scenario in scenarios do
+        let snapshot =
+          gameplay.Projections.ComputeMovement3DSnapshot(scenarioId)
 
-        for KeyValue(id, newPosition) in snapshot.Positions do
-          stateWrite.UpdatePosition(id, newPosition)
+        for KeyValue(id, proposedPos) in snapshot.Positions do
+          // Projectiles handle their own physics - pass through unchanged
+          let isProjectile = liveProjectiles |> HashMap.containsKey id
+
+          let finalPos =
+            if isProjectile then
+              // Projectile: no grounding, preserve Y
+              proposedPos
+            else
+              // Ground entity: apply block collision with grounding
+              match scenario.BlockMap with
+              | ValueSome blockMap ->
+                let dt =
+                  core.World.Time
+                  |> AVal.force
+                  |> fun t -> float32 t.Delta.TotalSeconds
+
+                calculateFinalPosition core.World blockMap id proposedPos dt
+              | ValueNone -> proposedPos
+
+          stateWrite.UpdatePosition(id, finalPos)
 
         for KeyValue(id, newRotation) in snapshot.Rotations do
           stateWrite.UpdateRotation(id, newRotation)

@@ -191,14 +191,36 @@ module Projectile =
 
   /// Handles the in-flight movement of a horizontal projectile.
   /// Updates velocity via StateWriteService directly.
+  /// Calculates 3D velocity with Y descent proportional to XZ travel.
   let private handleHorizontalFlight
     (stateWrite: IStateWriteService)
     (ctx: ProjectileContext)
     =
-    let pos2d = WorldPosition.toVector2 ctx.Position
-    let target2d = WorldPosition.toVector2 ctx.TargetPosition
-    let direction = Vector2.Normalize(target2d - pos2d)
-    let velocity = direction * ctx.Projectile.Info.Speed
+    let pos = ctx.Position
+    let target = ctx.TargetPosition
+
+    // XZ direction and distance
+    let xzDir = Vector2.Normalize(Vector2(target.X - pos.X, target.Z - pos.Z))
+
+    let xzDist =
+      Vector2.Distance(Vector2(pos.X, pos.Z), Vector2(target.X, target.Z))
+
+    // Y velocity: proportional descent to arrive at target Y when reaching XZ
+    let yVelocity =
+      if xzDist > 0.1f then
+        let yDelta = target.Y - pos.Y
+        (yDelta / xzDist) * ctx.Projectile.Info.Speed
+      else
+        0.0f
+
+    // 3D velocity (X, Y descent, Z)
+    let velocity =
+      Vector3(
+        xzDir.X * ctx.Projectile.Info.Speed,
+        yVelocity,
+        xzDir.Y * ctx.Projectile.Info.Speed // Vector2.Y -> world Z
+      )
+
     stateWrite.UpdateVelocity(ctx.Id, velocity)
     IndexList.empty
 
@@ -211,7 +233,7 @@ module Projectile =
     let pos2d = WorldPosition.toVector2 ctx.Position
     let target2d = WorldPosition.toVector2 ctx.TargetPosition
     let distance = Vector2.Distance(pos2d, target2d)
-    let threshold = 4.0f
+    let threshold = Constants.Projectile.ArrivalThreshold
 
     if distance < threshold then
       handleHorizontalImpact stateWrite world ctx
@@ -230,7 +252,13 @@ module Projectile =
     let targetPos =
       match projectile.Target with
       | EntityTarget entityId -> world.Positions.TryFindV entityId
-      | PositionTarget pos -> ValueSome(WorldPosition.fromVector2 pos)
+      | PositionTarget pos ->
+        // Get ground height at target XZ for proper descent
+        let groundY =
+          world.TryGetSurfaceHeight { X = pos.X; Y = 0f; Z = pos.Y }
+          |> ValueOption.defaultValue 0f
+
+        ValueSome { X = pos.X; Y = groundY; Z = pos.Y }
 
     let targetEntity =
       match projectile.Target with

@@ -225,12 +225,12 @@ module BlockMapScene =
       let proto = MapSpawning.tryLoadMapEntityGroupStore "Proto"
 
       match primary, proto with
-      | Some p, Some pr ->
+      | ValueSome p, ValueSome pr ->
         let tryFindMerged groupName =
           p.tryFind groupName
           |> ValueOption.orElseWith(fun () -> pr.tryFind groupName)
 
-        Some(
+        ValueSome
           { new MapEntityGroupStore with
               member _.tryFind groupName = tryFindMerged groupName
 
@@ -244,10 +244,9 @@ module BlockMapScene =
                 yield! pr.all()
               }
           }
-        )
-      | Some p, None -> Some p
-      | None, Some pr -> Some pr
-      | None, None -> None
+      | ValueSome p, ValueNone -> ValueSome p
+      | ValueNone, ValueSome pr -> ValueSome pr
+      | ValueNone, ValueNone -> ValueNone
 
     let candidates = BlockMapSpawning.extractSpawnCandidates blockMap
 

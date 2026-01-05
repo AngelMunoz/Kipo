@@ -155,11 +155,15 @@ module CompositionRoot =
           match paths with
           | [] -> ValueNone
           | path :: rest ->
-            match Systems.BlockMapLoader.load Systems.BlockMapLoader.Resolvers.runtime path with
+            match
+              Systems.BlockMapLoader.load
+                Systems.BlockMapLoader.Resolvers.runtime
+                path
+            with
             | Ok map -> ValueSome map
             | Error e ->
-                printfn $"Error loading Map: {path} - {e}"
-                loop rest
+              printfn $"Error loading Map: {path} - {e}"
+              loop rest
 
         loop candidatePaths
 
@@ -168,7 +172,7 @@ module CompositionRoot =
       | Scene.Gameplay(mapKey, targetSpawn) ->
         match tryLoadBlockMap mapKey with
         | ValueSome blockMap ->
-          Scenes.BlockMapScene.create
+          Scenes.GameplayScene.create
             game
             scope.Stores
             scope.MonoGame

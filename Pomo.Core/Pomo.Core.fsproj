@@ -26,6 +26,7 @@
     <Compile Include="Domain/Events.fs" />
     <Compile Include="Domain/World.fs" />
     <Compile Include="Algorithms/Physics.fs" />
+    <Compile Include="Algorithms/Spatial3D.fs" />
     <Compile Include="Algorithms/Pathfinding3D.fs" />
     <Compile Include="Algorithms/BlockMap.fs" />
     <Compile Include="Algorithms/BlockCollision.fs" />
@@ -64,7 +65,6 @@
     <Compile Include="Systems/DamageCalculator.fs" />
     <Compile Include="Systems/ResourceManager.fs" />
     <Compile Include="Systems/Combat.fs" />
-    <Compile Include="Systems/MovementLogic.fs" />
     <Compile Include="Systems/MovementLogic3D.fs" />
     <Compile Include="Systems/InputMapping.fs" />
     <Compile Include="Systems/PlayerMovement.fs" />
@@ -106,6 +106,7 @@
     <Compile Include="Editor/UI.fs" />
     <Compile Include="Editor/Scene.fs" />
     <Compile Include="Scenes.fs" />
+    <Compile Include="Scenes/GameplayScene.fs" />
     <Compile Include="Scenes/BlockMapScene.fs" />
     <Compile Include="CompositionRoot.fs" />
     <Compile Include="PomoGame.fs" />

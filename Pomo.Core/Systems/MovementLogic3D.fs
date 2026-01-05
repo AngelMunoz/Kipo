@@ -16,16 +16,18 @@ module MovementLogic3D =
   [<Struct>]
   type MovementResult3D =
     | Arrived3D
-    | Moving3D of velocity: Vector2
+    | Moving3D of velocity: Vector3
     | WaypointReached3D of remainingPath: WorldPosition list
 
   /// Threshold for considering arrived at destination (XZ distance)
+  /// Must be reasonable relative to CellSize (64)
   [<Literal>]
-  let private ArrivalThreshold = 0.5f
+  let private ArrivalThreshold = 25.0f
 
   /// Threshold for considering waypoint reached (XZ distance)
+  /// Must be reasonable relative to CellSize (64)
   [<Literal>]
-  let private WaypointThreshold = 0.8f
+  let private WaypointThreshold = 40.0f
 
   /// Calculate squared XZ distance (avoids sqrt)
   let inline private distanceSquaredXZ (a: WorldPosition) (b: WorldPosition) =
@@ -58,7 +60,7 @@ module MovementLogic3D =
       Arrived3D
     else
       let dir = directionXZ currentPos target
-      Moving3D(dir * speed)
+      Moving3D(Vector3(dir.X * speed, 0.0f, dir.Y * speed))
 
   /// Handle moving along a path of waypoints
   let handleMovingAlongPath3D
@@ -76,7 +78,7 @@ module MovementLogic3D =
         WaypointReached3D remaining
       else
         let dir = directionXZ currentPos waypoint
-        Moving3D(dir * speed)
+        Moving3D(Vector3(dir.X * speed, 0.0f, dir.Y * speed))
 
   /// Notify that entity has arrived at destination
   let notifyArrived3D
@@ -84,7 +86,7 @@ module MovementLogic3D =
     (stateWrite: IStateWriteService)
     (eventBus: EventBus)
     =
-    stateWrite.UpdateVelocity(entityId, Vector2.Zero)
+    stateWrite.UpdateVelocity(entityId, Vector3.Zero)
 
     eventBus.Publish(
       GameEvent.State(Physics(MovementStateChanged struct (entityId, Idle)))
@@ -93,10 +95,10 @@ module MovementLogic3D =
   /// Notify velocity change (only publishes if changed)
   let notifyVelocityChange3D
     (entityId: Guid<EntityId>)
-    (newVelocity: Vector2)
-    (lastVelocity: Vector2)
+    (newVelocity: Vector3)
+    (lastVelocity: Vector3)
     (stateWrite: IStateWriteService)
-    : Vector2 =
+    : Vector3 =
     if newVelocity <> lastVelocity then
       stateWrite.UpdateVelocity(entityId, newVelocity)
 
@@ -109,12 +111,12 @@ module MovementLogic3D =
     (stateWrite: IStateWriteService)
     (eventBus: EventBus)
     =
-    // Convert to 2D path for current MovementState compatibility
-    let path2D = remainingPath |> List.map(fun p -> Vector2(p.X, p.Z))
-    stateWrite.UpdateMovementState(entityId, MovingAlongPath path2D)
+    stateWrite.UpdateMovementState(entityId, MovingAlongPath remainingPath)
 
     eventBus.Publish(
       GameEvent.State(
-        Physics(MovementStateChanged struct (entityId, MovingAlongPath path2D))
+        Physics(
+          MovementStateChanged struct (entityId, MovingAlongPath remainingPath)
+        )
       )
     )

@@ -17,77 +17,81 @@ open Pomo.Core.Domain.Core.Constants
 module Collision =
   open Pomo.Core.Domain
   open Pomo.Core.Domain.World
+  open Pomo.Core.Domain.BlockMap
   open System.Collections.Generic
+  open Pomo.Core.Environment
+  open Pomo.Core.Environment.Patterns
 
-  // Helper to get entities in nearby cells
-  let private neighborOffsets = [|
-    struct (-1, -1)
-    0, -1
-    1, -1
-    -1, 0
-    0, 0
-    1, 0
-    -1, 1
-    0, 1
-    1, 1
+  let private neighborOffsets3D: struct (int * int * int)[] = [|
+    struct (-1, 0, -1)
+    struct (0, 0, -1)
+    struct (1, 0, -1)
+    struct (-1, 0, 0)
+    struct (0, 0, 0)
+    struct (1, 0, 0)
+    struct (-1, 0, 1)
+    struct (0, 0, 1)
+    struct (1, 0, 1)
   |]
 
-  let getNearbyEntities
-    (grid: IReadOnlyDictionary<GridCell, Guid<EntityId>[]>)
-    (cell: GridCell)
+  let private getNearbyEntities3D
+    (grid: IReadOnlyDictionary<GridCell3D, Guid<EntityId>[]>)
+    (cell: GridCell3D)
     =
-    neighborOffsets
-    |> Seq.collect(fun struct (dx, dy) ->
-      let neighborCell = { X = cell.X + dx; Y = cell.Y + dy }
+    neighborOffsets3D
+    |> Seq.collect(fun struct (dx, dy, dz) ->
+      let neighborCell: GridCell3D = {
+        X = cell.X + dx
+        Y = cell.Y + dy
+        Z = cell.Z + dz
+      }
 
       match grid |> Dictionary.tryFindV neighborCell with
       | ValueSome entities -> entities
       | ValueNone -> Array.empty)
-
-
-  open Pomo.Core.Environment
-  open Pomo.Core.Environment.Patterns
 
   type CollisionSystem(game: Game, env: PomoEnvironment) =
     inherit GameSystem(game)
 
     let (Core core) = env.CoreServices
     let (Gameplay gameplay) = env.GameplayServices
-    let stateWrite = env.CoreServices.StateWrite
 
     override val Kind = SystemKind.Collision with get
 
-    override this.Update _ =
+    override this.Update gameTime =
       let scenarios = core.World.Scenarios |> AMap.force
-      let entityScenarios = core.World.EntityScenario |> AMap.force
 
-      for scenarioId, scenario in scenarios do
-        let snapshot = gameplay.Projections.ComputeMovementSnapshot(scenarioId)
-        let grid = snapshot.SpatialGrid
+      for scenarioId, _ in scenarios do
+        let snapshot =
+          gameplay.Projections.ComputeMovement3DSnapshot(scenarioId)
+
+        let grid = snapshot.SpatialGrid3D
         let positions = snapshot.Positions
-        let getNearbyTo = getNearbyEntities grid
 
-        // Check for entity-entity collisions
+        // Entity-entity collision detection only
+        // Block collision is handled in the snapshot calculation
         for KeyValue(entityId, pos) in positions do
-          let cell = getGridCell BlockMap.CellSize (WorldPosition.toVector2 pos)
+          let cell: GridCell3D = {
+            X = int(pos.X / BlockMap.CellSize)
+            Y = int(pos.Y / BlockMap.CellSize)
+            Z = int(pos.Z / BlockMap.CellSize)
+          }
 
-          let nearbyEntities = getNearbyTo cell
+          let nearbyEntities = getNearbyEntities3D grid cell
 
           for otherId in nearbyEntities do
             if entityId <> otherId then
-              match positions |> Dictionary.tryFindV otherId with
-              | ValueSome otherPos ->
-                let pos2d = WorldPosition.toVector2 pos
-                let otherPos2d = WorldPosition.toVector2 otherPos
-                let distance = Vector2.Distance(pos2d, otherPos2d)
-                // Simple radius check
-                if distance < Core.Constants.Entity.CollisionDistance then
+              positions
+              |> Dictionary.tryFindV otherId
+              |> ValueOption.iter(fun otherPos ->
+                let dx = pos.X - otherPos.X
+                let dz = pos.Z - otherPos.Z
+                let distanceXZ = sqrt(dx * dx + dz * dz)
+
+                if distanceXZ < Core.Constants.Entity.CollisionDistance then
                   core.EventBus.Publish(
                     GameEvent.Collision(
                       SystemCommunications.EntityCollision
                         struct (entityId, otherId)
                     )
-                  )
-              | ValueNone -> ()
-
-        ()
+                  ))

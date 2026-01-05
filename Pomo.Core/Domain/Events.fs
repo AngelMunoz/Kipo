@@ -21,8 +21,8 @@ open Pomo.Core.Domain.Core
 [<Struct>]
 type MovementState =
   | Idle
-  | MovingTo of targetPosition: Vector2
-  | MovingAlongPath of path: Vector2 list
+  | MovingTo of targetPosition: WorldPosition
+  | MovingAlongPath of path: WorldPosition list
 
 [<Struct>]
 type Selection =
@@ -67,6 +67,13 @@ module SystemCommunications =
     ScenarioId: Guid<ScenarioId>
     MaxEnemies: int
     Zones: SpawnZoneData[]
+  }
+
+  [<Struct>]
+  type PortalTravel = {
+    EntityId: Guid<EntityId>
+    TargetMap: string
+    TargetSpawn: string
   }
 
   [<Struct>]
@@ -261,6 +268,8 @@ type IntentEvent =
   | MovementTarget of movement: SystemCommunications.SetMovementTarget
   | TargetSelection of target: SystemCommunications.TargetSelected
   | SlotActivated of slot: SystemCommunications.SlotActivated
+  | Portal of portal: SystemCommunications.PortalTravel
+
 
 // --- Item Intent Events ---
 [<Struct>]

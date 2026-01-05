@@ -87,7 +87,7 @@ module Core =
       let ModelScale = 0.5f
 
       [<Literal>]
-      let CollisionRadius = 8.0f
+      let CollisionRadius = 16.0f
 
       [<Literal>]
       let CollisionDistance = 16.0f
@@ -98,11 +98,15 @@ module Core =
     module Projectile =
       let Size = Vector2(8.0f, 8.0f)
 
+      [<Literal>]
+      let ArrivalThreshold = 16f
+
     module UI =
       let TargetingIndicatorSize = Vector2(20.0f, 20.0f)
 
     module Navigation =
       let EntitySize = Vector2(4.0f, 4.0f)
+      let FreeMovementThreshold = Entity.Size.X * 5.0f
 
     module Spawning =
       let DefaultDuration = TimeSpan.FromSeconds 1.0
@@ -112,7 +116,7 @@ module Core =
 
     module AI =
       [<Literal>]
-      let WaypointReachedThreshold = 8.0f
+      let WaypointReachedThreshold = 16.0f
 
       /// Margin multiplier for AI active zone (1.3 = 30% beyond screen edges)
       [<Literal>]
