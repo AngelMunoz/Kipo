@@ -20,6 +20,7 @@ module Movement =
   open Pomo.Core.Environment
   open Pomo.Core.Environment.Patterns
   open Pomo.Core.Domain
+  open Pomo.Core.Domain.Skill
 
   let calculateFinalPosition
     (world: World.World)
@@ -52,6 +53,64 @@ module Movement =
     else
       proposedPos
 
+  let private shouldRefreshEffect
+    (totalTime: TimeSpan)
+    (duration: Duration)
+    (activeEffect: ActiveEffect)
+    =
+    match duration with
+    | Duration.Permanent
+    | Duration.PermanentLoop _ -> false // Infinite duration effects don't need to be re-applied
+    | Duration.Instant -> true
+    | Duration.Timed d
+    | Duration.Loop(_, d) ->
+      let elapsed = totalTime - activeEffect.StartTime
+      let remaining = d - elapsed
+      remaining.TotalSeconds < 0.5
+
+  let tryApplyBlockEffect
+    (core: CoreServices)
+    (activeEffects: HashMap<Guid<Units.EntityId>, IndexList<ActiveEffect>>)
+    (id: Guid<Units.EntityId>)
+    (finalPos: WorldPosition)
+    (blockMap: BlockMapDefinition)
+    =
+    let cell = BlockMap.worldPositionToCell finalPos
+
+    // Check current cell (e.g. inside liquid/gas) or below (standing on floor)
+    let effect =
+      BlockMap.getBlockEffect cell blockMap
+      |> ValueOption.orElseWith(fun () ->
+        let below = { cell with Y = cell.Y - 1 }
+        BlockMap.getBlockEffect below blockMap)
+
+    effect
+    |> ValueOption.iter(fun e ->
+      let shouldApply =
+        activeEffects
+        |> HashMap.tryFindV id
+        |> ValueOption.bind(fun existingEffects ->
+          existingEffects
+          |> IndexList.tryFind(fun _ ae -> ae.SourceEffect.Name = e.Name)
+          |> ValueOption.ofOption)
+        |> ValueOption.map(fun activeEffect ->
+          let totalTime =
+            core.World.Time |> AVal.map _.TotalGameTime |> AVal.force
+
+          shouldRefreshEffect totalTime e.Duration activeEffect)
+        |> ValueOption.defaultValue true
+
+      if shouldApply then
+        let intent: SystemCommunications.EffectApplicationIntent = {
+          SourceEntity = id
+          TargetEntity = id
+          Effect = e
+        }
+
+        core.EventBus.Publish(
+          GameEvent.Intent(IntentEvent.EffectApplication intent)
+        ))
+
   type MovementSystem(game: Game, env: PomoEnvironment) =
     inherit GameSystem(game)
 
@@ -64,6 +123,7 @@ module Movement =
     override this.Update _ =
       let scenarios = core.World.Scenarios |> AMap.force
       let liveProjectiles = core.World.LiveProjectiles |> AMap.force
+      let activeEffects = core.World.ActiveEffects |> AMap.force
 
       for scenarioId, scenario in scenarios do
         let snapshot =
@@ -90,6 +150,12 @@ module Movement =
               | ValueNone -> proposedPos
 
           stateWrite.UpdatePosition(id, finalPos)
+
+          // Check for block effects
+          scenario.BlockMap
+          |> ValueOption.iter(
+            tryApplyBlockEffect core activeEffects id finalPos
+          )
 
         for KeyValue(id, newRotation) in snapshot.Rotations do
           stateWrite.UpdateRotation(id, newRotation)

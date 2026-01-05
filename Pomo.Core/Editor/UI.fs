@@ -98,10 +98,15 @@ module EditorUI =
           | ValueSome archetypeId ->
             let map = state.BlockMap.Value
 
-            Pomo.Core.Algorithms.BlockMap.setArchetypeEffect
-              map
-              archetypeId
-              ValueNone
+            let newId =
+              Pomo.Core.Algorithms.BlockMap.getOrCreateEffectVariant
+                map
+                archetypeId
+                ValueNone
+
+            match newId with
+            | ValueSome id -> state.SelectedBlockType.Value <- ValueSome id
+            | ValueNone -> ()
 
             state.BlockMap.Value <- { map with Version = map.Version + 1 }
           | ValueNone -> ()))
@@ -115,11 +120,17 @@ module EditorUI =
           | ValueSome archetypeId ->
             let map = state.BlockMap.Value
 
-            Pomo.Core.Algorithms.BlockMap.setArchetypeEffect
-              map
-              archetypeId
-              (ValueSome EditorEffectPresets.lava)
+            let newId =
+              Pomo.Core.Algorithms.BlockMap.getOrCreateEffectVariant
+                map
+                archetypeId
+                (ValueSome EditorEffectPresets.lava)
 
+            match newId with
+            | ValueSome id -> state.SelectedBlockType.Value <- ValueSome id
+            | ValueNone -> ()
+
+            // Force map update to refresh palette UI if needed
             state.BlockMap.Value <- { map with Version = map.Version + 1 }
           | ValueNone -> ()))
 
