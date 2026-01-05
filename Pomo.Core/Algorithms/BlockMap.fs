@@ -87,6 +87,55 @@ module BlockMap =
           map.Palette.Add(newId, variant)
           ValueSome newId))
 
+  /// Gets or creates a variant with a specific effect.
+  let getOrCreateEffectVariant
+    (map: BlockMapDefinition)
+    (baseId: int<BlockTypeId>)
+    (effect: Effect voption)
+    : int<BlockTypeId> voption =
+    tryGetArchetype map baseId
+    |> ValueOption.bind(fun startBlock ->
+      // Determine the base archetype ID to keep variants grouped
+      // If the input is already a variant, use its ArchetypeId
+      let rootArchetypeId = startBlock.ArchetypeId
+
+      // Construct the variant key based on existing properties + new effect
+      // We need to preserve "Collision=On" if it's present
+      let hasCollision =
+        match startBlock.VariantKey with
+        | ValueSome k when k.Contains(VariantKeyCollisionEnabled) -> true
+        | _ -> false
+
+      let effectKey =
+        match effect with
+        | ValueSome e -> ValueSome $"Effect={e.Name}"
+        | ValueNone -> ValueNone
+
+      let newVariantKey =
+        match hasCollision, effectKey with
+        | true, ValueNone -> ValueSome VariantKeyCollisionEnabled
+        | true, ValueSome e -> ValueSome $"{VariantKeyCollisionEnabled};{e}"
+        | false, ValueNone -> ValueNone // Back to base archetype
+        | false, ValueSome e -> ValueSome e
+
+      match newVariantKey with
+      | ValueNone -> ValueSome rootArchetypeId
+      | ValueSome key ->
+        tryFindVariantId map.Palette rootArchetypeId key
+        |> ValueOption.orElseWith(fun () ->
+          let newId = nextBlockTypeId map.Palette
+
+          let newBlock = {
+            startBlock with
+                Id = newId
+                ArchetypeId = rootArchetypeId
+                VariantKey = ValueSome key
+                Effect = effect
+          }
+
+          map.Palette.Add(newId, newBlock)
+          ValueSome newId))
+
   /// Sets the effect on an archetype and propagates it to all its variants.
   ///
   /// This ensures consistency: when you set an effect on "Lava", both the

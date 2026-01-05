@@ -43,8 +43,12 @@ module EditorEffectPresets =
     DamageSource = Magical
     Stacking = RefreshDuration
     Duration = Loop(TimeSpan.FromSeconds(1.0), TimeSpan.FromSeconds(5.0))
-    Visuals = VisualManifest.empty
+    Visuals = {
+      VisualManifest.empty with
+          VfxId = ValueSome "FireBurn"
+    }
     Modifiers = [|
-      ResourceChange(Entity.ResourceType.HP, Formula.Const -10.0)
+      AbilityDamageMod(Formula.Const 10.0, ValueSome Element.Fire)
+      StaticMod(Additive(MS, -40))
     |]
   }
