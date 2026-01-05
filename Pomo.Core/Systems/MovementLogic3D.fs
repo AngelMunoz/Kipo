@@ -27,7 +27,7 @@ module MovementLogic3D =
   /// Threshold for considering waypoint reached (XZ distance)
   /// Must be reasonable relative to CellSize (64)
   [<Literal>]
-  let private WaypointThreshold = 30.0f
+  let private WaypointThreshold = 40.0f
 
   /// Calculate squared XZ distance (avoids sqrt)
   let inline private distanceSquaredXZ (a: WorldPosition) (b: WorldPosition) =

@@ -85,35 +85,45 @@ module Spatial3D =
     (entityHeight: float32)
     : bool =
     let cfg = defaultValueArg config DefaultConfig
-    let struct (cx, cz) = getCellAtXZ pos
+    let radius = Entity.CollisionRadius
 
-    if not(inXZBounds map cx cz) then
-      false
-    else
-      let entityCellY = int(pos.Y / BlockMap.CellSize)
+    let checkPoint(p: WorldPosition) =
+      let struct (cx, cz) = getCellAtXZ p
 
-      let heightInCells =
-        entityHeight
-        |> fun h -> if h > 0.0f then h else BlockMap.CellSize
-        |> fun h -> int(MathF.Ceiling(h / BlockMap.CellSize))
-        |> max 1
+      if not(inXZBounds map cx cz) then
+        false
+      else
+        let entityCellY = int(p.Y / BlockMap.CellSize)
 
-      let mutable blocked = false
-      let mutable y = entityCellY
-      let yEnd = entityCellY + heightInCells - 1
+        let heightInCells =
+          entityHeight
+          |> fun h -> if h > 0.0f then h else BlockMap.CellSize
+          |> fun h -> int(MathF.Ceiling(h / BlockMap.CellSize))
+          |> max 1
 
-      while not blocked && y <= yEnd do
-        if y < 0 || y >= map.Height then
-          blocked <- true
-        else
-          let cell: GridCell3D = { X = cx; Y = y; Z = cz }
+        let mutable blocked = false
+        let mutable y = entityCellY
+        let yEnd = entityCellY + heightInCells - 1
 
-          if cfg.IsBlockingCell map cell then
+        while not blocked && y <= yEnd do
+          if y < 0 || y >= map.Height then
             blocked <- true
+          else
+            let cell: GridCell3D = { X = cx; Y = y; Z = cz }
 
-        y <- y + 1
+            if cfg.IsBlockingCell map cell then
+              blocked <- true
 
-      not blocked
+          y <- y + 1
+
+        not blocked
+
+    // Check center and 4 points around the radius for "fat" collision
+    checkPoint pos
+    && checkPoint { pos with X = pos.X + radius }
+    && checkPoint { pos with X = pos.X - radius }
+    && checkPoint { pos with Z = pos.Z + radius }
+    && checkPoint { pos with Z = pos.Z - radius }
 
   let tryProjectToGroundWithConfig
     (config: QueryConfig voption)

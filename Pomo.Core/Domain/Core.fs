@@ -87,7 +87,7 @@ module Core =
       let ModelScale = 0.5f
 
       [<Literal>]
-      let CollisionRadius = 8.0f
+      let CollisionRadius = 16.0f
 
       [<Literal>]
       let CollisionDistance = 16.0f
