@@ -41,9 +41,11 @@ module PlayerMovement =
               Vector2.Zero
 
           if moveDir.LengthSquared() > 0.0f then
-            Vector2.Normalize moveDir * speed
+            let normalized = Vector2.Normalize moveDir
+            // Ground movement: XZ velocity with Y=0
+            Vector3(normalized.X * speed, 0.0f, normalized.Y * speed)
           else
-            Vector2.Zero)
+            Vector3.Zero)
         actions
         speed
 
@@ -75,7 +77,7 @@ module PlayerMovement =
 
     let movementState = core.World.MovementStates |> AMap.tryFind playerId
 
-    let mutable lastVelocity = Vector2.Zero
+    let mutable lastVelocity = Vector3.Zero
 
     override _.Initialize() = base.Initialize()
 
@@ -95,11 +97,11 @@ module PlayerMovement =
       let isRooted = statuses |> IndexList.exists(fun _ s -> s.IsRooted)
 
       if isStunned || isRooted then
-        if lastVelocity <> Vector2.Zero then
+        if lastVelocity <> Vector3.Zero then
           lastVelocity <-
             MovementLogic3D.notifyVelocityChange3D
               playerId
-              Vector2.Zero
+              Vector3.Zero
               lastVelocity
               stateWrite
       else
@@ -121,7 +123,7 @@ module PlayerMovement =
           with
           | MovementLogic3D.Arrived3D ->
             MovementLogic3D.notifyArrived3D playerId stateWrite core.EventBus
-            lastVelocity <- Vector2.Zero
+            lastVelocity <- Vector3.Zero
           | MovementLogic3D.Moving3D finalVelocity ->
             lastVelocity <-
               MovementLogic3D.notifyVelocityChange3D
@@ -142,7 +144,7 @@ module PlayerMovement =
           with
           | MovementLogic3D.Arrived3D ->
             MovementLogic3D.notifyArrived3D playerId stateWrite core.EventBus
-            lastVelocity <- Vector2.Zero
+            lastVelocity <- Vector3.Zero
           | MovementLogic3D.WaypointReached3D remainingPath ->
             MovementLogic3D.notifyWaypointReached3D
               playerId

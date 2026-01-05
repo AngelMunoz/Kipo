@@ -759,7 +759,7 @@ module ParticleSystem =
     ActiveEffects: HashMap<Guid<EntityId>, Skill.ActiveEffect IndexList>
     // For transform updates (not stable - raw world data)
     Positions: IReadOnlyDictionary<Guid<EntityId>, WorldPosition>
-    Velocities: IReadOnlyDictionary<Guid<EntityId>, Vector2>
+    Velocities: IReadOnlyDictionary<Guid<EntityId>, Vector3>
     Rotations: IReadOnlyDictionary<Guid<EntityId>, float32>
   }
 
@@ -843,9 +843,9 @@ module ParticleSystem =
 
         let vel =
           ctx.Velocities.TryFindV ownerId
-          |> ValueOption.defaultValue Vector2.Zero
+          |> ValueOption.defaultValue Vector3.Zero
 
-        ownerVelocity <- Vector3(vel.X, 0.0f, vel.Y)
+        ownerVelocity <- vel
 
         let rot =
           ctx.Rotations.TryFindV ownerId |> ValueOption.defaultValue 0.0f

@@ -31,7 +31,7 @@ module AIContext =
   [<Struct>]
   type WorldSnapshot = {
     Positions: IReadOnlyDictionary<Guid<EntityId>, WorldPosition>
-    Velocities: IReadOnlyDictionary<Guid<EntityId>, Vector2>
+    Velocities: IReadOnlyDictionary<Guid<EntityId>, Vector3>
     Factions: HashMap<Guid<EntityId>, Faction HashSet>
     SpatialGrid: IReadOnlyDictionary<GridCell, Guid<EntityId>[]>
   }
@@ -1270,7 +1270,7 @@ type AISystem(game: Game, env: PomoEnvironment) =
 
     // Lazily compute velocities/factions/cooldowns only when first accessed
     let mutable velocitiesOpt
-      : IReadOnlyDictionary<Guid<EntityId>, Vector2> voption =
+      : IReadOnlyDictionary<Guid<EntityId>, Vector3> voption =
       ValueNone
 
     let mutable factionsOpt: HashMap<Guid<EntityId>, Faction HashSet> voption =
@@ -1366,6 +1366,7 @@ type AISystem(game: Game, env: PomoEnvironment) =
             let vel =
               getVelocities()
               |> Dictionary.tryFindV controller.controlledEntityId
+              |> ValueOption.map(fun v -> Vector2(v.X, v.Z))
               |> ValueOption.defaultValue Vector2.Zero
 
             let entityCtx: AIContext.EntityContext = {

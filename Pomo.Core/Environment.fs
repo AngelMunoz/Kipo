@@ -35,7 +35,7 @@ module Environment =
 
   type IPhysicsWriteService =
     abstract UpdatePosition: Guid<EntityId> * WorldPosition -> unit
-    abstract UpdateVelocity: Guid<EntityId> * Vector2 -> unit
+    abstract UpdateVelocity: Guid<EntityId> * Vector3 -> unit
     abstract UpdateRotation: Guid<EntityId> * float32 -> unit
 
   type IEntityLifecycleService =

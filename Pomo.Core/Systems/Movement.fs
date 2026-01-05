@@ -58,18 +58,21 @@ module Movement =
                 let velocity =
                   core.World.Velocities
                   |> Dictionary.tryFindV id
-                  |> ValueOption.defaultValue Vector2.Zero
+                  |> ValueOption.defaultValue Vector3.Zero
 
-                if velocity <> Vector2.Zero then
+                if velocity <> Vector3.Zero then
                   let dt =
                     core.World.Time
                     |> AVal.force
                     |> fun t -> float32 t.Delta.TotalSeconds
 
+                  // Extract XZ for block collision (ground movement)
+                  let velocity2D = Vector2(velocity.X, velocity.Z)
+
                   BlockCollision.applyCollision
                     blockMap
                     startPos
-                    velocity
+                    velocity2D
                     dt
                     BlockMap.CellSize
                 else

@@ -185,7 +185,7 @@ module EntitySpawnerLogic =
       Id = entityId
       ScenarioId = pending.ScenarioId
       Position = pos
-      Velocity = Vector2.Zero
+      Velocity = Vector3.Zero
     }
 
     match pending.Type with

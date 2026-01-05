@@ -26,7 +26,7 @@ module UnitMovement =
     let stateWrite = core.StateWrite
 
     let lastVelocities =
-      System.Collections.Generic.Dictionary<Guid<EntityId>, Vector2>()
+      System.Collections.Generic.Dictionary<Guid<EntityId>, Vector3>()
 
     let movementStates =
       core.World.MovementStates |> AMap.filter(fun id _ -> id <> playerId)
@@ -71,7 +71,7 @@ module UnitMovement =
                     stateWrite
                     core.EventBus
 
-                  lastVelocities[entityId] <- Vector2.Zero
+                  lastVelocities[entityId] <- Vector3.Zero
                 | MovementLogic3D.WaypointReached3D remaining ->
                   MovementLogic3D.notifyWaypointReached3D
                     entityId
@@ -82,7 +82,7 @@ module UnitMovement =
                   let lastVel =
                     match lastVelocities.TryGetValue entityId with
                     | true, v -> v
-                    | false, _ -> Vector2.Zero
+                    | false, _ -> Vector3.Zero
 
                   lastVelocities[entityId] <-
                     MovementLogic3D.notifyVelocityChange3D
@@ -103,12 +103,12 @@ module UnitMovement =
                     stateWrite
                     core.EventBus
 
-                  lastVelocities[entityId] <- Vector2.Zero
+                  lastVelocities[entityId] <- Vector3.Zero
                 | MovementLogic3D.Moving3D finalVel ->
                   let lastVel =
                     match lastVelocities.TryGetValue entityId with
                     | true, v -> v
-                    | false, _ -> Vector2.Zero
+                    | false, _ -> Vector3.Zero
 
                   lastVelocities[entityId] <-
                     MovementLogic3D.notifyVelocityChange3D
@@ -121,12 +121,12 @@ module UnitMovement =
               | Idle ->
                 if
                   lastVelocities.ContainsKey entityId
-                  && lastVelocities[entityId] <> Vector2.Zero
+                  && lastVelocities[entityId] <> Vector3.Zero
                 then
                   lastVelocities[entityId] <-
                     MovementLogic3D.notifyVelocityChange3D
                       entityId
-                      Vector2.Zero
+                      Vector3.Zero
                       lastVelocities[entityId]
                       stateWrite
             | ValueNone -> ()

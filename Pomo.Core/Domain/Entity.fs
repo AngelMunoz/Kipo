@@ -14,7 +14,7 @@ module Entity =
     Id: Guid<EntityId>
     ScenarioId: Guid<ScenarioId>
     Position: WorldPosition
-    Velocity: Vector2
+    Velocity: Vector3
   }
 
   [<Struct>]
