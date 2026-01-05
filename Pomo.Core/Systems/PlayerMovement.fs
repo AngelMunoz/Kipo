@@ -116,10 +116,8 @@ module PlayerMovement =
 
         match movementState with
         | Some(MovingTo destination) ->
-          let target3D = WorldPosition.fromVector2 destination
-
           match
-            MovementLogic3D.handleMovingTo3D position target3D movementSpeed
+            MovementLogic3D.handleMovingTo3D position destination movementSpeed
           with
           | MovementLogic3D.Arrived3D ->
             MovementLogic3D.notifyArrived3D playerId stateWrite core.EventBus
@@ -134,13 +132,8 @@ module PlayerMovement =
           | _ -> ()
 
         | Some(MovingAlongPath path) ->
-          let path3D = path |> List.map(fun v -> WorldPosition.fromVector2 v)
-
           match
-            MovementLogic3D.handleMovingAlongPath3D
-              position
-              path3D
-              movementSpeed
+            MovementLogic3D.handleMovingAlongPath3D position path movementSpeed
           with
           | MovementLogic3D.Arrived3D ->
             MovementLogic3D.notifyArrived3D playerId stateWrite core.EventBus

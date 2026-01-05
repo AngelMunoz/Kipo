@@ -60,13 +60,8 @@ module UnitMovement =
 
               match state with
               | MovingAlongPath path ->
-                let path3D = path |> List.map WorldPosition.fromVector2
-
                 match
-                  MovementLogic3D.handleMovingAlongPath3D
-                    currentPos
-                    path3D
-                    speed
+                  MovementLogic3D.handleMovingAlongPath3D currentPos path speed
                 with
                 | MovementLogic3D.Arrived3D ->
                   MovementLogic3D.notifyArrived3D
@@ -95,10 +90,8 @@ module UnitMovement =
                       stateWrite
 
               | MovingTo target ->
-                let target3D = WorldPosition.fromVector2 target
-
                 match
-                  MovementLogic3D.handleMovingTo3D currentPos target3D speed
+                  MovementLogic3D.handleMovingTo3D currentPos target speed
                 with
                 | MovementLogic3D.Arrived3D ->
                   MovementLogic3D.notifyArrived3D

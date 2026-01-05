@@ -111,12 +111,12 @@ module MovementLogic3D =
     (stateWrite: IStateWriteService)
     (eventBus: EventBus)
     =
-    // Convert to 2D path for current MovementState compatibility
-    let path2D = remainingPath |> List.map(fun p -> Vector2(p.X, p.Z))
-    stateWrite.UpdateMovementState(entityId, MovingAlongPath path2D)
+    stateWrite.UpdateMovementState(entityId, MovingAlongPath remainingPath)
 
     eventBus.Publish(
       GameEvent.State(
-        Physics(MovementStateChanged struct (entityId, MovingAlongPath path2D))
+        Physics(
+          MovementStateChanged struct (entityId, MovingAlongPath remainingPath)
+        )
       )
     )

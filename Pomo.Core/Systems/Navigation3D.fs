@@ -125,13 +125,28 @@ module Navigation3D =
     (entityId: Guid<EntityId>)
     (path: WorldPosition[])
     =
-    // Convert to Vector2 path for current MovementState compatibility
-    let path2D = path |> Array.map(fun p -> Vector2(p.X, p.Z)) |> Array.toList
-    stateWrite.UpdateMovementState(entityId, MovingAlongPath path2D)
+    let pathList = path |> Array.toList
+    stateWrite.UpdateMovementState(entityId, MovingAlongPath pathList)
 
     eventBus.Publish(
       GameEvent.State(
-        Physics(MovementStateChanged struct (entityId, MovingAlongPath path2D))
+        Physics(
+          MovementStateChanged struct (entityId, MovingAlongPath pathList)
+        )
+      )
+    )
+
+  let inline private publishMoveTo
+    (stateWrite: IStateWriteService)
+    (eventBus: EventBus)
+    (entityId: Guid<EntityId>)
+    (target: WorldPosition)
+    =
+    stateWrite.UpdateMovementState(entityId, MovingTo target)
+
+    eventBus.Publish(
+      GameEvent.State(
+        Physics(MovementStateChanged struct (entityId, MovingTo target))
       )
     )
 
@@ -177,10 +192,10 @@ module Navigation3D =
           let targetPos = clickTo3D blockMap currentPos target.Target
 
           {
-          EntityId = entityId
-          TargetPos = targetPos
-          CurrentPos = currentPos
-          BlockMap = blockMap
+            EntityId = entityId
+            TargetPos = targetPos
+            CurrentPos = currentPos
+            BlockMap = blockMap
           })))
 
   /// Execute pathfinding and publish result
@@ -209,9 +224,19 @@ module Navigation3D =
         trySnapToNearestWalkable ctx.BlockMap navGrid ctx.TargetPos
         |> ValueOption.defaultValue ctx.TargetPos
 
-    match AStar.findPath navGrid startPos targetPos with
-    | ValueSome path -> publishPath stateWrite eventBus ctx.EntityId path
-    | ValueNone -> publishNoPath stateWrite eventBus ctx.EntityId
+    // Check for free movement: close distance + clear line of sight
+    let distance = WorldPosition.distance startPos targetPos
+
+    let useDirect =
+      distance < Navigation.FreeMovementThreshold
+      && AStar.hasLineOfSight navGrid startPos targetPos
+
+    if useDirect then
+      publishMoveTo stateWrite eventBus ctx.EntityId targetPos
+    else
+      match AStar.findPath navGrid startPos targetPos with
+      | ValueSome path -> publishPath stateWrite eventBus ctx.EntityId path
+      | ValueNone -> publishNoPath stateWrite eventBus ctx.EntityId
 
   /// Handle a movement target intent
   let private handleMovementTarget

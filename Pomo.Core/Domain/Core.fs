@@ -106,6 +106,7 @@ module Core =
 
     module Navigation =
       let EntitySize = Vector2(4.0f, 4.0f)
+      let FreeMovementThreshold = Entity.Size.X * 5.0f
 
     module Spawning =
       let DefaultDuration = TimeSpan.FromSeconds 1.0
