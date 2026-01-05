@@ -106,6 +106,7 @@
     <Compile Include="Editor/UI.fs" />
     <Compile Include="Editor/Scene.fs" />
     <Compile Include="Scenes.fs" />
+    <Compile Include="Scenes/GameplayScene.fs" />
     <Compile Include="Scenes/BlockMapScene.fs" />
     <Compile Include="CompositionRoot.fs" />
     <Compile Include="PomoGame.fs" />

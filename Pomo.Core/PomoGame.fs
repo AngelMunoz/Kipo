@@ -22,6 +22,7 @@ type PomoGame() as this =
   let sceneManager =
     new SceneManager(
       this,
+      globalScope.HUDService,
       CompositionRoot.sceneTransitionSubject,
       CompositionRoot.SceneFactory.sceneLoader this globalScope playerId
     )

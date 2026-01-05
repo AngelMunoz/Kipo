@@ -70,6 +70,13 @@ module SystemCommunications =
   }
 
   [<Struct>]
+  type PortalTravel = {
+    EntityId: Guid<EntityId>
+    TargetMap: string
+    TargetSpawn: string
+  }
+
+  [<Struct>]
   type NotificationType =
     | Normal
     | Damage
@@ -261,6 +268,8 @@ type IntentEvent =
   | MovementTarget of movement: SystemCommunications.SetMovementTarget
   | TargetSelection of target: SystemCommunications.TargetSelected
   | SlotActivated of slot: SystemCommunications.SlotActivated
+  | Portal of portal: SystemCommunications.PortalTravel
+
 
 // --- Item Intent Events ---
 [<Struct>]

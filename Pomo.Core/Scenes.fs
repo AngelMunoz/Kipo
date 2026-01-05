@@ -2,16 +2,23 @@ namespace Pomo.Core.Scenes
 
 open System
 open Microsoft.Xna.Framework
+open Microsoft.Xna.Framework.Graphics
+open FSharp.Data.Adaptive
+open Myra.Graphics2D.UI
+open Pomo.Core
 open Pomo.Core.Domain.Scenes
+open Pomo.Core.Domain.UI
 
 type SceneManager
   (
     game: Game,
+    hudService: IHUDService,
     sceneEvents: IObservable<Scene>,
     loader: Scene -> struct (IGameComponent list * IDisposable)
   ) =
-  inherit GameComponent(game)
+  inherit DrawableGameComponent(game)
 
+  let mutable desktop: Desktop voption = ValueNone
   let mutable currentDisposable: IDisposable voption = ValueNone
   let mutable currentComponents: IGameComponent list = []
   let mutable subscription: IDisposable voption = ValueNone
@@ -44,6 +51,13 @@ type SceneManager
   override _.Initialize() =
     base.Initialize()
 
+    let root =
+      Systems.HUDComponents.globalOverlay
+        hudService.Config
+        hudService.LoadingOverlayVisible
+
+    desktop <- ValueSome(new Desktop(Root = root))
+
     subscription <-
       ValueSome(
         sceneEvents
@@ -56,6 +70,9 @@ type SceneManager
       switchTo scene
       nextScene <- ValueNone
     | ValueNone -> ()
+
+  override _.Draw _ =
+    desktop |> ValueOption.iter(fun d -> d.Render())
 
   override _.Dispose(disposing: bool) =
     if disposing then

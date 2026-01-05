@@ -15,7 +15,7 @@ open Pomo.Core.Domain
 open Pomo.Core.Domain.Events
 open Pomo.Core.Domain.Units
 open Pomo.Core.Domain.Core
-open Pomo.Core.Domain.Map
+open Pomo.Core.Domain.BlockMap
 open Pomo.Core.Domain.Scenes
 open Pomo.Core.Domain.UI
 open Pomo.Core.Stores
@@ -41,7 +41,30 @@ open Pomo.Core.Systems.StateWrite
 open Pomo.Core.Systems.Collision
 
 /// Creates and manages the Gameplay scene with all systems, services, and map lifecycle
+/// Uses BlockMap for 3D world rendering and Navigation3D for pathfinding
 module GameplayScene =
+
+  let inline private clamp (minV: float32) (maxV: float32) (v: float32) =
+    if v < minV then minV
+    elif v > maxV then maxV
+    else v
+
+  let private clampToMapBounds (map: BlockMapDefinition) (pos: WorldPosition) =
+    let maxX = float32 map.Width * BlockMap.CellSize
+    let maxY = float32 map.Height * BlockMap.CellSize
+    let maxZ = float32 map.Depth * BlockMap.CellSize
+
+    {
+      X = clamp 0.0f maxX pos.X
+      Y = clamp 0.0f maxY pos.Y
+      Z = clamp 0.0f maxZ pos.Z
+    }
+
+  /// Get BlockMap for a scenario (used by Navigation3D)
+  let private createBlockMapProvider
+    (scenarioBlockMaps: Dictionary<Guid<ScenarioId>, BlockMapDefinition>)
+    : Guid<ScenarioId> -> BlockMapDefinition voption =
+    fun scenarioId -> scenarioBlockMaps |> Dictionary.tryFindV scenarioId
 
   /// Creates a complete gameplay scene with all systems and services
   let create
@@ -53,12 +76,8 @@ module GameplayScene =
     (hudService: IHUDService)
     (sceneTransitionSubject: IObserver<Scene>)
     (playerId: Guid<EntityId>)
-    (initialMapKey: string)
-    (initialTargetSpawn: string voption)
+    (blockMap: BlockMapDefinition)
     =
-    // Mutable state for the GameplayScene instance
-    let mutable currentMapKey: string voption = ValueNone
-
     // 1. Create World and Local EventBus
     let eventBus = new EventBus()
     let struct (mutableWorld, worldView) = World.create random
@@ -70,13 +89,9 @@ module GameplayScene =
     let projections =
       Projections.create(stores.ItemStore, worldView, physicsCacheService)
 
+    // Use BlockMap 3D camera
     let cameraService =
-      CameraSystem.create(
-        game,
-        projections,
-        worldView,
-        Array.singleton playerId
-      )
+      BlockMapCameraSystem.create game projections blockMap playerId
 
     let targetingService =
       Targeting.create(
@@ -107,20 +122,31 @@ module GameplayScene =
         playerId
       )
 
-    let navigationService =
-      Navigation.create(
-        eventBus,
-        stateWriteService,
-        stores.MapStore,
-        projections
-      )
+    // BlockMap storage for Navigation3D
+    let scenarioBlockMaps = Dictionary<Guid<ScenarioId>, BlockMapDefinition>()
+    let getBlockMap = createBlockMapProvider scenarioBlockMaps
+
+    // Use Navigation3D for BlockMap-based pathfinding
+    let navigation3DService =
+      Navigation3D.create eventBus stateWriteService projections getBlockMap
 
     let inventoryService =
       Inventory.create(eventBus, stores.ItemStore, worldView, stateWriteService)
 
     let equipmentService = Equipment.create worldView eventBus stateWriteService
 
-    // 4. Construct PomoEnvironment (Local Scope)
+    // 4. Create Scenario and store BlockMap
+    let scenarioId = Guid.NewGuid() |> UMX.tag<ScenarioId>
+
+    let scenario: World.Scenario = {
+      Id = scenarioId
+      BlockMap = ValueSome blockMap
+    }
+
+    mutableWorld.Scenarios[scenarioId] <- scenario
+    scenarioBlockMaps[scenarioId] <- blockMap
+
+    // 5. Construct PomoEnvironment (Local Scope)
     let pomoEnv =
       { new Pomo.Core.Environment.PomoEnvironment with
           member _.CoreServices =
@@ -144,7 +170,7 @@ module GameplayScene =
             { new ListenerServices with
                 member _.EffectApplication = effectApplication
                 member _.ActionHandler = actionHandler
-                member _.NavigationService = navigationService
+                member _.NavigationService = navigation3DService
                 member _.InventoryService = inventoryService
                 member _.EquipmentService = equipmentService
             }
@@ -153,7 +179,7 @@ module GameplayScene =
           member _.StoreServices = stores
       }
 
-    // Systems that are always present (order matters!)
+    // 6. Create Systems (order matters!)
     let baseComponents = new ResizeArray<IGameComponent>()
     baseComponents.Add(new RawInputSystem(game, pomoEnv, playerId))
     baseComponents.Add(new InputMappingSystem(game, pomoEnv, playerId))
@@ -193,114 +219,84 @@ module GameplayScene =
 
     baseComponents.Add(hoverFeedbackSystem)
 
-    // Map Dependent Systems (Renderers)
-    let mapDependentComponents = new ResizeArray<IGameComponent>()
+    // 7. Spawn player at BlockMap spawn point
+    let playerPos =
+      BlockMapSpawning.findPlayerSpawnPosition blockMap
+      |> clampToMapBounds blockMap
 
-    let clearCurrentMapData() =
-      stateWriteService.RemoveEntity(playerId)
+    let playerIntent: SystemCommunications.SpawnEntityIntent = {
+      EntityId = playerId
+      ScenarioId = scenarioId
+      Type = SystemCommunications.SpawnType.Player 0
+      Position = playerPos
+    }
 
-    // Initialize WorldMapService
-    let worldMapService =
-      new Pomo.Core.Systems.WorldMapService.WorldMapService()
+    eventBus.Publish(GameEvent.Spawn(SpawningEvent.SpawnEntity playerIntent))
 
-    worldMapService.Initialize()
+    let mapKey = blockMap.MapKey |> ValueOption.defaultValue blockMap.Key
 
-    let spawnEntitiesForMap
-      (mapDef: Map.MapDefinition)
-      (spawnPlayerId: Guid<EntityId>)
-      (scenarioId: Guid<ScenarioId>)
-      (targetSpawn: string voption)
-      =
-      let maxEnemies = MapSpawning.getMaxEnemies mapDef
+    let mapEntityGroupStore =
+      let primary = MapSpawning.tryLoadMapEntityGroupStore mapKey
+      let proto = MapSpawning.tryLoadMapEntityGroupStore "Proto"
 
-      let mapEntityGroupStore =
-        MapSpawning.tryLoadMapEntityGroupStore mapDef.Key
+      match primary, proto with
+      | ValueSome p, ValueSome pr ->
+        let tryFindMerged groupName =
+          p.tryFind groupName
+          |> ValueOption.orElseWith(fun () -> pr.tryFind groupName)
 
-      // Generate NavGrid for spawn validation
-      let navGrid =
-        Algorithms.Pathfinding.Grid.generate
-          mapDef
-          BlockMap.CellSize
-          Navigation.EntitySize
+        ValueSome
+          { new MapEntityGroupStore with
+              member _.tryFind groupName = tryFindMerged groupName
 
-      let candidates = MapSpawning.extractSpawnCandidates mapDef navGrid random
+              member _.find groupName =
+                match tryFindMerged groupName with
+                | ValueSome g -> g
+                | ValueNone -> failwith $"MapEntityGroup not found: {groupName}"
 
-      let playerPos = MapSpawning.findPlayerSpawnPosition targetSpawn candidates
+              member _.all() = seq {
+                yield! p.all()
+                yield! pr.all()
+              }
+          }
+      | ValueSome p, ValueNone -> ValueSome p
+      | ValueNone, ValueSome pr -> ValueSome pr
+      | ValueNone, ValueNone -> ValueNone
 
-      // Spawn player
-      let playerIntent: SystemCommunications.SpawnEntityIntent = {
-        EntityId = spawnPlayerId
-        ScenarioId = scenarioId
-        Type = SystemCommunications.SpawnType.Player 0
-        Position = WorldPosition.fromVector2 playerPos
-      }
+    let candidates = BlockMapSpawning.extractSpawnCandidates blockMap
 
-      eventBus.Publish(GameEvent.Spawn(SpawningEvent.SpawnEntity playerIntent))
+    let maxEnemies =
+      candidates |> Array.sumBy(fun c -> if c.IsPlayerSpawn then 0 else 1)
 
-      // Spawn enemies using MapSpawning module
-      let spawnCtx: MapSpawning.SpawnContext = {
-        Random = random
-        MapEntityGroupStore = mapEntityGroupStore
-        EntityStore = stores.AIEntityStore
-        ScenarioId = scenarioId
-        MaxEnemies = maxEnemies
-      }
+    let spawnCtx: MapSpawning.SpawnContext = {
+      Random = random
+      MapEntityGroupStore = mapEntityGroupStore
+      EntityStore = stores.AIEntityStore
+      ScenarioId = scenarioId
+      MaxEnemies = maxEnemies
+    }
 
-      let publisher: MapSpawning.SpawnEventPublisher = {
-        RegisterZones =
-          fun zones ->
-            eventBus.Publish(GameEvent.Spawn(SpawningEvent.RegisterZones zones))
-        SpawnEntity =
-          fun entity ->
-            eventBus.Publish(GameEvent.Spawn(SpawningEvent.SpawnEntity entity))
-      }
+    let publisher: MapSpawning.SpawnEventPublisher = {
+      RegisterZones =
+        fun zones ->
+          eventBus.Publish(GameEvent.Spawn(SpawningEvent.RegisterZones zones))
+      SpawnEntity =
+        fun entity ->
+          eventBus.Publish(GameEvent.Spawn(SpawningEvent.SpawnEntity entity))
+    }
 
-      MapSpawning.spawnEnemiesForScenario spawnCtx candidates publisher
+    MapSpawning.spawnEnemiesForScenario spawnCtx candidates publisher
 
-    let loadMap (newMapKey: string) (targetSpawn: string voption) =
-      // Show loading overlay immediately
-      hudService.ShowLoadingOverlay()
+    // 8. RenderOrchestrator for BlockMap
+    let renderOrchestrator =
+      RenderOrchestrator.create(
+        game,
+        pomoEnv,
+        Rendering.BlockMap3D blockMap,
+        playerId,
+        Render.Layer.TerrainBase
+      )
 
-      let startTime = System.Diagnostics.Stopwatch.StartNew()
-
-      mapDependentComponents.Clear()
-      clearCurrentMapData()
-
-      let mapDef = stores.MapStore.find newMapKey
-
-      // Create Scenario
-      let scenarioId = Guid.NewGuid() |> UMX.tag<ScenarioId>
-
-      let scenario: World.Scenario = {
-        Id = scenarioId
-        Map = ValueSome mapDef
-        BlockMap = ValueNone
-      }
-
-      mutableWorld.Scenarios[scenarioId] <- scenario
-
-      let renderOrchestrator =
-        RenderOrchestrator.create(
-          game,
-          pomoEnv,
-          Rendering.TileMap mapDef,
-          playerId,
-          Render.Layer.TerrainBase
-        )
-
-      mapDependentComponents.Add(renderOrchestrator)
-
-      spawnEntitiesForMap mapDef playerId scenarioId targetSpawn
-
-      let elapsed = startTime.Elapsed
-      let minDuration = AssetPreloader.Constants.MinLoadingOverlayDuration
-
-      if elapsed < minDuration then
-        System.Threading.Thread.Sleep(minDuration - elapsed)
-
-      hudService.HideLoadingOverlay()
-
-    // UI for Gameplay (HUD)
     let mutable hudDesktop: Desktop voption = ValueNone
 
     let publishHudGuiAction(action: GuiAction) =
@@ -315,7 +311,7 @@ module GameplayScene =
       | GuiAction.OpenMapEditor
       | GuiAction.ExitGame -> ()
 
-    // 6. Setup Listeners (Subs)
+    // 9. Setup Listeners (Subs)
     let subs = new CompositeDisposable()
 
     // Bridge EventBus to SceneTransitionSubject
@@ -331,14 +327,11 @@ module GameplayScene =
 
     // Initialize Listeners
     subs.Add(actionHandler.StartListening())
-    subs.Add(navigationService.StartListening())
+    subs.Add(navigation3DService.StartListening())
     subs.Add(targetingService.StartListening())
     subs.Add(effectApplication.StartListening())
     subs.Add(inventoryService.StartListening())
     subs.Add(equipmentService.StartListening())
-
-    // Load initial map
-    loadMap initialMapKey initialTargetSpawn
 
     // Handle Portal Travel
     subs.Add(
@@ -356,7 +349,7 @@ module GameplayScene =
           ))
     )
 
-    // Create ad-hoc components for World Update and HUD
+    // 10. Create ad-hoc components for World Update and HUD
     let worldUpdateComponent =
       { new GameComponent(game) with
           override _.Update(gameTime) =
@@ -388,6 +381,7 @@ module GameplayScene =
                 publishHudGuiAction
 
             hudDesktop <- ValueSome(new Desktop(Root = root))
+            hudService.HideLoadingOverlay()
 
           override _.Draw(gameTime) =
             hudDesktop |> ValueOption.iter(fun d -> d.Render())
@@ -404,8 +398,9 @@ module GameplayScene =
     baseComponents.Add(worldUpdateComponent)
     baseComponents.Add(hudDrawComponent)
     baseComponents.Add(stateWriteFlushComponent)
+    baseComponents.Add(renderOrchestrator)
 
-    let allComponents = [ yield! baseComponents; yield! mapDependentComponents ]
+    let allComponents = [ yield! baseComponents ]
 
     let disposable =
       { new IDisposable with
@@ -416,13 +411,6 @@ module GameplayScene =
             // Dispose StateWriteService to return pooled array
             stateWriteService.Dispose()
             hudDesktop |> ValueOption.iter(fun d -> d.Dispose())
-            // Cleanup map dependent components
-            for c in mapDependentComponents do
-              match c with
-              | :? IDisposable as d -> d.Dispose()
-              | _ -> ()
-
-            mapDependentComponents.Clear()
       }
 
     struct (allComponents, disposable)
