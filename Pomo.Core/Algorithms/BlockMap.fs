@@ -14,6 +14,25 @@ module BlockMap =
   [<Literal>]
   let private VariantKeyCollisionEnabled = "Collision=On"
 
+  let inline private variantKeyParts(k: string) : Set<string> =
+    if System.String.IsNullOrWhiteSpace k then
+      Set.empty
+    else
+      k.Split(';', System.StringSplitOptions.RemoveEmptyEntries)
+      |> Array.map(fun p -> p.Trim())
+      |> Array.filter(fun p -> not(System.String.IsNullOrWhiteSpace p))
+      |> Set.ofArray
+
+  let inline private variantKeyFromParts(parts: Set<string>) : string voption =
+    if parts.IsEmpty then
+      ValueNone
+    else
+      parts
+      |> Set.toArray
+      |> Array.sort
+      |> fun xs -> System.String.Join(";", xs)
+      |> ValueSome
+
   let inline private tryGetArchetype
     (map: BlockMapDefinition)
     (archetypeId: int<BlockTypeId>)
@@ -25,6 +44,7 @@ module BlockMap =
     (archetypeId: int<BlockTypeId>)
     (variantKey: string)
     : int<BlockTypeId> voption =
+    let targetParts = variantKeyParts variantKey
     let mutable found = ValueNone
     use mutable e = palette.Values.GetEnumerator()
 
@@ -33,7 +53,8 @@ module BlockMap =
 
       if bt.ArchetypeId = archetypeId then
         match bt.VariantKey with
-        | ValueSome k when k = variantKey -> found <- ValueSome bt.Id
+        | ValueSome k when variantKeyParts k = targetParts ->
+          found <- ValueSome bt.Id
         | _ -> ()
 
     found
@@ -88,6 +109,11 @@ module BlockMap =
           ValueSome newId))
 
   /// Gets or creates a variant with a specific effect.
+  ///
+  /// If the provided block type is already a variant, this function keeps the
+  /// variant's existing behavior flags (e.g., collision enabled) when layering
+  /// the effect. Concretely, calling this with a collision-enabled variant will
+  /// produce (or reuse) an effect variant that remains collision-enabled.
   let getOrCreateEffectVariant
     (map: BlockMapDefinition)
     (baseId: int<BlockTypeId>)
@@ -99,24 +125,22 @@ module BlockMap =
       // If the input is already a variant, use its ArchetypeId
       let rootArchetypeId = startBlock.ArchetypeId
 
-      // Construct the variant key based on existing properties + new effect
-      // We need to preserve "Collision=On" if it's present
-      let hasCollision =
+      let existingParts =
         match startBlock.VariantKey with
-        | ValueSome k when k.Contains(VariantKeyCollisionEnabled) -> true
-        | _ -> false
+        | ValueSome k -> variantKeyParts k
+        | ValueNone -> Set.empty
 
-      let effectKey =
+      let partsWithoutEffect =
+        existingParts
+        |> Set.filter(fun p ->
+          not(p.StartsWith("Effect=", System.StringComparison.Ordinal)))
+
+      let newParts =
         match effect with
-        | ValueSome e -> ValueSome $"Effect={e.Name}"
-        | ValueNone -> ValueNone
+        | ValueSome e -> partsWithoutEffect.Add $"Effect={e.Name}"
+        | ValueNone -> partsWithoutEffect
 
-      let newVariantKey =
-        match hasCollision, effectKey with
-        | true, ValueNone -> ValueSome VariantKeyCollisionEnabled
-        | true, ValueSome e -> ValueSome $"{VariantKeyCollisionEnabled};{e}"
-        | false, ValueNone -> ValueNone // Back to base archetype
-        | false, ValueSome e -> ValueSome e
+      let newVariantKey = variantKeyFromParts newParts
 
       match newVariantKey with
       | ValueNone -> ValueSome rootArchetypeId

@@ -107,6 +107,8 @@ module EditorUI =
             match newId with
             | ValueSome id -> state.SelectedBlockType.Value <- ValueSome id
             | ValueNone -> ()
+
+            state.BlockMap.Value <- { map with Version = map.Version + 1 }
           | ValueNone -> ()))
 
     let effectLavaBtn =

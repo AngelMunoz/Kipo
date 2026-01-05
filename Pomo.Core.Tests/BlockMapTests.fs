@@ -342,3 +342,69 @@ type ArchetypeVariantTests() =
     let block2 = normalized2.Palette.[%5]
 
     Assert.AreEqual(block1.ArchetypeId, block2.ArchetypeId)
+
+  [<TestMethod>]
+  member _.``getOrCreateEffectVariant reuses existing variant regardless of key order``
+    ()
+    =
+    let map = BlockMap.createEmpty "test" 10 5 10
+    let archetype = BlockMapTestHelpers.createArchetype 1 "Lava"
+    map.Palette.Add(archetype.Id, archetype)
+
+    let collisionVariantId =
+      match BlockMap.getOrCreateVariantId map archetype.Id true with
+      | ValueSome id -> id
+      | ValueNone -> failwith "Expected collision variant"
+
+    let effect = BlockMapTestHelpers.createTestEffect "Burn"
+    let effectVariantId: int<BlockTypeId> = %99
+
+    let preexistingEffectVariant: BlockType = {
+      map.Palette.[collisionVariantId] with
+          Id = effectVariantId
+          ArchetypeId = archetype.Id
+          VariantKey = ValueSome "Effect=Burn;Collision=On"
+          CollisionType = Box
+          Effect = ValueSome effect
+    }
+
+    map.Palette.Add(effectVariantId, preexistingEffectVariant)
+
+    let result =
+      BlockMap.getOrCreateEffectVariant
+        map
+        collisionVariantId
+        (ValueSome effect)
+
+    Assert.AreEqual(ValueSome effectVariantId, result)
+    Assert.AreEqual(3, map.Palette.Count)
+
+  [<TestMethod>]
+  member _.``getOrCreateEffectVariant clearing effect preserves collision variant``
+    ()
+    =
+    let map = BlockMap.createEmpty "test" 10 5 10
+    let archetype = BlockMapTestHelpers.createArchetype 1 "Lava"
+    map.Palette.Add(archetype.Id, archetype)
+
+    let collisionVariantId =
+      match BlockMap.getOrCreateVariantId map archetype.Id true with
+      | ValueSome id -> id
+      | ValueNone -> failwith "Expected collision variant"
+
+    let effect = BlockMapTestHelpers.createTestEffect "Burn"
+
+    let effectVariantId =
+      match
+        BlockMap.getOrCreateEffectVariant
+          map
+          collisionVariantId
+          (ValueSome effect)
+      with
+      | ValueSome id -> id
+      | ValueNone -> failwith "Expected effect variant"
+
+    let cleared =
+      BlockMap.getOrCreateEffectVariant map effectVariantId ValueNone
+
+    Assert.AreEqual(ValueSome collisionVariantId, cleared)

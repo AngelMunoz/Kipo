@@ -60,15 +60,10 @@ module Movement =
     =
     match duration with
     | Duration.Permanent
-    | Duration.PermanentLoop _ -> false // Infinite duration, no need to refresh active effect
-    | _ ->
-      // Timed/Loop: Check if expiring soon (< 0.5s)
-      let d =
-        match duration with
-        | Duration.Timed d -> d
-        | Duration.Loop(_, d) -> d
-        | _ -> TimeSpan.MaxValue // Should be covered above
-
+    | Duration.PermanentLoop _ -> false // Infinite duration effects don't need to be re-applied
+    | Duration.Instant -> true
+    | Duration.Timed d
+    | Duration.Loop(_, d) ->
       let elapsed = totalTime - activeEffect.StartTime
       let remaining = d - elapsed
       remaining.TotalSeconds < 0.5
@@ -91,7 +86,6 @@ module Movement =
 
     effect
     |> ValueOption.iter(fun e ->
-      // Smart Debounce: Check if effect is already active and valid
       let shouldApply =
         activeEffects
         |> HashMap.tryFindV id
@@ -104,7 +98,7 @@ module Movement =
             core.World.Time |> AVal.map _.TotalGameTime |> AVal.force
 
           shouldRefreshEffect totalTime e.Duration activeEffect)
-        |> ValueOption.defaultValue true // Effect not present or no effects on entity
+        |> ValueOption.defaultValue true
 
       if shouldApply then
         let intent: SystemCommunications.EffectApplicationIntent = {
