@@ -58,14 +58,23 @@ module Pathfinding3D =
       isWalkableWithHeight grid grid.CellSize cell
 
     /// XZ movement directions (same Y level)
-    let private directions = [|
+    /// Cardinals + Diagonals for smooth corner navigation
+    let private cardinalDirections = [|
       struct (1, 0)
       struct (-1, 0)
       struct (0, 1)
       struct (0, -1)
     |]
 
+    let private diagonalDirections = [|
+      struct (1, 1)
+      struct (1, -1)
+      struct (-1, 1)
+      struct (-1, -1)
+    |]
+
     /// Get walkable neighbors into provided ResizeArray (avoids allocation)
+    /// Includes diagonals with corner-cutting prevention
     let getNeighborsIntoWithHeight
       (grid: NavGrid3D)
       (entityHeight: float32)
@@ -74,7 +83,8 @@ module Pathfinding3D =
       =
       results.Clear()
 
-      for struct (dx, dz) in directions do
+      // Cardinal directions - always check
+      for struct (dx, dz) in cardinalDirections do
         let neighbor = {
           X = cell.X + dx
           Y = cell.Y
@@ -82,6 +92,28 @@ module Pathfinding3D =
         }
 
         if isWalkableWithHeight grid entityHeight neighbor then
+          results.Add neighbor
+
+      // Diagonal directions - only if adjacent cardinals are walkable
+      // This prevents corner-cutting through walls
+      for struct (dx, dz) in diagonalDirections do
+        let neighbor = {
+          X = cell.X + dx
+          Y = cell.Y
+          Z = cell.Z + dz
+        }
+
+        // Check adjacent cardinal cells to prevent cutting corners
+        let adjX = { cell with X = cell.X + dx }
+        let adjZ = { cell with Z = cell.Z + dz }
+
+        let canMoveDiagonally =
+          isWalkableWithHeight grid entityHeight adjX
+          && isWalkableWithHeight grid entityHeight adjZ
+
+        if
+          canMoveDiagonally && isWalkableWithHeight grid entityHeight neighbor
+        then
           results.Add neighbor
 
     let getNeighborsInto

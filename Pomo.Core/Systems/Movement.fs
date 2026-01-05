@@ -8,6 +8,10 @@ open FSharp.Data.Adaptive
 
 open Pomo.Core
 open Pomo.Core.Domain.Events
+open Pomo.Core.Domain.Core
+open Pomo.Core.Domain.Core.Constants
+open Pomo.Core.Domain.BlockMap
+open Pomo.Core.Algorithms
 open Pomo.Core.Systems.Systems
 
 
@@ -27,13 +31,52 @@ module Movement =
 
     override this.Update _ =
       let scenarios = core.World.Scenarios |> AMap.force
+      let liveProjectiles = core.World.LiveProjectiles |> AMap.force
 
-      for scenarioId, _ in scenarios do
+      for scenarioId, scenario in scenarios do
         let snapshot =
           gameplay.Projections.ComputeMovement3DSnapshot(scenarioId)
 
-        for KeyValue(id, newPosition) in snapshot.Positions do
-          stateWrite.UpdatePosition(id, newPosition)
+        for KeyValue(id, proposedPos) in snapshot.Positions do
+          // Projectiles handle their own physics - pass through unchanged
+          let isProjectile = liveProjectiles |> HashMap.containsKey id
+
+          let finalPos =
+            if isProjectile then
+              // Projectile: no grounding, preserve Y
+              proposedPos
+            else
+              // Ground entity: apply block collision with grounding
+              match scenario.BlockMap with
+              | ValueSome blockMap ->
+                // Get the committed position to calculate proper collision
+                let startPos =
+                  core.World.Positions
+                  |> Dictionary.tryFindV id
+                  |> ValueOption.defaultValue proposedPos
+
+                let velocity =
+                  core.World.Velocities
+                  |> Dictionary.tryFindV id
+                  |> ValueOption.defaultValue Vector2.Zero
+
+                if velocity <> Vector2.Zero then
+                  let dt =
+                    core.World.Time
+                    |> AVal.force
+                    |> fun t -> float32 t.Delta.TotalSeconds
+
+                  BlockCollision.applyCollision
+                    blockMap
+                    startPos
+                    velocity
+                    dt
+                    BlockMap.CellSize
+                else
+                  proposedPos
+              | ValueNone -> proposedPos
+
+          stateWrite.UpdatePosition(id, finalPos)
 
         for KeyValue(id, newRotation) in snapshot.Rotations do
           stateWrite.UpdateRotation(id, newRotation)
