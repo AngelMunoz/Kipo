@@ -14,6 +14,13 @@
 - Avoid aggressive refactors; always do small, methodical, incremental, and verifiable changes
 - If working on an implementation that is part of the current plan (either outlined in the current `gh` cli pulled issue or by the user prompt), always update the corresponding document to reflect the current progress
 
+**IMPORTANT**: ALWAYS present the investigation and analysis of the issue before presenting the solution.
+
+- Ask the right questions to get the context of the issue.
+- Do not assume things, research the code, trace the workflow and understand the context before presenting the solution.
+- Do not present bandaids or half-baked solutions, always provide a sensible solution.
+- IF you are unable to present a good solution, it is all right to say you are unable to do so, present your hypothesis and ask the user to handle the situation.
+
 **IMPORTANT**: You can find suplementary guidelines and conventions in the `.agents` folder in the project root. See [./.agents/README.md](./.agents/README.md) for details.
 
 ## 🤖 PROGRAMMING PARADIGM HIERARCHY 🤖
