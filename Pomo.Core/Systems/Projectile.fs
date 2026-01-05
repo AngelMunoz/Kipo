@@ -233,7 +233,7 @@ module Projectile =
     let pos2d = WorldPosition.toVector2 ctx.Position
     let target2d = WorldPosition.toVector2 ctx.TargetPosition
     let distance = Vector2.Distance(pos2d, target2d)
-    let threshold = 4.0f
+    let threshold = Constants.Projectile.ArrivalThreshold
 
     if distance < threshold then
       handleHorizontalImpact stateWrite world ctx

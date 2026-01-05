@@ -42,12 +42,15 @@ module UnitMovement =
       let movementStates = movementStates |> AMap.force
       let derivedStats = derivedStats |> AMap.force
 
-      for (scenarioId, _) in scenarios do
+      let liveProjectiles =
+        core.World.LiveProjectiles |> AMap.keys |> ASet.force
+
+      for scenarioId, _ in scenarios do
         let snapshot =
           gameplay.Projections.ComputeMovement3DSnapshot(scenarioId)
 
         for KeyValue(entityId, currentPos) in snapshot.Positions do
-          if entityId <> playerId then
+          if entityId <> playerId && not(liveProjectiles.Contains entityId) then
             match movementStates.TryFindV entityId with
             | ValueSome state ->
               let speed =
