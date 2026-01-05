@@ -81,8 +81,9 @@ module Collision =
 
           for otherId in nearbyEntities do
             if entityId <> otherId then
-              match positions |> Dictionary.tryFindV otherId with
-              | ValueSome otherPos ->
+              positions
+              |> Dictionary.tryFindV otherId
+              |> ValueOption.iter(fun otherPos ->
                 let dx = pos.X - otherPos.X
                 let dz = pos.Z - otherPos.Z
                 let distanceXZ = sqrt(dx * dx + dz * dz)
@@ -93,5 +94,4 @@ module Collision =
                       SystemCommunications.EntityCollision
                         struct (entityId, otherId)
                     )
-                  )
-              | ValueNone -> ()
+                  ))

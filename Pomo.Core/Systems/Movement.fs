@@ -19,6 +19,38 @@ module Movement =
 
   open Pomo.Core.Environment
   open Pomo.Core.Environment.Patterns
+  open Pomo.Core.Domain
+
+  let calculateFinalPosition
+    (world: World.World)
+    (blockMap: BlockMapDefinition)
+    (id: Guid<Units.EntityId>)
+    (proposedPos: WorldPosition)
+    (dt: float32)
+    : WorldPosition =
+    // Get the committed position to calculate proper collision
+    let startPos =
+      world.Positions
+      |> Dictionary.tryFindV id
+      |> ValueOption.defaultValue proposedPos
+
+    let velocity =
+      world.Velocities
+      |> Dictionary.tryFindV id
+      |> ValueOption.defaultValue Vector3.Zero
+
+    if velocity <> Vector3.Zero then
+      // Extract XZ for block collision (ground movement)
+      let velocity2D = Vector2(velocity.X, velocity.Z)
+
+      BlockCollision.applyCollision
+        blockMap
+        startPos
+        velocity2D
+        dt
+        BlockMap.CellSize
+    else
+      proposedPos
 
   type MovementSystem(game: Game, env: PomoEnvironment) =
     inherit GameSystem(game)
@@ -49,34 +81,12 @@ module Movement =
               // Ground entity: apply block collision with grounding
               match scenario.BlockMap with
               | ValueSome blockMap ->
-                // Get the committed position to calculate proper collision
-                let startPos =
-                  core.World.Positions
-                  |> Dictionary.tryFindV id
-                  |> ValueOption.defaultValue proposedPos
+                let dt =
+                  core.World.Time
+                  |> AVal.force
+                  |> fun t -> float32 t.Delta.TotalSeconds
 
-                let velocity =
-                  core.World.Velocities
-                  |> Dictionary.tryFindV id
-                  |> ValueOption.defaultValue Vector3.Zero
-
-                if velocity <> Vector3.Zero then
-                  let dt =
-                    core.World.Time
-                    |> AVal.force
-                    |> fun t -> float32 t.Delta.TotalSeconds
-
-                  // Extract XZ for block collision (ground movement)
-                  let velocity2D = Vector2(velocity.X, velocity.Z)
-
-                  BlockCollision.applyCollision
-                    blockMap
-                    startPos
-                    velocity2D
-                    dt
-                    BlockMap.CellSize
-                else
-                  proposedPos
+                calculateFinalPosition core.World blockMap id proposedPos dt
               | ValueNone -> proposedPos
 
           stateWrite.UpdatePosition(id, finalPos)
