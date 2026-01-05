@@ -476,17 +476,17 @@ module Projections =
         | ValueSome sId when sId = scenarioId ->
           let currentPos =
             match velocities |> Dictionary.tryFindV id with
-            | ValueSome v ->
+            | ValueSome v when v <> Vector2.Zero ->
               match blockMap with
               | ValueSome map ->
-                BlockCollision.applyCollision map startPos v dt 1.0f
+                BlockCollision.applyCollision map startPos v dt BlockMap.CellSize
               | ValueNone ->
                   {
                     WorldPosition.X = startPos.X + v.X * dt
                     Y = startPos.Y
                     Z = startPos.Z + v.Y * dt
                   }
-            | ValueNone -> startPos
+            | _ -> startPos
 
           positionsBuilder[id] <- currentPos
 

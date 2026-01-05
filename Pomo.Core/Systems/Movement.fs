@@ -29,7 +29,8 @@ module Movement =
       let scenarios = core.World.Scenarios |> AMap.force
 
       for scenarioId, _ in scenarios do
-        let snapshot = gameplay.Projections.ComputeMovementSnapshot(scenarioId)
+        let snapshot =
+          gameplay.Projections.ComputeMovement3DSnapshot(scenarioId)
 
         for KeyValue(id, newPosition) in snapshot.Positions do
           stateWrite.UpdatePosition(id, newPosition)

@@ -42,35 +42,20 @@ module Pathfinding3D =
       && cell.Z >= 0
       && cell.Z < map.Depth
 
-    let inline private isCellFree (map: BlockMapDefinition) (cell: GridCell3D) =
-      map.Blocks
-      |> Dictionary.tryFindV cell
-      |> ValueOption.bind(fun block ->
-        map.Palette |> Dictionary.tryFindV block.BlockTypeId)
-      |> ValueOption.map(fun blockType -> blockType.CollisionType.IsNoCollision)
-      |> ValueOption.defaultValue true
-
-    let inline private hasFloorBelow
-      (map: BlockMapDefinition)
+    let isWalkableWithHeight
+      (grid: NavGrid3D)
+      (entityHeight: float32)
       (cell: GridCell3D)
-      =
-      if cell.Y = 0 then
-        true
-      else
-        let belowCell = { cell with Y = cell.Y - 1 }
+      : bool =
+      isInBounds grid.BlockMap cell
+      && Spatial3D.canStandInCellWithConfig
+        ValueNone
+        grid.BlockMap
+        cell
+        entityHeight
 
-        map.Blocks
-        |> Dictionary.tryFindV belowCell
-        |> ValueOption.bind(fun block ->
-          map.Palette |> Dictionary.tryFindV block.BlockTypeId)
-        |> ValueOption.map(fun blockType ->
-          blockType.CollisionType.IsBox || blockType.CollisionType.IsMesh)
-        |> ValueOption.defaultValue false
-
-    /// Check if cell is walkable: empty or NoCollision, with solid floor below
     let isWalkable (grid: NavGrid3D) (cell: GridCell3D) : bool =
-      let map = grid.BlockMap
-      isInBounds map cell && isCellFree map cell && hasFloorBelow map cell
+      isWalkableWithHeight grid grid.CellSize cell
 
     /// XZ movement directions (same Y level)
     let private directions = [|
@@ -81,8 +66,9 @@ module Pathfinding3D =
     |]
 
     /// Get walkable neighbors into provided ResizeArray (avoids allocation)
-    let getNeighborsInto
+    let getNeighborsIntoWithHeight
       (grid: NavGrid3D)
+      (entityHeight: float32)
       (cell: GridCell3D)
       (results: ResizeArray<GridCell3D>)
       =
@@ -95,20 +81,15 @@ module Pathfinding3D =
           Z = cell.Z + dz
         }
 
-        if isWalkable grid neighbor then
+        if isWalkableWithHeight grid entityHeight neighbor then
           results.Add neighbor
-        else
-          // Check if can step up
-          let upNeighbor = { neighbor with Y = neighbor.Y + 1 }
 
-          if isWalkable grid upNeighbor then
-            results.Add upNeighbor
-
-          // Check if can step down
-          let downNeighbor = { neighbor with Y = neighbor.Y - 1 }
-
-          if downNeighbor.Y >= 0 && isWalkable grid downNeighbor then
-            results.Add downNeighbor
+    let getNeighborsInto
+      (grid: NavGrid3D)
+      (cell: GridCell3D)
+      (results: ResizeArray<GridCell3D>)
+      =
+      getNeighborsIntoWithHeight grid grid.CellSize cell results
 
   module AStar =
 
@@ -119,9 +100,58 @@ module Pathfinding3D =
       let dz = float32(abs(a.Z - b.Z))
       sqrt(dx * dx + dy * dy + dz * dz)
 
-    /// A* pathfinding in 3D
-    let findPath
+    let hasLineOfSightWithHeight
       (grid: NavGrid3D)
+      (entityHeight: float32)
+      (startPos: WorldPosition)
+      (endPos: WorldPosition)
+      : bool =
+      Spatial3D.canTraverseWithConfig
+        ValueNone
+        grid.BlockMap
+        startPos
+        endPos
+        entityHeight
+        grid.CellSize
+
+    let hasLineOfSight
+      (grid: NavGrid3D)
+      (startPos: WorldPosition)
+      (endPos: WorldPosition)
+      : bool =
+      hasLineOfSightWithHeight grid grid.CellSize startPos endPos
+
+    /// Smooth path by removing intermediate waypoints when there's line of sight
+    let private smoothPath
+      (grid: NavGrid3D)
+      (entityHeight: float32)
+      (path: WorldPosition[])
+      =
+      if path.Length <= 2 then
+        path
+      else
+        let result = ResizeArray<WorldPosition>()
+        result.Add path[0]
+        let mutable current = 0
+
+        while current < path.Length - 1 do
+          let mutable farthest = current + 1
+
+          for i = current + 2 to path.Length - 1 do
+            if
+              hasLineOfSightWithHeight grid entityHeight path[current] path[i]
+            then
+              farthest <- i
+
+          result.Add path[farthest]
+          current <- farthest
+
+        result.ToArray()
+
+    /// A* pathfinding in 3D
+    let findPathWithHeight
+      (grid: NavGrid3D)
+      (entityHeight: float32)
       (startPos: WorldPosition)
       (endPos: WorldPosition)
       : WorldPosition[] voption =
@@ -130,7 +160,8 @@ module Pathfinding3D =
       let endCell = Grid.worldToCell grid endPos
 
       if
-        not(Grid.isWalkable grid startCell) || not(Grid.isWalkable grid endCell)
+        not(Grid.isWalkableWithHeight grid entityHeight startCell)
+        || not(Grid.isWalkableWithHeight grid entityHeight endCell)
       then
         ValueNone
       else
@@ -153,7 +184,7 @@ module Pathfinding3D =
           if current = endCell then
             found <- true
           else
-            Grid.getNeighborsInto grid current neighbors
+            Grid.getNeighborsIntoWithHeight grid entityHeight current neighbors
 
             for neighbor in neighbors do
               let tentativeG =
@@ -185,43 +216,17 @@ module Pathfinding3D =
           path.Reverse()
 
           if path.Count > 0 then
-            ValueSome(path.ToArray())
+            let rawPath = path.ToArray()
+            let smoothed = smoothPath grid entityHeight rawPath
+            ValueSome smoothed
           else
             ValueNone
         else
           ValueNone
 
-    /// Check line of sight between two positions (simple grid raycast)
-    let hasLineOfSight
+    let findPath
       (grid: NavGrid3D)
       (startPos: WorldPosition)
       (endPos: WorldPosition)
-      : bool =
-      let startCell = Grid.worldToCell grid startPos
-      let endCell = Grid.worldToCell grid endPos
-      let dx = endCell.X - startCell.X
-      let dy = endCell.Y - startCell.Y
-      let dz = endCell.Z - startCell.Z
-      let steps = max (max (abs dx) (abs dy)) (abs dz)
-
-      if steps = 0 then
-        true
-      else
-        let mutable blocked = false
-        let mutable i = 1
-
-        while i <= steps && not blocked do
-          let t = float32 i / float32 steps
-
-          let cell: GridCell3D = {
-            X = startCell.X + int(float32 dx * t)
-            Y = startCell.Y + int(float32 dy * t)
-            Z = startCell.Z + int(float32 dz * t)
-          }
-
-          if not(Grid.isWalkable grid cell) then
-            blocked <- true
-
-          i <- i + 1
-
-        not blocked
+      : WorldPosition[] voption =
+      findPathWithHeight grid grid.CellSize startPos endPos

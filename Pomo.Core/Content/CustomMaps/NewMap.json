@@ -1,5 +1,5 @@
 {
-  "Version": 1,
+  "Version": 696,
   "Key": "NewMap",
   "MapKey": "NewMap",
   "Width": 32,
@@ -13,6 +13,26 @@
       "Category": "Basic",
       "CollisionType": {
         "Type": "Box"
+      },
+      "Effect": {
+        "Name": "Lava",
+        "Kind": "DamageOverTime",
+        "DamageSource": "Magical",
+        "Stacking": {
+          "Type": "RefreshDuration"
+        },
+        "Duration": {
+          "Type": "Loop",
+          "Interval": 1,
+          "Duration": 5
+        },
+        "Modifiers": [
+          {
+            "Type": "ResourceChange",
+            "Resource": "HP",
+            "Amount": "(0 - 10)"
+          }
+        ]
       }
     },
     "2": {
@@ -78,26 +98,6 @@
       "Category": "Basic",
       "CollisionType": {
         "Type": "Box"
-      },
-      "Effect": {
-        "Name": "Lava",
-        "Kind": "DamageOverTime",
-        "DamageSource": "Magical",
-        "Stacking": {
-          "Type": "RefreshDuration"
-        },
-        "Duration": {
-          "Type": "Loop",
-          "Interval": 1,
-          "Duration": 5
-        },
-        "Modifiers": [
-          {
-            "Type": "ResourceChange",
-            "Resource": "HP",
-            "Amount": "(0 - 10)"
-          }
-        ]
       }
     },
     "7": {
@@ -109,17 +109,6 @@
       "Category": "Basic",
       "CollisionType": {
         "Type": "Box"
-      }
-    },
-    "8": {
-      "Id": 8,
-      "ArchetypeId": 6,
-      "VariantKey": "Collision=On",
-      "Name": "Dark Stone",
-      "Model": "Tiles/kaykit_blocks/stone_dark",
-      "Category": "Basic",
-      "CollisionType": {
-        "Type": "Box"
       },
       "Effect": {
         "Name": "Lava",
@@ -142,12 +131,34 @@
         ]
       }
     },
+    "8": {
+      "Id": 8,
+      "ArchetypeId": 6,
+      "VariantKey": "Collision=On",
+      "Name": "Dark Stone",
+      "Model": "Tiles/kaykit_blocks/stone_dark",
+      "Category": "Basic",
+      "CollisionType": {
+        "Type": "Box"
+      }
+    },
     "9": {
       "Id": 9,
       "ArchetypeId": 2,
       "VariantKey": "Collision=On",
       "Name": "Dirt",
       "Model": "Tiles/kaykit_blocks/dirt",
+      "Category": "Basic",
+      "CollisionType": {
+        "Type": "Box"
+      }
+    },
+    "10": {
+      "Id": 10,
+      "ArchetypeId": 5,
+      "VariantKey": "Collision=On",
+      "Name": "Wood",
+      "Model": "Tiles/kaykit_blocks/wood",
       "Category": "Basic",
       "CollisionType": {
         "Type": "Box"
@@ -4273,7 +4284,7 @@
         "Y": 0,
         "Z": 22
       },
-      "BlockTypeId": 6
+      "BlockTypeId": 2
     },
     {
       "Cell": {
@@ -4553,7 +4564,7 @@
         "Y": 0,
         "Z": 24
       },
-      "BlockTypeId": 6
+      "BlockTypeId": 2
     },
     {
       "Cell": {
@@ -4569,7 +4580,7 @@
         "Y": 0,
         "Z": 23
       },
-      "BlockTypeId": 1
+      "BlockTypeId": 2
     },
     {
       "Cell": {
@@ -4577,7 +4588,7 @@
         "Y": 0,
         "Z": 24
       },
-      "BlockTypeId": 6
+      "BlockTypeId": 2
     },
     {
       "Cell": {
@@ -5217,7 +5228,7 @@
         "Y": 0,
         "Z": 23
       },
-      "BlockTypeId": 6
+      "BlockTypeId": 2
     },
     {
       "Cell": {
@@ -5225,7 +5236,7 @@
         "Y": 0,
         "Z": 23
       },
-      "BlockTypeId": 6
+      "BlockTypeId": 2
     },
     {
       "Cell": {
@@ -5249,7 +5260,7 @@
         "Y": 0,
         "Z": 24
       },
-      "BlockTypeId": 6
+      "BlockTypeId": 2
     },
     {
       "Cell": {
@@ -5257,7 +5268,7 @@
         "Y": 0,
         "Z": 23
       },
-      "BlockTypeId": 6
+      "BlockTypeId": 2
     },
     {
       "Cell": {
@@ -5273,7 +5284,7 @@
         "Y": 0,
         "Z": 21
       },
-      "BlockTypeId": 3
+      "BlockTypeId": 8
     },
     {
       "Cell": {
@@ -5305,7 +5316,7 @@
         "Y": 0,
         "Z": 21
       },
-      "BlockTypeId": 6
+      "BlockTypeId": 2
     },
     {
       "Cell": {
@@ -5321,7 +5332,7 @@
         "Y": 0,
         "Z": 22
       },
-      "BlockTypeId": 6
+      "BlockTypeId": 2
     },
     {
       "Cell": {
@@ -6409,7 +6420,7 @@
         "Y": 0,
         "Z": 21
       },
-      "BlockTypeId": 6
+      "BlockTypeId": 2
     },
     {
       "Cell": {
@@ -6433,7 +6444,7 @@
         "Y": 0,
         "Z": 19
       },
-      "BlockTypeId": 6
+      "BlockTypeId": 8
     },
     {
       "Cell": {
@@ -6441,7 +6452,7 @@
         "Y": 0,
         "Z": 20
       },
-      "BlockTypeId": 6
+      "BlockTypeId": 8
     },
     {
       "Cell": {
@@ -7225,7 +7236,7 @@
         "Y": 0,
         "Z": 19
       },
-      "BlockTypeId": 4
+      "BlockTypeId": 8
     },
     {
       "Cell": {
@@ -7233,7 +7244,7 @@
         "Y": 0,
         "Z": 20
       },
-      "BlockTypeId": 4
+      "BlockTypeId": 8
     },
     {
       "Cell": {
@@ -7241,7 +7252,7 @@
         "Y": 0,
         "Z": 21
       },
-      "BlockTypeId": 3
+      "BlockTypeId": 8
     },
     {
       "Cell": {
@@ -7249,7 +7260,7 @@
         "Y": 0,
         "Z": 19
       },
-      "BlockTypeId": 4
+      "BlockTypeId": 8
     },
     {
       "Cell": {
@@ -7265,7 +7276,7 @@
         "Y": 0,
         "Z": 20
       },
-      "BlockTypeId": 4
+      "BlockTypeId": 8
     },
     {
       "Cell": {
@@ -8097,7 +8108,7 @@
         "Y": 0,
         "Z": 20
       },
-      "BlockTypeId": 4
+      "BlockTypeId": 8
     },
     {
       "Cell": {
@@ -8105,7 +8116,7 @@
         "Y": 0,
         "Z": 19
       },
-      "BlockTypeId": 4
+      "BlockTypeId": 8
     },
     {
       "Cell": {
@@ -8113,7 +8124,7 @@
         "Y": 0,
         "Z": 21
       },
-      "BlockTypeId": 3
+      "BlockTypeId": 8
     },
     {
       "Cell": {
@@ -8189,739 +8200,131 @@
     },
     {
       "Cell": {
-        "X": 0,
+        "X": 6,
         "Y": 1,
-        "Z": 12
+        "Z": 17
       },
-      "BlockTypeId": 5
+      "BlockTypeId": 10
     },
     {
       "Cell": {
-        "X": 1,
+        "X": 21,
         "Y": 1,
         "Z": 12
       },
-      "BlockTypeId": 5
+      "BlockTypeId": 7
     },
     {
       "Cell": {
-        "X": 2,
+        "X": 21,
         "Y": 1,
-        "Z": 12
+        "Z": 16
       },
-      "BlockTypeId": 5
+      "BlockTypeId": 7
     },
     {
       "Cell": {
-        "X": 3,
+        "X": 21,
         "Y": 1,
-        "Z": 12
+        "Z": 14
       },
-      "BlockTypeId": 5
-    },
-    {
-      "Cell": {
-        "X": 4,
-        "Y": 1,
-        "Z": 12
-      },
-      "BlockTypeId": 5
-    },
-    {
-      "Cell": {
-        "X": 5,
-        "Y": 1,
-        "Z": 12
-      },
-      "BlockTypeId": 5
+      "BlockTypeId": 7
     },
     {
       "Cell": {
         "X": 6,
         "Y": 1,
-        "Z": 12
+        "Z": 13
       },
-      "BlockTypeId": 5
+      "BlockTypeId": 10
     },
     {
       "Cell": {
-        "X": 7,
+        "X": 21,
         "Y": 1,
-        "Z": 12
+        "Z": 13
       },
-      "BlockTypeId": 5
+      "BlockTypeId": 7
     },
     {
       "Cell": {
-        "X": 8,
+        "X": 21,
         "Y": 1,
-        "Z": 12
+        "Z": 15
       },
-      "BlockTypeId": 5
+      "BlockTypeId": 7
     },
     {
       "Cell": {
-        "X": 26,
+        "X": 9,
         "Y": 1,
-        "Z": 12
+        "Z": 13
       },
-      "BlockTypeId": 5
-    },
-    {
-      "Cell": {
-        "X": 26,
-        "Y": 1,
-        "Z": 11
-      },
-      "BlockTypeId": 5
-    },
-    {
-      "Cell": {
-        "X": 27,
-        "Y": 1,
-        "Z": 11
-      },
-      "BlockTypeId": 5
-    },
-    {
-      "Cell": {
-        "X": 28,
-        "Y": 1,
-        "Z": 11
-      },
-      "BlockTypeId": 5
-    },
-    {
-      "Cell": {
-        "X": 29,
-        "Y": 1,
-        "Z": 11
-      },
-      "BlockTypeId": 5
-    },
-    {
-      "Cell": {
-        "X": 30,
-        "Y": 1,
-        "Z": 11
-      },
-      "BlockTypeId": 5
-    },
-    {
-      "Cell": {
-        "X": 31,
-        "Y": 1,
-        "Z": 11
-      },
-      "BlockTypeId": 5
-    },
-    {
-      "Cell": {
-        "X": 15,
-        "Y": 1,
-        "Z": 31
-      },
-      "BlockTypeId": 5
-    },
-    {
-      "Cell": {
-        "X": 15,
-        "Y": 1,
-        "Z": 30
-      },
-      "BlockTypeId": 5
-    },
-    {
-      "Cell": {
-        "X": 15,
-        "Y": 1,
-        "Z": 29
-      },
-      "BlockTypeId": 5
-    },
-    {
-      "Cell": {
-        "X": 16,
-        "Y": 1,
-        "Z": 29
-      },
-      "BlockTypeId": 5
-    },
-    {
-      "Cell": {
-        "X": 16,
-        "Y": 1,
-        "Z": 28
-      },
-      "BlockTypeId": 5
-    },
-    {
-      "Cell": {
-        "X": 15,
-        "Y": 1,
-        "Z": 28
-      },
-      "BlockTypeId": 5
-    },
-    {
-      "Cell": {
-        "X": 15,
-        "Y": 1,
-        "Z": 27
-      },
-      "BlockTypeId": 5
-    },
-    {
-      "Cell": {
-        "X": 16,
-        "Y": 1,
-        "Z": 27
-      },
-      "BlockTypeId": 5
-    },
-    {
-      "Cell": {
-        "X": 16,
-        "Y": 1,
-        "Z": 26
-      },
-      "BlockTypeId": 5
-    },
-    {
-      "Cell": {
-        "X": 16,
-        "Y": 1,
-        "Z": 6
-      },
-      "BlockTypeId": 5
-    },
-    {
-      "Cell": {
-        "X": 16,
-        "Y": 1,
-        "Z": 5
-      },
-      "BlockTypeId": 5
-    },
-    {
-      "Cell": {
-        "X": 15,
-        "Y": 1,
-        "Z": 5
-      },
-      "BlockTypeId": 5
-    },
-    {
-      "Cell": {
-        "X": 15,
-        "Y": 1,
-        "Z": 4
-      },
-      "BlockTypeId": 5
-    },
-    {
-      "Cell": {
-        "X": 15,
-        "Y": 1,
-        "Z": 3
-      },
-      "BlockTypeId": 5
-    },
-    {
-      "Cell": {
-        "X": 15,
-        "Y": 1,
-        "Z": 2
-      },
-      "BlockTypeId": 5
-    },
-    {
-      "Cell": {
-        "X": 14,
-        "Y": 1,
-        "Z": 2
-      },
-      "BlockTypeId": 5
-    },
-    {
-      "Cell": {
-        "X": 14,
-        "Y": 1,
-        "Z": 1
-      },
-      "BlockTypeId": 5
-    },
-    {
-      "Cell": {
-        "X": 14,
-        "Y": 1,
-        "Z": 0
-      },
-      "BlockTypeId": 5
-    },
-    {
-      "Cell": {
-        "X": 23,
-        "Y": 1,
-        "Z": 1
-      },
-      "BlockTypeId": 6
-    },
-    {
-      "Cell": {
-        "X": 24,
-        "Y": 1,
-        "Z": 1
-      },
-      "BlockTypeId": 6
-    },
-    {
-      "Cell": {
-        "X": 24,
-        "Y": 1,
-        "Z": 2
-      },
-      "BlockTypeId": 6
-    },
-    {
-      "Cell": {
-        "X": 25,
-        "Y": 1,
-        "Z": 2
-      },
-      "BlockTypeId": 6
-    },
-    {
-      "Cell": {
-        "X": 25,
-        "Y": 1,
-        "Z": 3
-      },
-      "BlockTypeId": 6
-    },
-    {
-      "Cell": {
-        "X": 26,
-        "Y": 1,
-        "Z": 4
-      },
-      "BlockTypeId": 6
-    },
-    {
-      "Cell": {
-        "X": 27,
-        "Y": 1,
-        "Z": 5
-      },
-      "BlockTypeId": 6
-    },
-    {
-      "Cell": {
-        "X": 28,
-        "Y": 1,
-        "Z": 5
-      },
-      "BlockTypeId": 6
-    },
-    {
-      "Cell": {
-        "X": 28,
-        "Y": 1,
-        "Z": 6
-      },
-      "BlockTypeId": 6
-    },
-    {
-      "Cell": {
-        "X": 8,
-        "Y": 1,
-        "Z": 6
-      },
-      "BlockTypeId": 6
-    },
-    {
-      "Cell": {
-        "X": 3,
-        "Y": 1,
-        "Z": 5
-      },
-      "BlockTypeId": 6
-    },
-    {
-      "Cell": {
-        "X": 3,
-        "Y": 1,
-        "Z": 8
-      },
-      "BlockTypeId": 6
-    },
-    {
-      "Cell": {
-        "X": 6,
-        "Y": 1,
-        "Z": 25
-      },
-      "BlockTypeId": 6
-    },
-    {
-      "Cell": {
-        "X": 2,
-        "Y": 1,
-        "Z": 21
-      },
-      "BlockTypeId": 6
-    },
-    {
-      "Cell": {
-        "X": 7,
-        "Y": 1,
-        "Z": 24
-      },
-      "BlockTypeId": 6
-    },
-    {
-      "Cell": {
-        "X": 7,
-        "Y": 1,
-        "Z": 25
-      },
-      "BlockTypeId": 6
-    },
-    {
-      "Cell": {
-        "X": 7,
-        "Y": 1,
-        "Z": 26
-      },
-      "BlockTypeId": 6
+      "BlockTypeId": 10
     },
     {
       "Cell": {
         "X": 10,
         "Y": 1,
-        "Z": 29
+        "Z": 13
       },
-      "BlockTypeId": 6
+      "BlockTypeId": 10
     },
     {
       "Cell": {
-        "X": 25,
+        "X": 12,
         "Y": 1,
-        "Z": 21
+        "Z": 13
       },
-      "BlockTypeId": 6
+      "BlockTypeId": 10
     },
     {
       "Cell": {
-        "X": 26,
-        "Y": 1,
-        "Z": 21
-      },
-      "BlockTypeId": 6
-    },
-    {
-      "Cell": {
-        "X": 29,
-        "Y": 1,
-        "Z": 20
-      },
-      "BlockTypeId": 6
-    },
-    {
-      "Cell": {
-        "X": 30,
-        "Y": 1,
-        "Z": 16
-      },
-      "BlockTypeId": 6
-    },
-    {
-      "Cell": {
-        "X": 30,
-        "Y": 1,
-        "Z": 15
-      },
-      "BlockTypeId": 6
-    },
-    {
-      "Cell": {
-        "X": 2,
-        "Y": 1,
-        "Z": 16
-      },
-      "BlockTypeId": 6
-    },
-    {
-      "Cell": {
-        "X": 4,
+        "X": 7,
         "Y": 1,
         "Z": 17
       },
-      "BlockTypeId": 6
+      "BlockTypeId": 10
     },
     {
       "Cell": {
-        "X": 3,
+        "X": 12,
         "Y": 1,
         "Z": 17
       },
-      "BlockTypeId": 6
+      "BlockTypeId": 10
     },
     {
       "Cell": {
-        "X": 2,
+        "X": 7,
         "Y": 1,
-        "Z": 18
+        "Z": 13
       },
-      "BlockTypeId": 6
+      "BlockTypeId": 10
     },
     {
       "Cell": {
-        "X": 2,
+        "X": 8,
         "Y": 1,
-        "Z": 17
+        "Z": 13
       },
-      "BlockTypeId": 6
+      "BlockTypeId": 10
     },
     {
       "Cell": {
-        "X": 4,
+        "X": 11,
         "Y": 1,
-        "Z": 19
+        "Z": 13
       },
-      "BlockTypeId": 6
+      "BlockTypeId": 10
     },
     {
       "Cell": {
-        "X": 2,
-        "Y": 1,
-        "Z": 19
-      },
-      "BlockTypeId": 6
-    },
-    {
-      "Cell": {
-        "X": 2,
-        "Y": 1,
-        "Z": 20
-      },
-      "BlockTypeId": 6
-    },
-    {
-      "Cell": {
-        "X": 4,
-        "Y": 1,
-        "Z": 18
-      },
-      "BlockTypeId": 6
-    },
-    {
-      "Cell": {
-        "X": 3,
-        "Y": 1,
-        "Z": 20
-      },
-      "BlockTypeId": 6
-    },
-    {
-      "Cell": {
-        "X": 3,
-        "Y": 1,
-        "Z": 19
-      },
-      "BlockTypeId": 6
-    },
-    {
-      "Cell": {
-        "X": 4,
-        "Y": 2,
-        "Z": 19
-      },
-      "BlockTypeId": 6
-    },
-    {
-      "Cell": {
-        "X": 3,
-        "Y": 2,
-        "Z": 20
-      },
-      "BlockTypeId": 6
-    },
-    {
-      "Cell": {
-        "X": 2,
-        "Y": 2,
-        "Z": 20
-      },
-      "BlockTypeId": 6
-    },
-    {
-      "Cell": {
-        "X": 2,
-        "Y": 2,
-        "Z": 19
-      },
-      "BlockTypeId": 6
-    },
-    {
-      "Cell": {
-        "X": 3,
-        "Y": 2,
-        "Z": 17
-      },
-      "BlockTypeId": 6
-    },
-    {
-      "Cell": {
-        "X": 3,
-        "Y": 2,
-        "Z": 18
-      },
-      "BlockTypeId": 6
-    },
-    {
-      "Cell": {
-        "X": 4,
-        "Y": 2,
-        "Z": 17
-      },
-      "BlockTypeId": 6
-    },
-    {
-      "Cell": {
-        "X": 3,
-        "Y": 2,
-        "Z": 19
-      },
-      "BlockTypeId": 6
-    },
-    {
-      "Cell": {
-        "X": 3,
-        "Y": 3,
-        "Z": 19
-      },
-      "BlockTypeId": 6
-    },
-    {
-      "Cell": {
-        "X": 3,
-        "Y": 3,
-        "Z": 18
-      },
-      "BlockTypeId": 6
-    },
-    {
-      "Cell": {
-        "X": 4,
-        "Y": 3,
-        "Z": 17
-      },
-      "BlockTypeId": 6
-    },
-    {
-      "Cell": {
-        "X": 3,
-        "Y": 3,
-        "Z": 20
-      },
-      "BlockTypeId": 6
-    },
-    {
-      "Cell": {
-        "X": 19,
-        "Y": 1,
-        "Z": 20
-      },
-      "BlockTypeId": 7
-    },
-    {
-      "Cell": {
-        "X": 18,
-        "Y": 1,
-        "Z": 20
-      },
-      "BlockTypeId": 7
-    },
-    {
-      "Cell": {
-        "X": 17,
-        "Y": 1,
-        "Z": 20
-      },
-      "BlockTypeId": 7
-    },
-    {
-      "Cell": {
-        "X": 25,
-        "Y": 1,
-        "Z": 15
-      },
-      "BlockTypeId": 1
-    },
-    {
-      "Cell": {
-        "X": 25,
-        "Y": 1,
-        "Z": 16
-      },
-      "BlockTypeId": 1
-    },
-    {
-      "Cell": {
-        "X": 25,
+        "X": 10,
         "Y": 1,
         "Z": 17
       },
-      "BlockTypeId": 1
-    },
-    {
-      "Cell": {
-        "X": 19,
-        "Y": 1,
-        "Z": 19
-      },
-      "BlockTypeId": 7
-    },
-    {
-      "Cell": {
-        "X": 19,
-        "Y": 1,
-        "Z": 18
-      },
-      "BlockTypeId": 7
-    },
-    {
-      "Cell": {
-        "X": 25,
-        "Y": 1,
-        "Z": 14
-      },
-      "BlockTypeId": 1
-    },
-    {
-      "Cell": {
-        "X": 24,
-        "Y": 1,
-        "Z": 14
-      },
-      "BlockTypeId": 1
-    },
-    {
-      "Cell": {
-        "X": 23,
-        "Y": 1,
-        "Z": 14
-      },
-      "BlockTypeId": 1
-    },
-    {
-      "Cell": {
-        "X": 14,
-        "Y": 1,
-        "Z": 22
-      },
-      "BlockTypeId": 8
+      "BlockTypeId": 10
     },
     {
       "Cell": {
@@ -8929,31 +8332,23 @@
         "Y": 1,
         "Z": 17
       },
-      "BlockTypeId": 8
+      "BlockTypeId": 10
     },
     {
       "Cell": {
-        "X": 10,
+        "X": 8,
         "Y": 1,
-        "Z": 18
+        "Z": 17
       },
-      "BlockTypeId": 8
+      "BlockTypeId": 10
     },
     {
       "Cell": {
         "X": 11,
         "Y": 1,
-        "Z": 19
+        "Z": 17
       },
-      "BlockTypeId": 8
-    },
-    {
-      "Cell": {
-        "X": 18,
-        "Y": 1,
-        "Z": 14
-      },
-      "BlockTypeId": 9
+      "BlockTypeId": 10
     },
     {
       "Cell": {

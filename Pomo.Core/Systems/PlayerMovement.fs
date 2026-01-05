@@ -11,10 +11,7 @@ open Pomo.Core.Domain.Core
 open Pomo.Core.Domain.World
 open Pomo.Core.Domain.Events
 open Pomo.Core.Domain.Action
-open Pomo.Core.Domain.Action
 open Pomo.Core.Systems.Systems
-open Pomo.Core.Algorithms
-open Pomo.Core.Systems
 
 module PlayerMovement =
 
@@ -52,6 +49,7 @@ module PlayerMovement =
 
   open Pomo.Core.Environment
   open Pomo.Core.Environment.Patterns
+  open Pomo.Core.Projections
   open System.Collections.Generic
 
   type PlayerMovementSystem
@@ -67,7 +65,6 @@ module PlayerMovement =
       |> AMap.tryFind playerId
       |> AVal.map(Option.defaultValue IndexList.empty)
 
-
     let movementSpeed =
       gameplay.Projections.DerivedStats
       |> AMap.tryFind playerId
@@ -78,8 +75,6 @@ module PlayerMovement =
 
     let movementState = core.World.MovementStates |> AMap.tryFind playerId
 
-    // This is a simple, non-adaptive way to track the last published value.
-    // A mutable variable scoped to the system is acceptable for this kind of internal bookkeeping.
     let mutable lastVelocity = Vector2.Zero
 
     override _.Initialize() = base.Initialize()
@@ -90,16 +85,8 @@ module PlayerMovement =
       let snapshot =
         match entityScenarios |> HashMap.tryFindV playerId with
         | ValueSome scenarioId ->
-          gameplay.Projections.ComputeMovementSnapshot(scenarioId)
-        | ValueNone ->
-            {
-              Positions = Dictionary()
-              SpatialGrid = Dictionary()
-              Rotations = Dictionary()
-              ModelConfigIds = Dictionary()
-            }
-
-      let accumulatedMtv = Vector2.Zero
+          gameplay.Projections.ComputeMovement3DSnapshot(scenarioId)
+        | ValueNone -> Movement3DSnapshot.Empty
 
       let currentVelocity = velocity |> AVal.force
       let statuses = playerCombatStatuses |> AVal.force
@@ -108,10 +95,9 @@ module PlayerMovement =
       let isRooted = statuses |> IndexList.exists(fun _ s -> s.IsRooted)
 
       if isStunned || isRooted then
-        // If stunned or rooted, ensure velocity is zero.
         if lastVelocity <> Vector2.Zero then
           lastVelocity <-
-            MovementLogic.notifyVelocityChange
+            MovementLogic3D.notifyVelocityChange3D
               playerId
               Vector2.Zero
               lastVelocity
@@ -122,67 +108,60 @@ module PlayerMovement =
         let position =
           snapshot.Positions
           |> Dictionary.tryFindV playerId
-          |> ValueOption.map WorldPosition.toVector2
-          |> ValueOption.defaultValue Vector2.Zero
+          |> ValueOption.defaultValue WorldPosition.zero
 
         let movementSpeed = movementSpeed |> AVal.force
 
         match movementState with
         | Some(MovingTo destination) ->
+          let target3D = WorldPosition.fromVector2 destination
+
           match
-            MovementLogic.handleMovingTo
-              position
-              destination
-              movementSpeed
-              accumulatedMtv
+            MovementLogic3D.handleMovingTo3D position target3D movementSpeed
           with
-          | MovementLogic.Arrived ->
-            MovementLogic.notifyArrived playerId stateWrite core.EventBus
-          | MovementLogic.Moving finalVelocity ->
+          | MovementLogic3D.Arrived3D ->
+            MovementLogic3D.notifyArrived3D playerId stateWrite core.EventBus
+            lastVelocity <- Vector2.Zero
+          | MovementLogic3D.Moving3D finalVelocity ->
             lastVelocity <-
-              MovementLogic.notifyVelocityChange
+              MovementLogic3D.notifyVelocityChange3D
                 playerId
                 finalVelocity
                 lastVelocity
                 stateWrite
-          | _ -> () // Should not happen for MovingTo
+          | _ -> ()
 
         | Some(MovingAlongPath path) ->
+          let path3D = path |> List.map(fun v -> WorldPosition.fromVector2 v)
+
           match
-            MovementLogic.handleMovingAlongPath
+            MovementLogic3D.handleMovingAlongPath3D
               position
-              path
+              path3D
               movementSpeed
-              accumulatedMtv
           with
-          | MovementLogic.Arrived ->
-            MovementLogic.notifyArrived playerId stateWrite core.EventBus
+          | MovementLogic3D.Arrived3D ->
+            MovementLogic3D.notifyArrived3D playerId stateWrite core.EventBus
             lastVelocity <- Vector2.Zero
-          | MovementLogic.WaypointReached remainingWaypoints ->
-            MovementLogic.notifyWaypointReached
+          | MovementLogic3D.WaypointReached3D remainingPath ->
+            MovementLogic3D.notifyWaypointReached3D
               playerId
-              remainingWaypoints
+              remainingPath
               stateWrite
               core.EventBus
-          | MovementLogic.Moving finalVelocity ->
+          | MovementLogic3D.Moving3D finalVelocity ->
             lastVelocity <-
-              MovementLogic.notifyVelocityChange
+              MovementLogic3D.notifyVelocityChange3D
                 playerId
                 finalVelocity
                 lastVelocity
                 stateWrite
 
         | Some Idle ->
-          let mutable targetVelocity = currentVelocity
-
-          // Apply collision sliding to Input velocity
-          let targetVelocity =
-            Physics.applyCollisionSliding targetVelocity accumulatedMtv
-
           lastVelocity <-
-            MovementLogic.notifyVelocityChange
+            MovementLogic3D.notifyVelocityChange3D
               playerId
-              targetVelocity
+              currentVelocity
               lastVelocity
               stateWrite
         | None -> ()

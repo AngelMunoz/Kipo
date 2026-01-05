@@ -36,18 +36,13 @@ module Navigation3D =
 
   let inline private clickTo3D
     (blockMap: BlockMapDefinition)
+    (currentPos: WorldPosition)
     (target: Vector2)
     : WorldPosition =
-    let basePos = WorldPosition.fromVector2 target
-
-    let surfaceY =
-      BlockCollision.getSurfaceHeight blockMap basePos
-      |> ValueOption.defaultValue 0f
-
     {
-      X = basePos.X
-      Y = surfaceY
-      Z = basePos.Z
+      X = target.X
+      Y = currentPos.Y
+      Z = target.Y
     }
 
   let inline private isInXZBounds
@@ -79,17 +74,10 @@ module Navigation3D =
         let candidatePos = Grid.cellToWorld navGrid cell
 
         if isInXZBounds blockMap candidatePos then
-          let surfaceYOpt =
-            BlockCollision.getSurfaceHeight blockMap {
-              X = candidatePos.X
-              Y = 0f
-              Z = candidatePos.Z
-            }
-
-          surfaceYOpt
-          |> ValueOption.map(fun surfaceY -> { candidatePos with Y = surfaceY })
-          |> ValueOption.filter(fun snapped ->
-            Grid.isWalkable navGrid (Grid.worldToCell navGrid snapped))
+          if Grid.isWalkable navGrid cell then
+            ValueSome candidatePos
+          else
+            ValueNone
         else
           ValueNone
 
@@ -182,16 +170,18 @@ module Navigation3D =
     |> ValueOption.bind(fun ctx ->
       getBlockMap ctx.ScenarioId
       |> ValueOption.bind(fun blockMap ->
-        let targetPos = clickTo3D blockMap target.Target
         let snapshot = projections.ComputeMovement3DSnapshot(ctx.ScenarioId)
 
         tryGetPosition3D snapshot entityId
-        |> ValueOption.map(fun currentPos -> {
+        |> ValueOption.map(fun currentPos ->
+          let targetPos = clickTo3D blockMap currentPos target.Target
+
+          {
           EntityId = entityId
           TargetPos = targetPos
           CurrentPos = currentPos
           BlockMap = blockMap
-        })))
+          })))
 
   /// Execute pathfinding and publish result
   let private executePathfinding
@@ -210,7 +200,16 @@ module Navigation3D =
         trySnapToNearestWalkable ctx.BlockMap navGrid ctx.CurrentPos
         |> ValueOption.defaultValue ctx.CurrentPos
 
-    match AStar.findPath navGrid startPos ctx.TargetPos with
+    let targetPos =
+      let targetCell = Grid.worldToCell navGrid ctx.TargetPos
+
+      if Grid.isWalkable navGrid targetCell then
+        ctx.TargetPos
+      else
+        trySnapToNearestWalkable ctx.BlockMap navGrid ctx.TargetPos
+        |> ValueOption.defaultValue ctx.TargetPos
+
+    match AStar.findPath navGrid startPos targetPos with
     | ValueSome path -> publishPath stateWrite eventBus ctx.EntityId path
     | ValueNone -> publishNoPath stateWrite eventBus ctx.EntityId
 

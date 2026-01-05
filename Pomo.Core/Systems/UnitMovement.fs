@@ -10,8 +10,7 @@ open Pomo.Core.Domain.World
 open Pomo.Core.Domain.Events
 open Pomo.Core.Systems.Systems
 open Pomo.Core.Domain.Core
-open Pomo.Core.Algorithms
-open Pomo.Core.Systems
+open Pomo.Core.Projections
 
 module UnitMovement =
 
@@ -26,18 +25,11 @@ module UnitMovement =
     let (Gameplay gameplay) = env.GameplayServices
     let stateWrite = core.StateWrite
 
-    // Mutable state to track last known velocities to avoid spamming events
     let lastVelocities =
       System.Collections.Generic.Dictionary<Guid<EntityId>, Vector2>()
 
-    // Local state for path following
-    let mutable currentPaths =
-      System.Collections.Generic.Dictionary<Guid<EntityId>, Vector2 list>()
-
     let movementStates =
       core.World.MovementStates |> AMap.filter(fun id _ -> id <> playerId)
-
-
 
     let derivedStats =
       gameplay.Projections.DerivedStats
@@ -49,11 +41,10 @@ module UnitMovement =
       let scenarios = core.World.Scenarios |> AMap.force
       let movementStates = movementStates |> AMap.force
       let derivedStats = derivedStats |> AMap.force
-      let entityScenarios = core.World.EntityScenario |> AMap.force
 
-      // 2. Process Movement
       for (scenarioId, _) in scenarios do
-        let snapshot = gameplay.Projections.ComputeMovementSnapshot(scenarioId)
+        let snapshot =
+          gameplay.Projections.ComputeMovement3DSnapshot(scenarioId)
 
         for KeyValue(entityId, currentPos) in snapshot.Positions do
           if entityId <> playerId then
@@ -64,60 +55,63 @@ module UnitMovement =
                 | ValueSome stats -> float32 stats.MS
                 | ValueNone -> 100.0f
 
-              let mtv = Vector2.Zero
-
-              let currentPos2d = WorldPosition.toVector2 currentPos
-
               match state with
               | MovingAlongPath path ->
-                currentPaths[entityId] <- path
+                let path3D = path |> List.map WorldPosition.fromVector2
 
                 match
-                  MovementLogic.handleMovingAlongPath
-                    currentPos2d
-                    path
+                  MovementLogic3D.handleMovingAlongPath3D
+                    currentPos
+                    path3D
                     speed
-                    mtv
                 with
-                | MovementLogic.Arrived ->
-                  MovementLogic.notifyArrived entityId stateWrite core.EventBus
+                | MovementLogic3D.Arrived3D ->
+                  MovementLogic3D.notifyArrived3D
+                    entityId
+                    stateWrite
+                    core.EventBus
+
                   lastVelocities[entityId] <- Vector2.Zero
-                  currentPaths.Remove(entityId) |> ignore
-                | MovementLogic.WaypointReached remaining ->
-                  MovementLogic.notifyWaypointReached
+                | MovementLogic3D.WaypointReached3D remaining ->
+                  MovementLogic3D.notifyWaypointReached3D
                     entityId
                     remaining
                     stateWrite
                     core.EventBus
-                | MovementLogic.Moving finalVel ->
+                | MovementLogic3D.Moving3D finalVel ->
                   let lastVel =
                     match lastVelocities.TryGetValue entityId with
                     | true, v -> v
                     | false, _ -> Vector2.Zero
 
                   lastVelocities[entityId] <-
-                    MovementLogic.notifyVelocityChange
+                    MovementLogic3D.notifyVelocityChange3D
                       entityId
                       finalVel
                       lastVel
                       stateWrite
 
               | MovingTo target ->
+                let target3D = WorldPosition.fromVector2 target
+
                 match
-                  MovementLogic.handleMovingTo currentPos2d target speed mtv
+                  MovementLogic3D.handleMovingTo3D currentPos target3D speed
                 with
-                | MovementLogic.Arrived ->
-                  MovementLogic.notifyArrived entityId stateWrite core.EventBus
+                | MovementLogic3D.Arrived3D ->
+                  MovementLogic3D.notifyArrived3D
+                    entityId
+                    stateWrite
+                    core.EventBus
+
                   lastVelocities[entityId] <- Vector2.Zero
-                  currentPaths.Remove(entityId) |> ignore
-                | MovementLogic.Moving finalVel ->
+                | MovementLogic3D.Moving3D finalVel ->
                   let lastVel =
                     match lastVelocities.TryGetValue entityId with
                     | true, v -> v
                     | false, _ -> Vector2.Zero
 
                   lastVelocities[entityId] <-
-                    MovementLogic.notifyVelocityChange
+                    MovementLogic3D.notifyVelocityChange3D
                       entityId
                       finalVel
                       lastVel
@@ -130,11 +124,9 @@ module UnitMovement =
                   && lastVelocities[entityId] <> Vector2.Zero
                 then
                   lastVelocities[entityId] <-
-                    MovementLogic.notifyVelocityChange
+                    MovementLogic3D.notifyVelocityChange3D
                       entityId
                       Vector2.Zero
                       lastVelocities[entityId]
                       stateWrite
-
-                currentPaths.Remove(entityId) |> ignore
             | ValueNone -> ()
