@@ -3,7 +3,7 @@ name: Weekly Preview Release
 on:
   schedule:
     # Every Monday at 9:00 AM UTC
-    - cron: '0 9 * * 1'
+    - cron: "0 9 * * 1"
   workflow_dispatch: # Allow manual trigger
 
 permissions:
@@ -35,8 +35,8 @@ jobs:
             echo "No previous weekly release found, using first commit"
           }
 
-      - name: Generate Changelog
-        id: changelog
+      - name: Generate Release Notes
+        id: release_notes
         shell: pwsh
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -64,119 +64,106 @@ jobs:
             }
           } | Where-Object { $_ -ne $null }
 
-          # Build the changelog
-          $changelog = @()
+          # Build the release notes
+          $notes = @()
+          $notes += "## 📅 Weekly Preview Release"
+          $notes += ""
+          $notes += "This is an automated weekly preview release containing all changes merged to main since the last weekly build."
+          $notes += ""
 
           # PRs section (highlights)
           if ($mergedPRs.Count -gt 0) {
-            $changelog += "## ✨ Highlights (Merged PRs)"
-            $changelog += ""
+            $notes += "## ✨ Highlights (Merged PRs)"
+            $notes += ""
             foreach ($pr in $mergedPRs) {
-              $changelog += "- **[#$($pr.number)]($($pr.url))**: $($pr.title)"
+              $notes += "- **[#$($pr.number)]($($pr.url))**: $($pr.title)"
             }
-            $changelog += ""
+            $notes += ""
           } else {
-            $changelog += "## ✨ Highlights"
-            $changelog += ""
-            $changelog += "_No PRs were merged this week._"
-            $changelog += ""
+            $notes += "## ✨ Highlights"
+            $notes += ""
+            $notes += "_No PRs were merged this week._"
+            $notes += ""
           }
 
           # Commits section
           if ($commits.Count -gt 0) {
-            $changelog += "## 🔧 Other Changes (Direct Commits)"
-            $changelog += ""
-            $changelog += "<details>"
-            $changelog += "<summary>View $($commits.Count) commit(s)</summary>"
-            $changelog += ""
+            $notes += "## 🔧 Other Changes (Direct Commits)"
+            $notes += ""
+            $notes += "<details>"
+            $notes += "<summary>View $($commits.Count) commit(s)</summary>"
+            $notes += ""
             foreach ($commit in $commits) {
-              $changelog += "- ``$($commit.Hash)`` $($commit.Message) — _$($commit.Author)_"
+              $notes += "- ``$($commit.Hash)`` $($commit.Message) — _$($commit.Author)_"
             }
-            $changelog += ""
-            $changelog += "</details>"
-            $changelog += ""
+            $notes += ""
+            $notes += "</details>"
+            $notes += ""
           }
+
+          $notes += "---"
+          $notes += ""
+          $notes += "> [!IMPORTANT]"
+          $notes += "> These builds are **NOT self-contained**."
+          $notes += "> You **MUST** have the **.NET 10 Runtime** installed to run these binaries."
+          $notes += ""
+          $notes += "### Assets"
+          $notes += "- `Pomo-DesktopGL.zip`: Cross-platform Desktop version."
+          $notes += "- `Pomo-WindowsDX.zip`: Windows-specific DirectX version."
 
           # Check if there are any changes at all
           $hasChanges = ($mergedPRs.Count -gt 0) -or ($commits.Count -gt 0)
           echo "has_changes=$hasChanges" >> $env:GITHUB_OUTPUT
 
-          # Write changelog to file (multi-line output)
-          $changelogText = $changelog -join "`n"
-          $changelogText | Out-File -FilePath changelog.md -Encoding utf8
-          echo "Generated changelog with $($mergedPRs.Count) PRs and $($commits.Count) commits"
+          # Write release notes to file
+          $notesText = $notes -join "`n"
+          $notesText | Out-File -FilePath release_notes.md -Encoding utf8
+          echo "Generated release notes with $($mergedPRs.Count) PRs and $($commits.Count) commits"
 
       - name: Check for Changes
-        if: steps.changelog.outputs.has_changes == 'False'
+        if: steps.release_notes.outputs.has_changes == 'False'
         run: |
           echo "No changes since last weekly release. Skipping."
           exit 0
 
       - name: Setup .NET
-        if: steps.changelog.outputs.has_changes == 'True'
+        if: steps.release_notes.outputs.has_changes == 'True'
         uses: actions/setup-dotnet@v4
         with:
-          dotnet-version: '10.0.x'
+          dotnet-version: "10.0.x"
 
       - name: Build DesktopGL
-        if: steps.changelog.outputs.has_changes == 'True'
+        if: steps.release_notes.outputs.has_changes == 'True'
         run: dotnet publish Pomo.DesktopGL/Pomo.DesktopGL.fsproj -c Release -o publish/DesktopGL
 
       - name: Build WindowsDX
-        if: steps.changelog.outputs.has_changes == 'True'
+        if: steps.release_notes.outputs.has_changes == 'True'
         run: dotnet publish Pomo.WindowsDX/Pomo.WindowsDX.fsproj -c Release -o publish/WindowsDX
 
       - name: Zip Artifacts
-        if: steps.changelog.outputs.has_changes == 'True'
+        if: steps.release_notes.outputs.has_changes == 'True'
         shell: pwsh
         run: |
           Compress-Archive -Path publish/DesktopGL/* -DestinationPath publish/Pomo-DesktopGL.zip
           Compress-Archive -Path publish/WindowsDX/* -DestinationPath publish/Pomo-WindowsDX.zip
 
       - name: Generate Timestamp
-        if: steps.changelog.outputs.has_changes == 'True'
+        if: steps.release_notes.outputs.has_changes == 'True'
         id: timestamp
         shell: pwsh
         run: |
           $timestamp = Get-Date -Format "dd-MM-yyyy"
           echo "value=$timestamp" >> $env:GITHUB_OUTPUT
 
-      - name: Read Changelog
-        if: steps.changelog.outputs.has_changes == 'True'
-        id: read_changelog
-        shell: pwsh
-        run: |
-          $content = Get-Content changelog.md -Raw
-          # Escape for GitHub Actions
-          $content = $content -replace '%', '%25'
-          $content = $content -replace "`n", '%0A'
-          $content = $content -replace "`r", '%0D'
-          echo "content=$content" >> $env:GITHUB_OUTPUT
-
       - name: Create Weekly Release
-        if: steps.changelog.outputs.has_changes == 'True'
+        if: steps.release_notes.outputs.has_changes == 'True'
         uses: softprops/action-gh-release@v2
         with:
           tag_name: weekly-${{ steps.timestamp.outputs.value }}
           name: "Weekly Preview - ${{ steps.timestamp.outputs.value }}"
           prerelease: true
           make_latest: true
-          body: |
-            ## 📅 Weekly Preview Release
-
-            This is an automated weekly preview release containing all changes merged to main since the last weekly build.
-
-            ${{ steps.read_changelog.outputs.content }}
-
-            ---
-
-            > [!IMPORTANT]
-            > These builds are **NOT self-contained**.
-            > You **MUST** have the **.NET 10 Runtime** installed to run these binaries.
-
-            ### Assets
-            - `Pomo-DesktopGL.zip`: Cross-platform Desktop version.
-            - `Pomo-WindowsDX.zip`: Windows-specific DirectX version.
+          body_path: release_notes.md
           files: |
             publish/Pomo-DesktopGL.zip
             publish/Pomo-WindowsDX.zip
