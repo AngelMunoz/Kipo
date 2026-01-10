@@ -14,12 +14,14 @@ module BlockMapLoader =
 
     [<TailCall>]
     let rec private findSourcesRoot(currentDir: DirectoryInfo) =
-      match currentDir.Parent with
-      | null -> ValueNone
-      | existing ->
-        match existing.GetDirectories("Pomo.Core") with
-        | [| found |] -> ValueSome found.FullName
-        | _ -> findSourcesRoot existing
+      // First check if Pomo.Core exists in current directory
+      match currentDir.GetDirectories("Pomo.Core") with
+      | [| found |] -> ValueSome found.FullName
+      | _ ->
+        // Then recurse to parent
+        match currentDir.Parent with
+        | null -> ValueNone
+        | parent -> findSourcesRoot parent
 
     let runtime: PathResolver =
       fun path ->

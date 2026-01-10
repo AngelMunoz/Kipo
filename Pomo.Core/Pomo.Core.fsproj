@@ -109,6 +109,13 @@
     <Compile Include="Scenes/GameplayScene.fs" />
     <Compile Include="Scenes/BlockMapScene.fs" />
     <Compile Include="CompositionRoot.fs" />
+    <Compile Include="App/EditorInput.fs" />
+    <Compile Include="App/Services.fs" />
+    <Compile Include="App/Types.fs" />
+    <Compile Include="App/State.fs" />
+    <Compile Include="App/MyraRenderer.fs" />
+    <Compile Include="App/EditorRenderer.fs" />
+    <Compile Include="App/Program.fs" />
     <Compile Include="PomoGame.fs" />
   </ItemGroup>
   <ItemGroup>
@@ -157,6 +164,7 @@
     <PackageReference Include="FSharp.Data.Adaptive" Version="1.2.25" />
     <PackageReference Include="FSharp.UMX" Version="1.1.0" />
     <PackageReference Include="JDeck" Version="1.0.0" />
+    <PackageReference Include="Mibo" Version="1.1.0" />
     <PackageReference Include="Myra" Version="1.5.10" />
     <PackageReference Include="MonoGame.Framework.DesktopGL" Version="3.8.*" PrivateAssets="All" />
     <!-- Build and analysis tools -->

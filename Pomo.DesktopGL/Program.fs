@@ -1,5 +1,5 @@
-﻿open Pomo.Core
+open Pomo.Core
 
 // Start a game instance.
-let game = new PomoGame()
+let game = App.Program.create()
 game.Run()
