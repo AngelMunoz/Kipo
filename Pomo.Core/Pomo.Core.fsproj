@@ -105,6 +105,10 @@
     <Compile Include="Editor/EditorRenderer.fs" />
     <Compile Include="Editor/UI.fs" />
     <Compile Include="Editor/Scene.fs" />
+    <Compile Include="MiboApp/System.fs" />
+    <Compile Include="MiboApp/Editor.fs" />
+    <Compile Include="MiboApp/Model.fs" />
+    <Compile Include="MiboApp/Program.fs" />
     <Compile Include="Scenes.fs" />
     <Compile Include="Scenes/GameplayScene.fs" />
     <Compile Include="Scenes/BlockMapScene.fs" />
