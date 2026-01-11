@@ -32,7 +32,13 @@ module Program =
       Draw3D.clear (ValueSome Color.Black) true buffer
 
   let private init(ctx: GameContext) : struct (AppModel * Cmd<AppMsg>) =
-    let editorState = Editor.createEmpty()
+    let editorState =
+      match Editor.loadMap "Content/CustomMaps/NewMap.json" with
+      | Ok state -> state
+      | Error err ->
+        printfn $"[MiboApp] Failed to load map: {err}"
+        Editor.createEmpty()
+
     { CurrentScene = Editor editorState }, Cmd.none
 
   let create() =

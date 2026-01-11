@@ -12,10 +12,11 @@ open Pomo.Core.Domain.Core
 open Pomo.Core.Domain.BlockMap
 open Pomo.Core.Domain.Spatial
 open Pomo.Core.Domain.Core.Constants
+open Pomo.Core.Graphics
 
 type EditorState = {
   BlockMap: BlockMapDefinition
-  Camera: Camera
+  CameraParams: Camera.CameraParams
   CurrentLayer: int
   GridCursor: GridCell3D voption
   SelectedBlockType: string voption
@@ -23,6 +24,27 @@ type EditorState = {
 }
 
 module Editor =
+  open Pomo.Core.Systems
+
+  let private createCameraParams(blockMap: BlockMapDefinition) =
+    // Blocks are centered at origin via calcCenterOffset, so camera starts at origin
+    {
+      Camera.Defaults.defaultParams with
+          Position = Vector3.Zero
+    }
+
+  let loadMap(path: string) : Result<EditorState, string> =
+    match BlockMapLoader.load BlockMapLoader.Resolvers.editor path with
+    | Ok blockMap ->
+      Ok {
+        BlockMap = blockMap
+        CameraParams = createCameraParams blockMap
+        CurrentLayer = blockMap.Settings.StartingLayer
+        GridCursor = ValueNone
+        SelectedBlockType = ValueNone
+        CurrentRotation = 0
+      }
+    | Error err -> Error err
 
   let createEmpty() : EditorState =
     let palette = Dictionary<int<BlockTypeId>, BlockType>()
@@ -57,33 +79,27 @@ module Editor =
           }
         )
 
-    {
-      BlockMap = {
-        Version = 1
-        Key = "test"
-        MapKey = ValueNone
-        Width = 32
-        Height = 8
-        Depth = 32
-        Palette = palette
-        Blocks = blocks
-        SpawnCell = ValueNone
-        Settings = {
-          EngagementRules = PvE
-          MaxEnemyEntities = 50
-          StartingLayer = 0
-        }
-        Objects = []
+    let blockMap = {
+      Version = 1
+      Key = "test"
+      MapKey = ValueNone
+      Width = 32
+      Height = 8
+      Depth = 32
+      Palette = palette
+      Blocks = blocks
+      SpawnCell = ValueNone
+      Settings = {
+        EngagementRules = PvE
+        MaxEnemyEntities = 50
+        StartingLayer = 0
       }
-      Camera =
-        Camera3D.lookAt
-          (Vector3(150f, 200f, 300f))
-          (Vector3(128f, 0f, 128f))
-          Vector3.Up
-          MathHelper.PiOver4
-          (16f / 9f)
-          0.1f
-          2000f
+      Objects = []
+    }
+
+    {
+      BlockMap = blockMap
+      CameraParams = createCameraParams blockMap
       CurrentLayer = 0
       GridCursor = ValueNone
       SelectedBlockType = ValueNone
@@ -95,39 +111,25 @@ module Editor =
     (dt: float32)
     (keyboard: KeyboardState)
     =
-    let camera = state.Camera
-    let speed = 10f * dt
-    let currentPos = camera.View.Translation
-    let mutable offset = Vector3.Zero
+    let speed = 5f * dt
+    let mutable camParams = state.CameraParams
 
     if keyboard.IsKeyDown Keys.W then
-      offset <- offset + Vector3.Forward * speed
+      camParams <- Camera.Transform.panRelative camParams 0f -speed
 
     if keyboard.IsKeyDown Keys.S then
-      offset <- offset + Vector3.Backward * speed
+      camParams <- Camera.Transform.panRelative camParams 0f speed
 
     if keyboard.IsKeyDown Keys.A then
-      offset <- offset + Vector3.Left * speed
+      camParams <- Camera.Transform.panRelative camParams -speed 0f
 
     if keyboard.IsKeyDown Keys.D then
-      offset <- offset + Vector3.Right * speed
+      camParams <- Camera.Transform.panRelative camParams speed 0f
 
-    if offset = Vector3.Zero then
+    if camParams = state.CameraParams then
       state
     else
-      let newPos = currentPos + offset
-
-      let newCamera =
-        Camera3D.lookAt
-          newPos
-          (newPos + Vector3.Forward)
-          Vector3.Up
-          MathHelper.PiOver4
-          (16f / 9f)
-          0.1f
-          1000f
-
-      { state with Camera = newCamera }
+      { state with CameraParams = camParams }
 
   let update (gt: GameTime) (state: EditorState) : EditorState =
     let dt = float32 gt.ElapsedGameTime.TotalSeconds
@@ -139,36 +141,52 @@ module Editor =
     (state: EditorState)
     (buffer: RenderBuffer<RenderCmd3D>)
     =
-    Draw3D.viewport ctx.GraphicsDevice.Viewport buffer
-    Draw3D.clear (ValueSome Color.CornflowerBlue) true buffer
-    Draw3D.camera state.Camera buffer
+    let viewport = ctx.GraphicsDevice.Viewport
+    let ppu = BlockMap.CellSize
+    let scaleFactor = BlockMap.CellSize / ppu
 
-    for block in state.BlockMap.Blocks do
+    // Compute Mibo Camera from Kipo CameraParams
+    let view = Camera.Compute.getViewMatrix state.CameraParams
+
+    let projection =
+      Camera.Compute.getProjectionMatrix state.CameraParams viewport ppu
+
+    let miboCamera = { View = view; Projection = projection }
+
+    Draw3D.viewport viewport buffer
+    Draw3D.clear (ValueSome Color.CornflowerBlue) true buffer
+    Draw3D.camera miboCamera buffer
+
+    let blockMap = state.BlockMap
+
+    let centerOffset =
+      RenderMath.BlockMap3D.calcCenterOffset blockMap.Width blockMap.Depth ppu
+
+    for block in blockMap.Blocks do
       let cell = block.Key
       let blockData = block.Value
 
-      match state.BlockMap.Palette.TryGetValue(blockData.BlockTypeId) with
+      match blockMap.Palette.TryGetValue(blockData.BlockTypeId) with
       | true, blockType ->
         let model = ctx |> Assets.model blockType.Model
 
-        let position =
-          Vector3(
-            float32 cell.X * BlockMap.CellSize,
-            float32 cell.Y * BlockMap.CellSize,
-            float32 cell.Z * BlockMap.CellSize
-          )
+        let pos =
+          RenderMath.BlockMap3D.cellToRender
+            cell.X
+            cell.Y
+            cell.Z
+            ppu
+            centerOffset
 
         let scale =
-          Matrix.CreateScale(
-            BlockMap.CellSize / 32f * BlockMap.KayKitBlockModelScale
-          )
+          Matrix.CreateScale(scaleFactor * BlockMap.KayKitBlockModelScale)
 
         let rot =
           match blockData.Rotation with
           | ValueSome q -> Matrix.CreateFromQuaternion q
           | ValueNone -> Matrix.Identity
 
-        let trans = Matrix.CreateTranslation(position)
+        let trans = Matrix.CreateTranslation(pos)
         let world = scale * rot * trans
 
         Draw3D.mesh model world
