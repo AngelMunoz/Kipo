@@ -45,7 +45,7 @@ module EditorEmitter =
       buffer.[idx] <-
         VertexPositionColor(
           Vector3(0f, layerHeight, zPos) + centerOffset,
-          Color.Gray
+          Color.Black
         )
 
       idx <- idx + 1
@@ -53,7 +53,7 @@ module EditorEmitter =
       buffer.[idx] <-
         VertexPositionColor(
           Vector3(renderWidth, layerHeight, zPos) + centerOffset,
-          Color.Gray
+          Color.Black
         )
 
       idx <- idx + 1
@@ -65,7 +65,7 @@ module EditorEmitter =
       buffer.[idx] <-
         VertexPositionColor(
           Vector3(xPos, layerHeight, 0f) + centerOffset,
-          Color.Gray
+          Color.Black
         )
 
       idx <- idx + 1
@@ -73,7 +73,7 @@ module EditorEmitter =
       buffer.[idx] <-
         VertexPositionColor(
           Vector3(xPos, layerHeight, renderDepth) + centerOffset,
-          Color.Gray
+          Color.Black
         )
 
       idx <- idx + 1

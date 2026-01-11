@@ -105,9 +105,10 @@
     <Compile Include="Editor/EditorRenderer.fs" />
     <Compile Include="Editor/UI.fs" />
     <Compile Include="Editor/Scene.fs" />
+    <Compile Include="MiboApp/Types.fs" />
+    <Compile Include="MiboApp/UIService.fs" />
     <Compile Include="MiboApp/System.fs" />
     <Compile Include="MiboApp/Editor.fs" />
-    <Compile Include="MiboApp/Model.fs" />
     <Compile Include="MiboApp/Program.fs" />
     <Compile Include="Scenes.fs" />
     <Compile Include="Scenes/GameplayScene.fs" />
@@ -168,7 +169,7 @@
     <PackageReference Include="FSharp.Data.Adaptive" Version="1.2.25" />
     <PackageReference Include="FSharp.UMX" Version="1.1.0" />
     <PackageReference Include="JDeck" Version="1.0.0" />
-    <PackageReference Include="Mibo" Version="1.1.0" />
+    <PackageReference Include="Mibo" Version="1.*" />
     <PackageReference Include="Myra" Version="1.5.10" />
     <PackageReference Include="MonoGame.Framework.DesktopGL" Version="3.8.*" PrivateAssets="All" />
     <!-- Build and analysis tools -->
