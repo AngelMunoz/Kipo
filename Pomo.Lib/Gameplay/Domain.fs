@@ -1,4 +1,4 @@
-namespace Pomo.Lib.Editor
+namespace Pomo.Lib.Gameplay
 
 open Microsoft.Xna.Framework
 
