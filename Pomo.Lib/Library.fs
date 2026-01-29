@@ -1,39 +1,75 @@
 namespace Pomo.Lib
 
-
 open Mibo.Elmish
 open Mibo.Rendering.Graphics3D
+open Microsoft.Xna.Framework
 open Microsoft.Xna.Framework.Graphics
 open Pomo.Lib
 
 
+[<Struct>]
+type State = {
+  EditorState: Editor.EditorModel voption
+  GameplayState: Gameplay.State voption
+  Env: AppEnv
+}
+
+type Message =
+  | Tick of tick: GameTime
+  | EditorMsg of emsg: Editor.EditorMsg
+  | GameplayMsg of gmsg: Gameplay.Message
+
 module internal Entry =
 
-  let init ctx : struct (State * Cmd<Message>) = State(), Cmd.none
+  let init ctx : struct (State * Cmd<Message>) =
+    let env = AppEnv.create ctx
+    let struct (es, cmd) = Editor.Entry.init env ctx
+
+    struct ({
+              EditorState = ValueSome es
+              GameplayState = ValueNone
+              Env = env
+            },
+            Cmd.map EditorMsg cmd)
 
   let update msg state : struct (State * Cmd<Message>) =
     match msg with
-    | Tick gt -> state, Cmd.ofMsg(EditorMsg(Editor.Message.Tick gt))
+    | Tick gt ->
+      // Forward ticks to active subsystems
+      let cmd =
+        match state.EditorState with
+        | ValueSome _ -> Cmd.ofMsg(EditorMsg(Editor.EditorMsg.Tick gt))
+        | ValueNone -> Cmd.none
+
+      struct (state, cmd)
+
     | EditorMsg emsg ->
-      state.EditorState
-      |> ValueOption.map(fun es ->
-        let struct (es, cmd) = Editor.Entry.update emsg es
-        state.EditorState <- ValueSome es
-        struct (state, Cmd.map EditorMsg cmd))
-      |> ValueOption.defaultValue(state, Cmd.none)
+      match state.EditorState with
+      | ValueSome es ->
+        let struct (newEs, cmd) = Editor.Entry.update state.Env emsg es
+
+        struct ({
+                  state with
+                      EditorState = ValueSome newEs
+                },
+                Cmd.map EditorMsg cmd)
+      | ValueNone -> struct (state, Cmd.none)
+
     | GameplayMsg gmsg ->
-      state.GameplayState
-      |> ValueOption.map(fun gs ->
-        let struct (gs, cmd) = Gameplay.Entry.update gmsg gs
-        state.GameplayState <- ValueSome gs
-        struct (state, Cmd.map GameplayMsg cmd))
-      |> ValueOption.defaultValue(state, Cmd.none)
+      match state.GameplayState with
+      | ValueSome gs ->
+        let struct (newGs, cmd) = Gameplay.Entry.update state.Env gmsg gs
+
+        struct ({
+                  state with
+                      GameplayState = ValueSome newGs
+                },
+                Cmd.map GameplayMsg cmd)
+      | ValueNone -> struct (state, Cmd.none)
 
   let view ctx (state: State) buffer =
     state.EditorState
-    |> ValueOption.iter(fun es -> Editor.Entry.view ctx es buffer)
-
-
+    |> ValueOption.iter(fun es -> Editor.Entry.view state.Env ctx es buffer)
 
 module Program =
 

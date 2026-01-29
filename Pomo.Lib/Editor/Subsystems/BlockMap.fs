@@ -1,15 +1,16 @@
-namespace Pomo.Lib
+namespace Pomo.Lib.Editor.Subsystems
 
-open System.Collections.Generic
+open System
 open Microsoft.Xna.Framework
+open System.Collections.Generic
+open FSharp.UMX
 open Mibo.Elmish
-
-
-[<Measure>]
-type BlockTypeId
-
+open Pomo.Lib
+open Pomo.Lib.Editor
+open Pomo.Lib.Services
 
 module BlockMap =
+  open Pomo.Lib.BlockMap
 
   [<Struct>]
   type CollisionType =
@@ -82,22 +83,6 @@ module BlockMap =
     CollisionType: CollisionType
   }
 
-  [<Struct>]
-  type GridDimensions = {
-    Width: int
-    Height: int
-    Depth: int
-  } with
-
-    static member Default = { Width = 50; Height = 10; Depth = 50 }
-
-  [<Struct>]
-  type Transform = {
-    Position: Vector3
-    Rotation: Quaternion
-    Scale: Vector3
-  }
-
   type BlockMapDefinition = {
     Version: int
     Key: string
@@ -141,3 +126,44 @@ module BlockMap =
     | RemoveBlock of cell: Vector3
     | SetCursor of Vector3 voption
     | SetMap of BlockMapDefinition
+
+
+
+  let init
+    (_env: #FileSystemCap & #AssetsCap)
+    (mapDef: BlockMapDefinition)
+    : BlockMapModel =
+    {
+      Definition = mapDef
+      Cursor = ValueNone
+      Dirty = false
+    }
+
+  let update
+    (_env: #FileSystemCap & #AssetsCap)
+    (msg: BlockMapMsg)
+    (model: BlockMapModel)
+    : struct (BlockMapModel * Cmd<BlockMapMsg>) =
+    match msg with
+    | PlaceBlock(cell, blockId) ->
+      model.Definition.Blocks.Add(
+        cell,
+        {
+          Cell = cell
+          BlockTypeId = blockId
+          Rotation = ValueNone
+        }
+      )
+
+      { model with Dirty = true }, Cmd.none
+    | RemoveBlock cell ->
+      model.Definition.Blocks.Remove cell |> ignore
+      { model with Dirty = true }, Cmd.none
+    | SetCursor cursor -> { model with Cursor = cursor }, Cmd.none
+    | SetMap map ->
+      {
+        model with
+            Definition = map
+            Dirty = false
+      },
+      Cmd.none

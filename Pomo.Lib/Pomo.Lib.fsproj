@@ -6,14 +6,18 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <Compile Include="Domain.fs" />
+    <Compile Include="Services/FileSystem.fs" />
     <Compile Include="Editor/Domain.fs" />
+    <Compile Include="Editor/Subsystems/BlockMap.fs" />
+    <Compile Include="Services/BlockMapPersistence.fs" />
+    <Compile Include="AppEnv.fs" />
     <Compile Include="Editor/Entry.fs" />
     <Compile Include="Gameplay/Domain.fs" />
     <Compile Include="Gameplay/Entry.fs" />
-    <Compile Include="Domain.fs" />
     <Compile Include="Library.fs" />
   </ItemGroup>
->
+
   <ItemGroup>
     <PackageReference Include="FSharp.UMX" Version="1.1.0" />
     <PackageReference Include="JDeck" Version="1.0.0" />
