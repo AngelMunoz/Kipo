@@ -1,0 +1,39 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Compile Include="Editor/Domain.fs" />
+    <Compile Include="Editor/Entry.fs" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Content Include="Content/Items.json" CopyToPublishDirectory="PreserveNewest" />
+    <Content Include="Content/AIArchetypes.json" CopyToPublishDirectory="PreserveNewest" />
+    <Content Include="Content/Skills.json" CopyToPublishDirectory="PreserveNewest" />
+    <Content Include="Content/Models.json" CopyToPublishDirectory="PreserveNewest" />
+    <Content Include="Content/Animations.json" CopyToPublishDirectory="PreserveNewest" />
+    <Content Include="Content/Particles.json" CopyToPublishDirectory="PreserveNewest" />
+    <Content Include="Content/AIFamilies.json" CopyToPublishDirectory="PreserveNewest" />
+    <Content Include="Content/AIEntities.json" CopyToPublishDirectory="PreserveNewest" />
+    <Content Include="Content/DecisionTrees.json" CopyToPublishDirectory="PreserveNewest" />
+    <Content Include="Content/Maps/Proto.ai-entities.json" CopyToPublishDirectory="PreserveNewest" />
+    <Content Include="Content/AssetManifests/Proto.json" CopyToPublishDirectory="PreserveNewest" />
+    <Content Include="Content/HUDConfig.json" CopyToPublishDirectory="PreserveNewest" />
+    <Content Include="Content/CustomMaps/**/*.json" CopyToPublishDirectory="PreserveNewest" />
+  </ItemGroup>
+  <ItemGroup>
+    <PackageReference Include="FSharp.UMX" Version="1.1.0" />
+    <PackageReference Include="JDeck" Version="1.0.0" />
+    <PackageReference Include="Mibo" Version="1.*" />
+    <PackageReference Include="Myra" Version="1.5.10" />
+    <PackageReference Include="MonoGame.Framework.Native" Version="3.8.*" PrivateAssets="All" />
+    <!-- Build and analysis tools -->
+    <PackageReference Include="Ionide.Analyzers" Version="0.*" PrivateAssets="All" />
+    <PackageReference Include="FSharp.Analyzers.Build" Version="0.*" PrivateAssets="All" IncludeAssets="build" />
+  </ItemGroup>
+
+</Project>

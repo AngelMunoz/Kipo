@@ -158,7 +158,7 @@
     <PackageReference Include="FSharp.UMX" Version="1.1.0" />
     <PackageReference Include="JDeck" Version="1.0.0" />
     <PackageReference Include="Myra" Version="1.5.10" />
-    <PackageReference Include="MonoGame.Framework.DesktopGL" Version="3.8.*" PrivateAssets="All" />
+    <PackageReference Include="MonoGame.Framework.Native" Version="3.8.*" PrivateAssets="All" />
     <!-- Build and analysis tools -->
     <PackageReference Include="Ionide.Analyzers" Version="0.*" PrivateAssets="All" />
     <PackageReference Include="FSharp.Analyzers.Build" Version="0.*" PrivateAssets="All" IncludeAssets="build" />

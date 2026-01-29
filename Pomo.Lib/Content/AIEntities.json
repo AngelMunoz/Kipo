@@ -1,0 +1,162 @@
+{
+  "FireMage": {
+    "Name": "Fire Mage",
+    "ArchetypeId": 1,
+    "Family": "Magic",
+    "Skills": [2, 3],
+    "DecisionTree": "RangedCaster",
+    "Model": "HumanoidBase"
+  },
+  "IceMage": {
+    "Name": "Ice Mage",
+    "ArchetypeId": 1,
+    "Family": "Magic",
+    "Skills": [11, 20],
+    "DecisionTree": "RangedCaster",
+    "Model": "HumanoidBase"
+  },
+  "ElementalCaster": {
+    "Name": "Elemental Caster",
+    "ArchetypeId": 1,
+    "Family": "Magic",
+    "Skills": [14, 15, 20],
+    "DecisionTree": "RangedCaster",
+    "Model": "HumanoidBase"
+  },
+  "Warrior": {
+    "Name": "Warrior",
+    "ArchetypeId": 1,
+    "Family": "Power",
+    "Skills": [1, 16, 21],
+    "DecisionTree": "MeleeAttacker",
+    "Model": "HumanoidBase"
+  },
+  "Berserker": {
+    "Name": "Berserker",
+    "ArchetypeId": 1,
+    "Family": "Power",
+    "Skills": [1, 6, 16, 21],
+    "DecisionTree": "MeleeAttacker",
+    "Model": "HumanoidBase"
+  },
+  "Bard": {
+    "Name": "Bard",
+    "ArchetypeId": 1,
+    "Family": "Charm",
+    "Skills": [5, 14, 22, 23],
+    "DecisionTree": "SupportBuffer",
+    "Model": "HumanoidBase"
+  },
+  "Enchanter": {
+    "Name": "Enchanter",
+    "ArchetypeId": 1,
+    "Family": "Charm",
+    "Skills": [4, 5, 15, 22, 24],
+    "DecisionTree": "SupportBuffer",
+    "Model": "HumanoidBase"
+  },
+  "Sniper": {
+    "Name": "Sniper",
+    "ArchetypeId": 2,
+    "Family": "Sense",
+    "Skills": [17, 19],
+    "DecisionTree": "TacticalRanged",
+    "Model": "HumanoidBase"
+  },
+  "Assassin": {
+    "Name": "Assassin",
+    "ArchetypeId": 1,
+    "Family": "Sense",
+    "Skills": [12, 13],
+    "DecisionTree": "TacticalRanged",
+    "Model": "HumanoidBase"
+  },
+  "FireTower": {
+    "Name": "Fire Tower",
+    "ArchetypeId": 3,
+    "Family": "Magic",
+    "Skills": [2],
+    "DecisionTree": "Turret",
+    "Model": "HumanoidBase"
+  },
+  "IceTower": {
+    "Name": "Ice Tower",
+    "ArchetypeId": 3,
+    "Family": "Magic",
+    "Skills": [11],
+    "DecisionTree": "Turret",
+    "Model": "HumanoidBase"
+  },
+  "EarthTower": {
+    "Name": "Earth Tower",
+    "ArchetypeId": 3,
+    "Family": "Magic",
+    "Skills": [7],
+    "DecisionTree": "Turret",
+    "Model": "HumanoidBase"
+  },
+  "Ranger": {
+    "Name": "Ranger",
+    "ArchetypeId": 2,
+    "Family": "Sense",
+    "Skills": [17, 19],
+    "DecisionTree": "TacticalRanged",
+    "Model": "SkeletonArcher"
+  },
+  "Mage": {
+    "Name": "Mage",
+    "ArchetypeId": 1,
+    "Family": "Magic",
+    "Skills": [11, 20],
+    "DecisionTree": "RangedCaster",
+    "Model": "SkeletonMage"
+  },
+  "Knight": {
+    "Name": "Knight",
+    "ArchetypeId": 1,
+    "Family": "Power",
+    "Skills": [1, 16, 21],
+    "DecisionTree": "MeleeAttacker",
+    "Model": "Knight"
+  },
+  "Barbarian": {
+    "Name": "Barbarian",
+    "ArchetypeId": 1,
+    "Family": "Power",
+    "Skills": [1, 6, 16],
+    "DecisionTree": "MeleeAttacker",
+    "Model": "Barbarian"
+  },
+  "Rogue": {
+    "Name": "Rogue",
+    "ArchetypeId": 1,
+    "Family": "Sense",
+    "Skills": [12, 13],
+    "DecisionTree": "TacticalRanged",
+    "Model": "Rogue"
+  },
+  "RogueHooded": {
+    "Name": "Hooded Rogue",
+    "ArchetypeId": 1,
+    "Family": "Sense",
+    "Skills": [12, 13, 17],
+    "DecisionTree": "TacticalRanged",
+    "Model": "RogueHooded"
+  },
+  "Jack": {
+    "Name": "Jack",
+    "ArchetypeId": 1,
+    "Family": "Charm",
+    "Skills": [5, 14, 22, 23],
+    "DecisionTree": "SupportBuffer",
+    "Model": "Jack"
+  },
+  "Witch": {
+    "Name": "Witch",
+    "ArchetypeId": 1,
+    "Family": "Magic",
+    "Skills": [2, 3, 9, 10],
+    "DecisionTree": "RangedCaster",
+    "Model": "Witch"
+  }
+}

@@ -1,0 +1,112 @@
+{
+  "1": {
+    "Id": 1,
+    "Name": "Simple Sword",
+    "Weight": 5,
+    "Kind": {
+      "Type": "Wearable",
+      "Slot": "Weapon",
+      "Stats": [
+        {
+          "Type": "Additive",
+          "Stat": "AP",
+          "Value": 5.0
+        }
+      ]
+    }
+  },
+  "2": {
+    "Id": 2,
+    "Name": "Health Potion",
+    "Weight": 1,
+    "Kind": {
+      "Type": "Usable",
+      "Effect": {
+        "Name": "Health Potion",
+        "Kind": "ResourceOverTime",
+        "DamageSource": "Physical",
+        "Stacking": { "Type": "NoStack" },
+        "Duration": { "Type": "Instant" },
+        "Modifiers": [
+          {
+            "Type": "ResourceChange",
+            "Resource": "HP",
+            "Amount": "50"
+          }
+        ]
+      }
+    }
+  },
+  "3": {
+    "Id": 3,
+    "Name": "Rock",
+    "Weight": 1,
+    "Kind": {
+      "Type": "NonUsable"
+    }
+  },
+  "4": {
+    "Id": 4,
+    "Name": "Wizard Hat",
+    "Weight": 30,
+    "Kind": {
+      "Type": "Wearable",
+      "Slot": "Head",
+      "Stats": [
+        {
+          "Type": "Additive",
+          "Stat": "MA",
+          "Value": 10.0
+        },
+        {
+          "Type": "Additive",
+          "Stat": "MS",
+          "Value": 50
+        }
+      ]
+    }
+  },
+  "5": {
+    "Id": 5,
+    "Name": "Magic Staff",
+    "Weight": 40,
+    "Kind": {
+      "Type": "Wearable",
+      "Slot": "Weapon",
+      "Stats": [
+        {
+          "Type": "Additive",
+          "Stat": "MA",
+          "Value": 15.0
+        },
+        {
+          "Type": "Additive",
+          "Stat": "MPRegen",
+          "Value": 5.0
+        }
+      ]
+    }
+  },
+  "6": {
+    "Id": 6,
+    "Name": "Troll's Blood Potion",
+    "Weight": 5,
+    "Kind": {
+      "Type": "Usable",
+      "Effect": {
+        "Name": "Troll's Blood",
+        "Kind": "ResourceOverTime",
+        "DamageSource": "Physical",
+        "Stacking": { "Type": "RefreshDuration" },
+        "Duration": { "Type": "Loop", "Interval": 1.5, "Duration": 10 },
+        "Modifiers": [
+          {
+            "Type": "ResourceChange",
+            "Resource": "HP",
+            "Amount": "5"
+          }
+        ]
+      }
+    }
+  }
+}
