@@ -4,7 +4,7 @@
 
 > **Architecture Pattern**: Module-based Elmish decomposition - single file per module, each with its own Model/Msg/Update/View. Main program orchestrates subsystems.
 
-> **Last Updated**: 2026-01-29 - Check disk before implementing - file locations and patterns have diverged from original plan
+> **Last Updated**: 2026-01-29 - Updated to reflect current implementation status
 
 ---
 
@@ -16,15 +16,22 @@
 - Services: FileSystem, BlockMapPersistence in Pomo.Lib/Services/
 - AppEnv: Central composition in Pomo.Lib/AppEnv.fs
 - BlockMap subsystem: Model, Msg, init, update in Pomo.Lib/Editor/Subsystems/BlockMap.fs
+- Camera subsystem: Pomo.Lib/Editor/Subsystems/Camera.fs (Isometric/FreeFly modes, pan, zoom, layer tracking)
+- Input handling: Subscriptions wired via InputMapper with semantic action mapping in Pomo.Lib/Editor/Entry.fs
+- View/Rendering: Grid overlay at current editing layer
 - Entry point: Consolidated in Pomo.Lib/Editor/Entry.fs
 
 **Stubs:**
 - BlockMapPersistence Save/Load (TODO comments present)
-- Editor view function (empty implementation)
+- BlockMap subsystem view function (empty implementation)
+- Camera view function (empty - camera is renderless)
 
 **Not Started:**
-- Camera, Brush, Navigation, Input, History, UI subsystems
-- Subscriptions
+- Brush subsystem (types exist in Domain.fs, no subsystem yet)
+- Mouse/cursor tracking and ray casting
+- Block placement via mouse interaction
+- History (Undo/Redo) subsystem
+- UI subsystem
 - JSON serialization (actual encode/decode)
 
 ---
@@ -35,26 +42,26 @@
 
 **Block Manipulation:**
 
-- [x] Place blocks at grid cursor position
-- [x] Remove blocks at cursor position
+- [x] Place blocks at grid cursor position (via BlockMap subsystem - API ready)
+- [x] Remove blocks at cursor position (via BlockMap subsystem - API ready)
 - [ ] Block rotation (X, Y, Z axes via Q/E keys)
-- [ ] Multiple brush modes (Place, Erase, Select) - types exist, subsystem needed
+- [ ] Multiple brush modes (Place, Erase, Select) - types exist in Domain.fs, subsystem needed
 - [ ] Drag-to-place (continuous placement while holding click)
 - [ ] Collision-enabled variant toggle
 
 **Navigation:**
 
-- [ ] Isometric camera (pan with WASD, zoom with scroll, fixed angle)
-- [ ] Free-fly camera (6DOF, rotate with right-click drag)
-- [ ] Layer navigation (Page Up/Down to change Y-level)
+- [x] Isometric camera (pan with WASD, fixed angle)
+- [x] Free-fly camera (6DOF with mode toggle via Tab)
+- [x] Layer navigation (Page Up/Down to change Y-level)
+- [x] Visual grid overlay at current editing layer
 - [ ] Grid cursor tracking (ray-plane intersection at current layer)
-- [ ] Visual grid overlay at current editing layer
 - [ ] Ghost block preview at cursor position
 
 **State Management:**
 
 - [ ] Undo/Redo with full action history
-- [x] Dirty tracking
+- [x] Dirty tracking (in BlockMapModel)
 - [ ] Block map serialization/deserialization (JSON) - stubbed
 - [ ] New map creation with configurable dimensions
 - [ ] Load/save map files with validation - stubbed
@@ -67,17 +74,17 @@
 - [ ] Block categories for UI organization
 - [ ] Variant system (collision, effect variants)
 - [ ] Block models (3D model references)
-- [ ] Collision types (Box, Mesh, NoCollision)
+- [ ] Collision types (Box, Mesh, NoCollision) - type exists
 - [ ] Block effects (lava damage, ice slow, etc. via Skill.Effect)
 
 **Map Structure:**
 
-- [ ] 3D grid coordinates (X/Y/Z)
-- [ ] Sparse block storage (only occupied cells)
-- [ ] Map dimensions (Width, Height, Depth)
+- [x] 3D grid coordinates (X/Y/Z) - using Vector3
+- [x] Sparse block storage (only occupied cells) - Dictionary<Vector3, PlacedBlock>
+- [x] Map dimensions (Width, Height, Depth) - GridDimensions type
 - [ ] Spawn point definition
-- [ ] Map settings (engagement rules, max enemies)
-- [ ] Map objects (spawns, teleports, triggers)
+- [ ] Map settings (engagement rules, max enemies) - type exists
+- [ ] Map objects (spawns, teleports, triggers) - type exists
 
 ### 1.3 Rendering Features
 
@@ -88,7 +95,7 @@
 - [ ] Frustum culling for visible blocks
 - [ ] Ghost block with transparency
 - [ ] Cursor wireframe overlay
-- [ ] Grid line rendering
+- [x] Grid line rendering (immediate mode lines)
 - [ ] Lighting support (PBR materials optional, unlit for editor)
 
 **Performance:**
@@ -105,7 +112,7 @@
 - [ ] Block type selection (click to select brush)
 - [ ] Layer indicator and navigation buttons
 - [ ] Brush mode toggle buttons
-- [ ] Camera mode switch (Isometric/FreeFly)
+- [ ] Camera mode switch (Isometric/FreeFly) - implemented via Tab key
 - [ ] Help overlay with keyboard shortcuts
 - [ ] Undo/Redo buttons
 - [ ] Save/Load menu with file dialogs
@@ -113,10 +120,10 @@
 
 **Input Handling:**
 
-- [ ] Semantic input mapping (actions bound to keys)
+- [x] Semantic input mapping (actions bound to keys) - EditorInputAction type with InputMapper
 - [ ] Mouse tracking for cursor position
 - [ ] Mouse click for block placement/removal
-- [ ] Keyboard shortcuts (undo, redo, rotation, layer change)
+- [x] Keyboard shortcuts for camera navigation (WASD, PageUp/Down, Home, Tab)
 - [ ] Input rebinding support (via Mibo's input mapping)
 
 ### 1.5 Serialization Features
@@ -128,7 +135,7 @@
 - [ ] BlockType encoder/decoder
 - [ ] MapObject encoder/decoder
 - [ ] Quaternion encoder/decoder
-- [ ] GridCell3D encoder/decoder
+- [ ] Grid coordinates encoder/decoder
 - [ ] Roundtrip verification (encode → decode → equal)
 
 ---
@@ -143,9 +150,10 @@
 Pomo.Lib/
   Editor/
     Domain.fs           // BrushMode, CameraMode, EditorAction
-    Entry.fs            // Main Elmish (Model, Msg, init, update, view)
+    Entry.fs            // Main Elmish (Model, Msg, init, update, view, subscribe)
     Subsystems/
-      BlockMap.fs       // Model, Msg, init, update (view stub)
+      BlockMap.fs       // Model, Msg, init, update, view
+      Camera.fs         // Model, Msg, init, update, view
 
   Services/
     FileSystem.fs       // FileSystem capability + implementation
@@ -159,6 +167,7 @@ Pomo.Lib/
 - Services at library level (shared with gameplay)
 - Domain types at library level (shared)
 - Entry.fs consolidated instead of Model.fs + Msg.fs + Init.fs + Update.fs + View.fs
+- Camera subsystem added
 
 ### 2.2 Core Domain Types
 
@@ -220,6 +229,20 @@ type BlockMapDefinition = {
 }
 ```
 
+**Pomo.Lib/Editor/Entry.fs (Input Actions):**
+
+```fsharp
+[<Struct>] type EditorInputAction =
+  | PanLeft
+  | PanRight
+  | PanForward
+  | PanBackward
+  | LayerUp
+  | LayerDown
+  | ResetCameraView
+  | ToggleCameraMode
+```
+
 ### 2.3 Subsystem Model Pattern
 
 **Pattern from BlockMap.fs:**
@@ -267,7 +290,56 @@ module BlockMap =
     | SetCursor cursor -> { model with Cursor = cursor }, Cmd.none
     | SetMap map -> { model with Definition = map; Dirty = false }, Cmd.none
 
-  let view ctx model buffer = ()  // stub
+  let view ctx model buffer = ()
+```
+
+**Pattern from Camera.fs:**
+
+```fsharp
+namespace Pomo.Lib.Editor.Subsystems
+
+open System
+open Microsoft.Xna.Framework
+open Microsoft.Xna.Framework.Input
+open Mibo.Elmish
+open Mibo.Rendering.Graphics3D
+open Pomo.Lib.Services
+
+module Camera =
+  [<Struct>] type CameraMode = Isometric | FreeFly
+
+  [<Struct>] type CameraModel = {
+    Camera: Camera
+    Mode: CameraMode
+    Pan: Vector2
+    Zoom: float32
+    CurrentLayer: int
+    IsDragging: bool
+    LastMousePos: Point
+  }
+
+  type Msg =
+    | SetMode of CameraMode
+    | Pan of delta: Vector2
+    | Zoom of delta: float32
+    | SetLayer of layer: int
+    | SetIsDragging of isDragging: bool
+    | SetLastMousePos of pos: Point
+    | Orbit of yaw: float32 * pitch: float32
+    | ResetCamera
+
+  let isometricDefaults: Camera = ...
+  let freeFlyDefaults: Camera = ...
+
+  let init (_env: #FileSystemCap & #AssetsCap) : CameraModel = ...
+
+  let update
+    (_env: #FileSystemCap & #AssetsCap)
+    (msg: Msg)
+    (model: CameraModel)
+    : struct (CameraModel * Cmd<Msg>) = ...
+
+  let view _ctx _model _buffer = ()
 ```
 
 ### 2.4 Main Model Composition
@@ -278,49 +350,52 @@ module BlockMap =
 namespace Pomo.Lib.Editor
 
 open Microsoft.Xna.Framework
+open Microsoft.Xna.Framework.Input
 open Mibo.Elmish
+open Mibo.Input
+open Mibo.Rendering
+open Mibo.Rendering.Graphics3D
 open Pomo.Lib
 open Pomo.Lib.Services
 open Pomo.Lib.Editor.Subsystems
 open Pomo.Lib.Editor.Subsystems.BlockMap
+open Pomo.Lib.Editor.Subsystems.Camera
 
-[<Struct>] type EditorModel = { BlockMap: BlockMapModel }
+[<Struct>] type EditorInputAction = ...
+
+[<Struct>] type EditorModel = {
+  BlockMap: BlockMapModel
+  Camera: CameraModel
+  Actions: ActionState<EditorInputAction>
+}
 
 [<Struct>] type EditorMsg =
-  | BlockMapMsg of blockMap: BlockMapMsg
+  | BlockMapMsg of blockMap: BlockMap.Msg
+  | CameraMsg of camera: Camera.Msg
+  | InputMapped of ActionState<EditorInputAction>
   | Tick of gt: GameTime
 
 module Entry =
-  let init
-    (env: #FileSystemCap & #AssetsCap & #BlockMapPersistenceCap)
-    (ctx: obj)
-    : struct (EditorModel * Cmd<EditorMsg>) =
-    { BlockMap = BlockMap.init env BlockMapDefinition.empty }, Cmd.none
+  let private inputMap = ...
 
-  let update
-    (env: #FileSystemCap & #AssetsCap & #BlockMapPersistenceCap)
-    (msg: EditorMsg)
-    (model: EditorModel)
-    : struct (EditorModel * Cmd<EditorMsg>) =
-    match msg with
-    | BlockMapMsg subMsg ->
-      let struct (subModel, cmd) = BlockMap.update env subMsg model.BlockMap
-      { model with BlockMap = subModel }, cmd |> Cmd.map BlockMapMsg
-    | Tick _ -> model, Cmd.none
+  let init env ctx : struct (EditorModel * Cmd<EditorMsg>) = ...
 
-  let view env ctx model buffer = ()  // stub
+  let update env msg model : struct (EditorModel * Cmd<EditorMsg>) = ...
+
+  let subscribe ctx model : Sub<EditorMsg> =
+    InputMapper.subscribeStatic inputMap InputMapped ctx
+
+  let view env ctx model buffer : unit = ...
 ```
-
-Add new subsystems by: extending EditorModel, adding wrapped case to EditorMsg, handling in update with Cmd.map, calling in view.
 
 ### 2.5 Update, View, Subscriptions, Services
 
 All consolidated in Entry.fs. See section 2.4 for the actual pattern.
 
-Planned additions:
-- Subscriptions module for input handling
+Implemented additions:
+- Subscriptions via InputMapper for input handling
 - View context with rendering pipeline
-- Additional services (ModelCache, AssetLoader)
+- Grid rendering via line drawing
 
 ---
 
@@ -408,17 +483,19 @@ Planned additions:
 - [x] AppEnv composition
 - [x] BlockMap subsystem
 - [x] Basic Elmish setup
-- [ ] Camera subsystem
+- [x] Camera subsystem
 - [ ] Brush subsystem
-- [ ] Input handling
-- [ ] View/Rendering
-- [ ] Mibo pipeline
+- [x] Input handling (keyboard navigation)
+- [x] View/Rendering (grid)
+- [x] Mibo pipeline
+- [ ] Mouse/cursor tracking
+- [ ] Block placement via mouse
 
 ### Phase 2: Core Editor
 
-- [ ] Block placement/removal
-- [ ] Cursor tracking
-- [ ] Grid overlay
+- [ ] Block placement/removal via mouse
+- [ ] Cursor tracking (ray-plane intersection)
+- [x] Grid overlay
 - [ ] Ghost block preview
 - [ ] Basic UI (palette, layer indicator)
 
@@ -432,7 +509,7 @@ Planned additions:
 ### Phase 4: Advanced Editor
 
 - [ ] Undo/Redo system
-- [ ] Camera modes (isometric + free-fly)
+- [x] Camera modes (isometric + free-fly)
 - [ ] Brush rotation
 - [ ] Collision variants
 - [ ] Map objects
@@ -440,7 +517,7 @@ Planned additions:
 ### Phase 5: Polish
 
 - [ ] Complete UI (all panels, dialogs)
-- [ ] Input mapping and rebinding
+- [x] Input mapping and rebinding (framework in place)
 - [ ] Help system
 - [ ] Performance optimization
 - [ ] Testing and bug fixes
@@ -494,4 +571,4 @@ Planned additions:
 
 ---
 
-**Next Steps**: Begin Phase 1 implementation by creating the core domain types and subsystem structure in Pomo.Lib/Editor/.
+**Next Steps**: Begin Phase 1 completion by implementing Brush subsystem and mouse cursor tracking.
