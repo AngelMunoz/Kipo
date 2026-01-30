@@ -24,7 +24,7 @@ module Camera =
     LastMousePos: Point
   }
 
-  type CameraMsg =
+  type Msg =
     | SetMode of CameraMode
     | Pan of delta: Vector2
     | Zoom of delta: float32
@@ -35,8 +35,8 @@ module Camera =
     | ResetCamera
 
   let isometricDefaults: Camera =
-    let yaw = MathHelper.ToRadians -45f
-    let pitch = MathHelper.ToRadians -35.264f
+    let yaw = MathHelper.ToRadians 45f
+    let pitch = MathHelper.ToRadians 35.264f
     let distance = 50f
     let target = Vector3.Zero
 
@@ -95,9 +95,9 @@ module Camera =
 
   let update
     (_env: #FileSystemCap & #AssetsCap)
-    (msg: CameraMsg)
+    (msg: Msg)
     (model: CameraModel)
-    : struct (CameraModel * Cmd<CameraMsg>) =
+    : struct (CameraModel * Cmd<Msg>) =
     match msg with
     | SetMode mode ->
       let newCamera =

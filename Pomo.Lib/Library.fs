@@ -71,6 +71,11 @@ module internal Entry =
     state.EditorState
     |> ValueOption.iter(fun es -> Editor.Entry.view state.Env ctx es buffer)
 
+  let subscribe ctx (state: State) : Sub<Message> =
+    match state.EditorState with
+    | ValueSome es -> Editor.Entry.subscribe ctx es |> Sub.map "editor" EditorMsg
+    | ValueNone -> Sub.none
+
 module Program =
 
   let create() : Program<State, Message> =
@@ -78,6 +83,7 @@ module Program =
     |> Program.withAssets
     |> Program.withInput
     |> Program.withTick Tick
+    |> Program.withSubscription Entry.subscribe
     |> Program.withPipeline PipelineConfig.defaults Entry.view
     |> Program.withConfig(fun (game, graphicsDeviceManager) ->
       game.Content.RootDirectory <- "Content"

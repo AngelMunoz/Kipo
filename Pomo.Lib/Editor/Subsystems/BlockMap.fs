@@ -14,7 +14,7 @@ module BlockMap =
     Dirty: bool
   }
 
-  type BlockMapMsg =
+  type Msg =
     | PlaceBlock of cell: Vector3 * blockId: int<BlockTypeId>
     | RemoveBlock of cell: Vector3
     | SetCursor of Vector3 voption
@@ -32,9 +32,9 @@ module BlockMap =
 
   let update
     (_env: #FileSystemCap & #AssetsCap)
-    (msg: BlockMapMsg)
+    (msg: Msg)
     (model: BlockMapModel)
-    : struct (BlockMapModel * Cmd<BlockMapMsg>) =
+    : struct (BlockMapModel * Cmd<Msg>) =
     match msg with
     | PlaceBlock(cell, blockId) ->
       model.Definition.Blocks.Add(
