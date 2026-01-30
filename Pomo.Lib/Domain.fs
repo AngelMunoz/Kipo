@@ -2,142 +2,125 @@ namespace Pomo.Lib
 
 open System.Collections.Generic
 open Microsoft.Xna.Framework
-open Mibo.Elmish
-
+open FSharp.UMX
 
 [<Measure>]
 type BlockTypeId
 
+[<Struct>]
+type GridDimensions = {
+  Width: int
+  Height: int
+  Depth: int
+} with
+  static member Default = { Width = 50; Height = 10; Depth = 50 }
 
-module BlockMap =
+[<Struct>]
+type Transform = {
+  Position: Vector3
+  Rotation: Quaternion
+  Scale: Vector3
+}
 
-  [<Struct>]
-  type CollisionType =
-    | Box
-    | Mesh
-    | NoCollision
+// --- Block Types ---
 
-  [<Struct>]
-  type EngagementRules =
-    | Peaceful
-    | PvE
-    | PvP
-    | FFA
+[<Struct>]
+type CollisionType =
+  | Box
+  | Mesh
+  | NoCollision
 
-  type MapSettings = {
-    EngagementRules: EngagementRules
-    MaxEnemyEntities: int
-    StartingLayer: int
-  }
+type BlockType = {
+  Id: int<BlockTypeId>
+  ArchetypeId: int<BlockTypeId>
+  VariantKey: string voption
+  Name: string
+  Model: string
+  Category: string
+  CollisionType: CollisionType
+}
 
-  [<Struct; RequireQualifiedAccess>]
-  type MapObjectShape =
-    | Box of size: Vector3
-    | Sphere of radius: float32
+// --- Map Structure ---
 
-  [<Struct>]
-  type SpawnProperties = {
-    IsPlayerSpawn: bool
-    EntityGroup: string voption
-    MaxSpawns: int
-    Faction: string voption
-  }
+[<Struct>]
+type EngagementRules =
+  | Peaceful
+  | PvE
+  | PvP
+  | FFA
 
-  [<Struct>]
-  type TeleportProperties = {
-    TargetMap: string voption
-    TargetObjectName: string
-  }
+type MapSettings = {
+  EngagementRules: EngagementRules
+  MaxEnemyEntities: int
+  StartingLayer: int
+}
 
-  [<Struct>]
-  type MapObjectData =
-    | Spawn of spawn: SpawnProperties
-    | Teleport of teleport: TeleportProperties
-    | Trigger of triggerId: string
+[<Struct; RequireQualifiedAccess>]
+type MapObjectShape =
+  | Box of size: Vector3
+  | Sphere of radius: float32
 
-  type MapObject = {
-    Id: int
-    Name: string
-    Position: Vector3
-    Rotation: Quaternion voption
-    Shape: MapObjectShape
-    Data: MapObjectData
-  }
+[<Struct>]
+type SpawnProperties = {
+  IsPlayerSpawn: bool
+  EntityGroup: string voption
+  MaxSpawns: int
+  Faction: string voption
+}
 
-  [<Struct>]
-  type PlacedBlock = {
-    Cell: Vector3
-    BlockTypeId: int<BlockTypeId>
-    Rotation: Quaternion voption
-  }
+[<Struct>]
+type TeleportProperties = {
+  TargetMap: string voption
+  TargetObjectName: string
+}
 
+[<Struct>]
+type MapObjectData =
+  | Spawn of spawn: SpawnProperties
+  | Teleport of teleport: TeleportProperties
+  | Trigger of triggerId: string
 
-  type BlockType = {
-    Id: int<BlockTypeId>
-    ArchetypeId: int<BlockTypeId>
-    VariantKey: string voption
-    Name: string
-    Model: string
-    Category: string
-    CollisionType: CollisionType
-  }
+type MapObject = {
+  Id: int
+  Name: string
+  Position: Vector3
+  Rotation: Quaternion voption
+  Shape: MapObjectShape
+  Data: MapObjectData
+}
 
-  [<Struct>]
-  type GridDimensions = {
-    Width: int
-    Height: int
-    Depth: int
-  } with
+[<Struct>]
+type PlacedBlock = {
+  Cell: Vector3
+  BlockTypeId: int<BlockTypeId>
+  Rotation: Quaternion voption
+}
 
-    static member Default = { Width = 50; Height = 10; Depth = 50 }
+type BlockMapDefinition = {
+  Version: int
+  Key: string
+  MapKey: string voption
+  Dimensions: GridDimensions
+  Palette: Dictionary<int<BlockTypeId>, BlockType>
+  Blocks: Dictionary<Vector3, PlacedBlock>
+  SpawnCell: Vector3 voption
+  Settings: MapSettings
+  Objects: MapObject[]
+}
 
-  [<Struct>]
-  type Transform = {
-    Position: Vector3
-    Rotation: Quaternion
-    Scale: Vector3
-  }
-
-  type BlockMapDefinition = {
-    Version: int
-    Key: string
-    MapKey: string voption
-    Dimensions: GridDimensions
-    Palette: Dictionary<int<BlockTypeId>, BlockType>
-    Blocks: Dictionary<Vector3, PlacedBlock>
-    SpawnCell: Vector3 voption
-    Settings: MapSettings
-    Objects: MapObject[]
-  }
-
-  module BlockMapDefinition =
-    let empty = {
-      Version = 1
-      Key = "NewMap"
-      MapKey = ValueNone
-      Dimensions = GridDimensions.Default
-      Palette = Dictionary()
-      Blocks = Dictionary()
-      SpawnCell = ValueNone
-      Settings = {
-        EngagementRules = EngagementRules.PvE
-        MaxEnemyEntities = 0
-        StartingLayer = 0
-      }
-      Objects = Array.empty
+module BlockMapDefinition =
+  let empty = {
+    Version = 1
+    Key = "NewMap"
+    MapKey = ValueNone
+    Dimensions = GridDimensions.Default
+    Palette = Dictionary()
+    Blocks = Dictionary()
+    SpawnCell = ValueNone
+    Settings = {
+      EngagementRules = EngagementRules.PvE
+      MaxEnemyEntities = 0
+      StartingLayer = 0
     }
-
-  // --- Elmish Module ---
-
-  [<Struct>]
-  type BlockMapModel = {
-    Definition: BlockMapDefinition
-    Cursor: Vector3 voption
-    Dirty: bool
+    Objects = Array.empty
   }
-
-  type BlockMapMsg =
-    | PlaceBlock of cell: Vector3 * blockId: int<BlockTypeId>
-    | RemoveBlock of cell: Vector3
-    | SetCursor of Vector3 voption
-    | SetMap of BlockMapDefinition

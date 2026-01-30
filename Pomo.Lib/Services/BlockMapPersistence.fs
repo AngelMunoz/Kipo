@@ -2,7 +2,6 @@ namespace Pomo.Lib.Services
 
 open Pomo.Lib
 open System.Text.Json
-open Pomo.Lib.BlockMap
 
 [<Interface>]
 type BlockMapPersistence =

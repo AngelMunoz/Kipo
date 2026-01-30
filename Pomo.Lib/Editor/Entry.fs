@@ -26,7 +26,7 @@ module Entry =
     // env is available here for any initialization that needs services
     // For now, we just use the basic BlockMap initialization
     {
-      BlockMap = BlockMap.init env BlockMap.BlockMapDefinition.empty
+      BlockMap = BlockMap.init env BlockMapDefinition.empty
     },
     Cmd.none
 
