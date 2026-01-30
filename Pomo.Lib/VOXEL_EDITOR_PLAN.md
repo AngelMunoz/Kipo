@@ -17,8 +17,10 @@
 - AppEnv: Central composition in Pomo.Lib/AppEnv.fs
 - BlockMap subsystem: Model, Msg, init, update in Pomo.Lib/Editor/Subsystems/BlockMap.fs
 - Camera subsystem: Pomo.Lib/Editor/Subsystems/Camera.fs (Isometric/FreeFly modes, pan, zoom, layer tracking)
+- Cursor subsystem: Pomo.Lib/Editor/Subsystems/Cursor.fs (ray-plane intersection, grid cell tracking)
 - Input handling: Subscriptions wired via InputMapper with semantic action mapping in Pomo.Lib/Editor/Entry.fs
 - View/Rendering: Grid overlay at current editing layer
+- Mouse cursor tracking: Ray-plane intersection at current layer with visual wireframe highlight
 - Entry point: Consolidated in Pomo.Lib/Editor/Entry.fs
 
 **Stubs:**
@@ -28,7 +30,6 @@
 
 **Not Started:**
 - Brush subsystem (types exist in Domain.fs, no subsystem yet)
-- Mouse/cursor tracking and ray casting
 - Block placement via mouse interaction
 - History (Undo/Redo) subsystem
 - UI subsystem
@@ -55,7 +56,7 @@
 - [x] Free-fly camera (6DOF with mode toggle via Tab)
 - [x] Layer navigation (Page Up/Down to change Y-level)
 - [x] Visual grid overlay at current editing layer
-- [ ] Grid cursor tracking (ray-plane intersection at current layer)
+- [x] Grid cursor tracking (ray-plane intersection at current layer)
 - [ ] Ghost block preview at cursor position
 
 **State Management:**
@@ -488,7 +489,7 @@ Implemented additions:
 - [x] Input handling (keyboard navigation)
 - [x] View/Rendering (grid)
 - [x] Mibo pipeline
-- [ ] Mouse/cursor tracking
+- [x] Mouse/cursor tracking
 - [ ] Block placement via mouse
 
 ### Phase 2: Core Editor

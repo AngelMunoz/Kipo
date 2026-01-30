@@ -171,6 +171,24 @@ module Entry =
         gridColor
       ) |> ignore
 
+  let private getCursorCell (ctx: GameContext) (camera: Camera) (layerY: float32) : Vector3 voption =
+    let mouseState = Mouse.GetState()
+    let viewport = ctx.GraphicsDevice.Viewport
+    let mousePos = Vector2(float32 mouseState.X, float32 mouseState.Y)
+    let ray = Camera.screenPointToRay camera mousePos viewport
+
+    // Ray-plane intersection with Y plane at layerY
+    if Math.Abs ray.Direction.Y < 0.0001f then
+      ValueNone
+    else
+      let t = (layerY - ray.Position.Y) / ray.Direction.Y
+      if t >= 0f then
+        let worldPos = ray.Position + ray.Direction * t
+        let cell = Vector3(MathF.Floor worldPos.X, MathF.Floor worldPos.Y, MathF.Floor worldPos.Z)
+        ValueSome cell
+      else
+        ValueNone
+
   let view
     (env: #FileSystemCap & #AssetsCap & #BlockMapPersistenceCap)
     (ctx: GameContext)
@@ -184,4 +202,26 @@ module Entry =
     drawGrid buffer layerY
 
     BlockMap.view ctx model.BlockMap buffer
+
+    // Compute and draw cursor highlight at current layer
+    match getCursorCell ctx model.Camera.Camera layerY with
+    | ValueSome cell ->
+      let cursorColor = Color.Yellow
+      let min = Vector3(cell.X, cell.Y, cell.Z)
+      let max = Vector3(cell.X + 1f, cell.Y + 1f, cell.Z + 1f)
+      // Draw wireframe box around cursor cell
+      buffer.Line(Vector3(min.X, min.Y, min.Z), Vector3(max.X, min.Y, min.Z), cursorColor) |> ignore
+      buffer.Line(Vector3(max.X, min.Y, min.Z), Vector3(max.X, min.Y, max.Z), cursorColor) |> ignore
+      buffer.Line(Vector3(max.X, min.Y, max.Z), Vector3(min.X, min.Y, max.Z), cursorColor) |> ignore
+      buffer.Line(Vector3(min.X, min.Y, max.Z), Vector3(min.X, min.Y, min.Z), cursorColor) |> ignore
+      buffer.Line(Vector3(min.X, max.Y, min.Z), Vector3(max.X, max.Y, min.Z), cursorColor) |> ignore
+      buffer.Line(Vector3(max.X, max.Y, min.Z), Vector3(max.X, max.Y, max.Z), cursorColor) |> ignore
+      buffer.Line(Vector3(max.X, max.Y, max.Z), Vector3(min.X, max.Y, max.Z), cursorColor) |> ignore
+      buffer.Line(Vector3(min.X, max.Y, max.Z), Vector3(min.X, max.Y, min.Z), cursorColor) |> ignore
+      buffer.Line(Vector3(min.X, min.Y, min.Z), Vector3(min.X, max.Y, min.Z), cursorColor) |> ignore
+      buffer.Line(Vector3(max.X, min.Y, min.Z), Vector3(max.X, max.Y, min.Z), cursorColor) |> ignore
+      buffer.Line(Vector3(max.X, min.Y, max.Z), Vector3(max.X, max.Y, max.Z), cursorColor) |> ignore
+      buffer.Line(Vector3(min.X, min.Y, max.Z), Vector3(min.X, max.Y, max.Z), cursorColor) |> ignore
+    | ValueNone -> ()
+
     buffer.Submit()

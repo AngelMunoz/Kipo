@@ -11,6 +11,7 @@
     <Compile Include="Editor/Domain.fs" />
     <Compile Include="Editor/Subsystems/Camera.fs" />
     <Compile Include="Editor/Subsystems/BlockMap.fs" />
+    <Compile Include="Editor/Subsystems/Cursor.fs" />
     <Compile Include="Services/BlockMapPersistence.fs" />
     <Compile Include="AppEnv.fs" />
     <Compile Include="Editor/Entry.fs" />
