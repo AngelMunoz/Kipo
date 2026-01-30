@@ -58,3 +58,5 @@ module BlockMap =
             Dirty = false
       },
       Cmd.none
+
+  let view _ _ _ = ()

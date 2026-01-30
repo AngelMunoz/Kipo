@@ -4,6 +4,29 @@
 
 > **Architecture Pattern**: Module-based Elmish decomposition - single file per module, each with its own Model/Msg/Update/View. Main program orchestrates subsystems.
 
+> **Last Updated**: 2026-01-29 - Check disk before implementing - file locations and patterns have diverged from original plan
+
+---
+
+## Current State
+
+**Implemented:**
+- Domain types: BlockMapDefinition, BlockType, PlacedBlock, etc. in Pomo.Lib/Domain.fs
+- Editor types: BrushMode, CameraMode, EditorAction in Pomo.Lib/Editor/Domain.fs
+- Services: FileSystem, BlockMapPersistence in Pomo.Lib/Services/
+- AppEnv: Central composition in Pomo.Lib/AppEnv.fs
+- BlockMap subsystem: Model, Msg, init, update in Pomo.Lib/Editor/Subsystems/BlockMap.fs
+- Entry point: Consolidated in Pomo.Lib/Editor/Entry.fs
+
+**Stubs:**
+- BlockMapPersistence Save/Load (TODO comments present)
+- Editor view function (empty implementation)
+
+**Not Started:**
+- Camera, Brush, Navigation, Input, History, UI subsystems
+- Subscriptions
+- JSON serialization (actual encode/decode)
+
 ---
 
 ## 1. Target Features
@@ -12,10 +35,10 @@
 
 **Block Manipulation:**
 
-- [ ] Place blocks at grid cursor position
-- [ ] Remove blocks at cursor position
+- [x] Place blocks at grid cursor position
+- [x] Remove blocks at cursor position
 - [ ] Block rotation (X, Y, Z axes via Q/E keys)
-- [ ] Multiple brush modes (Place, Erase, Select)
+- [ ] Multiple brush modes (Place, Erase, Select) - types exist, subsystem needed
 - [ ] Drag-to-place (continuous placement while holding click)
 - [ ] Collision-enabled variant toggle
 
@@ -31,10 +54,10 @@
 **State Management:**
 
 - [ ] Undo/Redo with full action history
-- [ ] Dirty tracking (map version increments on modification)
-- [ ] Block map serialization/deserialization (JSON)
+- [x] Dirty tracking
+- [ ] Block map serialization/deserialization (JSON) - stubbed
 - [ ] New map creation with configurable dimensions
-- [ ] Load/save map files with validation
+- [ ] Load/save map files with validation - stubbed
 
 ### 1.2 Map Domain Features
 
@@ -114,69 +137,42 @@
 
 ### 2.1 File Organization
 
-**Top-Level Modules:**
+**Current Layout:**
 
 ```
 Pomo.Lib/
   Editor/
-    Domain.fs           // Core domain types (BrushMode, CameraMode, EditorAction)
-    Model.fs            // EditorModel = composition of subsystems
-    Msg.fs              // EditorMsg = wrapping pattern for subsystems
-    Init.fs             // Initialize editor state and services
-    Update.fs           // Main update, delegates to subsystems
-    View.fs             // Main view, delegates to subsystems
-    Subscriptions.fs    // Input subscriptions
-    Services.fs         // Service abstractions and implementations
-    Persistence.fs     // JSON serialization
-
+    Domain.fs           // BrushMode, CameraMode, EditorAction
+    Entry.fs            // Main Elmish (Model, Msg, init, update, view)
     Subsystems/
-      BlockMap.fs       // BlockMap model, messages, update, view
-      Brush.fs          // Brush model, messages, update, view
-      Camera.fs         // Camera model, messages, update, view
-      Navigation.fs     // Navigation model, messages, update, view
-      UI.fs            // UI model, messages, update, view
-      History.fs        // History model, messages, update, view
-      Input.fs          // Input model, messages, update, view
+      BlockMap.fs       // Model, Msg, init, update (view stub)
+
+  Services/
+    FileSystem.fs       // FileSystem capability + implementation
+    BlockMapPersistence.fs // Persistence capability + stub
+
+  Domain.fs             // BlockMapDefinition, BlockType, etc.
+  AppEnv.fs             // Central composition root
 ```
+
+**Differences from plan:**
+- Services at library level (shared with gameplay)
+- Domain types at library level (shared)
+- Entry.fs consolidated instead of Model.fs + Msg.fs + Init.fs + Update.fs + View.fs
 
 ### 2.2 Core Domain Types
 
-**Spatial Types (Domain.fs):**
+**Pomo.Lib/Domain.fs:**
 
 ```fsharp
-// 3D grid coordinates (integer)
-[<Struct>]
-type GridCell3D = { X: int; Y: int; Z: int }
+[<Measure>] type BlockTypeId
 
-// World position (float32)
-[<Struct>]
-type WorldPosition = { X: float32; Y: float32; Z: float32 }
+[<Struct>] type GridDimensions = { Width: int; Height: int; Depth: int }
+[<Struct>] type CollisionType = Box | Mesh | NoCollision
 
-// Map dimensions
-[<Struct>]
-type GridDimensions = { Width: int; Height: int; Depth: int }
-
-// Transform
-[<Struct>]
-type Transform = {
-  Position: WorldPosition
-  Rotation: Quaternion
-  Scale: Vector3
-}
-```
-
-**Block Types (Subsystems/BlockMap.fs):**
-
-```fsharp
-type BlockTypeId = int
-
-[<Struct>]
-type CollisionType = Box | Mesh | NoCollision
-
-[<Struct>]
 type BlockType = {
-  Id: BlockTypeId
-  ArchetypeId: BlockTypeId
+  Id: int<BlockTypeId>
+  ArchetypeId: int<BlockTypeId>
   VariantKey: string voption
   Name: string
   Model: string
@@ -184,328 +180,147 @@ type BlockType = {
   CollisionType: CollisionType
 }
 
-[<Struct>]
-type PlacedBlock = {
-  Cell: GridCell3D
-  BlockTypeId: BlockTypeId
+[<Struct>] type PlacedBlock = {
+  Cell: Vector3
+  BlockTypeId: int<BlockTypeId>
   Rotation: Quaternion voption
 }
 
 type BlockMapDefinition = {
   Version: int
   Key: string
+  MapKey: string voption
   Dimensions: GridDimensions
-  Palette: Map<BlockTypeId, BlockType>
-  Blocks: Map<GridCell3D, PlacedBlock>
-  SpawnCell: GridCell3D voption
+  Palette: Dictionary<int<BlockTypeId>, BlockType>
+  Blocks: Dictionary<Vector3, PlacedBlock>
+  SpawnCell: Vector3 voption
   Settings: MapSettings
-  Objects: MapObject list
+  Objects: MapObject[]
 }
 ```
 
-**Editor Types (Domain.fs):**
+**Pomo.Lib/Editor/Domain.fs:**
 
 ```fsharp
-[<Struct>]
-type BrushMode = Place | Erase | Select
+[<Struct>] type BrushMode = Place | Erase | Select
+[<Struct>] type CameraMode = Isometric | FreeFly
 
-[<Struct>]
-type CameraMode = Isometric | FreeFly
+[<Struct>] type EditorAction =
+  | PlaceBlock of cell: Vector3 * blockTypeId: int<BlockTypeId>
+  | RemoveBlock of cell: Vector3
+  | ChangeLayer of layer: int
+  | SetBrushMode of brushMode: BrushMode
+  | SetCameraMode of cameraMode: CameraMode
 
-[<Struct>]
-type EditorAction =
-  | PlaceBlock of PlacedBlock * PlacedBlock voption
-  | RemoveBlock of GridCell3D * PlacedBlock voption
-  | SetRotation of Quaternion * Quaternion
-  | ChangeLayer of int
-  | SetBrushMode of BrushMode * BrushMode
+[<Struct>] type InputState = {
+  MousePosition: Point
+  IsLeftDown: bool
+  IsRightDown: bool
+  KeysDown: Set<Keys>
+}
 ```
 
 ### 2.3 Subsystem Model Pattern
 
-Each subsystem file follows this pattern:
+**Pattern from BlockMap.fs:**
 
 ```fsharp
 namespace Pomo.Lib.Editor.Subsystems
 
+open Microsoft.Xna.Framework
 open Mibo.Elmish
+open Pomo.Lib
+open Pomo.Lib.Services
 
-// 1. MODEL
-[<Struct>]
-type BlockMapModel = {
-  Definition: BlockMapDefinition
-  Cursor: GridCell3D voption
-  Dirty: bool
-}
-
-// 2. MESSAGES
-and BlockMapMsg =
-  | PlaceBlock of cell: GridCell3D
-  | RemoveBlock of cell: GridCell3D
-  | SetCursor of GridCell3D voption
-  | SetMap of BlockMapDefinition
-  | SetSpawn of GridCell3D voption
-
-// 3. INIT
 module BlockMap =
-  let init (map: BlockMapDefinition) : BlockMapModel = {
-    Definition = map
-    Cursor = ValueNone
-    Dirty = false
+  [<Struct>]
+  type BlockMapModel = {
+    Definition: BlockMapDefinition
+    Cursor: Vector3 voption
+    Dirty: bool
   }
 
-// 4. UPDATE
-  let update (msg: BlockMapMsg) (model: BlockMapModel)
+  type BlockMapMsg =
+    | PlaceBlock of cell: Vector3 * blockId: int<BlockTypeId>
+    | RemoveBlock of cell: Vector3
+    | SetCursor of Vector3 voption
+    | SetMap of BlockMapDefinition
+
+  let init
+    (_env: #FileSystemCap & #AssetsCap)
+    (mapDef: BlockMapDefinition)
+    : BlockMapModel =
+    { Definition = mapDef; Cursor = ValueNone; Dirty = false }
+
+  let update
+    (_env: #FileSystemCap & #AssetsCap)
+    (msg: BlockMapMsg)
+    (model: BlockMapModel)
     : struct (BlockMapModel * Cmd<BlockMapMsg>) =
     match msg with
-    | PlaceBlock cell ->
-      // Pure transformation logic
-      let newDef = { model.Definition with ... }
-      struct ({ model with Definition = newDef; Dirty = true }, Cmd.none)
+    | PlaceBlock(cell, blockId) ->
+      model.Definition.Blocks.Add(cell, { Cell = cell; BlockTypeId = blockId; Rotation = ValueNone })
+      { model with Dirty = true }, Cmd.none
+    | RemoveBlock cell ->
+      model.Definition.Blocks.Remove cell |> ignore
+      { model with Dirty = true }, Cmd.none
+    | SetCursor cursor -> { model with Cursor = cursor }, Cmd.none
+    | SetMap map -> { model with Definition = map; Dirty = false }, Cmd.none
 
-    | SetCursor opt ->
-      struct ({ model with Cursor = opt }, Cmd.none)
-
-    | _ -> struct (model, Cmd.none)
-
-// 5. VIEW (render commands)
-  let view (ctx: EditorViewContext) (model: BlockMapModel)
-    (buffer: RenderBuffer<unit, RenderCommand>) : unit =
-    // Emit render commands based on model state
-    match model.Cursor with
-    | ValueSome cell ->
-      buffer |> DrawCursor cell
-    | ValueNone -> ()
+  let view ctx model buffer = ()  // stub
 ```
 
 ### 2.4 Main Model Composition
 
-**Main Editor Model (Model.fs):**
+**From Entry.fs:**
 
 ```fsharp
 namespace Pomo.Lib.Editor
 
+open Microsoft.Xna.Framework
 open Mibo.Elmish
+open Pomo.Lib
+open Pomo.Lib.Services
 open Pomo.Lib.Editor.Subsystems
+open Pomo.Lib.Editor.Subsystems.BlockMap
 
-[<Struct>]
-type EditorModel = {
-  // Subsystem models
-  BlockMap: BlockMap.BlockMapModel
-  Brush: Brush.BrushModel
-  Camera: Camera.CameraModel
-  Navigation: Navigation.NavigationModel
-  UI: UI.UIModel
-  History: History.HistoryModel
-  Input: Input.InputModel
+[<Struct>] type EditorModel = { BlockMap: BlockMapModel }
 
-  // Shared state
-  Services: EditorServices
-}
-```
+[<Struct>] type EditorMsg =
+  | BlockMapMsg of blockMap: BlockMapMsg
+  | Tick of gt: GameTime
 
-**Main Editor Message (Msg.fs):**
+module Entry =
+  let init
+    (env: #FileSystemCap & #AssetsCap & #BlockMapPersistenceCap)
+    (ctx: obj)
+    : struct (EditorModel * Cmd<EditorMsg>) =
+    { BlockMap = BlockMap.init env BlockMapDefinition.empty }, Cmd.none
 
-```fsharp
-namespace Pomo.Lib.Editor
-
-[<Struct>]
-type EditorMsg =
-  // Subsystem messages (wrapping pattern)
-  | BlockMapMsg of BlockMap.BlockMapMsg
-  | BrushMsg of Brush.BrushMsg
-  | CameraMsg of Camera.CameraMsg
-  | NavigationMsg of Navigation.NavigationMsg
-  | UIMsg of UI.UIMsg
-  | HistoryMsg of History.HistoryMsg
-  | InputMsg of Input.InputMsg
-
-  // Cross-subsystem messages
-  | Tick of GameTime
-  | FileSave of path: string
-  | FileLoad of path: string
-  | NewMap of GridDimensions
-```
-
-### 2.5 Update Orchestration
-
-**Main Update (Update.fs):**
-
-```fsharp
-namespace Pomo.Lib.Editor
-
-module Update =
-  let update (msg: EditorMsg) (model: EditorModel)
+  let update
+    (env: #FileSystemCap & #AssetsCap & #BlockMapPersistenceCap)
+    (msg: EditorMsg)
+    (model: EditorModel)
     : struct (EditorModel * Cmd<EditorMsg>) =
     match msg with
-    // Delegate to subsystems
-    | BlockMapMsg msg ->
-      let newBlockMap, cmd = BlockMap.update msg model.BlockMap
-      let newModel = { model with BlockMap = newBlockMap }
-      struct (newModel, cmd |> Cmd.map BlockMapMsg)
+    | BlockMapMsg subMsg ->
+      let struct (subModel, cmd) = BlockMap.update env subMsg model.BlockMap
+      { model with BlockMap = subModel }, cmd |> Cmd.map BlockMapMsg
+    | Tick _ -> model, Cmd.none
 
-    | CameraMsg msg ->
-      let newCamera, cmd = Camera.update msg model.Camera
-      let newModel = { model with Camera = newCamera }
-      struct (newModel, cmd |> Cmd.map CameraMsg)
-
-    // Handle Tick with System Pipeline (optional for complex logic)
-    | Tick gt ->
-      let dt = float32 gt.ElapsedGameTime.TotalSeconds
-
-      // Use Mibo System pipeline if needed
-      // For now, simple delegation
-      struct (model, Cmd.none)
-
-    // File operations (async, return commands)
-    | FileSave path ->
-      let cmd = Persistence.save model.BlockMap.Definition path
-      struct (model, cmd |> Cmd.map FileSaved)
-
-    | _ -> struct (model, Cmd.none)
+  let view env ctx model buffer = ()  // stub
 ```
 
-### 2.6 View Orchestration
+Add new subsystems by: extending EditorModel, adding wrapped case to EditorMsg, handling in update with Cmd.map, calling in view.
 
-**Main View (View.fs):**
+### 2.5 Update, View, Subscriptions, Services
 
-```fsharp
-namespace Pomo.Lib.Editor
+All consolidated in Entry.fs. See section 2.4 for the actual pattern.
 
-open Mibo.Rendering.Graphics3D
-
-type EditorViewContext = {
-  Camera: Camera
-  Lighting: LightingState
-  Assets: AssetCache
-  Time: GameTime
-  Device: GraphicsDevice
-}
-
-module View =
-  let view (ctx: EditorViewContext) (model: EditorModel)
-    (buffer: RenderBuffer<unit, RenderCommand>) : unit =
-
-    // 1. Set camera
-    let camera = Camera.getCamera model.Camera
-    buffer
-      |> SetCamera camera
-      |> Clear Color.Black
-
-    // 2. Render subsystems (order matters)
-    BlockMap.view ctx model.BlockMap buffer
-    Navigation.view ctx model.Navigation buffer
-    UI.view ctx model.UI buffer
-
-    |> Submit()
-```
-
-### 2.7 Subscriptions
-
-**Input Subscriptions (Subscriptions.fs):**
-
-```fsharp
-namespace Pomo.Lib.Editor
-
-module Subscriptions =
-  let subscribe (ctx: GameContext) (model: EditorModel) : Sub<EditorMsg> =
-    Sub.batch [
-      // Keyboard
-      Keyboard.onPressed (fun key ->
-        InputMsg (Input.KeyPressed key)) ctx
-
-      // Mouse
-      Mouse.onMove (fun pos ->
-        InputMsg (Input.MouseMoved pos)) ctx
-
-      Mouse.onLeftClick (fun pos ->
-        InputMsg (Input.LeftClicked pos)) ctx
-
-      // Semantic input mapping (recommended)
-      InputMapper.subscribe {
-        Map = Editor.inputMap
-        OnAction = fun action -> InputMsg (Input.Action action)
-      } ctx
-    ]
-```
-
-### 2.8 Service Abstractions
-
-**Editor Services (Services.fs):**
-
-```fsharp
-namespace Pomo.Lib.Editor
-
-[<Struct>]
-type EditorServices = {
-  FileSystem: IFileSystem
-  AssetLoader: IAssetLoader
-  ModelCache: IModelCache
-  Persistence: IBlockMapPersistence
-}
-
-[<Interface>]
-type IFileSystem =
-  abstract ReadTextFile: string -> Async<Result<string, Error>>
-  abstract WriteTextFile: string * string -> Async<Result<unit, Error>>
-
-[<Interface>]
-type IAssetLoader =
-  abstract LoadModel: string -> Async<Result<Model, Error>>
-
-[<Interface>]
-type IModelCache =
-  abstract GetOrLoad: string -> Async<Result<Model, Error>>
-
-[<Interface>]
-type IBlockMapPersistence =
-  abstract Save: BlockMapDefinition * string -> Async<Result<unit, Error>>
-  abstract Load: string -> Async<Result<BlockMapDefinition, Error>>
-```
-
-### 2.9 Program Setup
-
-**Initialization (Init.fs):**
-
-```fsharp
-namespace Pomo.Lib.Editor
-
-module Init =
-  let init (ctx: GameContext) : struct (EditorModel * Cmd<EditorMsg>) =
-
-    // Initialize services
-    let services = {
-      FileSystem = StandardFileSystem()
-      AssetLoader = MonoGameAssetLoader(ctx.Content)
-      ModelCache = ModelCache()
-      Persistence = JsonBlockMapPersistence()
-    }
-
-    // Load initial map or create new
-    let initialMap = BlockMap.createDefault GridDimensions.Default
-
-    // Initialize subsystems
-    let blockMapModel = BlockMap.init initialMap
-    let brushModel = Brush.init()
-    let cameraModel = Camera.init CameraMode.Isometric
-    let navigationModel = Navigation.init()
-    let uiModel = UI.init()
-    let historyModel = History.init()
-    let inputModel = Input.init()
-
-    let model = {
-      BlockMap = blockMapModel
-      Brush = brushModel
-      Camera = cameraModel
-      Navigation = navigationModel
-      UI = uiModel
-      History = historyModel
-      Input = inputModel
-      Services = services
-    }
-
-    struct (model, Cmd.none)
-```
+Planned additions:
+- Subscriptions module for input handling
+- View context with rendering pipeline
+- Additional services (ModelCache, AssetLoader)
 
 ---
 
@@ -586,13 +401,18 @@ module Init =
 
 ## 4. Implementation Phases
 
-### Phase 1: Foundation (Current Goal)
+### Phase 1: Foundation
 
-- [ ] Core domain types
-- [ ] Subsystem structure (single file per module)
-- [ ] Basic Elmish program setup
-- [ ] Mibo pipeline configuration
-- [ ] Initial camera (isometric only)
+- [x] Core domain types
+- [x] Service infrastructure
+- [x] AppEnv composition
+- [x] BlockMap subsystem
+- [x] Basic Elmish setup
+- [ ] Camera subsystem
+- [ ] Brush subsystem
+- [ ] Input handling
+- [ ] View/Rendering
+- [ ] Mibo pipeline
 
 ### Phase 2: Core Editor
 

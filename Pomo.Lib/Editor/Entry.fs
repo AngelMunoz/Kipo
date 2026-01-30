@@ -8,13 +8,18 @@ open Pomo.Lib
 open Pomo.Lib.Services
 open Pomo.Lib.Editor.Subsystems
 open Pomo.Lib.Editor.Subsystems.BlockMap
+open Pomo.Lib.Editor.Subsystems.Camera
 
 [<Struct>]
-type EditorModel = { BlockMap: BlockMapModel }
+type EditorModel = {
+  BlockMap: BlockMapModel
+  Camera: CameraModel
+}
 
 [<Struct>]
 type EditorMsg =
   | BlockMapMsg of blockMap: BlockMapMsg
+  | CameraMsg of camera: CameraMsg
   | Tick of gt: GameTime
 
 module Entry =
@@ -27,6 +32,7 @@ module Entry =
     // For now, we just use the basic BlockMap initialization
     {
       BlockMap = BlockMap.init env BlockMapDefinition.empty
+      Camera = Camera.init env
     },
     Cmd.none
 
@@ -40,14 +46,24 @@ module Entry =
       let struct (subModel, cmd) = BlockMap.update env subMsg model.BlockMap
       { model with BlockMap = subModel }, cmd |> Cmd.map BlockMapMsg
 
+    | CameraMsg subMsg ->
+      let struct (subModel, cmd) = Camera.update env subMsg model.Camera
+      { model with Camera = subModel }, cmd |> Cmd.map CameraMsg
+
     | Tick time -> model, Cmd.none
+
+  let subscribe (ctx: obj) (_model: EditorModel) : Sub<EditorMsg> = Sub.none
 
   let view
     (env: #FileSystemCap & #AssetsCap & #BlockMapPersistenceCap)
     (ctx: obj)
     (model: EditorModel)
-    buffer
+    (buffer: RenderBuffer<unit, RenderCommand>)
     : unit =
-    // Placeholder view
-    // TODO: Implement actual rendering logic using env for asset loading
-    ()
+    // Set up camera and clear screen
+    buffer.Camera(model.Camera.Camera).Clear(Color.CornflowerBlue) |> ignore
+
+    // Delegate to subsystem views
+    BlockMap.view ctx model.BlockMap buffer
+
+    buffer.Submit()
