@@ -4,7 +4,7 @@
 
 > **Architecture Pattern**: Module-based Elmish decomposition - single file per module, each with its own Model/Msg/Update/View. Main program orchestrates subsystems.
 
-> **Last Updated**: 2026-01-29 - Updated to reflect current implementation status
+> **Last Updated**: 2026-01-30 - Mouse cursor tracking service implemented, grid/cursor rendering optimized with buffer.Lines
 
 ---
 
@@ -13,15 +13,16 @@
 **Implemented:**
 - Domain types: BlockMapDefinition, BlockType, PlacedBlock, etc. in Pomo.Lib/Domain.fs
 - Editor types: BrushMode, CameraMode, EditorAction in Pomo.Lib/Editor/Domain.fs
-- Services: FileSystem, BlockMapPersistence in Pomo.Lib/Services/
-- AppEnv: Central composition in Pomo.Lib/AppEnv.fs
+- Services: FileSystem, BlockMapPersistence, EditorCursor in Pomo.Lib/Services/
+- AppEnv: Central composition with capability interfaces in Pomo.Lib/AppEnv.fs
 - BlockMap subsystem: Model, Msg, init, update in Pomo.Lib/Editor/Subsystems/BlockMap.fs
 - Camera subsystem: Pomo.Lib/Editor/Subsystems/Camera.fs (Isometric/FreeFly modes, pan, zoom, layer tracking)
-- Cursor subsystem: Pomo.Lib/Editor/Subsystems/Cursor.fs (ray-plane intersection, grid cell tracking)
+- EditorCursor service: Pull-based cursor tracking for ray-plane intersection at editing layer
 - Input handling: Subscriptions wired via InputMapper with semantic action mapping in Pomo.Lib/Editor/Entry.fs
-- View/Rendering: Grid overlay at current editing layer
-- Mouse cursor tracking: Ray-plane intersection at current layer with visual wireframe highlight
-- Entry point: Consolidated in Pomo.Lib/Editor/Entry.fs
+- Mouse interaction: Left-click place block, right-click remove block via EditorCursor service
+- View/Rendering: Grid overlay using buffer.Lines with VertexPositionColor arrays
+- Mouse cursor tracking: Ray-plane intersection at current layer with wireframe box highlight
+- Entry point: Consolidated in Pomo.Lib/Editor/Entry.fs with InputHandler module
 
 **Stubs:**
 - BlockMapPersistence Save/Load (TODO comments present)
@@ -30,7 +31,6 @@
 
 **Not Started:**
 - Brush subsystem (types exist in Domain.fs, no subsystem yet)
-- Block placement via mouse interaction
 - History (Undo/Redo) subsystem
 - UI subsystem
 - JSON serialization (actual encode/decode)
@@ -95,8 +95,8 @@
 - [ ] Proper world transforms (scale × rotation × translation)
 - [ ] Frustum culling for visible blocks
 - [ ] Ghost block with transparency
-- [ ] Cursor wireframe overlay
-- [x] Grid line rendering (immediate mode lines)
+- [x] Cursor wireframe overlay - Yellow wireframe box at cursor cell using buffer.Lines
+- [x] Grid line rendering - Using buffer.Lines with VertexPositionColor arrays
 - [ ] Lighting support (PBR materials optional, unlit for editor)
 
 **Performance:**
@@ -122,8 +122,8 @@
 **Input Handling:**
 
 - [x] Semantic input mapping (actions bound to keys) - EditorInputAction type with InputMapper
-- [ ] Mouse tracking for cursor position
-- [ ] Mouse click for block placement/removal
+- [x] Mouse tracking for cursor position - EditorCursor service with ray-plane intersection
+- [x] Mouse click for block placement/removal - LeftClick/RightClick input actions
 - [x] Keyboard shortcuts for camera navigation (WASD, PageUp/Down, Home, Tab)
 - [ ] Input rebinding support (via Mibo's input mapping)
 
@@ -490,13 +490,13 @@ Implemented additions:
 - [x] View/Rendering (grid)
 - [x] Mibo pipeline
 - [x] Mouse/cursor tracking
-- [ ] Block placement via mouse
+- [x] Block placement via mouse
 
 ### Phase 2: Core Editor
 
-- [ ] Block placement/removal via mouse
-- [ ] Cursor tracking (ray-plane intersection)
-- [x] Grid overlay
+- [x] Block placement/removal via mouse
+- [x] Cursor tracking (ray-plane intersection) - EditorCursor service
+- [x] Grid overlay - Using buffer.Lines
 - [ ] Ghost block preview
 - [ ] Basic UI (palette, layer indicator)
 
@@ -572,4 +572,4 @@ Implemented additions:
 
 ---
 
-**Next Steps**: Begin Phase 1 completion by implementing Brush subsystem and mouse cursor tracking.
+**Next Steps**: Begin Phase 2 completion by implementing Brush subsystem (Place/Erase/Select modes) and Ghost block preview.
