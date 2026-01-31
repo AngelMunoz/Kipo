@@ -1,7 +1,6 @@
 namespace Pomo.Lib.Services
 
 open Pomo.Lib
-open System.Text.Json
 
 [<Interface>]
 type BlockMapPersistence =
@@ -15,22 +14,14 @@ type BlockMapPersistenceCap =
   abstract BlockMapPersistence: BlockMapPersistence
 
 module BlockMapPersistence =
-  let jsonOptions =
-    let options = JsonSerializerOptions(WriteIndented = true)
-    options
-
-  let live(fileSystem: FileSystem) : BlockMapPersistence =
+  let live
+    (fileSystem: FileSystem)
+    (serialization: Serialization)
+    : BlockMapPersistence =
     { new BlockMapPersistence with
         member _.Save(definition, path) = async {
           try
-            // TODO: Implement proper JSON serialization for BlockMapDefinition
-            // For now, just create a placeholder JSON structure
-            let json =
-              sprintf
-                """{"version":%d,"key":"%s"}"""
-                definition.Version
-                definition.Key
-
+            let json = serialization.Serialize definition
             return! fileSystem.WriteText(path, json)
           with ex ->
             return Error(IOException ex.Message)
@@ -39,11 +30,13 @@ module BlockMapPersistence =
         member _.Load path = async {
           try
             let! result = fileSystem.ReadText path
-
             match result with
-            | Ok _json ->
-              // TODO: Implement proper JSON deserialization for BlockMapDefinition
-              return Ok(BlockMapDefinition.empty)
+            | Ok json ->
+              try
+                let definition = serialization.Deserialize<BlockMapDefinition> json
+                return Ok definition
+              with ex ->
+                return Error(DeserializationError ex.Message)
             | Error err -> return Error err
           with ex ->
             return Error(IOException ex.Message)

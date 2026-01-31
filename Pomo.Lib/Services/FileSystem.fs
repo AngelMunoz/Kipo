@@ -9,6 +9,7 @@ type Error =
   | FileNotFound of path: string
   | AccessDenied of path: string
   | IOException of message: string
+  | DeserializationError of message: string
 
 [<Interface>]
 type FileSystem =

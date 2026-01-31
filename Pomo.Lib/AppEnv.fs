@@ -9,6 +9,7 @@ type AppEnv = {
   BlockMapPersistenceService: BlockMapPersistence
   AssetsService: IAssets
   EditorCursorService: EditorCursorService
+  SerializationService: Serialization
 } with
   // Service capability interfaces - these allow generic constraint resolution
   interface FileSystemCap with
@@ -24,3 +25,7 @@ type AppEnv = {
   // Editor cursor capability
   interface EditorCursorCap with
     member this.EditorCursor = this.EditorCursorService
+
+  // Serialization capability
+  interface SerializationCap with
+    member this.Serialization = this.SerializationService
