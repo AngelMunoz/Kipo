@@ -8,10 +8,7 @@ open Mibo.Rendering.Graphics3D
 open Pomo.Lib.Services
 
 module Camera =
-  [<Struct>]
-  type CameraMode =
-    | Isometric
-    | FreeFly
+  open Pomo.Lib.Editor
 
   [<Struct>]
   type CameraModel = {

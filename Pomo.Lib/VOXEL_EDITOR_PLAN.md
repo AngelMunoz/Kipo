@@ -22,7 +22,8 @@
 - Mouse interaction: Left-click place block, right-click remove block via EditorCursor service
 - View/Rendering: Grid overlay using buffer.Lines with VertexPositionColor arrays
 - Mouse cursor tracking: Ray-plane intersection at current layer with wireframe box highlight
-- Entry point: Consolidated in Pomo.Lib/Editor/Entry.fs with InputHandler module
+- Entry point: Entry.fs orchestrates InputHandler module
+- Input handling: Extracted to InputHandler.fs with composable functions (OneShotActions, ContinuousActions, MouseActions modules)
 
 **Stubs:**
 - BlockMapPersistence Save/Load (TODO comments present)
@@ -30,7 +31,6 @@
 - Camera view function (empty - camera is renderless)
 
 **Not Started:**
-- Brush subsystem (types exist in Domain.fs, no subsystem yet)
 - History (Undo/Redo) subsystem
 - UI subsystem
 - JSON serialization (actual encode/decode)
@@ -45,10 +45,10 @@
 
 - [x] Place blocks at grid cursor position (via BlockMap subsystem - API ready)
 - [x] Remove blocks at cursor position (via BlockMap subsystem - API ready)
-- [ ] Block rotation (X, Y, Z axes via Q/E keys)
-- [ ] Multiple brush modes (Place, Erase, Select) - types exist in Domain.fs, subsystem needed
-- [ ] Drag-to-place (continuous placement while holding click)
-- [ ] Collision-enabled variant toggle
+- [x] Block rotation (Y axis via Q/E keys) - 90° increments
+- [x] Multiple brush modes (Place, Erase, Select) - Brush subsystem implemented
+- [x] Drag-to-place (continuous placement while holding click)
+- [x] Collision-enabled variant toggle (C key)
 
 **Navigation:**
 
@@ -57,7 +57,7 @@
 - [x] Layer navigation (Page Up/Down to change Y-level)
 - [x] Visual grid overlay at current editing layer
 - [x] Grid cursor tracking (ray-plane intersection at current layer)
-- [ ] Ghost block preview at cursor position
+- [x] Ghost block preview at cursor position (white wireframe at cursor cell)
 
 **State Management:**
 
@@ -148,11 +148,14 @@
 **Current Layout:**
 
 ```
-Pomo.Lib/
+  Pomo.Lib/
   Editor/
     Domain.fs           // BrushMode, CameraMode, EditorAction
+    EditorTypes.fs      // EditorInputAction, EditorModel, EditorMsg, InputResult
+    InputHandler.fs     // InputContext, InputAccumulator, composable input modules
     Entry.fs            // Main Elmish (Model, Msg, init, update, view, subscribe)
     Subsystems/
+      Brush.fs          // Model, Msg, init, update, view - Place/Erase/Select modes
       BlockMap.fs       // Model, Msg, init, update, view
       Camera.fs         // Model, Msg, init, update, view
 
@@ -485,7 +488,7 @@ Implemented additions:
 - [x] BlockMap subsystem
 - [x] Basic Elmish setup
 - [x] Camera subsystem
-- [ ] Brush subsystem
+- [x] Brush subsystem
 - [x] Input handling (keyboard navigation)
 - [x] View/Rendering (grid)
 - [x] Mibo pipeline
@@ -497,7 +500,8 @@ Implemented additions:
 - [x] Block placement/removal via mouse
 - [x] Cursor tracking (ray-plane intersection) - EditorCursor service
 - [x] Grid overlay - Using buffer.Lines
-- [ ] Ghost block preview
+- [x] Ghost block preview - Wireframe rendered at cursor
+- [x] Brush subsystem with rotation and collision toggle
 - [ ] Basic UI (palette, layer indicator)
 
 ### Phase 3: Serialization
@@ -511,8 +515,8 @@ Implemented additions:
 
 - [ ] Undo/Redo system
 - [x] Camera modes (isometric + free-fly)
-- [ ] Brush rotation
-- [ ] Collision variants
+- [x] Brush rotation (Y-axis via Q/E keys)
+- [x] Collision variants (C key toggle)
 - [ ] Map objects
 
 ### Phase 5: Polish
@@ -572,4 +576,4 @@ Implemented additions:
 
 ---
 
-**Next Steps**: Begin Phase 2 completion by implementing Brush subsystem (Place/Erase/Select modes) and Ghost block preview.
+**Next Steps**: **Serialization (JSON)** - Implement BlockMapDefinition encoder/decoder, then wire up Save/Load functionality via BlockMapPersistence service. This will enable creating, saving, and loading map files.

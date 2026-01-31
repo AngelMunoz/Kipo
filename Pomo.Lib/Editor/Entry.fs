@@ -14,174 +14,41 @@ open Pomo.Lib.Services
 open Pomo.Lib.Editor.Subsystems
 open Pomo.Lib.Editor.Subsystems.BlockMap
 open Pomo.Lib.Editor.Subsystems.Camera
-
-[<Struct>]
-type EditorInputAction =
-  | PanLeft
-  | PanRight
-  | PanForward
-  | PanBackward
-  | LayerUp
-  | LayerDown
-  | ResetCameraView
-  | ToggleCameraMode
-  | LeftClick
-  | RightClick
-
-[<Struct>]
-type EditorModel = {
-  BlockMap: BlockMapModel
-  Camera: CameraModel
-  Actions: ActionState<EditorInputAction>
-  PrevMouseState: MouseState
-}
-
-[<Struct>]
-type EditorMsg =
-  | BlockMapMsg of blockMap: BlockMap.Msg
-  | CameraMsg of camera: Camera.Msg
-  | InputMapped of ActionState<EditorInputAction>
-  | Tick of gt: GameTime
-
-module InputHandler =
-  type InputResult = {
-    CameraCommands: ResizeArray<Camera.Msg>
-    BlockMapModel: BlockMapModel
-    Actions: ActionState<EditorInputAction>
-    PrevMouseState: MouseState
-  }
-
-  let handleInput
-    (env:
-      #FileSystemCap & #AssetsCap & #BlockMapPersistenceCap & #EditorCursorCap)
-    (actions: ActionState<EditorInputAction>)
-    (model: EditorModel)
-    : struct (InputResult * Cmd<EditorMsg>) =
-    let panSpeed = 0.5f
-    let cameraCmds = ResizeArray<Camera.Msg>()
-    let mutable blockMapModel = model.BlockMap
-
-    // Check mouse state for button clicks
-    let mouseState = Mouse.GetState()
-
-    let leftClick =
-      mouseState.LeftButton = ButtonState.Pressed
-      && model.PrevMouseState.LeftButton = ButtonState.Released
-
-    let rightClick =
-      mouseState.RightButton = ButtonState.Pressed
-      && model.PrevMouseState.RightButton = ButtonState.Released
-
-    // Get current cursor cell using the service (only if clicking)
-    let cursorCell =
-      if leftClick || rightClick then
-        EditorCursor.getCursorCell
-          env
-          model.Camera.Camera
-          (float32 model.Camera.CurrentLayer)
-      else
-        ValueNone
-
-    // Handle one-shot actions (Started)
-    if actions.Started.Contains LayerUp then
-      cameraCmds.Add(SetLayer(model.Camera.CurrentLayer + 1))
-
-    if actions.Started.Contains LayerDown then
-      cameraCmds.Add(SetLayer(model.Camera.CurrentLayer - 1))
-
-    if actions.Started.Contains ResetCameraView then
-      cameraCmds.Add(ResetCamera)
-
-    if actions.Started.Contains ToggleCameraMode then
-      let newMode =
-        match model.Camera.Mode with
-        | Isometric -> FreeFly
-        | FreeFly -> Isometric
-
-      cameraCmds.Add(SetMode newMode)
-
-    // Handle mouse clicks for block placement/removal
-    if leftClick then
-      match cursorCell with
-      | ValueSome cell ->
-        let struct (newBlockMap, _) =
-          BlockMap.update
-            env
-            (BlockMap.Msg.PlaceBlock(cell, UMX.tag 1))
-            blockMapModel
-
-        blockMapModel <- newBlockMap
-      | ValueNone -> ()
-
-    if rightClick then
-      match cursorCell with
-      | ValueSome cell ->
-        let struct (newBlockMap, _) =
-          BlockMap.update env (BlockMap.Msg.RemoveBlock cell) blockMapModel
-
-        blockMapModel <- newBlockMap
-      | ValueNone -> ()
-
-    // Handle continuous actions (Held) - these apply every frame while held
-    let mutable panDelta = Vector2.Zero
-
-    if actions.Held.Contains PanLeft then
-      panDelta <- panDelta + Vector2(-panSpeed, 0f)
-
-    if actions.Held.Contains PanRight then
-      panDelta <- panDelta + Vector2(panSpeed, 0f)
-
-    if actions.Held.Contains PanForward then
-      panDelta <- panDelta + Vector2(0f, panSpeed)
-
-    if actions.Held.Contains PanBackward then
-      panDelta <- panDelta + Vector2(0f, -panSpeed)
-
-    if panDelta <> Vector2.Zero then
-      cameraCmds.Add(Pan panDelta)
-
-    let result = {
-      CameraCommands = cameraCmds
-      BlockMapModel = blockMapModel
-      Actions = actions
-      PrevMouseState = mouseState
-    }
-
-    let cmd =
-      cameraCmds
-      |> Seq.map(fun msg -> Cmd.map CameraMsg (Cmd.ofMsg msg))
-      |> Cmd.batch
-
-    struct (result, cmd)
+open Pomo.Lib.Editor.Subsystems.Brush
 
 module Entry =
 
   let private inputMap =
     InputMap.empty
-    |> InputMap.key PanLeft Keys.A
-    |> InputMap.key PanRight Keys.D
-    |> InputMap.key PanForward Keys.W
-    |> InputMap.key PanBackward Keys.S
+    |> InputMap.key PanLeft Keys.Left
+    |> InputMap.key PanRight Keys.Right
+    |> InputMap.key PanForward Keys.Up
+    |> InputMap.key PanBackward Keys.Down
     |> InputMap.key LayerUp Keys.PageUp
     |> InputMap.key LayerDown Keys.PageDown
     |> InputMap.key ResetCameraView Keys.Home
     |> InputMap.key ToggleCameraMode Keys.Tab
+    |> InputMap.key RotateLeft Keys.Q
+    |> InputMap.key RotateRight Keys.E
+    |> InputMap.key EditorInputAction.ToggleCollision Keys.C
+    |> InputMap.key SetBrushPlace Keys.D1
+    |> InputMap.key SetBrushErase Keys.D2
 
   let init
-    (env: #FileSystemCap & #AssetsCap & #BlockMapPersistenceCap)
+    (env: AppEnv)
     (ctx: GameContext)
     : struct (EditorModel * Cmd<EditorMsg>) =
     {
       BlockMap = BlockMap.init env BlockMapDefinition.empty
       Camera = Camera.init env
+      Brush = Brush.init()
       Actions = ActionState.empty
       PrevMouseState = Mouse.GetState()
     },
     Cmd.none
 
   let update
-    (env:
-      #FileSystemCap & #AssetsCap & #BlockMapPersistenceCap & #EditorCursorCap)
+    (env: AppEnv)
     (msg: EditorMsg)
     (model: EditorModel)
     : struct (EditorModel * Cmd<EditorMsg>) =
@@ -194,16 +61,34 @@ module Entry =
       let struct (subModel, cmd) = Camera.update env subMsg model.Camera
       { model with Camera = subModel }, cmd |> Cmd.map CameraMsg
 
-    | InputMapped actions ->
-      let struct (result, cmd) = InputHandler.handleInput env actions model
+    | BrushMsg subMsg ->
+      let struct (subModel, cmd) = Brush.update subMsg model.Brush
+      { model with Brush = subModel }, cmd |> Cmd.map BrushMsg
 
-      struct ({
-                model with
-                    Actions = result.Actions
-                    BlockMap = result.BlockMapModel
-                    PrevMouseState = result.PrevMouseState
-              },
-              cmd)
+    | InputMapped actions ->
+      let result = InputHandler.processInput env actions model
+
+      // Apply brush updates from input handler
+      let mutable brushModel = model.Brush
+
+      for brushMsg in result.BrushCommands do
+        let struct (newBrush, _) = Brush.update brushMsg brushModel
+        brushModel <- newBrush
+
+      // Build camera commands from input result
+      let cameraCmds =
+        result.CameraCommands
+        |> Seq.map(fun msg -> Cmd.ofMsg(CameraMsg msg))
+        |> Cmd.batch
+
+      {
+        model with
+            Actions = result.Actions
+            BlockMap = result.BlockMapModel
+            Brush = brushModel
+            PrevMouseState = result.PrevMouseState
+      },
+      cameraCmds
 
     | Tick time ->
       // Continuous camera movement based on currently held actions
@@ -234,12 +119,12 @@ module Entry =
       // Update mouse state tracking
       let mouseState = Mouse.GetState()
 
-      struct ({
-                model with
-                    Camera = cameraModel
-                    PrevMouseState = mouseState
-              },
-              Cmd.none)
+      {
+        model with
+            Camera = cameraModel
+            PrevMouseState = mouseState
+      },
+      Cmd.none
 
   let subscribe (ctx: GameContext) (_model: EditorModel) : Sub<EditorMsg> =
     InputMapper.subscribeStatic inputMap InputMapped ctx
@@ -312,6 +197,9 @@ module Entry =
     // Get cursor cell using the service and draw highlight
     let cursorCellOpt =
       EditorCursor.getCursorCell env model.Camera.Camera layerY
+
+    // Draw ghost block preview
+    Brush.view ctx model.Brush cursorCellOpt buffer
 
     match cursorCellOpt with
     | ValueSome cell ->

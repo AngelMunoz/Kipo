@@ -37,14 +37,12 @@ module BlockMap =
     : struct (BlockMapModel * Cmd<Msg>) =
     match msg with
     | PlaceBlock(cell, blockId) ->
-      model.Definition.Blocks.Add(
-        cell,
+      model.Definition.Blocks.[cell] <-
         {
           Cell = cell
           BlockTypeId = blockId
           Rotation = ValueNone
         }
-      )
 
       { model with Dirty = true }, Cmd.none
     | RemoveBlock cell ->
