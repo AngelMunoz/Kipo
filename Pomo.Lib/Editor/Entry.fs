@@ -192,7 +192,6 @@ module Entry =
     let layerY = float32 model.Camera.CurrentLayer
     drawGrid buffer layerY
 
-    BlockMap.view ctx model.BlockMap buffer
 
     // Get cursor cell using the service and draw highlight
     let cursorCellOpt =

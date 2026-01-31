@@ -22,15 +22,15 @@ type Message =
 module internal Entry =
 
   let init ctx : struct (State * Cmd<Message>) =
-    let env = AppEnv.create ctx
+    let env = EnvFactory.create ctx
     let struct (es, cmd) = Editor.Entry.init env ctx
 
-    struct ({
-              EditorState = ValueSome es
-              GameplayState = ValueNone
-              Env = env
-            },
-            Cmd.map EditorMsg cmd)
+    {
+      EditorState = ValueSome es
+      GameplayState = ValueNone
+      Env = env
+    },
+    Cmd.map EditorMsg cmd
 
   let update msg state : struct (State * Cmd<Message>) =
     match msg with
@@ -41,40 +41,45 @@ module internal Entry =
         | ValueSome _ -> Cmd.ofMsg(EditorMsg(Editor.EditorMsg.Tick gt))
         | ValueNone -> Cmd.none
 
-      struct (state, cmd)
+      state, cmd
 
     | EditorMsg emsg ->
       match state.EditorState with
       | ValueSome es ->
         let struct (newEs, cmd) = Editor.Entry.update state.Env emsg es
 
-        struct ({
-                  state with
-                      EditorState = ValueSome newEs
-                },
-                Cmd.map EditorMsg cmd)
-      | ValueNone -> struct (state, Cmd.none)
+        {
+          state with
+              EditorState = ValueSome newEs
+        },
+        Cmd.map EditorMsg cmd
+      | ValueNone -> state, Cmd.none
 
     | GameplayMsg gmsg ->
       match state.GameplayState with
       | ValueSome gs ->
         let struct (newGs, cmd) = Gameplay.Entry.update state.Env gmsg gs
 
-        struct ({
-                  state with
-                      GameplayState = ValueSome newGs
-                },
-                Cmd.map GameplayMsg cmd)
-      | ValueNone -> struct (state, Cmd.none)
+        {
+          state with
+              GameplayState = ValueSome newGs
+        },
+        Cmd.map GameplayMsg cmd
+      | ValueNone -> state, Cmd.none
 
   let view ctx (state: State) buffer =
     state.EditorState
     |> ValueOption.iter(fun es -> Editor.Entry.view state.Env ctx es buffer)
 
+    state.GameplayState
+    |> ValueOption.iter(fun gs -> Gameplay.Entry.view state.Env ctx gs buffer)
+
   let subscribe ctx (state: State) : Sub<Message> =
-    match state.EditorState with
-    | ValueSome es -> Editor.Entry.subscribe ctx es |> Sub.map "editor" EditorMsg
-    | ValueNone -> Sub.none
+    state.EditorState
+    |> ValueOption.map(fun es ->
+      Editor.Entry.subscribe ctx es |> Sub.map "editor" EditorMsg)
+    |> ValueOption.defaultValue Sub.none
+
 
 module Program =
 

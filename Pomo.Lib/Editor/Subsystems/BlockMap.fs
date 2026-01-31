@@ -20,29 +20,24 @@ module BlockMap =
     | SetCursor of Vector3 voption
     | SetMap of BlockMapDefinition
 
-  let init
-    (_env: #FileSystemCap & #AssetsCap)
-    (mapDef: BlockMapDefinition)
-    : BlockMapModel =
-    {
-      Definition = mapDef
-      Cursor = ValueNone
-      Dirty = false
-    }
+  let init _ (mapDef: BlockMapDefinition) : BlockMapModel = {
+    Definition = mapDef
+    Cursor = ValueNone
+    Dirty = false
+  }
 
   let update
-    (_env: #FileSystemCap & #AssetsCap)
+    _
     (msg: Msg)
     (model: BlockMapModel)
     : struct (BlockMapModel * Cmd<Msg>) =
     match msg with
     | PlaceBlock(cell, blockId) ->
-      model.Definition.Blocks.[cell] <-
-        {
-          Cell = cell
-          BlockTypeId = blockId
-          Rotation = ValueNone
-        }
+      model.Definition.Blocks.[cell] <- {
+        Cell = cell
+        BlockTypeId = blockId
+        Rotation = ValueNone
+      }
 
       { model with Dirty = true }, Cmd.none
     | RemoveBlock cell ->
@@ -56,5 +51,3 @@ module BlockMap =
             Dirty = false
       },
       Cmd.none
-
-  let view _ _ _ = ()

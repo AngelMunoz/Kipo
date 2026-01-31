@@ -91,7 +91,7 @@ module Camera =
     }
 
   let update
-    (_env: #FileSystemCap & #AssetsCap)
+    _
     (msg: Msg)
     (model: CameraModel)
     : struct (CameraModel * Cmd<Msg>) =

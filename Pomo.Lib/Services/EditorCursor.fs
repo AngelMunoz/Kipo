@@ -14,17 +14,12 @@ type EditorCursorService =
 
 /// Capability interface for accessing EditorCursorService
 [<Interface>]
-type EditorCursorCap = abstract EditorCursor: EditorCursorService
+type EditorCursorCap =
+  abstract EditorCursor: EditorCursorService
 
 module EditorCursor =
-  let private worldToGridCell(worldPos: Vector3) : Vector3 =
-    Vector3(
-      MathF.Floor worldPos.X,
-      MathF.Floor worldPos.Y,
-      MathF.Floor worldPos.Z
-    )
 
-  let live (graphicsDevice: GraphicsDevice) : EditorCursorService =
+  let live(graphicsDevice: GraphicsDevice) : EditorCursorService =
     { new EditorCursorService with
         member _.GetCursorCell camera layerY =
           let mouseState = Mouse.GetState()
@@ -37,9 +32,10 @@ module EditorCursor =
             ValueNone
           else
             let t = (layerY - ray.Position.Y) / ray.Direction.Y
+
             if t >= 0f then
               let worldPos = ray.Position + ray.Direction * t
-              ValueSome(worldToGridCell worldPos)
+              ValueSome worldPos
             else
               ValueNone
     }

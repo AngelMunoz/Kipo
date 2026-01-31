@@ -13,6 +13,7 @@ type GridDimensions = {
   Height: int
   Depth: int
 } with
+
   static member Default = { Width = 50; Height = 10; Depth = 50 }
 
 [<Struct>]

@@ -16,9 +16,7 @@ type BlockMapPersistenceCap =
 
 module BlockMapPersistence =
   let jsonOptions =
-    let options = JsonSerializerOptions()
-    options.WriteIndented <- true
-    options.PropertyNamingPolicy <- JsonNamingPolicy.CamelCase
+    let options = JsonSerializerOptions(WriteIndented = true)
     options
 
   let live(fileSystem: FileSystem) : BlockMapPersistence =

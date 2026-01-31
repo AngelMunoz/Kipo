@@ -43,11 +43,7 @@ module Cursor =
       MathF.Floor worldPos.Z
     )
 
-  let update
-    (_env: #FileSystemCap & #AssetsCap)
-    (msg: Msg)
-    (model: CursorModel)
-    : struct (CursorModel * Cmd<Msg>) =
+  let update _ (msg: Msg) _ : struct (CursorModel * Cmd<Msg>) =
     match msg with
     | UpdatePosition {
                        MousePos = mousePos
@@ -67,5 +63,3 @@ module Cursor =
         { Cell = ValueSome cell }, Cmd.none
 
     | ClearPosition -> { Cell = ValueNone }, Cmd.none
-
-  let view _ctx _model _buffer = ()

@@ -1,10 +1,8 @@
 <Project Sdk="Microsoft.NET.Sdk">
-
   <PropertyGroup>
     <TargetFramework>net10.0</TargetFramework>
     <GenerateDocumentationFile>true</GenerateDocumentationFile>
   </PropertyGroup>
-
   <ItemGroup>
     <Compile Include="Domain.fs" />
     <Compile Include="Services/FileSystem.fs" />
@@ -21,9 +19,9 @@
     <Compile Include="Editor/Entry.fs" />
     <Compile Include="Gameplay/Domain.fs" />
     <Compile Include="Gameplay/Entry.fs" />
+    <Compile Include="EnvFactory.fs" />
     <Compile Include="Library.fs" />
   </ItemGroup>
-
   <ItemGroup>
     <PackageReference Include="FSharp.UMX" Version="1.1.0" />
     <PackageReference Include="JDeck" Version="1.0.0" />
@@ -34,5 +32,4 @@
     <PackageReference Include="Ionide.Analyzers" Version="0.*" PrivateAssets="All" />
     <PackageReference Include="FSharp.Analyzers.Build" Version="0.*" PrivateAssets="All" IncludeAssets="build" />
   </ItemGroup>
-
 </Project>
