@@ -35,7 +35,8 @@ module EditorCursor =
 
             if t >= 0f then
               let worldPos = ray.Position + ray.Direction * t
-              ValueSome worldPos
+              let gridCell = Vector3(MathF.Floor worldPos.X, layerY, MathF.Floor worldPos.Z)
+              ValueSome gridCell
             else
               ValueNone
     }

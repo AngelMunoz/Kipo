@@ -11,6 +11,7 @@
     <Compile Include="Services/EditorCursor.fs" />
     <Compile Include="Services/BlockMapPersistence.fs" />
     <Compile Include="AppEnv.fs" />
+    <Compile Include="UI/MyraExtensions.fs" />
     <Compile Include="Editor/Domain.fs" />
     <Compile Include="Editor/Subsystems/Brush.fs" />
     <Compile Include="Editor/Subsystems/Camera.fs" />
@@ -18,6 +19,7 @@
     <Compile Include="Editor/Subsystems/Cursor.fs" />
     <Compile Include="Editor/EditorTypes.fs" />
     <Compile Include="Editor/InputHandler.fs" />
+    <Compile Include="UI/EditorUI.fs" />
     <Compile Include="Editor/Entry.fs" />
     <Compile Include="Gameplay/Domain.fs" />
     <Compile Include="Gameplay/Entry.fs" />

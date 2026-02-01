@@ -15,8 +15,10 @@ open Pomo.Lib.Editor.Subsystems
 open Pomo.Lib.Editor.Subsystems.BlockMap
 open Pomo.Lib.Editor.Subsystems.Camera
 open Pomo.Lib.Editor.Subsystems.Brush
+open Pomo.Lib.UI
 
 module Entry =
+  open Myra.Graphics2D.UI
 
   let private inputMap =
     InputMap.empty
@@ -33,19 +35,22 @@ module Entry =
     |> InputMap.key EditorInputAction.ToggleCollision Keys.C
     |> InputMap.key SetBrushPlace Keys.D1
     |> InputMap.key SetBrushErase Keys.D2
+    |> InputMap.key EditorInputAction.ShowHelp Keys.F1
 
   let init
     (env: AppEnv)
     (ctx: GameContext)
     : struct (EditorModel * Cmd<EditorMsg>) =
-    {
+    let baseModel = {
       BlockMap = BlockMap.init env BlockMapDefinition.empty
       Camera = Camera.init env
       Brush = Brush.init()
       Actions = ActionState.empty
       PrevMouseState = Mouse.GetState()
-    },
-    Cmd.none
+      Desktop = ValueNone
+    }
+
+    baseModel, Cmd.ofMsg(EditorMsg.UIMsg InitializeUI)
 
   let update
     (env: AppEnv)
@@ -81,6 +86,20 @@ module Entry =
         |> Seq.map(fun msg -> Cmd.ofMsg(CameraMsg msg))
         |> Cmd.batch
 
+      // Check for ShowHelp action
+      let uiCmd =
+        if actions.Started.Contains EditorInputAction.ShowHelp then
+          Cmd.ofMsg(
+            EditorMsg.UIMsg(
+              if model.Desktop.IsSome then
+                UIMsg.HideHelp
+              else
+                UIMsg.ShowHelp
+            )
+          )
+        else
+          Cmd.none
+
       {
         model with
             Actions = result.Actions
@@ -88,7 +107,7 @@ module Entry =
             Brush = brushModel
             PrevMouseState = result.PrevMouseState
       },
-      cameraCmds
+      Cmd.batch [ cameraCmds; uiCmd ]
 
     | Tick time ->
       // Continuous camera movement based on currently held actions
@@ -125,6 +144,33 @@ module Entry =
             PrevMouseState = mouseState
       },
       Cmd.none
+
+    | UIMsg InitializeUI ->
+      let desktop = new Desktop(Root = EditorUI.buildRoot model)
+
+      {
+        model with
+            Desktop = ValueSome desktop
+      },
+      Cmd.none
+
+    | UIMsg ShowHelp ->
+      let helpPanel = EditorUI.buildHelp()
+
+      match model.Desktop with
+      | ValueSome desktop -> desktop.Widgets.Add(helpPanel)
+      | ValueNone -> ()
+
+      model, Cmd.none
+
+    | UIMsg HideHelp ->
+      match model.Desktop with
+      | ValueSome desktop ->
+        desktop.Widgets.Clear()
+        desktop.Widgets.Add(EditorUI.buildRoot model)
+      | ValueNone -> ()
+
+      model, Cmd.none
 
   let subscribe (ctx: GameContext) (_model: EditorModel) : Sub<EditorMsg> =
     InputMapper.subscribeStatic inputMap InputMapped ctx
@@ -239,4 +285,7 @@ module Entry =
       buffer.Lines(verts, 12) |> ignore
     | ValueNone -> ()
 
-    buffer.Submit()
+    buffer
+      .Custom(fun _ _ ->
+        model.Desktop |> ValueOption.iter(fun desktop -> desktop.Render()))
+      .Submit()

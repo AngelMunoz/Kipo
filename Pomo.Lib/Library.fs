@@ -23,6 +23,10 @@ module internal Entry =
 
   let init ctx : struct (State * Cmd<Message>) =
     let env = EnvFactory.create ctx
+
+    Myra.MyraEnvironment.Game <- ctx.Game
+    Myra.MyraEnvironment.EnableModalDarkening <- true
+
     let struct (es, cmd) = Editor.Entry.init env ctx
 
     {
