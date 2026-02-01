@@ -75,7 +75,7 @@ module BlockMap =
         ValueSome model
 
   let view
-    (env: #AssetsCap)
+    (env: #AssetsCap & #ModelScalerCap)
     (ctx: GameContext)
     (model: BlockMapModel)
     (buffer: RenderBuffer<unit, RenderCommand>)
@@ -95,20 +95,26 @@ module BlockMap =
           let rot =
             placedBlock.Rotation |> ValueOption.defaultValue Quaternion.Identity
 
-          let scale = blockType.Scale |> ValueOption.defaultValue 0.01f
+          // Get auto-computed scale and center offset from service
+          let autoScale = ModelScaler.getScale env blockType.Model
+          let scale = blockType.Scale |> ValueOption.defaultValue autoScale
+          let centerOffset = ModelScaler.getCenterOffset env blockType.Model
+
+          // Position at cell center (0.5, 0.5, 0.5) minus the model's center offset
+          // This centers the model in the grid cell so edges touch adjacent cells
+          let cellCenter = cell + Vector3(0.5f, 0.5f, 0.5f)
+          let position = cellCenter - (centerOffset * scale)
 
           let worldMatrix =
             Matrix.CreateScale(scale, scale, scale)
             * Matrix.CreateFromQuaternion(rot)
-            * Matrix.CreateTranslation(cell)
+            * Matrix.CreateTranslation(position)
 
-          buffer
-            .Draw(
-              draw {
-                mesh modelMesh
-                withTransform worldMatrix
-                withAlbedo Color.White
-              }
-            )
-            .Submit()
+          buffer.Draw(
+            draw {
+              mesh modelMesh
+              withTransform worldMatrix
+              withAlbedo Color.White
+            }
+          )
       | false, _ -> ()

@@ -13,7 +13,8 @@ type GridDimensions = {
   Height: int
   Depth: int
 } with
-
+  /// Size of each grid cell in world units
+  static member CellSize = 64.0f
   static member Default = { Width = 50; Height = 10; Depth = 50 }
 
 [<Struct>]

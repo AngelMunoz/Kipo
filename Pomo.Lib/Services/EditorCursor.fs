@@ -5,6 +5,7 @@ open Microsoft.Xna.Framework
 open Microsoft.Xna.Framework.Input
 open Microsoft.Xna.Framework.Graphics
 open Mibo.Rendering.Graphics3D
+open Pomo.Lib
 
 /// Service for tracking cursor position in the editor
 [<Interface>]
@@ -31,16 +32,21 @@ module EditorCursor =
           if Math.Abs ray.Direction.Y < 0.0001f then
             ValueNone
           else
-            let t = (layerY - ray.Position.Y) / ray.Direction.Y
+             let t = (layerY - ray.Position.Y) / ray.Direction.Y
 
-            if t >= 0f then
-              let worldPos = ray.Position + ray.Direction * t
-              let gridCell = Vector3(MathF.Floor worldPos.X, layerY, MathF.Floor worldPos.Z)
-              ValueSome gridCell
-            else
-              ValueNone
+             if t >= 0f then
+               let worldPos = ray.Position + ray.Direction * t
+               // Convert world position to grid cell coordinates (64 units per cell)
+               let cellSize = GridDimensions.CellSize
+               let cellX = MathF.Floor(worldPos.X / cellSize) * cellSize
+               let cellZ = MathF.Floor(worldPos.Z / cellSize) * cellSize
+               let gridCell = Vector3(cellX, layerY, cellZ)
+               ValueSome gridCell
+             else
+               ValueNone
     }
 
   /// Helper function to get cursor cell from environment
   let getCursorCell (env: #EditorCursorCap) camera layerY =
     env.EditorCursor.GetCursorCell camera layerY
+

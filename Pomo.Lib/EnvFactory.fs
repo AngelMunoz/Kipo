@@ -56,6 +56,7 @@ module EnvFactory =
     let blockMapPersistence = BlockMapPersistence.live fileSystem serialization
     let assets = Mibo.Elmish.Assets.getService ctx
     let editorCursor = EditorCursor.live ctx.GraphicsDevice
+    let modelScaler = ModelScaler.live ctx
 
     {
       FileSystemService = fileSystem
@@ -63,6 +64,7 @@ module EnvFactory =
       AssetsService = assets
       EditorCursorService = editorCursor
       SerializationService = serialization
+      ModelScalerService = modelScaler
     }
 
   let createRuntime(ctx: GameContext) : AppEnv =
@@ -72,6 +74,7 @@ module EnvFactory =
     let blockMapPersistence = BlockMapPersistence.live fileSystem serialization
     let assets = Mibo.Elmish.Assets.getService ctx
     let editorCursor = EditorCursor.live ctx.GraphicsDevice
+    let modelScaler = ModelScaler.live ctx
 
     {
       FileSystemService = fileSystem
@@ -79,4 +82,5 @@ module EnvFactory =
       AssetsService = assets
       EditorCursorService = editorCursor
       SerializationService = serialization
+      ModelScalerService = modelScaler
     }

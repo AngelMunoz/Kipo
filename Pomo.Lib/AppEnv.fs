@@ -10,6 +10,7 @@ type AppEnv = {
   AssetsService: IAssets
   EditorCursorService: EditorCursorService
   SerializationService: Serialization
+  ModelScalerService: ModelScalerService
 } with
   // Service capability interfaces - these allow generic constraint resolution
   interface FileSystemCap with
@@ -29,3 +30,7 @@ type AppEnv = {
   // Serialization capability
   interface SerializationCap with
     member this.Serialization = this.SerializationService
+
+  // Model scaler capability
+  interface ModelScalerCap with
+    member this.ModelScaler = this.ModelScalerService

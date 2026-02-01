@@ -237,50 +237,53 @@ module Entry =
   let subscribe (ctx: GameContext) (_model: EditorModel) : Sub<EditorMsg> =
     InputMapper.subscribeStatic inputMap InputMapped ctx
 
+  // Grid size in cells - 20 wide, 32 deep
+  let [<Literal>] GridWidth = 20
+  let [<Literal>] GridDepth = 32
+
   let private drawGrid
     (buffer: RenderBuffer<unit, RenderCommand>)
     (layerY: float32)
     =
-    let gridSize = 50
-    let gridSpacing = 1.0f
+    let gridSpacing = GridDimensions.CellSize
     let gridColor = Color(0.3f, 0.3f, 0.3f)
-    let maxLines = (gridSize * 2 + 1) * 2
+    let maxLines = (GridWidth + 1) + (GridDepth + 1)
 
     // Build vertex array for all grid lines
     let verts = Array.zeroCreate(maxLines * 2)
     let mutable idx = 0
 
-    // Horizontal lines (along X axis)
-    for z in -gridSize .. gridSize do
-      let zPos = float32 z * gridSpacing
+    // Vertical lines (along Z axis, at x = 0, 1, 2, ... GridWidth)
+    for x in 0 .. GridWidth do
+      let xPos = float32 x * gridSpacing
 
       verts.[idx] <-
         VertexPositionColor(
-          Vector3(float32 -gridSize * gridSpacing, layerY, zPos),
+          Vector3(xPos, layerY, 0.0f),
           gridColor
         )
 
       verts.[idx + 1] <-
         VertexPositionColor(
-          Vector3(float32 gridSize * gridSpacing, layerY, zPos),
+          Vector3(xPos, layerY, float32 GridDepth * gridSpacing),
           gridColor
         )
 
       idx <- idx + 2
 
-    // Vertical lines (along Z axis)
-    for x in -gridSize .. gridSize do
-      let xPos = float32 x * gridSpacing
+    // Horizontal lines (along X axis, at z = 0, 1, 2, ... GridDepth)
+    for z in 0 .. GridDepth do
+      let zPos = float32 z * gridSpacing
 
       verts.[idx] <-
         VertexPositionColor(
-          Vector3(xPos, layerY, float32 -gridSize * gridSpacing),
+          Vector3(0.0f, layerY, zPos),
           gridColor
         )
 
       verts.[idx + 1] <-
         VertexPositionColor(
-          Vector3(xPos, layerY, float32 gridSize * gridSpacing),
+          Vector3(float32 GridWidth * gridSpacing, layerY, zPos),
           gridColor
         )
 

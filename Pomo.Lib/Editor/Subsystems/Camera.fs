@@ -31,18 +31,23 @@ module Camera =
     | Orbit of yaw: float32 * pitch: float32
     | ResetCamera
 
+  // Grid center for camera target (20x32 cells * 64 units / 2)
+  let GridCenterX = 10.0f * 64.0f
+  let GridCenterZ = 16.0f * 64.0f
+
   let isometricDefaults: Camera =
     let yaw = MathHelper.ToRadians 45f
     let pitch = MathHelper.ToRadians 35.264f
-    let distance = 50f
-    let target = Vector3.Zero
+    // Distance for 20x32 grid (approx 400 units view distance)
+    let distance = 400f
+    let target = Vector3(GridCenterX, 0.0f, GridCenterZ)
 
     Camera.perspectiveDefaults |> Camera.orbit target yaw pitch distance
 
   let freeFlyDefaults: Camera =
     Camera.perspectiveDefaults
-    |> Camera.at(Vector3(20f, 20f, 20f))
-    |> Camera.lookingAt Vector3.Zero
+    |> Camera.at(Vector3(GridCenterX + 200f, 200f, GridCenterZ + 200f))
+    |> Camera.lookingAt(Vector3(GridCenterX, 0.0f, GridCenterZ))
 
   let init(_env: #FileSystemCap & #AssetsCap) : CameraModel = {
     Camera = isometricDefaults
