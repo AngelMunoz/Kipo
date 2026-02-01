@@ -36,6 +36,8 @@ module Entry =
     |> InputMap.key SetBrushPlace Keys.D1
     |> InputMap.key SetBrushErase Keys.D2
     |> InputMap.key EditorInputAction.ShowHelp Keys.F1
+    |> InputMap.key EditorInputAction.NextBlock Keys.O
+    |> InputMap.key EditorInputAction.PrevBlock Keys.P
 
   let init
     (env: AppEnv)
@@ -50,7 +52,11 @@ module Entry =
       Desktop = ValueNone
     }
 
-    baseModel, Cmd.ofMsg(EditorMsg.UIMsg InitializeUI)
+    baseModel,
+    Cmd.batch [
+      Cmd.ofMsg(EditorMsg.Load "Content/BlockPalette.json")
+      Cmd.ofMsg(EditorMsg.UIMsg InitializeUI)
+    ]
 
   let update
     (env: AppEnv)
@@ -158,7 +164,8 @@ module Entry =
       let helpPanel = EditorUI.buildHelp()
 
       match model.Desktop with
-      | ValueSome desktop -> desktop.Widgets.Add(helpPanel)
+      | ValueSome desktop ->
+        desktop.Widgets.Add(helpPanel)
       | ValueNone -> ()
 
       model, Cmd.none
@@ -171,6 +178,61 @@ module Entry =
       | ValueNone -> ()
 
       model, Cmd.none
+
+    | Load path ->
+      let loadBlockMap env path = async {
+        let! result = BlockMapPersistence.load env path
+
+        match result with
+        | Ok def -> return def
+        | Error err ->
+          let msg =
+            match err with
+            | FileNotFound p -> $"File not found: {p}"
+            | AccessDenied p -> $"Access denied: {p}"
+            | IOException m -> m
+            | DeserializationError m -> m
+
+          return failwith msg
+      }
+
+      model,
+      Cmd.ofAsync
+        (loadBlockMap env path)
+        (fun def ->
+          let blockMapModel = BlockMap.init env def
+          SetBlockMapModel blockMapModel)
+        (fun ex -> LoadFailed(IOException ex.Message))
+
+    | Save path ->
+      let saveBlockMap env definition path = async {
+        let! result = BlockMapPersistence.save env definition path
+
+        match result with
+        | Ok() -> ()
+        | Error err ->
+          let msg =
+            match err with
+            | FileNotFound p -> $"File not found: {p}"
+            | AccessDenied p -> $"Access denied: {p}"
+            | IOException m -> m
+            | DeserializationError m -> m
+
+          failwith msg
+      }
+
+      model,
+      Cmd.ofAsync
+        (saveBlockMap env model.BlockMap.Definition path)
+        (fun _ -> SaveComplete)
+        (fun ex -> LoadFailed(IOException ex.Message))
+
+    | SetBlockMapModel blockMapModel ->
+      { model with BlockMap = blockMapModel }, Cmd.none
+
+    | LoadFailed err -> model, Cmd.none
+
+    | SaveComplete -> model, Cmd.none
 
   let subscribe (ctx: GameContext) (_model: EditorModel) : Sub<EditorMsg> =
     InputMapper.subscribeStatic inputMap InputMapped ctx
@@ -233,11 +295,12 @@ module Entry =
     (buffer: RenderBuffer<unit, RenderCommand>)
     : unit =
     buffer.Camera(model.Camera.Camera).Clear Color.CornflowerBlue |> ignore
-
     // Draw grid at current editing layer
     let layerY = float32 model.Camera.CurrentLayer
     drawGrid buffer layerY
 
+    // Render all placed blocks
+    BlockMap.view env ctx model.BlockMap buffer
 
     // Get cursor cell using the service and draw highlight
     let cursorCellOpt =
@@ -287,5 +350,6 @@ module Entry =
 
     buffer
       .Custom(fun _ _ ->
-        model.Desktop |> ValueOption.iter(fun desktop -> desktop.Render()))
+        model.Desktop |> ValueOption.iter(_.Render()))
       .Submit()
+

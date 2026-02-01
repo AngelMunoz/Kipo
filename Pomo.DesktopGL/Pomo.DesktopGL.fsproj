@@ -9,7 +9,7 @@
     <AssemblyName>Pomo</AssemblyName>
   </PropertyGroup>
   <ItemGroup>
-    <MonoGameContentReference Include="..\Pomo.Core\Content\Pomo.mgcb">
+    <MonoGameContentReference Include="..\Pomo.Lib\Content\Pomo.mgcb">
       <Link>Content\Pomo.mgcb</Link>
     </MonoGameContentReference>
   </ItemGroup>

@@ -1,0 +1,114 @@
+{
+  "Version": 1,
+  "Key": "DefaultPalette",
+  "Dimensions": [50, 10, 50],
+  "Palette": [
+    [
+      1,
+      {
+        "Id": 1,
+        "ArchetypeId": 1,
+        "Name": "Barrel",
+        "Model": "PlatformerKit/barrel",
+        "CollisionType": "Box"
+      }
+    ],
+    [
+      2,
+      {
+        "Id": 2,
+        "ArchetypeId": 2,
+        "Name": "Grass Curve",
+        "Model": "PlatformerKit/block-grass-curve",
+        "CollisionType": "Box"
+      }
+    ],
+    [
+      3,
+      {
+        "Id": 3,
+        "ArchetypeId": 3,
+        "Name": "Grass Long",
+        "Model": "PlatformerKit/block-grass-long",
+        "CollisionType": "Box"
+      }
+    ],
+    [
+      4,
+      {
+        "Id": 4,
+        "ArchetypeId": 4,
+        "Name": "Grass Low",
+        "Model": "PlatformerKit/block-grass-low",
+        "CollisionType": "Box"
+      }
+    ],
+    [
+      5,
+      {
+        "Id": 5,
+        "ArchetypeId": 5,
+        "Name": "Grass Overhang Hexagon",
+        "Model": "PlatformerKit/block-grass-overhang-hexagon",
+        "CollisionType": "Box"
+      }
+    ],
+    [
+      6,
+      {
+        "Id": 6,
+        "ArchetypeId": 6,
+        "Name": "Grass Block",
+        "Model": "PlatformerKit/block-grass",
+        "CollisionType": "Box"
+      }
+    ],
+    [
+      7,
+      {
+        "Id": 7,
+        "ArchetypeId": 7,
+        "Name": "Snow Block",
+        "Model": "PlatformerKit/block-snow",
+        "CollisionType": "Box"
+      }
+    ],
+    [
+      8,
+      {
+        "Id": 8,
+        "ArchetypeId": 8,
+        "Name": "Grass",
+        "Model": "PlatformerKit/grass",
+        "CollisionType": "Box"
+      }
+    ],
+    [
+      9,
+      {
+        "Id": 9,
+        "ArchetypeId": 9,
+        "Name": "Stones",
+        "Model": "PlatformerKit/stones",
+        "CollisionType": "Box"
+      }
+    ],
+    [
+      10,
+      {
+        "Id": 10,
+        "ArchetypeId": 10,
+        "Name": "Tree",
+        "Model": "PlatformerKit/tree",
+        "CollisionType": "Box"
+      }
+    ]
+  ],
+  "Blocks": [],
+  "Settings": {
+    "EngagementRules": "PvE",
+    "MaxEnemyEntities": 0,
+    "StartingLayer": 0
+  },
+  "Objects": []
+}

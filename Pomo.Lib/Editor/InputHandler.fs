@@ -99,6 +99,24 @@ module OneShotActions =
     if ctx.Actions.Started.Contains ToggleCollision then
       acc.BrushCommands.Add(Brush.Msg.ToggleCollision)
 
+  /// Handle block type selection from palette
+  let handleBlockSelection (ctx: InputContext) (acc: InputAccumulator) =
+    let palette = ctx.Model.BlockMap.Definition.Palette
+    let currentId = ctx.Model.Brush.SelectedBlockId
+    let ids = palette.Keys |> Seq.toArray |> Array.sort
+
+    if ids.Length = 0 then ()
+    else
+      let currentIndex = Array.IndexOf(ids, currentId)
+
+      if ctx.Actions.Started.Contains NextBlock then
+        let nextIndex = (currentIndex + 1) % ids.Length
+        acc.BrushCommands.Add(Brush.Msg.SetBlockId ids.[nextIndex])
+
+      if ctx.Actions.Started.Contains PrevBlock then
+        let prevIndex = if currentIndex <= 0 then ids.Length - 1 else currentIndex - 1
+        acc.BrushCommands.Add(Brush.Msg.SetBlockId ids.[prevIndex])
+
 module ContinuousActions =
   /// Handle camera panning (arrow keys held)
   let handlePanning
@@ -282,6 +300,7 @@ module InputHandler =
     OneShotActions.handleCameraActions ctx acc
     OneShotActions.handleBrushRotation ctx acc
     OneShotActions.handleBrushMode ctx acc
+    OneShotActions.handleBlockSelection ctx acc
 
     // Process brush mouse actions
     MouseActions.handleBrushMouse ctx acc buttonState

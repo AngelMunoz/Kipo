@@ -5,7 +5,7 @@ open System.IO
 open System.Text
 open Mibo.Elmish
 
-type Error =
+type FsError =
   | FileNotFound of path: string
   | AccessDenied of path: string
   | IOException of message: string
@@ -13,12 +13,12 @@ type Error =
 
 [<Interface>]
 type FileSystem =
-  abstract ReadText: path: string -> Async<Result<string, Error>>
+  abstract ReadText: path: string -> Async<Result<string, FsError>>
 
   abstract WriteText:
-    path: string * content: string -> Async<Result<unit, Error>>
+    path: string * content: string -> Async<Result<unit, FsError>>
 
-  abstract CreateDirectory: path: string -> Result<unit, Error>
+  abstract CreateDirectory: path: string -> Result<unit, FsError>
 
 [<Interface>]
 type FileSystemCap =
@@ -30,11 +30,15 @@ type AssetsCap =
   abstract Assets: IAssets
 
 module FileSystem =
-  let live: FileSystem =
+  let live(resolve: PathResolver) : FileSystem =
     { new FileSystem with
         member _.ReadText path = async {
           try
-            let! content = File.ReadAllTextAsync(path) |> Async.AwaitTask
+            let resolvedPath = resolve path
+
+            let! content =
+              File.ReadAllTextAsync(resolvedPath) |> Async.AwaitTask
+
             return Ok content
           with
           | :? FileNotFoundException -> return Error(FileNotFound path)
@@ -44,8 +48,10 @@ module FileSystem =
 
         member _.WriteText(path, content) = async {
           try
+            let resolvedPath = resolve path
+
             do!
-              File.WriteAllTextAsync(path, content, Encoding.UTF8)
+              File.WriteAllTextAsync(resolvedPath, content, Encoding.UTF8)
               |> Async.AwaitTask
 
             return Ok()
@@ -57,7 +63,8 @@ module FileSystem =
 
         member _.CreateDirectory path =
           try
-            Directory.CreateDirectory path |> ignore
+            let resolvedPath = resolve path
+            Directory.CreateDirectory resolvedPath |> ignore
             Ok()
           with
           | :? UnauthorizedAccessException -> Error(AccessDenied path)

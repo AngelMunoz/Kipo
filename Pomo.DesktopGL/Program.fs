@@ -1,4 +1,3 @@
-﻿open Pomo.Core
 open Pomo.Lib
 open Mibo.Elmish
 

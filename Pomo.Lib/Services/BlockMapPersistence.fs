@@ -5,9 +5,10 @@ open Pomo.Lib
 [<Interface>]
 type BlockMapPersistence =
   abstract Save:
-    definition: BlockMapDefinition * path: string -> Async<Result<unit, Error>>
+    definition: BlockMapDefinition * path: string ->
+      Async<Result<unit, FsError>>
 
-  abstract Load: path: string -> Async<Result<BlockMapDefinition, Error>>
+  abstract Load: path: string -> Async<Result<BlockMapDefinition, FsError>>
 
 [<Interface>]
 type BlockMapPersistenceCap =
@@ -30,10 +31,13 @@ module BlockMapPersistence =
         member _.Load path = async {
           try
             let! result = fileSystem.ReadText path
+
             match result with
             | Ok json ->
               try
-                let definition = serialization.Deserialize<BlockMapDefinition> json
+                let definition =
+                  serialization.Deserialize<BlockMapDefinition> json
+
                 return Ok definition
               with ex ->
                 return Error(DeserializationError ex.Message)

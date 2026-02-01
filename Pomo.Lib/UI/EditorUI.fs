@@ -25,9 +25,14 @@ module EditorUI =
 
     let brushLabel = Label.create $"Brush: {model.Brush.Mode}" |> W.size 120 30
 
-    let blockLabel =
-      Label.create $"Block: {model.Brush.SelectedBlockId |> UMX.untag}"
-      |> W.size 150 30
+    let getBlockName() =
+      match model.BlockMap.Definition.Palette.TryGetValue(model.Brush.SelectedBlockId) with
+      | true, blockType -> blockType.Name
+      | false, _ -> $"Block #{model.Brush.SelectedBlockId |> UMX.untag}"
+
+    let blockLabel = Label.create $"Block: {getBlockName()}" |> W.size 150 30
+
+    let paletteHint = Label.create "P / O to cycle blocks" |> W.size 150 15
 
     let collisionLabel =
       Label.create(
@@ -52,6 +57,7 @@ module EditorUI =
         layerLabel
         brushLabel
         blockLabel
+        paletteHint
         collisionBtn
       ]
 
@@ -64,11 +70,13 @@ module EditorUI =
       "WASD", "Move Camera"
       "Scroll", "Zoom"
       "Page Up/Down", "Change Layer"
+      "P / O", "Cycle Blocks"
       "Left Click", "Place Block"
       "Right Click", "Remove Block"
       "Q / E", "Rotate Brush"
       "C", "Toggle Collision"
       "1 / 2", "Brush Mode"
+      "F1", "Toggle Help"
     ]
 
     let helpRows =

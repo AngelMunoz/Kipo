@@ -22,7 +22,7 @@ type Message =
 module internal Entry =
 
   let init ctx : struct (State * Cmd<Message>) =
-    let env = EnvFactory.create ctx
+    let env = EnvFactory.createEditor ctx
 
     Myra.MyraEnvironment.Game <- ctx.Game
     Myra.MyraEnvironment.EnableModalDarkening <- true
@@ -40,36 +40,43 @@ module internal Entry =
     match msg with
     | Tick gt ->
       // Forward ticks to active subsystems
-      let cmd =
-        match state.EditorState with
-        | ValueSome _ -> Cmd.ofMsg(EditorMsg(Editor.EditorMsg.Tick gt))
-        | ValueNone -> Cmd.none
+      let eCmd =
+        state.EditorState
+        |> ValueOption.map(fun es ->
+          Cmd.ofMsg(EditorMsg(Editor.EditorMsg.Tick gt)))
+        |> ValueOption.defaultValue Cmd.none
 
-      state, cmd
+      let gCmd =
+        state.GameplayState
+        |> ValueOption.map(fun gs -> Cmd.ofMsg(GameplayMsg(Gameplay.Tick gt)))
+        |> ValueOption.defaultValue Cmd.none
+
+      state, Cmd.batch2(eCmd, gCmd)
 
     | EditorMsg emsg ->
-      match state.EditorState with
-      | ValueSome es ->
-        let struct (newEs, cmd) = Editor.Entry.update state.Env emsg es
+      state.EditorState
+      |> ValueOption.map(fun es ->
+        let struct (newEs, newCmd) = Editor.Entry.update state.Env emsg es
 
-        {
-          state with
-              EditorState = ValueSome newEs
-        },
-        Cmd.map EditorMsg cmd
-      | ValueNone -> state, Cmd.none
+        struct ({
+                  state with
+                      EditorState = ValueSome newEs
+                },
+                Cmd.map EditorMsg newCmd))
+      |> ValueOption.defaultValue(state, Cmd.none)
+
 
     | GameplayMsg gmsg ->
-      match state.GameplayState with
-      | ValueSome gs ->
-        let struct (newGs, cmd) = Gameplay.Entry.update state.Env gmsg gs
+      state.GameplayState
+      |> ValueOption.map(fun gs ->
+        let struct (newGs, newCmd) = Gameplay.Entry.update state.Env gmsg gs
 
-        {
-          state with
-              GameplayState = ValueSome newGs
-        },
-        Cmd.map GameplayMsg cmd
-      | ValueNone -> state, Cmd.none
+        struct ({
+                  state with
+                      GameplayState = ValueSome newGs
+                },
+                Cmd.map GameplayMsg newCmd))
+      |> ValueOption.defaultValue(state, Cmd.none)
 
   let view ctx (state: State) buffer =
     state.EditorState

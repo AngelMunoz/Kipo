@@ -37,8 +37,8 @@ type BlockType = {
   VariantKey: string voption
   Name: string
   Model: string
-  Category: string
   CollisionType: CollisionType
+  Scale: float32 voption
 }
 
 // --- Map Structure ---
@@ -387,7 +387,6 @@ module DomainSerializers =
         )
         |> Encode.property("Name", Encode.string bt.Name)
         |> Encode.property("Model", Encode.string bt.Model)
-        |> Encode.property("Category", Encode.string bt.Category)
         |> Encode.property(
           "CollisionType",
           collisionTypeEncoder bt.CollisionType
@@ -396,6 +395,11 @@ module DomainSerializers =
       let obj =
         match bt.VariantKey with
         | ValueSome key -> Encode.property ("VariantKey", Encode.string key) obj
+        | ValueNone -> obj
+
+      let obj =
+        match bt.Scale with
+        | ValueSome scale -> Encode.property ("Scale", Encode.single scale) obj
         | ValueNone -> obj
 
       obj :> JsonNode
@@ -411,14 +415,14 @@ module DomainSerializers =
       and! name = Optional.Property.get ("Name", Decode.Required.string) json
       and! model = Optional.Property.get ("Model", Decode.Required.string) json
 
-      and! category =
-        Optional.Property.get ("Category", Decode.Required.string) json
-
       and! collisionType =
         Optional.Property.get ("CollisionType", collisionTypeDecoder) json
 
       and! variantKey =
         Optional.Property.get ("VariantKey", Decode.Required.string) json
+
+      and! scale =
+        Optional.Property.get ("Scale", Decode.Required.single) json
 
       return {
         Id = id |> Option.defaultValue 0 |> (fun i -> i * 1<BlockTypeId>)
@@ -426,10 +430,11 @@ module DomainSerializers =
           archetypeId |> Option.defaultValue 0 |> (fun i -> i * 1<BlockTypeId>)
         Name = name |> Option.defaultValue ""
         Model = model |> Option.defaultValue ""
-        Category = category |> Option.defaultValue ""
         CollisionType = collisionType |> Option.defaultValue Box
         VariantKey =
           variantKey |> Option.map ValueSome |> Option.defaultValue ValueNone
+        Scale =
+          scale |> Option.map ValueSome |> Option.defaultValue ValueNone
       }
     }
 

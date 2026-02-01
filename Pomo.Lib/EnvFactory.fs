@@ -49,8 +49,24 @@ module JsonSerializerOptions =
     |> Codec.useDecoder DomainSerializers.blockMapDefinitionDecoder
 
 module EnvFactory =
-  let create(ctx: GameContext) : AppEnv =
-    let fileSystem = FileSystem.live
+  let createEditor(ctx: GameContext) : AppEnv =
+    let fileSystem = FileSystem.live PathResolvers.editor
+    let serializationOptions = JsonSerializerOptions.createOptions()
+    let serialization = SerializationService.live serializationOptions
+    let blockMapPersistence = BlockMapPersistence.live fileSystem serialization
+    let assets = Mibo.Elmish.Assets.getService ctx
+    let editorCursor = EditorCursor.live ctx.GraphicsDevice
+
+    {
+      FileSystemService = fileSystem
+      BlockMapPersistenceService = blockMapPersistence
+      AssetsService = assets
+      EditorCursorService = editorCursor
+      SerializationService = serialization
+    }
+
+  let createRuntime(ctx: GameContext) : AppEnv =
+    let fileSystem = FileSystem.live PathResolvers.runtime
     let serializationOptions = JsonSerializerOptions.createOptions()
     let serialization = SerializationService.live serializationOptions
     let blockMapPersistence = BlockMapPersistence.live fileSystem serialization

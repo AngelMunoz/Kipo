@@ -7,6 +7,7 @@ open Mibo.Elmish
 open Mibo.Input
 open Pomo.Lib.Editor
 open Pomo.Lib.Editor.Subsystems
+open Pomo.Lib.Services
 
 [<Struct>]
 type EditorInputAction =
@@ -26,6 +27,8 @@ type EditorInputAction =
   | SetBrushPlace
   | SetBrushErase
   | ShowHelp
+  | NextBlock
+  | PrevBlock
 
 [<Struct>]
 type EditorModel = {
@@ -51,6 +54,11 @@ type EditorMsg =
   | InputMapped of actions: ActionState<EditorInputAction>
   | Tick of gt: GameTime
   | UIMsg of uimsg: UIMsg
+  | Load of path: string
+  | Save of path: string
+  | SetBlockMapModel of BlockMap.BlockMapModel
+  | LoadFailed of error: FsError
+  | SaveComplete
 
 
 type InputResult = {
