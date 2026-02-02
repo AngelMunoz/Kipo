@@ -100,9 +100,11 @@ module BlockMap =
           let scale = blockType.Scale |> ValueOption.defaultValue autoScale
           let centerOffset = ModelScaler.getCenterOffset env blockType.Model
 
-          // Position at cell center (0.5, 0.5, 0.5) minus the model's center offset
+          // Position at cell center minus the model's center offset
           // This centers the model in the grid cell so edges touch adjacent cells
-          let cellCenter = cell + Vector3(0.5f, 0.5f, 0.5f)
+          let cellSize = GridDimensions.CellSize
+          let halfCell = cellSize * 0.5f
+          let cellCenter = cell + Vector3(halfCell, halfCell, halfCell)
           let position = cellCenter - (centerOffset * scale)
 
           let worldMatrix =

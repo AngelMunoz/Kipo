@@ -21,25 +21,46 @@ type ModelScalerCap =
   abstract ModelScaler: ModelScalerService
 
 module ModelScaler =
-  /// Compute bounding box from model meshes using BoundingSpheres
+  /// Compute bounding box from model meshes using actual vertex data
   let private computeModelBounds(model: Model) : BoundingBox voption =
     let mutable hasAny = false
     let mutable minVec = Vector3(System.Single.MaxValue, System.Single.MaxValue, System.Single.MaxValue)
     let mutable maxVec = Vector3(System.Single.MinValue, System.Single.MinValue, System.Single.MinValue)
 
     for mesh in model.Meshes do
-      // Use BoundingSphere for each mesh
-      let sphere = mesh.BoundingSphere
-      let center = Vector3.Transform(sphere.Center, mesh.ParentBone.Transform)
-      let radius = sphere.Radius
+      let meshTransform = mesh.ParentBone.Transform
 
-      // Approximate box from sphere
-      let boxMin = center - Vector3(radius, radius, radius)
-      let boxMax = center + Vector3(radius, radius, radius)
+      for part in mesh.MeshParts do
+        let vertexBuffer = part.VertexBuffer
+        let declaration = vertexBuffer.VertexDeclaration
+        let vertexSize = declaration.VertexStride
+        let vertexData = Array.zeroCreate<byte>(vertexBuffer.VertexCount * vertexSize)
+        vertexBuffer.GetData(vertexData)
 
-      minVec <- Vector3.Min(minVec, boxMin)
-      maxVec <- Vector3.Max(maxVec, boxMax)
-      hasAny <- true
+        // Find position element in declaration
+        let posElementOpt =
+          declaration.GetVertexElements()
+          |> Seq.tryFind(fun e -> e.VertexElementUsage = VertexElementUsage.Position)
+
+        match posElementOpt with
+        | Some posElement ->
+          let offset = posElement.Offset
+          let mutable i = 0
+
+          while i < vertexBuffer.VertexCount do
+            let start = i * vertexSize + offset
+            let x = BitConverter.ToSingle(vertexData, start)
+            let y = BitConverter.ToSingle(vertexData, start + 4)
+            let z = BitConverter.ToSingle(vertexData, start + 8)
+
+            let localPos = Vector3(x, y, z)
+            let worldPos = Vector3.Transform(localPos, meshTransform)
+
+            minVec <- Vector3.Min(minVec, worldPos)
+            maxVec <- Vector3.Max(maxVec, worldPos)
+            hasAny <- true
+            i <- i + 1
+        | None -> ()
 
     if hasAny then
       ValueSome(BoundingBox(minVec, maxVec))

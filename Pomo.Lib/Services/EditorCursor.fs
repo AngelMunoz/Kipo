@@ -39,8 +39,9 @@ module EditorCursor =
                // Convert world position to grid cell coordinates (64 units per cell)
                let cellSize = GridDimensions.CellSize
                let cellX = MathF.Floor(worldPos.X / cellSize) * cellSize
+               let cellY = MathF.Floor(worldPos.Y / cellSize) * cellSize
                let cellZ = MathF.Floor(worldPos.Z / cellSize) * cellSize
-               let gridCell = Vector3(cellX, layerY, cellZ)
+               let gridCell = Vector3(cellX, cellY, cellZ)
                ValueSome gridCell
              else
                ValueNone

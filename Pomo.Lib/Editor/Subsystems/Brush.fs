@@ -87,8 +87,9 @@ module Brush =
       match model.Mode with
       | BrushMode.Place ->
         let color = Color(1f, 1f, 1f, 0.3f)
+        let cellSize = GridDimensions.CellSize
         let min = Vector3(cell.X, cell.Y, cell.Z)
-        let max = Vector3(cell.X + 1f, cell.Y + 1f, cell.Z + 1f)
+        let max = Vector3(cell.X + cellSize, cell.Y + cellSize, cell.Z + cellSize)
 
         let verts = [|
           VertexPositionColor(Vector3(min.X, min.Y, min.Z), color)

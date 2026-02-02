@@ -283,7 +283,7 @@ module InputHandler =
       EditorCursor.getCursorCell
         env
         model.Camera.Camera
-        (float32 model.Camera.CurrentLayer)
+        (float32 model.Camera.CurrentLayer * GridDimensions.CellSize)
 
     let ctx = {
       Env = env

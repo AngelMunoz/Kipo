@@ -299,7 +299,7 @@ module Entry =
     : unit =
     buffer.Camera(model.Camera.Camera).Clear Color.CornflowerBlue |> ignore
     // Draw grid at current editing layer
-    let layerY = float32 model.Camera.CurrentLayer
+    let layerY = float32 model.Camera.CurrentLayer * GridDimensions.CellSize
     drawGrid buffer layerY
 
     // Render all placed blocks
@@ -315,8 +315,9 @@ module Entry =
     match cursorCellOpt with
     | ValueSome cell ->
       let cursorColor = Color.Yellow
+      let cellSize = GridDimensions.CellSize
       let min = Vector3(cell.X, cell.Y, cell.Z)
-      let max = Vector3(cell.X + 1f, cell.Y + 1f, cell.Z + 1f)
+      let max = Vector3(cell.X + cellSize, cell.Y + cellSize, cell.Z + cellSize)
       // Draw wireframe box around cursor cell (12 edges)
       let verts = [|
         // Bottom face
