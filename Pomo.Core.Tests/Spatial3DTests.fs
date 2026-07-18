@@ -62,7 +62,7 @@ type Spatial3DTests() =
     Assert.AreEqual(ValueNone, result)
 
   [<TestMethod>]
-  member _.``tryGetSurfaceHeightWithConfig empty column returns zero``() =
+  member _.``tryGetSurfaceHeightWithConfig empty column returns none``() =
     let map = Pomo.Core.Algorithms.BlockMap.createEmpty "test" 4 4 4
 
     let pos: WorldPosition = {
@@ -73,7 +73,7 @@ type Spatial3DTests() =
 
     let result = Spatial3D.tryGetSurfaceHeightWithConfig ValueNone map pos
 
-    Assert.AreEqual(ValueSome 0.0f, result)
+    Assert.AreEqual(ValueNone, result)
 
   [<TestMethod>]
   member _.``tryGetSurfaceHeightWithConfig returns top surface``() =
@@ -184,3 +184,101 @@ type Spatial3DTests() =
         cellSize
 
     Assert.IsFalse ok
+
+  [<TestMethod>]
+  member _.``tryGetSurfaceHeightWithConfig treats NoCollision tile as surface``() =
+    let map = Pomo.Core.Algorithms.BlockMap.createEmpty "test" 4 4 4
+    let blockId = addBlockType map 1 NoCollision
+
+    addBlock map blockId { X = 0; Y = 0; Z = 0 }
+
+    let pos: WorldPosition = {
+      X = cellSize * 0.5f
+      Y = 0.0f
+      Z = cellSize * 0.5f
+    }
+
+    let result = Spatial3D.tryGetSurfaceHeightWithConfig ValueNone map pos
+
+    Assert.AreEqual(ValueSome(1.0f * cellSize), result)
+
+  [<TestMethod>]
+  member _.``tryProjectToGround lands on top of NoCollision terrain``() =
+    // Regression: previously snapped to Y=0 over NoCollision columns,
+    // which caused entities to sink into the terrain every frame.
+    let map = Pomo.Core.Algorithms.BlockMap.createEmpty "test" 4 4 4
+    let blockId = addBlockType map 1 NoCollision
+
+    addBlock map blockId { X = 0; Y = 0; Z = 0 }
+
+    let pos: WorldPosition = {
+      X = cellSize * 0.5f
+      Y = 1.0f * cellSize
+      Z = cellSize * 0.5f
+    }
+
+    let result = Spatial3D.tryProjectToGroundWithConfig ValueNone map pos
+
+    let expected: WorldPosition = { pos with Y = 1.0f * cellSize }
+
+    Assert.AreEqual(ValueSome expected, result)
+
+  [<TestMethod>]
+  member _.``tryProjectToGround returns none over void``() =
+    // Regression: previously coerced to ValueSome Y=0 even when no surface exists.
+    let map = Pomo.Core.Algorithms.BlockMap.createEmpty "test" 4 4 4
+
+    let pos: WorldPosition = {
+      X = cellSize * 0.5f
+      Y = 2.0f * cellSize
+      Z = cellSize * 0.5f
+    }
+
+    let result = Spatial3D.tryProjectToGroundWithConfig ValueNone map pos
+
+    Assert.AreEqual(ValueNone, result)
+
+  [<TestMethod>]
+  member _.``canStandInCellWithConfig treats NoCollision tile as support``() =
+    // Regression: a NoCollision tile directly below must count as standable
+    // so units spawn and pathfind at Y=1 over Y=0 NoCollision terrain.
+    let map = Pomo.Core.Algorithms.BlockMap.createEmpty "test" 4 4 4
+    let blockId = addBlockType map 1 NoCollision
+
+    addBlock map blockId { X = 0; Y = 0; Z = 0 }
+
+    let onTerrain =
+      Spatial3D.canStandInCellWithConfig
+        ValueNone
+        map
+        { X = 0; Y = 1; Z = 0 }
+        cellSize
+
+    let onVoid =
+      Spatial3D.canStandInCellWithConfig
+        ValueNone
+        map
+        { X = 1; Y = 1; Z = 0 }
+        cellSize
+
+    Assert.IsTrue onTerrain
+    Assert.IsFalse onVoid
+
+  [<TestMethod>]
+  member _.``canOccupyWithConfig ignores NoCollision tile overlap``() =
+    // A NoCollision tile does not block occupancy of its own cell:
+    // units can step into the cell occupied by grass, standing on its top.
+    let map = Pomo.Core.Algorithms.BlockMap.createEmpty "test" 4 4 4
+    let blockId = addBlockType map 1 NoCollision
+
+    addBlock map blockId { X = 0; Y = 0; Z = 0 }
+
+    let pos: WorldPosition = {
+      X = cellSize * 0.5f
+      Y = 0.0f
+      Z = cellSize * 0.5f
+    }
+
+    let ok = Spatial3D.canOccupyWithConfig ValueNone map pos cellSize
+
+    Assert.IsTrue ok

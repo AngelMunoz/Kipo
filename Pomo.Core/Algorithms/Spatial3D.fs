@@ -12,6 +12,9 @@ module Spatial3D =
 
   [<Struct>]
   type QueryConfig = {
+    /// Any placed terrain tile (regardless of CollisionType) — supports standing.
+    IsSurfaceCell: BlockMapDefinition -> GridCell3D -> bool
+    /// A tile whose CollisionType blocks vertical overlap (Box/Mesh).
     IsBlockingCell: BlockMapDefinition -> GridCell3D -> bool
     TryGetSupportYAtXZ: BlockMapDefinition -> WorldPosition -> float32 voption
   }
@@ -30,6 +33,14 @@ module Spatial3D =
     |> Dictionary.tryFindV cell
     |> ValueOption.bind(fun block ->
       map.Palette |> Dictionary.tryFindV block.BlockTypeId)
+
+  let inline private defaultIsSurfaceCell
+    (map: BlockMapDefinition)
+    (cell: GridCell3D)
+    : bool =
+    match tryGetBlockType map cell with
+    | ValueSome _ -> true
+    | ValueNone -> false
 
   let inline private defaultIsBlockingCell
     (map: BlockMapDefinition)
@@ -58,14 +69,15 @@ module Spatial3D =
       while y >= 0 && found.IsNone do
         let cell: GridCell3D = { X = cx; Y = y; Z = cz }
 
-        if defaultIsBlockingCell map cell then
+        if defaultIsSurfaceCell map cell then
           found <- ValueSome(float32(y + 1) * BlockMap.CellSize)
 
         y <- y - 1
 
-      found |> ValueOption.defaultValue 0.0f |> ValueSome
+      found
 
   let DefaultConfig: QueryConfig = {
+    IsSurfaceCell = defaultIsSurfaceCell
     IsBlockingCell = defaultIsBlockingCell
     TryGetSupportYAtXZ = defaultTryGetSupportYAtXZ
   }
@@ -137,24 +149,20 @@ module Spatial3D =
     if not(inXZBounds map cx cz) then
       ValueNone
     else
-      let startY = int(pos.Y / BlockMap.CellSize) - 1
+      let startY = min (map.Height - 1) (int(pos.Y / BlockMap.CellSize) - 1)
 
-      if startY < 0 then
-        ValueSome { pos with Y = 0.0f }
-      else
-        let mutable found = ValueNone
-        let mutable y = min (map.Height - 1) startY
+      let mutable found = ValueNone
+      let mutable y = startY
 
-        while y >= 0 && found.IsNone do
-          let cell: GridCell3D = { X = cx; Y = y; Z = cz }
+      while y >= 0 && found.IsNone do
+        let cell: GridCell3D = { X = cx; Y = y; Z = cz }
 
-          if cfg.IsBlockingCell map cell then
-            found <- ValueSome(float32(y + 1) * BlockMap.CellSize)
+        if cfg.IsSurfaceCell map cell then
+          found <- ValueSome(float32(y + 1) * BlockMap.CellSize)
 
-          y <- y - 1
+        y <- y - 1
 
-        let groundedY = found |> ValueOption.defaultValue 0.0f
-        ValueSome { pos with Y = groundedY }
+      found |> ValueOption.map(fun groundedY -> { pos with Y = groundedY })
 
   let canStandWithConfig
     (config: QueryConfig voption)
@@ -184,12 +192,11 @@ module Spatial3D =
     then
       false
     else
-      let hasSupport =
-        if cell.Y = 0 then
-          true
-        else
-          let below = { cell with Y = cell.Y - 1 }
-          cfg.IsBlockingCell map below
+      // A cell is standable when the cell directly below is a surface
+      // (any placed tile, regardless of CollisionType). No implicit Y=0 floor.
+      let belowCell = { cell with Y = cell.Y - 1 }
+
+      let hasSupport = cfg.IsSurfaceCell map belowCell
 
       if not hasSupport then
         false
@@ -235,20 +242,21 @@ module Spatial3D =
 
         let probe: WorldPosition = { X = x; Y = prevY; Z = z }
 
-        let y =
-          match tryProjectToGroundWithConfig config map probe with
-          | ValueSome grounded -> grounded.Y
-          | ValueNone -> 0.0f
+        match tryProjectToGroundWithConfig config map probe with
+        | ValueNone -> ok <- false
+        | ValueSome grounded ->
+          let y = grounded.Y
 
-        if abs(y - prevY) > maxStepHeight then
-          ok <- false
-        else
-          let p: WorldPosition = { X = x; Y = y; Z = z }
-
-          if not(canOccupyWithConfig config map p entityHeight) then
+          if abs(y - prevY) > maxStepHeight then
             ok <- false
+          else
+            let p: WorldPosition = { X = x; Y = y; Z = z }
 
-        prevY <- y
+            if not(canOccupyWithConfig config map p entityHeight) then
+              ok <- false
+
+          prevY <- y
+
         i <- i + 1
 
       ok
